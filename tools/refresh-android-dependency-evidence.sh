@@ -34,6 +34,7 @@ TASKS=(
   :app:assembleStagingDebugAndroidTest
   :app:lintDevDebug
   :app:lintE2eDebug
+  :app:lintSmokeDebug
   :app:lintDevRelease
   :app:lintStagingDebug
   :app:lintStagingRelease
@@ -41,6 +42,7 @@ TASKS=(
   :app:lintProdRelease
   :app:assembleDevDebug
   :app:assembleE2eDebug
+  :app:assembleSmokeDebug
   :app:assembleDevRelease
   :app:assembleStagingDebug
   :app:assembleStagingRelease

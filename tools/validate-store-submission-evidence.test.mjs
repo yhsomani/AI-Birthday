@@ -32,7 +32,7 @@ const STITCH_IDS = parseStitchScreenIds(
 const SHA = value => createHash('sha256').update(value).digest('hex');
 const SOURCE_REVISION = '0123456789abcdef0123456789abcdef01234567';
 const GENERATED_AT = '2026-07-12T00:00:00Z';
-const VALID_UNTIL = '2026-08-01T00:00:00Z';
+const VALID_UNTIL = '2026-07-19T00:00:00Z';
 const NOW = Date.parse('2026-07-15T00:00:00Z');
 
 const clone = value => structuredClone(value);
@@ -390,6 +390,131 @@ test('a fully bound release fixture passes every semantic and file check', () =>
   );
   assert.deepEqual(result.errors, []);
   assert.equal(result.scopeSha256, fixture.document.approvalScopeSha256);
+});
+
+test('taxonomy reviews accept the exact seven-day validity boundary', () => {
+  const fixture = makeReleaseFixture();
+  assert.equal(
+    Date.parse(fixture.document.validUntil) -
+      Date.parse(fixture.document.play.dataSafety.taxonomyReviewedAt),
+    7 * 86_400_000,
+  );
+  assert.equal(
+    Date.parse(fixture.document.validUntil) -
+      Date.parse(fixture.document.appStore.appPrivacy.taxonomyReviewedAt),
+    7 * 86_400_000,
+  );
+  assert.deepEqual(
+    validateStoreSubmissionEvidence(fixture.document, fixture.context).errors,
+    [],
+  );
+});
+
+test('every taxonomy review rejects a stale instant beyond the exact boundary', () => {
+  for (const [bundleName, expectedLabel] of [
+    ['dataSafety', 'Play Data Safety'],
+    ['appPrivacy', 'App Privacy'],
+  ]) {
+    const fixture = makeReleaseFixture();
+    const bundle =
+      bundleName === 'dataSafety'
+        ? fixture.document.play.dataSafety
+        : fixture.document.appStore.appPrivacy;
+    bundle.taxonomyReviewedAt = '2026-07-11T23:59:59.999Z';
+    const messages = validateStoreSubmissionEvidence(
+      fixture.document,
+      fixture.context,
+    ).errors.join('\n');
+    assert.match(
+      messages,
+      new RegExp(
+        `${expectedLabel}\\.taxonomyReviewedAt must remain current through package validUntil within 7 days`,
+        'u',
+      ),
+    );
+  }
+
+  const oldAtGenerationAndValidation = makeReleaseFixture();
+  oldAtGenerationAndValidation.document.play.dataSafety.taxonomyReviewedAt =
+    '2026-07-04T23:59:59.999Z';
+  oldAtGenerationAndValidation.document.appStore.appPrivacy.taxonomyReviewedAt =
+    '2026-07-04T23:59:59.999Z';
+  const oldMessages = validateStoreSubmissionEvidence(
+    oldAtGenerationAndValidation.document,
+    oldAtGenerationAndValidation.context,
+  ).errors.join('\n');
+  for (const expectedLabel of ['Play Data Safety', 'App Privacy']) {
+    assert.match(
+      oldMessages,
+      new RegExp(
+        `${expectedLabel}\\.taxonomyReviewedAt must be no more than 7 days old at package generation`,
+        'u',
+      ),
+    );
+    assert.match(
+      oldMessages,
+      new RegExp(
+        `${expectedLabel}\\.taxonomyReviewedAt must be no more than 7 days old at validation time`,
+        'u',
+      ),
+    );
+  }
+});
+
+test('every taxonomy review rejects an instant after package generation or validation', () => {
+  const fixture = makeReleaseFixture();
+  fixture.document.play.dataSafety.taxonomyReviewedAt =
+    '2026-07-12T00:00:00.001Z';
+  fixture.document.appStore.appPrivacy.taxonomyReviewedAt =
+    '2026-07-15T00:00:00.001Z';
+  const messages = validateStoreSubmissionEvidence(
+    fixture.document,
+    fixture.context,
+  ).errors.join('\n');
+  assert.match(
+    messages,
+    /Play Data Safety\.taxonomyReviewedAt must not be later than package generatedAt/u,
+  );
+  assert.match(
+    messages,
+    /App Privacy\.taxonomyReviewedAt must not be later than package generatedAt/u,
+  );
+  assert.match(
+    messages,
+    /App Privacy\.taxonomyReviewedAt must not be later than validation time/u,
+  );
+});
+
+test('later authority-bound mobile versions remain valid release coordinates', () => {
+  const fixture = makeReleaseFixture();
+  Object.assign(fixture.document.releaseCoordinates.android, {
+    versionCode: 42,
+    versionName: '2.7.0',
+  });
+  Object.assign(fixture.document.releaseCoordinates.ios, {
+    shortVersion: '2.7.0',
+    buildNumber: '42',
+  });
+  fixture.document.approvalScopeSha256 = calculateApprovalScopeSha256(
+    fixture.document,
+  );
+  for (const approval of fixture.document.approvals) {
+    approval.scopeSha256 = fixture.document.approvalScopeSha256;
+  }
+
+  assert.deepEqual(
+    validateStoreSubmissionEvidence(fixture.document, fixture.context).errors,
+    [],
+  );
+
+  fixture.document.releaseCoordinates.android.versionCode = 0;
+  fixture.document.releaseCoordinates.ios.buildNumber = '01';
+  const invalid = validateStoreSubmissionEvidence(
+    fixture.document,
+    fixture.context,
+  ).errors.join('\n');
+  assert.match(invalid, /versionCode must be a positive safe integer/u);
+  assert.match(invalid, /iOS buildNumber is invalid/u);
 });
 
 test('submission permits pending store decisions but release requires acceptance', () => {

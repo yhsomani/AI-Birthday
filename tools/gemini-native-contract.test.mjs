@@ -1,11 +1,26 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
+const promptContract = JSON.parse(
+  read('contracts/gemini-prompt-policy-v2.json'),
+);
+
+const concatenatedString = (source, startMarker, endMarker) => {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker, start + startMarker.length);
+  assert.ok(start >= 0 && end > start, `missing ${startMarker}`);
+  const values = [
+    ...source.slice(start, end).matchAll(/"((?:\\.|[^"\\])*)"/gu),
+  ];
+  return values.map(match => JSON.parse(`"${match[1]}"`)).join('');
+};
 
 const androidGateway = read(
   'android/app/src/main/java/com/yashsomani/birthdayautopilot/gemini/AndroidGeminiSuggestionGateway.kt',
@@ -58,6 +73,118 @@ const releaseRunbook = read('docs/IOS_RELEASE_EVIDENCE.md');
 const androidReleaseRunbook = read(
   'docs/ANDROID_RESTRICTED_RELEASE_EVIDENCE.md',
 );
+
+test('Android and iOS implement the exact canonical Gemini v2 prompt and account-scope contract', () => {
+  assert.equal(promptContract.schemaVersion, 1);
+  assert.equal(promptContract.policyVersion, 'birthday-greeting-prompt-v2');
+  assert.equal(promptContract.maximumRetainedRateScopes, 8);
+
+  assert.match(
+    androidGateway,
+    new RegExp(
+      `PROMPT_POLICY_VERSION = "${promptContract.policyVersion}"`,
+      'u',
+    ),
+  );
+  assert.match(
+    iosPolicy,
+    new RegExp(`promptPolicyVersion = "${promptContract.policyVersion}"`, 'u'),
+  );
+  const androidInstruction = concatenatedString(
+    androidGateway,
+    'const val SYSTEM_INSTRUCTION',
+    'fun parseRequest',
+  );
+  const iosInstruction = concatenatedString(
+    iosPolicy,
+    'static let systemInstruction',
+    'static func parseRequest',
+  );
+  assert.equal(androidInstruction, promptContract.systemInstruction);
+  assert.equal(iosInstruction, promptContract.systemInstruction);
+  assert.equal(androidInstruction, iosInstruction);
+
+  for (const [source, patterns] of [
+    [
+      androidGateway,
+      [
+        `MODEL_NAME = "${promptContract.model.name}"`,
+        `MODEL_LOCATION = "${promptContract.model.location}"`,
+        `MODEL_IDENTIFIER = "${promptContract.model.identifier}"`,
+      ],
+    ],
+    [
+      iosPolicy,
+      [
+        `modelName = "${promptContract.model.name}"`,
+        `modelLocation = "${promptContract.model.location}"`,
+        `modelIdentifier = "${promptContract.model.identifier}"`,
+      ],
+    ],
+  ]) {
+    for (const pattern of patterns)
+      assert.ok(source.includes(pattern), pattern);
+  }
+  assert.match(androidGateway, /setOf\("en", "hi"\)/u);
+  assert.match(androidGateway, /setOf\("warm", "simple", "cheerful"\)/u);
+  assert.match(iosPolicy, /\["en", "hi"\]\.contains/u);
+  assert.match(iosPolicy, /\["warm", "simple", "cheerful"\]\.contains/u);
+
+  for (const domain of [
+    promptContract.accountSessionDigestDomain,
+    promptContract.rateScopeDigestDomain,
+  ]) {
+    assert.equal(
+      (
+        `${androidGateway}\n${androidProvenance}`.match(
+          new RegExp(domain.replaceAll('.', '\\.'), 'gu'),
+        ) ?? []
+      ).length,
+      1,
+    );
+    assert.equal(
+      (iosPolicy.match(new RegExp(domain.replaceAll('.', '\\.'), 'gu')) ?? [])
+        .length,
+      1,
+    );
+  }
+  assert.match(
+    androidGateway,
+    /tryAcquire\(accountSessionKey, wallClockMillis\(\), elapsedClockMillis\(\)\)/u,
+  );
+  assert.match(
+    iosGateway,
+    /rateGuard\.tryAcquire\([\s\S]*?accountSessionKey: accountSessionKey/u,
+  );
+  assert.match(androidGateway, /MAXIMUM_GEMINI_RATE_SCOPES = 8/u);
+  assert.match(iosPolicy, /maximumRetainedScopes = 8/u);
+  assert.match(
+    androidAppGraph,
+    /accountGeneration = \{[\s\S]*?currentOrNull\(\)\?\.callbackGeneration/u,
+  );
+  assert.match(
+    iosGateway,
+    /IOSGeminiAccountScope\.accountSessionKey\([\s\S]*?accountGeneration: binding\.accountGeneration/u,
+  );
+  assert.ok(
+    (
+      androidAppGraph.match(
+        /clearAndroidGeminiLocalRateState\(appContext\)/gu,
+      ) ?? []
+    ).length >= 2,
+  );
+  assert.match(
+    iosIdentity,
+    /completeSignOutAfterSafetyShutdown\(retainData:[\s\S]*?geminiDataCleared = retainData[\s\S]*?clearLocalDataForAccountWipe/u,
+  );
+  assert.ok(
+    (iosIdentity.match(/clearLocalDataForAccountWipe\(\)/gu) ?? []).length >= 4,
+  );
+  assert.doesNotMatch(
+    `${androidGateway}\n${iosPolicy}`,
+    /putString\([^\n]*(?:firebaseUid|googleSubject)|defaults\.set\([^\n]*(?:firebaseUID|googleSubject)/u,
+  );
+});
 
 test('native Gemini dependencies are exact and use one Firebase family', () => {
   const gradle = read('android/app/build.gradle');
@@ -358,8 +485,8 @@ test('native provenance is digest-only, bounded, expiring and account-bound', ()
   assert.match(androidProvenance, /DEFAULT_TTL_MILLIS = 15 \* 60 \* 1_000L/u);
   assert.match(iosProvenance, /\(1\.\.\.3\)\.contains\(candidates\.count\)/u);
   assert.match(iosProvenance, /ttl: TimeInterval = 15 \* 60/u);
-  assert.match(androidGateway, /GeminiAccountSession\.v1/u);
-  assert.match(iosProvenance, /GeminiAccountSession\.v1/u);
+  assert.match(androidProvenance, /GeminiAccountSession\.v1/u);
+  assert.match(iosPolicy, /GeminiAccountSession\.v1/u);
   assert.ok(
     (combined.match(/GeminiCandidateExactText\.v1/gu) ?? []).length === 2,
   );
@@ -404,6 +531,48 @@ test('iOS protects exact provenance and clears only Gemini-owned template state'
     /IOSGeminiSuggestionGateway\.shared\.clearProvenance\(\)/u,
   );
 });
+
+test(
+  'production Swift Gemini v2 account and rate policy is executable',
+  { skip: process.platform !== 'darwin' },
+  t => {
+    const directory = mkdtempSync(join(tmpdir(), 'birthday-gemini-policy-'));
+    const binary = join(directory, 'gemini-policy-tests');
+    const moduleCache = join(directory, 'module-cache');
+    mkdirSync(moduleCache);
+    try {
+      const compile = spawnSync(
+        'xcrun',
+        [
+          'swiftc',
+          fileURLToPath(new URL(iosPolicyPath, root)),
+          fileURLToPath(
+            new URL('tests/ios/GeminiPromptAndRatePolicyTests.swift', root),
+          ),
+          '-module-cache-path',
+          moduleCache,
+          '-o',
+          binary,
+        ],
+        { encoding: 'utf8' },
+      );
+      if (
+        compile.status !== 0 &&
+        /SDK is not supported by the compiler|compiler\/SDK version mismatch/u.test(
+          compile.stderr,
+        )
+      ) {
+        t.skip('host Command Line Tools compiler and SDK do not match');
+        return;
+      }
+      assert.equal(compile.status, 0, compile.stderr || compile.stdout);
+      const run = spawnSync(binary, [], { encoding: 'utf8' });
+      assert.equal(run.status, 0, run.stderr || run.stdout);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  },
+);
 
 test(
   'new Swift sources parse with the installed compiler even when full Xcode is unavailable',

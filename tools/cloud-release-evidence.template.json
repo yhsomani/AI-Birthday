@@ -147,18 +147,21 @@
     "deployedSourceRevision": null,
     "callableNames": [
       "accountDeletionReceipt",
+      "acquireIOSComposerReservation",
       "armAttempt",
       "authorizeSafeRetry",
       "beginSenderTransfer",
       "changeAccountMode",
       "claimOccurrence",
       "claimTest",
+      "commitIOSComposerReservation",
       "companionStatus",
       "completeSenderTransfer",
       "coordinationLifecycleStatus",
       "getArmStatus",
       "registerAndroidInstallation",
       "releaseAndroidSender",
+      "releaseIOSComposerReservation",
       "renewSenderLease",
       "reportTestOutcome",
       "requestAccountDeletion",
@@ -204,6 +207,7 @@
       "deletionTombstones",
       "destinationGuards",
       "installations",
+      "iosComposerReservations",
       "occurrenceClaims",
       "occurrenceKeys",
       "testClaims"
@@ -318,6 +322,13 @@
     "firebaseConfigSha256": null,
     "releaseConfigSha256": null,
     "deployedArtifactSha256": null,
+    "deploymentManifestSha256": null,
+    "deploymentProvenanceSha256": null,
+    "deploymentConfigSha256": null,
+    "publicTreeSha256": null,
+    "providerOriginObservationSha256": null,
+    "firebaseWebConfigObservationSha256": null,
+    "currentLiveObservationSha256": null,
     "recaptchaEnterpriseAppCheckRegistered": null,
     "securityHeadersVerified": null,
     "legalCopyApproved": null,
@@ -325,9 +336,119 @@
     "deletionSagaTested": null,
     "evidenceId": "hosting-release"
   },
+  "hostingReleaseControl": {
+    "repository": "yhsomani/AI-Birthday",
+    "repositoryId": null,
+    "repositoryOwnerId": null,
+    "productionRef": "refs/heads/main",
+    "releaseSecurityProjectId": null,
+    "releaseSecurityProjectNumber": null,
+    "applicationIamAnalysisScope": null,
+    "releaseSecurityIamAnalysisScope": null,
+    "observer": {
+      "serviceAccount": null,
+      "userManagedKeyCount": null,
+      "wifProvider": null,
+      "workflowPath": ".github/workflows/hosting-current-live-observation.yml",
+      "protectedEnvironment": "hosting-production-readonly-live",
+      "subject": "repo:yhsomani/AI-Birthday:environment:hosting-production-readonly-live",
+      "attributeCondition": null,
+      "attributeMapping": {
+        "google.subject": "assertion.sub",
+        "attribute.repository": "assertion.repository",
+        "attribute.repository_id": "assertion.repository_id",
+        "attribute.repository_owner_id": "assertion.repository_owner_id",
+        "attribute.workflow_ref": "assertion.workflow_ref",
+        "attribute.ref": "assertion.ref"
+      },
+      "admissionBucketPermissions": [
+        "storage.buckets.get",
+        "storage.objects.create",
+        "storage.objects.get"
+      ]
+    },
+    "admissionReader": {
+      "serviceAccount": null,
+      "userManagedKeyCount": null,
+      "wifProvider": null,
+      "workflowPath": ".github/workflows/hosting-production-deploy.yml",
+      "protectedEnvironment": "hosting-production-admission",
+      "subject": "repo:yhsomani/AI-Birthday:environment:hosting-production-admission",
+      "attributeCondition": null,
+      "attributeMapping": {
+        "google.subject": "assertion.sub",
+        "attribute.repository": "assertion.repository",
+        "attribute.repository_id": "assertion.repository_id",
+        "attribute.repository_owner_id": "assertion.repository_owner_id",
+        "attribute.workflow_ref": "assertion.workflow_ref",
+        "attribute.ref": "assertion.ref"
+      },
+      "admissionBucketPermissions": [
+        "storage.buckets.get",
+        "storage.objects.get",
+        "storage.objects.list"
+      ]
+    },
+    "deployer": {
+      "serviceAccount": null,
+      "userManagedKeyCount": null,
+      "wifProvider": null,
+      "workflowPath": ".github/workflows/hosting-production-deploy.yml",
+      "protectedEnvironment": "hosting-production-deploy",
+      "subject": "repo:yhsomani/AI-Birthday:environment:hosting-production-deploy",
+      "attributeCondition": null,
+      "attributeMapping": {
+        "google.subject": "assertion.sub",
+        "attribute.repository": "assertion.repository",
+        "attribute.repository_id": "assertion.repository_id",
+        "attribute.repository_owner_id": "assertion.repository_owner_id",
+        "attribute.workflow_ref": "assertion.workflow_ref",
+        "attribute.ref": "assertion.ref"
+      },
+      "admissionBucketPermissions": []
+    },
+    "identitiesDistinct": null,
+    "admissionBucket": {
+      "name": null,
+      "resourceName": null,
+      "metageneration": null,
+      "publicAccessPrevention": "enforced",
+      "uniformBucketLevelAccess": null,
+      "versioningEnabled": null,
+      "softDeleteRetentionSeconds": null,
+      "retentionSeconds": 900,
+      "retentionLocked": null,
+      "lifecycleDeleteAgeDays": 1,
+      "lifecycleMatchesPrefix": "hosting-production-change-freezes/",
+      "releaseSecurityProjectBucketCount": 1
+    },
+    "applicationAndClientBucketAccessCount": 0,
+    "hostingMutation": {
+      "siteResourceName": null,
+      "serviceAccount": null,
+      "workflowPath": ".github/workflows/hosting-production-deploy.yml",
+      "mutationIdentityCount": 1,
+      "mutationWorkflowCount": 1,
+      "alternateMutationIdentityCount": 0
+    },
+    "auditLogging": {
+      "service": "storage.googleapis.com",
+      "logTypes": ["ADMIN_READ", "DATA_READ", "DATA_WRITE"],
+      "exemptedMembers": [],
+      "sinkName": null,
+      "sinkDestination": null,
+      "sinkFilter": null,
+      "sinkDisabled": null,
+      "sinkExclusions": [],
+      "logBucketName": null,
+      "logBucketLocation": null,
+      "retentionDays": null
+    },
+    "evidenceId": "live-readonly-audit"
+  },
   "prohibitedServices": {
     "realtimeDatabaseEnabled": null,
-    "cloudStorageEnabled": null,
+    "applicationProjectCloudStorageEnabled": null,
     "fcmEnabled": null,
     "analyticsEnabled": null,
     "adSdkEnabled": null,
@@ -533,6 +654,15 @@
       "kind": null
     },
     {
+      "id": "hosting-current-live",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
       "id": "hosting-release",
       "path": null,
       "sha256": null,
@@ -570,12 +700,12 @@
     },
     {
       "id": "live-readonly-audit",
-      "path": null,
+      "path": "cloud-readonly-observation-report.json",
       "sha256": null,
       "capturedAt": null,
       "validUntil": null,
-      "issuer": null,
-      "kind": null
+      "issuer": "Protected cloud read-only observation workflow",
+      "kind": "attestation"
     },
     {
       "id": "logging-privacy",

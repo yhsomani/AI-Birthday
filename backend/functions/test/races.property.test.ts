@@ -12,6 +12,11 @@ import {
   decideBeginContactDerivedReset,
   decideBeginSenderRelease,
 } from '../src/domain/coordinationOperations.js';
+import {
+  decideAcquireIOSComposerReservation,
+  deriveIOSComposerReservationKey,
+  isLiveIOSComposerReservation,
+} from '../src/domain/iosComposerReservation.js';
 import { deriveOperationIdentity } from '../src/domain/operationIdentity.js';
 import { SCHEMA_VERSION, type AccountFence } from '../src/domain/model.js';
 import {
@@ -118,6 +123,71 @@ describe('first-registration versus iOS deletion race', () => {
           NOW_MS + offset,
         );
         expect(decision.kind).toBe('WAIT');
+      }),
+    );
+  });
+});
+
+describe('first Android registration versus iOS composer reservation race', () => {
+  it('has no serial ordering that authorizes both platforms', () => {
+    fc.assert(
+      fc.property(fc.boolean(), reservationFirst => {
+        const key = deriveIOSComposerReservationKey(
+          'property-account',
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa801',
+        );
+        if (reservationFirst) {
+          const reserved = decideAcquireIOSComposerReservation(
+            {
+              control: globalControl(),
+              expectedLedgerGeneration: 'ledger-generation-1',
+              tombstone: null,
+              operation: null,
+              fence: null,
+              hasPresence: false,
+            },
+            null,
+            key,
+            NOW_MS,
+          );
+          expect(reserved.kind).toBe('RESERVED');
+          if (reserved.kind === 'RESERVED') {
+            // The Firestore adapter reads this exact reservation document in
+            // registration's transaction and refuses while logical expiry is
+            // live.
+            expect(
+              isLiveIOSComposerReservation(reserved.reservation, NOW_MS + 1),
+            ).toBe(true);
+          }
+          return;
+        }
+
+        const registered = decideRegistration(
+          globalControl(),
+          null,
+          null,
+          null,
+          registration,
+          NOW_MS,
+        );
+        expect(registered.kind).toBe('REGISTERED_ACTIVE');
+        if (registered.kind === 'REGISTERED_ACTIVE') {
+          expect(
+            decideAcquireIOSComposerReservation(
+              {
+                control: globalControl(),
+                expectedLedgerGeneration: 'ledger-generation-1',
+                tombstone: null,
+                operation: null,
+                fence: registered.fence,
+                hasPresence: true,
+              },
+              null,
+              key,
+              NOW_MS + 1,
+            ),
+          ).toMatchObject({ kind: 'REFUSED', reason: 'MANAGED_BY_ANDROID' });
+        }
       }),
     );
   });

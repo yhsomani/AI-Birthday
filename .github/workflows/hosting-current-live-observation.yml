@@ -1,0 +1,298 @@
+name: Hosting production current-live observation
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_revision:
+        description: Exact release source revision used by the closure
+        required: true
+        type: string
+      project_id:
+        description: Exact production Firebase project ID
+        required: true
+        type: string
+      project_number:
+        description: Exact production Firebase project number
+        required: true
+        type: string
+      firebase_web_app_id:
+        description: Exact production Firebase web app ID served by Hosting
+        required: true
+        type: string
+      hosting_site_id:
+        description: Exact production Firebase Hosting site ID
+        required: true
+        type: string
+      public_base_url:
+        description: Exact approved production HTTPS origin
+        required: true
+        type: string
+      admission_security_project_number:
+        description: Exact separate release-security Google Cloud project number
+        required: true
+        type: string
+      admission_security_project_id:
+        description: Exact separate release-security Google Cloud project ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: hosting-production-live-state-${{ inputs.hosting_site_id }}
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    name: Read the current live Hosting and public identity state
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: hosting-production-readonly-live
+    env:
+      CI: 'true'
+      CLOUDSDK_CORE_DISABLE_PROMPTS: '1'
+      EXPECTED_SOURCE_REVISION: ${{ inputs.source_revision }}
+      PROJECT_ID: ${{ inputs.project_id }}
+      PROJECT_NUMBER: ${{ inputs.project_number }}
+      WEB_APP_ID: ${{ inputs.firebase_web_app_id }}
+      HOSTING_SITE_ID: ${{ inputs.hosting_site_id }}
+      PUBLIC_BASE_URL: ${{ inputs.public_base_url }}
+      HOSTING_ADMISSION_SECURITY_PROJECT_NUMBER: ${{ inputs.admission_security_project_number }}
+      HOSTING_ADMISSION_SECURITY_PROJECT_ID: ${{ inputs.admission_security_project_id }}
+      HOSTING_ADMISSION_BUCKET: ${{ vars.HOSTING_ADMISSION_BUCKET }}
+      HOSTING_AUDIT_WIF_PROVIDER: ${{ vars.HOSTING_AUDIT_WIF_PROVIDER }}
+      HOSTING_AUDIT_SERVICE_ACCOUNT: ${{ vars.HOSTING_AUDIT_SERVICE_ACCOUNT }}
+
+    steps:
+      - name: Check out the exact release source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate every selected coordinate before authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$GITHUB_WORKFLOW_REF" = 'yhsomani/AI-Birthday/.github/workflows/hosting-current-live-observation.yml@refs/heads/main'
+          [[ "$GITHUB_REPOSITORY_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$GITHUB_REPOSITORY_OWNER_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          test "$(git rev-parse --verify HEAD)" = "$EXPECTED_SOURCE_REVISION"
+          [[ "$(git rev-parse --verify refs/remotes/origin/main)" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          [[ "$PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]
+          [[ "$PROJECT_NUMBER" =~ ^[1-9][0-9]{5,19}$ ]]
+          [[ "$WEB_APP_ID" =~ ^1:${PROJECT_NUMBER}:web:[0-9a-f]{8,64}$ ]]
+          [[ "$HOSTING_SITE_ID" =~ ^[a-z0-9][a-z0-9-]{4,62}$ ]]
+          [[ "$PUBLIC_BASE_URL" =~ ^https://[^/?#]+/$ ]]
+          [[ "$HOSTING_ADMISSION_SECURITY_PROJECT_NUMBER" =~ ^[1-9][0-9]{5,19}$ ]]
+          [[ "$HOSTING_ADMISSION_SECURITY_PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]
+          test "$HOSTING_ADMISSION_SECURITY_PROJECT_NUMBER" != "$PROJECT_NUMBER"
+          test "$HOSTING_ADMISSION_SECURITY_PROJECT_ID" != "$PROJECT_ID"
+          [[ "$HOSTING_ADMISSION_BUCKET" =~ ^[a-z0-9][a-z0-9-]{4,61}[a-z0-9]$ ]]
+          [[ "$HOSTING_AUDIT_WIF_PROVIDER" =~ ^projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/[a-z0-9-]{4,32}/providers/[a-z0-9-]{4,32}$ ]]
+          [[ "$HOSTING_AUDIT_SERVICE_ACCOUNT" =~ ^[a-z][a-z0-9-]{2,62}@${PROJECT_ID}\.iam\.gserviceaccount\.com$ ]]
+
+      - name: Set up the repository Node.js line
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Authenticate through read-only Workload Identity Federation
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ inputs.project_id }}
+          workload_identity_provider: ${{ vars.HOSTING_AUDIT_WIF_PROVIDER }}
+          service_account: ${{ vars.HOSTING_AUDIT_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Set up the exact Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          version: 575.0.1
+          project_id: ${{ inputs.project_id }}
+
+      - name: Collect current live, provider-origin, and Firebase web identity observations
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test "$(gcloud auth list --filter='status:ACTIVE' --format='value(account)')" = "$HOSTING_AUDIT_SERVICE_ACCOUNT"
+          output="release-evidence/hosting-current-live"
+          mkdir -p "$output"
+          public_hostname="$(node -e '
+            const value = new URL(process.argv[1]);
+            if (value.protocol !== "https:" || value.pathname !== "/" || value.search || value.hash || !/^[a-z0-9.-]+$/.test(value.hostname)) process.exit(1);
+            process.stdout.write(value.hostname);
+          ' "$PUBLIC_BASE_URL")"
+          access_token="$(gcloud auth print-access-token)"
+          firebase_get() {
+            local url="$1"
+            local destination="$2"
+            {
+              printf '%s\n' 'fail' 'silent' 'show-error' 'proto = "=https"' 'tlsv1.2' 'request = "GET"'
+              printf 'header = "Authorization: Bearer %s"\n' "$access_token"
+              printf 'url = "%s"\n' "$url"
+            } | curl --config - > "$destination"
+          }
+
+          firebase_get \
+            "https://firebasehosting.googleapis.com/v1beta1/projects/${PROJECT_ID}/sites/${HOSTING_SITE_ID}" \
+            "$output/hosting-site-observation.json"
+          jq -e --arg name "projects/${PROJECT_ID}/sites/${HOSTING_SITE_ID}" \
+            --arg defaultUrl "https://${HOSTING_SITE_ID}.web.app" \
+            '.name == $name and (.defaultUrl | rtrimstr("/")) == $defaultUrl' \
+            "$output/hosting-site-observation.json" > /dev/null
+
+          if [[ "$public_hostname" == "${HOSTING_SITE_ID}.web.app" || "$public_hostname" == "${HOSTING_SITE_ID}.firebaseapp.com" ]]; then
+            cp "$output/hosting-site-observation.json" "$output/hosting-origin-observation.json"
+          else
+            firebase_get \
+              "https://firebasehosting.googleapis.com/v1beta1/projects/${PROJECT_ID}/sites/${HOSTING_SITE_ID}/customDomains/${public_hostname}" \
+              "$output/hosting-origin-observation.json"
+            jq -e \
+              --arg name "projects/${PROJECT_ID}/sites/${HOSTING_SITE_ID}/customDomains/${public_hostname}" \
+              '.name == $name and .hostState == "HOST_ACTIVE" and .ownershipState == "OWNERSHIP_ACTIVE" and (.deleteTime == null) and (.redirectTarget == null or .redirectTarget == "") and ((.issues // []) | length == 0)' \
+              "$output/hosting-origin-observation.json" > /dev/null
+          fi
+
+          firebase_get \
+            "https://firebasehosting.googleapis.com/v1beta1/sites/${HOSTING_SITE_ID}/channels/live" \
+            "$output/hosting-live-channel-observation.json"
+          jq -e --arg channel "sites/${HOSTING_SITE_ID}/channels/live" \
+            '.name == $channel and .release.type == "DEPLOY" and (.release.version.name | startswith("sites/"))' \
+            "$output/hosting-live-channel-observation.json" > /dev/null
+          version_name="$(jq -er '.release.version.name' "$output/hosting-live-channel-observation.json")"
+          [[ "$version_name" =~ ^sites/${HOSTING_SITE_ID}/versions/[A-Za-z0-9._~-]{1,128}$ ]]
+          firebase_get \
+            "https://firebasehosting.googleapis.com/v1beta1/${version_name}" \
+            "$output/hosting-version-observation.json"
+
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+            --location --max-redirs 0 \
+            "${PUBLIC_BASE_URL}__/firebase/init.json" \
+            > "$output/firebase-web-config-observation.json"
+          jq -e --arg project "$PROJECT_ID" --arg number "$PROJECT_NUMBER" \
+            --arg app "$WEB_APP_ID" \
+            '.projectId == $project and (.messagingSenderId | tostring) == $number and .appId == $app' \
+            "$output/firebase-web-config-observation.json" > /dev/null
+          captured_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          captured_epoch="$(date -u -d "$captured_at" +%s)"
+          valid_until="$(date -u -d "@$((captured_epoch + 900))" +%Y-%m-%dT%H:%M:%S.000Z)"
+          lease_value="$(jq -cnS \
+            --arg siteId "$HOSTING_SITE_ID" \
+            --arg sourceRevision "$EXPECTED_SOURCE_REVISION" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg validUntil "$valid_until" \
+            '{schemaVersion:1,siteId:$siteId,sourceRevision:$sourceRevision,runId:$runId,runAttempt:$runAttempt,validUntil:$validUntil}')"
+          printf '%s' "$lease_value" > "$output/hosting-admission-lease.json"
+          object_name="hosting-production-change-freezes/${HOSTING_SITE_ID}/${EXPECTED_SOURCE_REVISION}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}.json"
+          encoded_object_name="$(jq -nr --arg value "$object_name" '$value | @uri')"
+          storage_get() {
+            local url="$1"
+            local destination="$2"
+            {
+              printf '%s\n' 'fail' 'silent' 'show-error' 'proto = "=https"' 'tlsv1.2' 'request = "GET"'
+              printf 'header = "Authorization: Bearer %s"\n' "$access_token"
+              printf 'url = "%s"\n' "$url"
+            } | curl --config - > "$destination"
+          }
+          storage_get \
+            "https://storage.googleapis.com/storage/v1/b/${HOSTING_ADMISSION_BUCKET}" \
+            "$output/hosting-admission-bucket-observation.json"
+          jq -e \
+            --arg bucket "$HOSTING_ADMISSION_BUCKET" \
+            --arg project "$HOSTING_ADMISSION_SECURITY_PROJECT_NUMBER" \
+            '.name == $bucket and (.projectNumber | tostring) == $project and
+             (.retentionPolicy.retentionPeriod | tostring) == "900" and
+             .retentionPolicy.isLocked == true and
+             .iamConfiguration.publicAccessPrevention == "enforced" and
+             .iamConfiguration.uniformBucketLevelAccess.enabled == true and
+             (.versioning.enabled // false) == false and
+             ((.softDeletePolicy.retentionDurationSeconds // "0") | tostring) == "0" and
+             (.lifecycle.rule | length) == 1 and
+             .lifecycle.rule[0].action.type == "Delete" and
+             .lifecycle.rule[0].condition.age == 1 and
+             .lifecycle.rule[0].condition.matchesPrefix == ["hosting-production-change-freezes/"]' \
+            "$output/hosting-admission-bucket-observation.json" > /dev/null
+
+          {
+            printf '%s\n' 'fail' 'silent' 'show-error' 'proto = "=https"' 'tlsv1.2' 'request = "POST"'
+            printf 'header = "Authorization: Bearer %s"\n' "$access_token"
+            printf '%s\n' 'header = "Content-Type: application/json"'
+            printf 'data-binary = "@%s"\n' "$output/hosting-admission-lease.json"
+            printf 'url = "https://storage.googleapis.com/upload/storage/v1/b/%s/o?uploadType=media&ifGenerationMatch=0&name=%s"\n' \
+              "$HOSTING_ADMISSION_BUCKET" "$encoded_object_name"
+          } | curl --config - > "$output/hosting-admission-upload-response.json"
+          generation="$(jq -er --arg bucket "$HOSTING_ADMISSION_BUCKET" --arg name "$object_name" \
+            'select(.bucket == $bucket and .name == $name) | .generation | select(test("^[1-9][0-9]{0,19}$"))' \
+            "$output/hosting-admission-upload-response.json")"
+          storage_get \
+            "https://storage.googleapis.com/storage/v1/b/${HOSTING_ADMISSION_BUCKET}/o/${encoded_object_name}?generation=${generation}" \
+            "$output/hosting-admission-object-observation.json"
+          storage_get \
+            "https://storage.googleapis.com/download/storage/v1/b/${HOSTING_ADMISSION_BUCKET}/o/${encoded_object_name}?alt=media&generation=${generation}" \
+            "$output/hosting-admission-lease-readback.json"
+          cmp "$output/hosting-admission-lease.json" "$output/hosting-admission-lease-readback.json"
+          rm -f "$output/hosting-admission-upload-response.json" "$output/hosting-admission-lease-readback.json"
+          unset access_token
+
+          node tools/create-hosting-current-live-observation.mjs \
+            --source-revision "$EXPECTED_SOURCE_REVISION" \
+            --project-id "$PROJECT_ID" \
+            --project-number "$PROJECT_NUMBER" \
+            --admission-security-project-id "$HOSTING_ADMISSION_SECURITY_PROJECT_ID" \
+            --web-app-id "$WEB_APP_ID" \
+            --site-id "$HOSTING_SITE_ID" \
+            --public-base-url "$PUBLIC_BASE_URL" \
+            --captured-at "$captured_at" \
+            --site-observation "$output/hosting-site-observation.json" \
+            --origin-observation "$output/hosting-origin-observation.json" \
+            --firebase-web-config "$output/firebase-web-config-observation.json" \
+            --live-channel-observation "$output/hosting-live-channel-observation.json" \
+            --version-observation "$output/hosting-version-observation.json" \
+            --admission-bucket-observation "$output/hosting-admission-bucket-observation.json" \
+            --admission-object-observation "$output/hosting-admission-object-observation.json" \
+            --admission-content "$output/hosting-admission-lease.json" \
+            --output "$output/hosting-current-live-observation.json"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Retain the short-lived current-live evidence
+        id: upload-current-live
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: hosting-current-live-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: release-evidence/hosting-current-live/
+
+      - name: Hold the canonical Hosting deployment freeze through evidence expiry
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ steps.upload-current-live.outputs.artifact-id }}
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          valid_until="$(jq -er '.validUntil' release-evidence/hosting-current-live/hosting-current-live-observation.json)"
+          valid_until_epoch="$(date -u -d "$valid_until" +%s)"
+          while true; do
+            now_epoch="$(date -u +%s)"
+            remaining=$((valid_until_epoch - now_epoch))
+            if ((remaining <= 0)); then
+              break
+            fi
+            if ((remaining > 30)); then
+              sleep 30
+            else
+              sleep "$remaining"
+            fi
+          done

@@ -221,6 +221,29 @@ describe('production live localization', () => {
     );
   });
 
+  it('discloses the sticky account-wide iOS hold before the final Review message tap', () => {
+    const english = liveEnglish['live.companion.editableWarning'];
+    const hindi = liveHindi['live.companion.editableWarning'];
+    expect(english).toMatch(
+      /Tapping Review message commits an account-wide safety hold/u,
+    );
+    expect(english).toMatch(/before presentation/u);
+    expect(english).toMatch(
+      /pause Android birthday sending for up to 72 hours/u,
+    );
+    expect(english).toMatch(
+      /even after Cancel, presentation failure, or an unknown result/u,
+    );
+    expect(english).toMatch(/Android birthdays may be missed/u);
+    expect(hindi).toMatch(/संदेश की समीक्षा दबाते ही/u);
+    expect(hindi).toMatch(/पूरे खाते की सुरक्षा रोक/u);
+    expect(hindi).toMatch(/72 घंटे तक रोक सकती है/u);
+    expect(hindi).toMatch(
+      /Cancel, प्रस्तुति विफलता या अज्ञात परिणाम के बाद भी/u,
+    );
+    expect(hindi).toMatch(/जन्मदिन संदेश छूट सकते हैं/u);
+  });
+
   it('describes cloud metadata and AI requests without claiming that cloud use is data-free', () => {
     const english = [
       liveEnglish['live.setup.contactsPrivacyAndroid'],
@@ -245,6 +268,11 @@ describe('production live localization', () => {
     expect(english).toMatch(/not anonymous/u);
     expect(english).toMatch(/Firebase Installations token/u);
     expect(english).toMatch(/does not register recipients/u);
+    expect(english).toMatch(/composer-reservation/u);
+    expect(english).toMatch(/one-way owner-capability key/u);
+    expect(english).toMatch(
+      /not released by Cancel, presentation failure, an unknown result/u,
+    );
     expect(english).toMatch(/no contact names, phone numbers, birthdays/u);
     expect(english).toMatch(/provider logs/u);
     expect(english).not.toMatch(/no cloud data|nothing.*cloud/u);
@@ -252,6 +280,8 @@ describe('production live localization', () => {
     expect(hindi).toMatch(/अनाम नहीं/u);
     expect(hindi).toMatch(/Firebase Installations टोकन/u);
     expect(hindi).toMatch(/पंजीकृत नहीं करता/u);
+    expect(hindi).toMatch(/कंपोज़र-रिज़र्वेशन/u);
+    expect(hindi).toMatch(/एकतरफ़ा मालिक-क्षमता कुंजी/u);
     expect(hindi).toMatch(/संपर्क नाम, फ़ोन नंबर, जन्मदिन/u);
     expect(hindi).toMatch(/प्रदाता लॉग/u);
   });

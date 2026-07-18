@@ -73,7 +73,10 @@ test('deletion client preserves the native deletion security contract', () => {
     source,
     /if \(deletionSubmissionInFlight \|\| receiptCheckInFlight\)/u,
   );
-  assert.match(source, /if \(receiptCheckInFlight\) \{\s*continueButton\.disabled = true;/u);
+  assert.match(
+    source,
+    /if \(receiptCheckInFlight\) \{\s*continueButton\.disabled = true;/u,
+  );
   assert.match(source, /services\.auth\.currentUser !== null/u);
   assert.match(source, /postAcceptanceSignOutFailed/u);
   assert.match(source, /associated with this deletion request/u);
@@ -142,8 +145,28 @@ test('deletion and privacy copy state the irreducible boundaries', () => {
   assert.match(privacy, /Firebase Installations token/iu);
   assert.match(privacy, /Only for people enabled on Android/iu);
   assert.match(privacy, /iOS does not register recipients/iu);
+  assert.match(
+    privacy,
+    /Tapping Review message commits an account-wide hold before presentation/iu,
+  );
+  assert.match(privacy, /one-way SHA-256 owner-capability key/iu);
+  assert.match(privacy, /PREPARED or COMMITTED/iu);
+  assert.match(privacy, /up to 72 hours/iu);
+  assert.match(privacy, /संदेश की समीक्षा दबाते ही प्रस्तुति से पहले/iu);
   assert.match(privacy, /message history/iu);
   assert.match(privacy, /cannot promise immediate erasure of provider logs/iu);
+
+  const terms = read('terms/index.html');
+  const support = read('support/index.html');
+  for (const page of [terms, support]) {
+    assert.match(page, /Tapping Review message commits/iu);
+    assert.match(page, /up to 72 hours/iu);
+    assert.match(page, /Android birthday/iu);
+    assert.match(page, /संदेश की समीक्षा दबाते ही प्रस्तुति से पहले/iu);
+    assert.doesNotMatch(page, /Open Messages/iu);
+  }
+  assert.doesNotMatch(privacy, /Open Messages/iu);
+  assert.match(support, /Do not ask support to release a live hold early/iu);
 });
 
 test('Firebase Hosting deploy is release-gated and applies security headers', () => {

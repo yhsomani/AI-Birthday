@@ -17,6 +17,12 @@ export const STANDBY_RETENTION_MS = 90 * DAY_MS;
 export const REVOKED_RETENTION_MS = 30 * DAY_MS;
 export const COORDINATION_RECEIPT_RETENTION_MS = 30 * DAY_MS;
 export const DELETION_RECEIPT_RETENTION_MS = 365 * DAY_MS;
+// An iOS MessageUI sheet can remain open while the user edits. Seventy-two
+// hours is deliberately longer than the worst possible remaining lifetime of
+// the device's current civil date (UTC+14 through the end of that date in
+// UTC-12, plus guard time). The native client dismisses before this deadline;
+// logical expiry, rather than Firestore TTL cleanup, authorizes Android again.
+export const IOS_COMPOSER_RESERVATION_MS = 72 * HOUR_MS;
 export const BIRTHDAY_ARM_CAP = 20;
 export const TEST_ARM_CAP = 3;
 
@@ -262,6 +268,23 @@ export interface CoordinationPresence {
 }
 
 /**
+ * Content-free, account-global exclusion between iOS MessageUI and the Android
+ * sender. The document lives outside accounts/{uid}, because sender release
+ * deletes that complete tree. `reservationKey` is a domain-separated SHA-256
+ * digest of the authenticated UID and an app-minted random UUID.
+ */
+export interface IOSComposerReservation {
+  readonly schemaVersion: typeof SCHEMA_VERSION;
+  readonly reservationKey: string;
+  readonly phase: 'PREPARED' | 'COMMITTED';
+  readonly ledgerGeneration: string;
+  readonly createdAtMs: number;
+  readonly updatedAtMs: number;
+  readonly expiresAtMs: number;
+  readonly cleanupAtMs: number;
+}
+
+/**
  * A short-lived, account-global mutation fence. It intentionally lives outside
  * accounts/{uid}; sender release must be able to delete that complete tree while
  * the fence remains authoritative.
@@ -342,7 +365,8 @@ export type SuppressionReason =
   | 'RESET_SUPPRESSED'
   | 'MISSING_FENCE'
   | 'MISSING_CLAIM'
-  | 'UNKNOWN_HISTORY';
+  | 'UNKNOWN_HISTORY'
+  | 'IOS_COMPOSER_RESERVED';
 
 export type CompanionStatus =
   | {

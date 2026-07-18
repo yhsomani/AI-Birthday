@@ -61,7 +61,7 @@ test('interactive production primitives keep semantic state and minimum targets'
   const theme = read('src/design-system/tokens/theme.ts');
   const cardSource = primitives.slice(
     primitives.indexOf('export function Card'),
-    primitives.indexOf('type ButtonProps'),
+    primitives.indexOf('export function InlineReviewCard'),
   );
 
   assert.match(theme, /minimumTargetSize = 48/u);
@@ -70,11 +70,41 @@ test('interactive production primitives keep semantic state and minimum targets'
   assert.match(primitives, /accessibilityState=\{\{ disabled \}\}/u);
   assert.match(primitives, /accessibilityRole="radio"/u);
   assert.match(primitives, /accessibilityState=\{\{ selected \}\}/u);
+  assert.match(primitives, /accessibilityRole="radiogroup"/u);
+  assert.match(primitives, /selected-indicator/u);
   assert.match(primitives, /checked: selected/u);
   assert.match(primitives, /minHeight: minimumTargetSize/u);
   assert.match(shell, /accessibilityRole="tab"/u);
   assert.match(shell, /accessibilityRole="tablist"/u);
   assert.match(shell, /accessibilityState=\{\{ selected \}\}/u);
+});
+
+test('high-consequence inline reviews reveal, announce and expose one choice state', () => {
+  const primitives = read('src/design-system/components/Primitives.tsx');
+  const privacy = read('src/features/live/LivePrivacyScreen.tsx');
+  const automation = read('src/features/live/LiveAutomationScreen.tsx');
+  const inlineReview = primitives.slice(
+    primitives.indexOf('export function InlineReviewCard'),
+    primitives.indexOf('type ButtonProps'),
+  );
+
+  assert.match(primitives, /scrollView\.current\?\.scrollTo/u);
+  assert.match(inlineReview, /onLayout=\{onLayout\}/u);
+  assert.match(inlineReview, /scrollToReview\(y\)/u);
+  assert.match(inlineReview, /isScreenReaderEnabled/u);
+  assert.match(inlineReview, /setAccessibilityFocus/u);
+  assert.match(inlineReview, /announceForAccessibilityWithOptions/u);
+  assert.match(inlineReview, /accessibilityRole="header"/u);
+
+  assert.match(privacy, /<SingleChoiceGroup/u);
+  assert.match(privacy, /selected=\{selected === action\.kind\}/u);
+  assert.doesNotMatch(
+    privacy,
+    /variant=\{selected === action\.kind \? 'primary' : 'secondary'\}/u,
+  );
+  assert.match(privacy, /testID="live-privacy-review"/u);
+  assert.match(automation, /testID="live-ios-activation-review"/u);
+  assert.match(automation, /testID="live-ios-composer-review"/u);
 });
 
 test('production UI owns high contrast reduced motion live regions and bidi layout', () => {

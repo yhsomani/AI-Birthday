@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   canonicalSha256,
-  collectIOSReleaseReferenceDigests,
+  collectIOSReleaseSupportingEvidence,
   stableJson,
   validateIOSReleaseEvidence,
 } from './ios-release-evidence.mjs';
@@ -1094,21 +1094,28 @@ const run = () => {
     fail('release evidence is malformed JSON');
     return;
   }
-  const evidencePreflight = validateIOSReleaseEvidence(document);
+  const evidencePreflight = validateIOSReleaseEvidence(document, {
+    allowUnresolvedStructuredEvidence: true,
+  });
   if (evidencePreflight.errors.length > 0) {
     evidencePreflight.errors.forEach(fail);
     return;
   }
   let referenceDigests;
+  let structuredEvidence;
+  let evidenceFiles;
   let observed;
   const temporaryRoot = mkdtempSync(
     path.join(tmpdir(), 'birthday-ios-release-'),
   );
   try {
-    referenceDigests = collectIOSReleaseReferenceDigests(
+    const supportingEvidence = collectIOSReleaseSupportingEvidence(
       argumentsByName.get('evidence-root'),
       document.references,
     );
+    referenceDigests = supportingEvidence.referenceDigests;
+    structuredEvidence = supportingEvidence.structuredEvidence;
+    evidenceFiles = supportingEvidence.evidenceFiles;
     observed = inspectIOSReleaseArtifacts({
       archivePath: argumentsByName.get('archive'),
       ipaPath: argumentsByName.get('ipa'),
@@ -1124,7 +1131,9 @@ const run = () => {
   }
   const validation = validateIOSReleaseEvidence(document, {
     observed,
+    evidenceFiles,
     referenceDigests,
+    structuredEvidence,
   });
   if (validation.errors.length > 0) {
     validation.errors.forEach(fail);
@@ -1133,7 +1142,9 @@ const run = () => {
   const report = {
     schemaVersion: 1,
     product: 'birthday-autopilot-ios-release-verification',
-    verifiedAt: new Date().toISOString(),
+    status: 'verified',
+    sourceRevision: observed.sourceRevision,
+    validUntil: document.approvals.validUntil,
     evidenceSha256: createHash('sha256').update(rawEvidence).digest('hex'),
     evidenceAuthorityPublicKeySpkiSha256: authority.publicKeySpkiSha256,
     observed,

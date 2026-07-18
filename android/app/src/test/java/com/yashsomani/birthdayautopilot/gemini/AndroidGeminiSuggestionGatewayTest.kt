@@ -7,6 +7,7 @@ import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -17,7 +18,8 @@ class AndroidGeminiSuggestionGatewayTest {
     val parsed = GeminiSuggestionPolicy.parseRequest(valid)!!
     val prompt = GeminiSuggestionPolicy.prompt(parsed)
     assertEquals("en", parsed.language)
-    assertTrue(prompt.contains("policyVersion=birthday-greeting-prompt-v1"))
+    assertTrue(prompt.contains("policyVersion=birthday-greeting-prompt-v2"))
+    assertTrue(GeminiSuggestionPolicy.SYSTEM_INSTRUCTION.startsWith("Create clearly positive"))
     assertFalse(prompt.contains("Alice"))
     assertFalse(prompt.contains("+91"))
 
@@ -89,15 +91,46 @@ class AndroidGeminiSuggestionGatewayTest {
   }
 
   @Test
-  fun `rate guard enforces cooldown and UTC daily limit without identity storage`() {
+  fun `rate guard scopes cooldown and UTC daily limit to an exact account session`() {
     val store = MemoryRateStore()
     val guard = GeminiUxRateGuard(store, dailyLimit = 2, cooldownMillis = 5_000)
-    assertTrue(guard.tryAcquire(0, 10_000))
-    assertFalse(guard.tryAcquire(1_000, 11_000))
-    assertTrue(guard.tryAcquire(6_000, 16_000))
-    assertFalse(guard.tryAcquire(7_000, 22_000))
-    assertTrue(guard.tryAcquire(86_400_000, 23_000))
-    assertEquals(GeminiRateState(1, 1), store.value)
+    val firstSession = accountSession("firebase-user-a", "generation-a")
+    val secondSession = accountSession("firebase-user-b", "generation-b")
+    assertTrue(guard.tryAcquire(firstSession, 0, 10_000))
+    assertFalse(guard.tryAcquire(firstSession, 1_000, 9_999))
+    assertFalse(guard.tryAcquire(firstSession, 1_000, 11_000))
+    assertTrue(guard.tryAcquire(secondSession, 1_000, 11_000))
+    assertTrue(guard.tryAcquire(firstSession, 6_000, 16_000))
+    assertFalse(guard.tryAcquire(firstSession, 7_000, 22_000))
+    assertTrue(guard.tryAcquire(firstSession, 86_400_000, 23_000))
+    assertFalse(guard.tryAcquire(firstSession, 0, 24_000))
+    assertEquals(2, store.value.size)
+    assertTrue(store.value.all { it.scopeKey.length == 64 })
+    assertFalse(store.value.toString().contains("firebase-user"))
+    assertFalse(store.value.toString().contains("generation"))
+  }
+
+  @Test
+  fun `account generation rotates provenance scope and rate state is bounded pruned and clearable`() {
+    val first = accountSession("same-firebase-user", "generation-one")
+    val second = accountSession("same-firebase-user", "generation-two")
+    assertNotEquals(first, second)
+
+    val store = MemoryRateStore()
+    val guard = GeminiUxRateGuard(store, dailyLimit = 10, cooldownMillis = 0)
+    repeat(MAXIMUM_GEMINI_RATE_SCOPES + 2) { index ->
+      assertTrue(
+        guard.tryAcquire(
+          accountSession("firebase-user-$index", "generation-$index"),
+          index * 86_400_000L,
+          index.toLong(),
+        ),
+      )
+    }
+    assertEquals(MAXIMUM_GEMINI_RATE_SCOPES, store.value.size)
+    assertTrue(store.value.none { it.epochDay < 2 })
+    assertTrue(guard.clearAll())
+    assertTrue(store.value.isEmpty())
   }
 
   @Test
@@ -187,9 +220,9 @@ class AndroidGeminiSuggestionGatewayTest {
     assertEquals(null, gateway.consumeProvenance(draft))
 
     assertEquals("candidates", gateway.generate(personalizedRequest()).getString("kind"))
-    client.sessionKey = "different-account-key"
+    client.sessionKey = accountSession("different-firebase-user", "different-generation")
     assertEquals(null, gateway.peekProvenance(draft))
-    client.sessionKey = "test-account-key"
+    client.sessionKey = accountSession("test-firebase-user", "test-account-generation")
     assertEquals("candidates", gateway.generate(personalizedRequest()).getString("kind"))
     elapsed += 60_001
     assertEquals(null, gateway.peekProvenance(draft))
@@ -220,11 +253,18 @@ class AndroidGeminiSuggestionGatewayTest {
     .put("placeholderMode", JSONObject().put("kind", "given-name").put("requiredCount", 1))
     .put("requestedSegmentCap", 2)
 
+  private fun accountSession(firebaseUid: String, generation: String): String =
+    checkNotNull(GeminiAccountScope.accountSessionKey(firebaseUid, generation))
+
   private class MemoryRateStore : GeminiRateStore {
-    var value: GeminiRateState? = null
-    override fun read(): GeminiRateState? = value
-    override fun write(value: GeminiRateState): Boolean {
-      this.value = value
+    var value: List<GeminiRateState> = emptyList()
+    override fun read(): List<GeminiRateState> = value
+    override fun write(value: List<GeminiRateState>): Boolean {
+      this.value = value.toList()
+      return true
+    }
+    override fun clearAll(): Boolean {
+      value = emptyList()
       return true
     }
   }
@@ -234,7 +274,10 @@ class AndroidGeminiSuggestionGatewayTest {
     var online = true
     var appCheck = true
     var response: String? = validResponse
-    var sessionKey: String? = "test-account-key"
+    var sessionKey: String? = GeminiAccountScope.accountSessionKey(
+      "test-firebase-user",
+      "test-account-generation",
+    )
     var generateBlock: (suspend () -> String?)? = null
     var sessionReads = 0
     var appCheckCalls = 0

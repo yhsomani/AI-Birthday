@@ -9,6 +9,7 @@ import com.yashsomani.birthdayautopilot.storage.database.ArmedAttemptPermit
 import com.yashsomani.birthdayautopilot.storage.database.CallbackKind
 import com.yashsomani.birthdayautopilot.storage.database.CallbackTokenEntity
 import com.yashsomani.birthdayautopilot.storage.database.CallbackTokenState
+import java.util.Locale
 import java.util.UUID
 
 internal data class CallbackIdentity(
@@ -41,7 +42,7 @@ internal object CallbackIdentityFactory {
     require(isOpaque(payload.callbackGeneration, 64)) { "callback-generation-invalid" }
     require(isOpaque(permit.operationId, 80)) { "callback-operation-invalid" }
     val tokenId = UUID.randomUUID().toString().lowercase()
-    val kindPath = kind.name.lowercase()
+    val kindPath = kind.name.lowercase(Locale.ROOT)
     val action = "$ACTION_PREFIX$kindPath.$tokenId"
     val dataUri = buildString {
       append(URI_PREFIX)
@@ -49,7 +50,7 @@ internal object CallbackIdentityFactory {
       append('/')
       append(payload.callbackGeneration)
       append('/')
-      append(permit.purpose.name.lowercase())
+      append(permit.purpose.name.lowercase(Locale.ROOT))
       append('/')
       append(permit.operationId)
       append('/')

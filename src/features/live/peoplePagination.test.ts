@@ -122,4 +122,95 @@ describe('scanPeoplePages', () => {
       problem: { kind: 'stale-revision', latestRevision: '2' },
     });
   });
+
+  it('accepts the exact 10,000-contact release ceiling without truncation', async () => {
+    const totalCount = 10_000;
+    const pageSize = 50;
+    const listPeople = jest.fn(async ({ cursor }: { cursor?: PageCursor }) => {
+      const pageIndex = cursor ? Number(cursor.replace('page-', '')) : 0;
+      const start = pageIndex * pageSize;
+      const items = Array.from({ length: pageSize }, (_, index) =>
+        contact(start + index + 1),
+      );
+      const nextPage = pageIndex + 1;
+      return ok({
+        items,
+        ...(nextPage * pageSize < totalCount
+          ? { nextCursor: `page-${nextPage}` as PageCursor }
+          : {}),
+        totalCount,
+      });
+    });
+
+    const result = await scanPeoplePages(
+      { listPeople } as Pick<PeoplePort, 'listPeople'>,
+      { filter: 'all' },
+      () => true,
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.envelope.value).toMatchObject({
+      scannedCount: totalCount,
+      totalCount,
+    });
+    expect(result.envelope.value.contactIds).toHaveLength(totalCount);
+    expect(result.envelope.value.contactIds.at(-1)).toBe('contact-10000');
+    expect(listPeople).toHaveBeenCalledTimes(200);
+  });
+
+  it('fails closed before scanning a result above the 10,000-contact ceiling', async () => {
+    const listPeople = jest.fn(async () =>
+      ok({
+        items: Array.from({ length: 50 }, (_, index) => contact(index + 1)),
+        nextCursor: 'page-1' as PageCursor,
+        totalCount: 10_001,
+      }),
+    );
+
+    const result = await scanPeoplePages(
+      { listPeople } as Pick<PeoplePort, 'listPeople'>,
+      { filter: 'all' },
+      () => true,
+    );
+
+    expect(result).toEqual({
+      kind: 'error',
+      problem: {
+        kind: 'internal',
+        supportCode: 'NATIVE_CONTRACT_INVALID',
+      },
+    });
+    expect(listPeople).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a duplicate contact ID across pages', async () => {
+    const firstPage = Array.from({ length: 50 }, (_, index) =>
+      contact(index + 1),
+    );
+    const listPeople = jest
+      .fn()
+      .mockResolvedValueOnce(
+        ok({
+          items: firstPage,
+          nextCursor: 'page-2' as PageCursor,
+          totalCount: 51,
+        }),
+      )
+      .mockResolvedValueOnce(ok({ items: [firstPage[0]], totalCount: 51 }));
+
+    const result = await scanPeoplePages(
+      { listPeople } as Pick<PeoplePort, 'listPeople'>,
+      { filter: 'all' },
+      () => true,
+    );
+
+    expect(result).toEqual({
+      kind: 'error',
+      problem: {
+        kind: 'internal',
+        supportCode: 'NATIVE_CONTRACT_INVALID',
+      },
+    });
+  });
 });

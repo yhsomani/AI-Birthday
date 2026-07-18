@@ -66,8 +66,17 @@ test('live navigation retains system back, accessibility, theme, and native-rout
 
   assert.match(
     source,
-    /navigation\.navigate\('Main', \{ screen: 'Home' \}\);[\s\S]*navigation\.navigate\(leaf\);/u,
+    /function navigateToLeafFromTab[\s\S]*navigation\.navigate\('Main', \{ screen: tab \}\);[\s\S]*navigation\.navigate\(leaf\);/u,
   );
+  assert.match(
+    source,
+    /function LiveSettingsRoute[\s\S]*navigateToLeafFromTab\(navigation, 'Settings', 'Privacy'\)/u,
+  );
+  const settingsRoute = source.slice(
+    source.indexOf('function LiveSettingsRoute'),
+    source.indexOf('function LivePersonRoute'),
+  );
+  assert.doesNotMatch(settingsRoute, /navigateToLeafFromHome/u);
   assert.match(source, /useIsFocused/u);
   assert.match(source, /<RouteAccessibilityFocus/u);
   assert.match(source, /accessibilityRole="tablist"/u);
@@ -84,42 +93,29 @@ test('live navigation retains system back, accessibility, theme, and native-rout
   assert.match(source, /onReady=\{flushPendingLeaf\}/u);
 });
 
-test('every live stack leaf has an explicit visible back destination', () => {
+test('every live stack leaf uses the same native-stack back destination as system Back', () => {
   const source = read('src/features/live/LiveAppShell.tsx');
 
-  for (const route of ['Person']) {
+  for (const route of [
+    'Person',
+    'Activity',
+    'ActivityDetail',
+    'Attention',
+    'Automation',
+    'Diagnostics',
+    'HelpLegal',
+    'Message',
+    'Privacy',
+  ]) {
     assert.match(
       source,
       new RegExp(
-        `function Live${route}Route[\\s\\S]*?onBack=\\{\\(\\) => navigateToTab\\(navigation, 'People'\\)\\}`,
-        'u',
-      ),
-    );
-  }
-  for (const route of ['Activity', 'Attention', 'Automation', 'Message']) {
-    assert.match(
-      source,
-      new RegExp(
-        `function Live${route}Route[\\s\\S]*?onBack=\\{\\(\\) => navigateToTab\\(navigation, 'Home'\\)\\}`,
-        'u',
-      ),
-      route,
-    );
-  }
-  for (const route of ['Diagnostics', 'HelpLegal', 'Privacy']) {
-    assert.match(
-      source,
-      new RegExp(
-        `function Live${route}Route[\\s\\S]*?onBack=\\{\\(\\) => navigateToTab\\(navigation, 'Settings'\\)\\}`,
+        `function Live${route}Route[\\s\\S]*?onBack=\\{\\(\\) => navigation\\.goBack\\(\\)\\}`,
         'u',
       ),
       route,
     );
   }
-  assert.match(
-    source,
-    /function LiveActivityDetailRoute[\s\S]*?onBack=\{\(\) => navigation\.goBack\(\)\}/u,
-  );
 });
 
 test('the fixture navigator mirrors shared tab, gesture, and bidi behavior', () => {

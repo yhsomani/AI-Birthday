@@ -487,6 +487,17 @@ internal class SmsOutcomeProcessor(
     decision: SmsOutcomeDecision,
     observedAtMillis: Long,
   ): String {
+    if (
+      attempt.state in PRE_ACCEPTANCE_STATES ||
+      (attempt.state == SendAttemptState.SUBMITTED &&
+        decision.timelySent == SentEvidenceDecision.WAITING)
+    ) {
+      return if (attempt.attemptNumber == 2) {
+        SmsVisibleOutcome.RETRY_SUBMITTED
+      } else {
+        SmsVisibleOutcome.SUBMITTED
+      }
+    }
     val immutable = immutableState(attempt)
     val sentLate = immutable !in setOf(
       BirthdayJobState.SENT_FROM_DEVICE.name,
@@ -600,6 +611,10 @@ internal class SmsOutcomeProcessor(
       SendAttemptState.BARRIER_CONSUMED,
       SendAttemptState.API_CALL_STARTED,
       SendAttemptState.SUBMITTED,
+    )
+    val PRE_ACCEPTANCE_STATES = setOf(
+      SendAttemptState.BARRIER_CONSUMED,
+      SendAttemptState.API_CALL_STARTED,
     )
     val TEST_REPORTABLE_STATES = setOf(
       TestJobState.PASSED,

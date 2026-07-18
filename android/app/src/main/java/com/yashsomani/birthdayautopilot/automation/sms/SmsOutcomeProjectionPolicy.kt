@@ -50,6 +50,9 @@ internal object SmsOutcomeAttentionPolicy {
 internal object SmsOutcomeProjectionPolicy {
   fun refine(current: String?, candidate: String): String {
     if (current == null || current == candidate) return candidate
+    PROVISIONAL_PRE_ACCEPTANCE_NORMALIZATIONS[current]?.let { acceptedCandidates ->
+      if (candidate in acceptedCandidates) return candidate
+    }
     if (current in ZERO_ACCEPTED_OUTCOMES && candidate in RETRY_PROGRESS_OUTCOMES) {
       return candidate
     }
@@ -131,4 +134,23 @@ internal object SmsOutcomeProjectionPolicy {
     SmsVisibleOutcome.PARTIAL_UNKNOWN,
     SmsVisibleOutcome.SUBMISSION_UNKNOWN,
   ) + DELIVERY_OUTCOMES
+  private val PROVISIONAL_PRE_ACCEPTANCE_NORMALIZATIONS = mapOf(
+    SmsVisibleOutcome.SENT_EVIDENCE_LATE to setOf(
+      SmsVisibleOutcome.SENT_FROM_DEVICE,
+      SmsVisibleOutcome.RETRY_SENT_FROM_DEVICE,
+      SmsVisibleOutcome.TEST_PASSED,
+    ),
+    SmsVisibleOutcome.ZERO_ACCEPTED_LATE to setOf(
+      SmsVisibleOutcome.ZERO_ACCEPTED_RADIO_OFF,
+      SmsVisibleOutcome.ZERO_ACCEPTED_NO_SERVICE,
+      SmsVisibleOutcome.RETRY_EXHAUSTED,
+    ),
+    SmsVisibleOutcome.DELIVERED_LATE to setOf(SmsVisibleOutcome.DELIVERED),
+    SmsVisibleOutcome.DELIVERY_FAILED_LATE to setOf(SmsVisibleOutcome.DELIVERY_FAILED),
+    SmsVisibleOutcome.PARTIAL_DELIVERY_LATE to setOf(SmsVisibleOutcome.PARTIAL_DELIVERY),
+    SmsVisibleOutcome.PARTIAL_UNKNOWN to setOf(
+      SmsVisibleOutcome.SUBMITTED,
+      SmsVisibleOutcome.RETRY_SUBMITTED,
+    ),
+  )
 }

@@ -3,6 +3,69 @@ import XCTest
 @testable import BirthdayAutopilot
 
 final class BirthdayAutopilotNativeTests: XCTestCase {
+  func testActivityRecoveryRequiresAConcreteCurrentRepair() {
+    XCTAssertNil(
+      IOSActivityRecoveryPolicy.route(
+        kind: "composer-failed",
+        reason: nil,
+        currentIssueCodes: [],
+        automationRepairAvailable: true,
+        approvalRepairAvailable: false,
+        composerRetryMatches: false
+      ))
+    XCTAssertNil(
+      IOSActivityRecoveryPolicy.route(
+        kind: "composer-cancelled",
+        reason: nil,
+        currentIssueCodes: ["contacts-stale"],
+        automationRepairAvailable: true,
+        approvalRepairAvailable: false,
+        composerRetryMatches: true
+      ))
+    XCTAssertNil(
+      IOSActivityRecoveryPolicy.route(
+        kind: "coordination-blocked",
+        reason: "coordination-unavailable",
+        currentIssueCodes: [],
+        automationRepairAvailable: false,
+        approvalRepairAvailable: false,
+        composerRetryMatches: false
+      ))
+    XCTAssertEqual(
+      IOSActivityRecoveryPolicy.route(
+        kind: "composer-cancelled",
+        reason: nil,
+        currentIssueCodes: [],
+        automationRepairAvailable: true,
+        approvalRepairAvailable: false,
+        composerRetryMatches: true
+      ),
+      "automation"
+    )
+    XCTAssertEqual(
+      IOSActivityRecoveryPolicy.route(
+        kind: "approval-invalidated",
+        reason: nil,
+        currentIssueCodes: [],
+        automationRepairAvailable: false,
+        approvalRepairAvailable: true,
+        composerRetryMatches: false
+      ),
+      "people"
+    )
+    XCTAssertEqual(
+      IOSActivityRecoveryPolicy.route(
+        kind: "coordination-blocked",
+        reason: "coordination-unavailable",
+        currentIssueCodes: ["coordination-unavailable"],
+        automationRepairAvailable: false,
+        approvalRepairAvailable: false,
+        composerRetryMatches: false
+      ),
+      "attention"
+    )
+  }
+
   func testGeminiOperationalPolicyIsCanonicalRemoteAndOffByDefault() {
     XCTAssertFalse(IOSGeminiOperationalPolicy.inAppDefault)
     XCTAssertEqual(
@@ -630,8 +693,7 @@ final class BirthdayAutopilotNativeTests: XCTestCase {
       id: "activity-1",
       kind: "sync",
       reason: nil,
-      occurredAt: originalDate,
-      actionable: false
+      occurredAt: originalDate
     )]
     workflow.activityClearedAt = originalDate
     workflow.privacyOperations = [CompanionWorkflowPrivacyOperation(

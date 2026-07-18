@@ -17,6 +17,23 @@ private enum IOSCompanionPlanRebuildOutcome {
   }
 }
 
+private struct IOSCompanionPlannedOccurrenceDescriptor {
+  let occurrenceId: String
+  let contactId: String
+  let civilDate: String
+}
+
+private struct IOSCompanionLazyMaterialContext {
+  let workflow: CompanionWorkflowState
+  let index: IOSCompanionPlanningIndex
+  let draft: CompanionWorkflowMessageDraft
+  let materializationNow: Date
+  let peopleSnapshotGeneration: String
+  let privateContactsById: [String: IOSPeoplePrivateContact]
+  let blockedDestinations: Set<String>
+  let destinationCounts: [String: Int]
+}
+
 enum IOSBirthdayMessageContentCategory: String, CaseIterable {
   case birthdayIntentRequired = "birthday-intent-required"
   case url
@@ -343,6 +360,27 @@ private struct IOSCompanionEffectiveContact {
   let approvalReasons: [String]
 }
 
+enum IOSActivityRecoveryPolicy {
+  static func route(
+    kind: String,
+    reason: String?,
+    currentIssueCodes: Set<String>,
+    automationRepairAvailable: Bool,
+    approvalRepairAvailable: Bool,
+    composerRetryMatches: Bool
+  ) -> String? {
+    if (kind == "composer-cancelled" || kind == "composer-failed"),
+      composerRetryMatches, currentIssueCodes.isEmpty
+    {
+      return "automation"
+    }
+    if kind == "paused", automationRepairAvailable { return "automation" }
+    if kind == "approval-invalidated", approvalRepairAvailable { return "people" }
+    if let reason, currentIssueCodes.contains(reason) { return "attention" }
+    return nil
+  }
+}
+
 /// Pure civil-date planner shared by iOS projections, simulation, and reminder materialization.
 /// Google birthday month/day values are Gregorian even when the user selects another display
 /// calendar. Scheduling still follows the device's autoupdating timezone.
@@ -577,31 +615,21 @@ final class IOSCompanionWorkflowEngine {
       guard workflow.desired == .remindersOn else {
         return .success(["kind": "none"])
       }
-      let today = Self.localDate(Date(), calendar: calendar)
-      let proposalById = Dictionary(
-        uniqueKeysWithValues: status.proposals.map { ($0.proposalId, $0) }
-      )
-      let contacts = Dictionary(
-        uniqueKeysWithValues: effectiveContacts(status: status).map {
-          ($0.safe.localId, $0)
-        }
-      )
-      guard
-        let occurrence = workflow.occurrences
-          .filter({ $0.civilDate == today })
-          .sorted(by: { $0.occurrenceId < $1.occurrenceId })
-          .first(where: { occurrence in
-            guard let proposal = proposalById[occurrence.proposalId] else { return false }
-            return proposal.state == .ready || proposal.state == .cancelled
-              || proposal.state == .failed
-          }), let contact = contacts[occurrence.contactId]
+      guard let binding = IOSGoogleIdentityCoordinator.shared.exactSessionBinding(),
+        let material = nextLazyProposalMaterial(
+          status: status,
+          binding: binding,
+          now: Date()
+        ), let contact = peopleStore.projection().contacts.first(where: {
+          $0.localId == material.contactId
+        })
       else { return .success(["kind": "none"]) }
       return .success([
         "kind": "ready",
-        "proposalId": occurrence.proposalId,
-        "occurrenceId": occurrence.occurrenceId,
-        "occurrenceDate": occurrence.civilDate,
-        "recipient": contact.safe.displayName,
+        "proposalId": material.proposalId,
+        "occurrenceId": material.occurrenceId,
+        "occurrenceDate": material.occurrenceCivilDate,
+        "recipient": contact.displayName,
       ])
     default:
       return .failure(Self.internalProblem("NATIVE_REQUEST_INVALID"))
@@ -650,12 +678,15 @@ final class IOSCompanionWorkflowEngine {
     occurrenceId: String,
     status: CompanionProjectionStatus
   ) -> IOSCompanionWorkflowEngineResult {
-    guard Self.validOpaque(occurrenceId),
-      let occurrence = status.workflow?.occurrences.first(where: {
-        $0.occurrenceId == occurrenceId
-      })
-    else { return .failure(Self.temporarilyUnavailable("contacts-stale")) }
     let record = status.composerRecords.last(where: { $0.occurrenceId == occurrenceId })
+    let planned = plannedOccurrenceDescriptor(
+      occurrenceId: occurrenceId,
+      status: status
+    )
+    guard Self.validOpaque(occurrenceId), record != nil || planned != nil else {
+      return .failure(Self.temporarilyUnavailable("contacts-stale"))
+    }
+    let civilDate = record?.occurrenceCivilDate ?? planned!.civilDate
     let phase: String
     if let record {
       switch record.outcome {
@@ -663,23 +694,24 @@ final class IOSCompanionWorkflowEngine {
       case .cancelled, .failed: phase = "dismissed"
       case .outcomeUnknown: phase = "expired"
       }
-    } else if occurrence.civilDate == Self.localDate(Date(), calendar: calendar) {
+    } else if civilDate == Self.localDate(Date(), calendar: calendar) {
       phase = "composer-ready"
     } else {
       phase = "reminder-planned"
     }
     return .success([
       "platform": "ios",
-      "occurrenceId": occurrence.occurrenceId,
-      "occurrenceDate": occurrence.civilDate,
+      "occurrenceId": occurrenceId,
+      "occurrenceDate": civilDate,
       "phase": phase,
-      "updatedAt": Self.dateString(record?.resolvedAt ?? record?.openedAt ?? occurrence.updatedAt),
+      "updatedAt": Self.dateString(record?.resolvedAt ?? record?.openedAt ?? Date()),
     ])
   }
 
   func activityProjection(
     request: [String: Any],
-    status: CompanionProjectionStatus
+    status: CompanionProjectionStatus,
+    currentIssueCodes: Set<String> = []
   ) -> IOSCompanionWorkflowEngineResult {
     guard request["kind"] as? String == "list",
       Set(request.keys) == ["kind", "query"],
@@ -688,6 +720,19 @@ final class IOSCompanionWorkflowEngine {
       let pageSize = Self.strictInteger(query["pageSize"], range: 1...50),
       let offset = Self.pageOffset(query["cursor"] as? String)
     else { return .failure(Self.internalProblem("NATIVE_REQUEST_INVALID")) }
+
+    let automationRepairAvailable = status.workflow.map {
+      $0.desired == .paused && $0.messageDraft != nil && $0.policy != nil
+    } ?? false
+    let approvalRepairAvailable = effectiveContacts(status: status).contains {
+      ($0.configuration?.enrollment == .enabled
+        || $0.configuration?.enrollment == .paused)
+        && $0.approvalKind != "valid"
+    }
+    let retryableProposalId = IOSGoogleIdentityCoordinator.shared.exactSessionBinding()
+      .flatMap {
+        nextLazyProposalMaterial(status: status, binding: $0, now: Date())?.proposalId
+      }
 
     var records =
       status.workflow?.activity.filter {
@@ -698,7 +743,14 @@ final class IOSCompanionWorkflowEngine {
           kind: activity.kind,
           reason: activity.reason,
           occurredAt: activity.occurredAt,
-          actionable: activity.actionable
+          recoveryRoute: IOSActivityRecoveryPolicy.route(
+            kind: activity.kind,
+            reason: activity.reason,
+            currentIssueCodes: currentIssueCodes,
+            automationRepairAvailable: automationRepairAvailable,
+            approvalRepairAvailable: approvalRepairAvailable,
+            composerRetryMatches: false
+          )
         )
       } ?? []
     let activityCutoff = status.workflow?.activityClearedAt
@@ -712,7 +764,7 @@ final class IOSCompanionWorkflowEngine {
               kind: "composer-opened",
               reason: nil,
               occurredAt: record.openedAt,
-              actionable: false
+              recoveryRoute: nil
             ))
         }
         let terminalKind: String?
@@ -733,7 +785,14 @@ final class IOSCompanionWorkflowEngine {
               kind: terminalKind,
               reason: nil,
               occurredAt: terminalAt,
-              actionable: record.outcome == .cancelled || record.outcome == .failed
+              recoveryRoute: IOSActivityRecoveryPolicy.route(
+                kind: terminalKind,
+                reason: nil,
+                currentIssueCodes: currentIssueCodes,
+                automationRepairAvailable: automationRepairAvailable,
+                approvalRepairAvailable: approvalRepairAvailable,
+                composerRetryMatches: record.proposalId == retryableProposalId
+              )
             ))
         }
         return values
@@ -789,22 +848,30 @@ final class IOSCompanionWorkflowEngine {
     let now = Date()
     let today = Self.localDate(now, calendar: calendar)
     // Inclusive range: today plus the following six civil dates is seven days.
-    let sevenDays = calendar.date(byAdding: .day, value: 6, to: now) ?? now
-    let seven = Self.localDate(sevenDays, calendar: calendar)
-    let occurrences = status.workflow?.occurrences ?? []
+    var nextSevenCount = 0
+    for offset in 0...6 {
+      guard let date = calendar.date(byAdding: .day, value: offset, to: now) else {
+        continue
+      }
+      nextSevenCount += plannedOccurrenceCount(
+        civilDate: Self.localDate(date, calendar: calendar),
+        status: status
+      )
+    }
     var result: [String: Any] = [
       "enabled": enabled.count,
       "needsAttention": contacts.filter { $0.readinessKind == "needs-attention" }.count,
       "unavailable": contacts.filter { $0.readinessKind == "unavailable" }.count,
-      "today": occurrences.filter { $0.civilDate == today }.count,
-      "nextSevenDays": occurrences.filter {
-        $0.civilDate >= today && $0.civilDate <= seven
-      }.count,
+      "today": plannedOccurrenceCount(civilDate: today, status: status),
+      "nextSevenDays": nextSevenCount,
     ]
-    if let next = occurrences.filter({ $0.civilDate >= today }).sorted(by: {
-      if $0.civilDate != $1.civilDate { return $0.civilDate < $1.civilDate }
-      return $0.occurrenceId < $1.occurrenceId
-    }).first, let contact = contacts.first(where: { $0.safe.localId == next.contactId }),
+    if let binding = IOSGoogleIdentityCoordinator.shared.exactSessionBinding(),
+      let next = firstLazyProposalMaterial(
+        status: status,
+        binding: binding,
+        startingCivilDate: today,
+        now: now
+      ), let contact = contacts.first(where: { $0.safe.localId == next.contactId }),
       let masked = contact.safe.phoneChoices.first(where: {
         $0.localId == contact.selectedPhoneId
       })?.maskedDisplay
@@ -812,22 +879,12 @@ final class IOSCompanionWorkflowEngine {
       var nextPayload: [String: Any] = [
         "occurrenceId": next.occurrenceId,
         "recipient": contact.safe.displayName,
-        "localDate": next.civilDate,
+        "localDate": next.occurrenceCivilDate,
         "windowLabel": status.workflow?.policy.map(Self.windowLabel)
           ?? IOSNativePresentationFormatter.reminderWindowLabel(),
         "maskedPhone": masked,
       ]
-      if contact.configuration?.enrollment == .enabled,
-        contact.approvalKind == "valid",
-        let draft = status.workflow?.messageDraft,
-        let rendered = Self.render(draft: draft, contact: contact.privateValue),
-        Self.smsEstimate(rendered).segments <= draft.requestedSegmentCap,
-        status.proposals.contains(where: {
-          $0.occurrenceId == next.occurrenceId && $0.state == .ready && $0.body == rendered
-        })
-      {
-        nextPayload["exactText"] = rendered
-      }
+      nextPayload["exactText"] = next.body
       result["next"] = nextPayload
     }
     return result
@@ -1191,12 +1248,13 @@ final class IOSCompanionWorkflowEngine {
     case "prepare-activation", "prepare-resume":
       prepareActivation(
         binding: binding, revision: status.revision, status: status,
+        readiness: readiness,
         completion: completion
       )
     case "activate", "resume":
       confirmActivation(
         payload: payload, binding: binding, expectedRevision: expectedRevision,
-        readiness: readiness, completion: completion
+        status: status, readiness: readiness, completion: completion
       )
     case "pause-all":
       pauseAll(
@@ -1550,7 +1608,18 @@ final class IOSCompanionWorkflowEngine {
     store.mutateWorkflow(
       expectedRevision: revision, binding: binding,
       body: { [peopleStore] workflow, _ in
-        guard let phoneId = Self.effectivePhoneId(contact, workflow: workflow),
+        let configurationIndexById = Dictionary(
+          uniqueKeysWithValues: workflow.contacts.indices.map {
+            (workflow.contacts[$0].contactId, $0)
+          }
+        )
+        let targetConfiguration = configurationIndexById[contact.localId].map {
+          workflow.contacts[$0]
+        }
+        guard let phoneId = Self.effectivePhoneId(
+          contact,
+          configuration: targetConfiguration
+        ),
           let destination = contact.phones.first(where: {
             $0.localId == phoneId
           })?.e164,
@@ -1567,23 +1636,34 @@ final class IOSCompanionWorkflowEngine {
         workflow.blockedDestinations = updated
         var invalidated = 0
         if shouldBlock {
-          let contacts = peopleStore.privateContacts()
-          var affectedIds = Set<String>()
-          for affected in contacts {
-            guard let selectedId = Self.effectivePhoneId(affected, workflow: workflow),
-              affected.phones.first(where: { $0.localId == selectedId })?.e164
-                == destination
-            else { continue }
-            affectedIds.insert(affected.localId)
-            var configuration = Self.contactConfiguration(affected, in: workflow)
-            if configuration.approvalHash != nil || configuration.approvedAt != nil {
-              invalidated += 1
+          let contactsById = Dictionary(
+            uniqueKeysWithValues: peopleStore.privateContacts().map {
+              ($0.localId, $0)
             }
-            Self.invalidateApproval(&configuration, reason: "phone-changed")
-            configuration.updatedAt = Date()
-            Self.upsert(configuration, in: &workflow)
+          )
+          guard let affectedIndices = IOSCompanionConfiguredContactScanner.matchingIndices(
+            configurations: workflow.contacts,
+            contactsByIdentifier: contactsById,
+            identifier: { $0.contactId },
+            matches: { configuration, affected in
+              guard
+                configuration.approvalHash != nil
+                  || configuration.approvedAt != nil,
+                let selectedId = Self.effectivePhoneId(
+                  affected,
+                  configuration: configuration
+                ),
+                affected.phones.first(where: { $0.localId == selectedId })?.e164
+                  == destination
+              else { return false }
+              return true
+            }
+          ) else { throw CompanionStoreError.invalidWorkflowState }
+          for index in affectedIndices {
+            invalidated += 1
+            Self.invalidateApproval(&workflow.contacts[index], reason: "phone-changed")
+            workflow.contacts[index].updatedAt = Date()
           }
-          workflow.occurrences.removeAll { affectedIds.contains($0.contactId) }
         }
         Self.bumpConfiguration(&workflow, activityKind: "settings-changed")
         return invalidated
@@ -2043,23 +2123,63 @@ final class IOSCompanionWorkflowEngine {
     binding: IOSNativeGoogleAccountBinding,
     revision: String,
     status: CompanionProjectionStatus,
+    readiness: [String: Any],
     completion: @escaping (IOSCompanionWorkflowEngineResult) -> Void
   ) {
-    let eligible = effectiveContacts(status: status).filter {
-      $0.configuration?.enrollment == .enabled && $0.approvalKind == "valid"
-        && $0.readinessKind == "ready"
-    }
-    guard status.workflow?.messageDraft != nil, status.workflow?.policy != nil,
-      !eligible.isEmpty
+    guard let workflow = status.workflow,
+      workflow.messageDraft != nil, workflow.policy != nil
     else {
       completion(.failure(Self.actionRequired(["ios-configuration-incomplete"])))
       return
     }
-    let ids = eligible.map { $0.safe.localId }
-    let blocker = Self.reviewHash(
-      kind: "activation", contactIds: ids,
-      workflow: status.workflow!, contacts: peopleStore.privateContacts()
+    let privateContacts = peopleStore.privateContacts()
+    let ids = Self.activationEligibleContactIds(
+      workflow: workflow,
+      contacts: privateContacts
     )
+    guard !ids.isEmpty
+    else {
+      completion(.failure(Self.actionRequired(["ios-configuration-incomplete"])))
+      return
+    }
+    guard let policy = workflow.policy,
+      let composer = readiness["composer"] as? [String: Any],
+      let composerKind = composer["kind"] as? String,
+      ["allowed", "blocked"].contains(composerKind)
+    else {
+      completion(.failure(Self.internalProblem("NATIVE_CONTRACT_INVALID")))
+      return
+    }
+    let readinessIssues: [[String: Any]]
+    if composerKind == "blocked" {
+      guard let blockedIssues = composer["issues"] as? [[String: Any]],
+        !blockedIssues.isEmpty
+      else {
+        completion(.failure(Self.internalProblem("NATIVE_CONTRACT_INVALID")))
+        return
+      }
+      readinessIssues = blockedIssues
+    } else {
+      readinessIssues = []
+    }
+    let readinessIssueIds = Set(readinessIssues.compactMap { $0["id"] as? String })
+    let coexistence: String
+    switch status.coexistence {
+    case .clear: coexistence = "clear"
+    case .deleting: coexistence = "deleting"
+    case .managed: coexistence = "managed"
+    case .staleOrUnknown: coexistence = "stale-or-unknown"
+    case .unavailable: coexistence = "unavailable"
+    }
+    guard
+      let blocker = Self.activationReviewHash(
+        contactIds: ids, workflow: workflow, contacts: privateContacts,
+        status: status, readiness: readiness
+      )
+    else {
+      completion(.failure(Self.internalProblem("NATIVE_CONTRACT_INVALID")))
+      return
+    }
     store.mutateWorkflow(
       expectedRevision: revision, binding: binding,
       body: { workflow, committedRevision in
@@ -2067,7 +2187,7 @@ final class IOSCompanionWorkflowEngine {
           handle: UUID().uuidString.lowercased(), kind: .activation,
           issuedForRevision: committedRevision,
           expiresAt: Date().addingTimeInterval(Self.reviewLifetime),
-          blockerHash: blocker, contactIds: ids, messageDraft: nil,
+          blockerHash: blocker, contactIds: [], messageDraft: nil,
           policy: nil, privacyAction: nil, occurrenceId: nil, consumedAt: nil
         )
         Self.installReview(review, in: &workflow)
@@ -2080,7 +2200,22 @@ final class IOSCompanionWorkflowEngine {
           completion(
             .success([
               "platform": "ios", "handle": handle,
-              "reminderRecipientCount": eligible.count,
+              "reminderRecipientCount": ids.count,
+              "plannedReminderCount": status.reminderPlans.count,
+              "reminderWindowLabel": Self.windowLabel(policy),
+              "reminderHorizon": status.reminderHorizonState?.rawValue ?? "not-built",
+              "coexistence": coexistence,
+              "contactsReady": !readinessIssueIds.contains(where: {
+                $0 == "readiness-contacts-authorization"
+                  || $0 == "readiness-contacts-stale"
+              }),
+              "messageUiReady": !readinessIssueIds.contains(
+                "readiness-message-composer-unavailable"
+              ),
+              "protectedStorageReady": !readinessIssueIds.contains(
+                "readiness-protected-data-unavailable"
+              ),
+              "readiness": readiness,
               "deliveryMode": "user-controlled-composer",
               "limitationsDisclosure":
                 "iOS only reminds you. You review the recipient and text and decide whether to tap Send. Messages and iOS control the available sender line and final transport; this app cannot select or guarantee either.",
@@ -2094,6 +2229,7 @@ final class IOSCompanionWorkflowEngine {
     payload: [String: Any],
     binding: IOSNativeGoogleAccountBinding,
     expectedRevision: String?,
+    status: CompanionProjectionStatus,
     readiness: [String: Any],
     completion: @escaping (IOSCompanionWorkflowEngineResult) -> Void
   ) {
@@ -2110,12 +2246,23 @@ final class IOSCompanionWorkflowEngine {
           )
         else { throw CompanionStoreError.invalidReview }
         let review = workflow.reviews[index]
+        let privateContacts = peopleStore.privateContacts()
+        let eligibleIds = Self.activationEligibleContactIds(
+          workflow: workflow,
+          contacts: privateContacts
+        )
+        let currentReviewHash = Self.activationReviewHash(
+          contactIds: eligibleIds, workflow: workflow, contacts: privateContacts,
+          status: status, readiness: readiness
+        )
+        guard let currentReviewHash else {
+          throw CompanionStoreError.staleMaterial
+        }
         guard
-          review.blockerHash
-            == Self.reviewHash(
-              kind: "activation", contactIds: review.contactIds,
-              workflow: workflow, contacts: peopleStore.privateContacts()
-            ), workflow.messageDraft != nil, workflow.policy != nil
+          !eligibleIds.isEmpty,
+          Self.activationReviewIsConfirmable(status: status, readiness: readiness),
+          review.blockerHash == currentReviewHash,
+          workflow.messageDraft != nil, workflow.policy != nil
         else { throw CompanionStoreError.staleMaterial }
         workflow.desired = .remindersOn
         workflow.reviews[index].consumedAt = Date()
@@ -2542,6 +2689,29 @@ final class IOSCompanionWorkflowEngine {
     binding: IOSNativeGoogleAccountBinding,
     completion: @escaping (IOSCompanionWorkflowEngineResult) -> Void
   ) {
+    if let wipeKind: IOSCompanionWipeRecoveryKind = {
+      switch operation.action {
+      case "sign-out-wipe": return .signOutWipe
+      case "wipe-local-data": return .wipeLocalData
+      default: return nil
+      }
+    }() {
+      var recoveryCalendar = Calendar(identifier: .gregorian)
+      recoveryCalendar.timeZone = .autoupdatingCurrent
+      guard IOSCompanionWipeRecoveryStore.shared.beginSaga(
+        kind: wipeKind,
+        operationId: operation.id,
+        binding: binding,
+        civilDate: CompanionProtectedStore.civilDate(
+          for: Date(), calendar: recoveryCalendar
+        )
+      ) else {
+        return updatePrivacyOperation(
+          operation, binding: binding, phase: "remote-pending",
+          reason: "coordination-unavailable", completion: completion
+        )
+      }
+    }
     switch operation.action {
     case "clear-gemini-templates":
       rebuildPlan(binding: binding) { [weak self] outcome in
@@ -2617,12 +2787,54 @@ final class IOSCompanionWorkflowEngine {
             )
             return
           }
+          guard IOSCompanionWipeRecoveryStore.shared.markLocalCleanupComplete(
+            operationId: operation.id
+          ) else {
+            self.updatePrivacyOperation(
+              operation, binding: binding, phase: "remote-pending",
+              reason: "coordination-unavailable", completion: completion
+            )
+            return
+          }
+          guard IOSComposerReservationJournal.shared.destroyAll(),
+            IOSCompanionWipeRecoveryStore.shared.markReservationJournalDestroyed(
+              operationId: operation.id
+            )
+          else {
+            self.updatePrivacyOperation(
+              operation, binding: binding, phase: "remote-pending",
+              reason: "coordination-unavailable", completion: completion
+            )
+            return
+          }
           self.reminderCoordinator.wipeCompanionData { wipeResult in
             guard wipeResult["kind"] as? String == "ok" else {
               self.updatePrivacyOperation(
                 operation, binding: binding, phase: "remote-pending",
                 reason: "coordination-unavailable", completion: completion
               )
+              return
+            }
+            guard IOSCompanionWipeRecoveryStore.shared
+              .markNotificationCleanupVerified(operationId: operation.id)
+            else {
+              completion(
+                .success(
+                  Self.privacyOperationPayload(
+                    operation, phase: "remote-pending",
+                    reason: "coordination-unavailable"
+                  )))
+              return
+            }
+            guard IOSCompanionWipeRecoveryStore.shared.clearCompletedSaga(
+              operationId: operation.id
+            ) else {
+              completion(
+                .success(
+                  Self.privacyOperationPayload(
+                    operation, phase: "remote-pending",
+                    reason: "coordination-unavailable"
+                  )))
               return
             }
             completion(
@@ -2642,15 +2854,36 @@ final class IOSCompanionWorkflowEngine {
                 operation, phase: "failed", reason: "coordination-unavailable"
               )))
         }
+        guard IOSCompanionWipeRecoveryStore.shared
+          .markNotificationCleanupVerified(operationId: operation.id)
+        else {
+          return completion(
+            .success(
+              Self.privacyOperationPayload(
+                operation, phase: "failed", reason: "coordination-unavailable"
+              )))
+        }
         Task { @MainActor in
           let success = await IOSGoogleIdentityCoordinator.shared
             .wipeLocalDataAfterSafetyShutdown(binding: binding)
+          let localCleanupRecorded = success
+            && IOSCompanionWipeRecoveryStore.shared.markLocalCleanupComplete(
+              operationId: operation.id
+            )
+          let reservationJournalRecorded = localCleanupRecorded
+            && IOSComposerReservationJournal.shared.destroyAll()
+            && IOSCompanionWipeRecoveryStore.shared
+              .markReservationJournalDestroyed(operationId: operation.id)
+          let journalCompleted = reservationJournalRecorded
+            && IOSCompanionWipeRecoveryStore.shared.clearCompletedSaga(
+              operationId: operation.id
+            )
           completion(
             .success(
               Self.privacyOperationPayload(
                 operation,
-                phase: success ? "complete" : "failed",
-                reason: success ? nil : "coordination-unavailable"
+                phase: journalCompleted ? "complete" : "failed",
+                reason: journalCompleted ? nil : "coordination-unavailable"
               )))
         }
       }
@@ -3150,7 +3383,10 @@ final class IOSCompanionWorkflowEngine {
     store.readProjectionStatus { [weak self] result in
       guard let self, case .success(let status) = result,
         let workflow = status.workflow, workflow.account.matches(binding)
-      else { return completion?() }
+      else {
+        completion?()
+        return
+      }
       let privateById = Dictionary(
         uniqueKeysWithValues: self.peopleStore.privateContacts().map { ($0.localId, $0) }
       )
@@ -3223,7 +3459,8 @@ final class IOSCompanionWorkflowEngine {
         self.store.replaceWorkflowPlan(
           binding: binding,
           expectedConfigurationGeneration: workflow.configurationGeneration,
-          occurrences: [], proposals: [], plans: []
+          planningIndex: nil,
+          plans: []
         ) { replaceResult in
           guard case .success = replaceResult else {
             if case .failure(let error) = replaceResult {
@@ -3242,94 +3479,93 @@ final class IOSCompanionWorkflowEngine {
         return
       }
 
+      guard workflow.contacts.map(\.contactId) == workflow.contacts.map(\.contactId).sorted(),
+        let contactTableDigest = IOSCompanionOccurrenceIdentity.contactTableDigest(
+          namespace: snapshot.occurrenceNamespace,
+          canonicalContactIdentifiers: workflow.contacts.map(\.contactId)
+        )
+      else {
+        return completion(.failed(Self.internalProblem("COMPANION_PLAN_BINDING_INVALID")))
+      }
+      let privateContacts = peopleStore.privateContacts()
       let privateById = Dictionary(
-        uniqueKeysWithValues: peopleStore.privateContacts().map { ($0.localId, $0) }
+        uniqueKeysWithValues: privateContacts.map { ($0.localId, $0) }
+      )
+      let destinationCounts = Self.enabledDestinationCounts(
+        workflow: workflow,
+        contacts: privateById
       )
       let blockedDestinations = Set(
         IOSCompanionDestinationBlocklistPolicy.normalized(
           workflow.blockedDestinations
         ) ?? []
       )
-      let existingByKey = Dictionary(
-        uniqueKeysWithValues: workflow.occurrences.map {
-          ("\($0.contactId)|\($0.civilDate)", $0)
-        }
+      let now = Date()
+      let todayStart = calendar.startOfDay(for: now)
+      let baseCivilDate = Self.localDate(todayStart, calendar: calendar)
+      let timeZoneIdentifier = calendar.timeZone.identifier
+      var ordinalsByDay = [[UInt16]](
+        repeating: [],
+        count: IOSCompanionPlanningIndex.planningDayCount
       )
-      var destinationCounts: [String: Int] = [:]
-      for configuration in workflow.contacts where configuration.enrollment == .enabled {
+      for (ordinal, configuration) in workflow.contacts.enumerated() {
         guard let contact = privateById[configuration.contactId],
-          let phoneId = configuration.selectedPhoneId,
-          let destination = contact.phones.first(where: {
-            $0.localId == phoneId
-          })?.e164
-        else { continue }
-        destinationCounts[destination, default: 0] += 1
-      }
-      var candidates:
-        [(contact: IOSPeoplePrivateContact, config: CompanionWorkflowContact, date: Date)] = []
-      for configuration in workflow.contacts where configuration.enrollment == .enabled {
-        guard let contact = privateById[configuration.contactId], !contact.deleted,
-          configuration.materialRevision == contact.materialRevision,
-          configuration.approvalInvalidationReasons.isEmpty,
-          Self.approvalMatches(
-            configuration.approvalHash,
-            contact: contact, configuration: configuration,
-            message: draft, policy: policy
+          Self.isPlanningEligible(
+            contact: contact,
+            configuration: configuration,
+            workflow: workflow,
+            blockedDestinations: blockedDestinations,
+            destinationCounts: destinationCounts
           ),
-          let phoneId = configuration.selectedPhoneId,
-          let destination = contact.phones.first(where: {
-            $0.localId == phoneId
-          })?.e164,
-          !blockedDestinations.contains(destination),
-          destinationCounts[destination] == 1,
           let birthdayId = configuration.selectedBirthdayId,
-          let birthday = contact.birthdays.first(where: { $0.localId == birthdayId })
+          let birthday = contact.birthdays.first(where: { $0.localId == birthdayId }),
+          let rendered = Self.render(draft: draft, contact: contact),
+          Self.smsEstimate(rendered).segments <= draft.requestedSegmentCap,
+          let encodedOrdinal = UInt16(exactly: ordinal)
         else { continue }
         for date in self.occurrenceDates(
-          birthday: birthday, leapPolicy: configuration.leapPolicy, from: Date()
+          birthday: birthday,
+          leapPolicy: configuration.leapPolicy,
+          from: now
         ) {
-          candidates.append((contact, configuration, date))
+          let offset = calendar.dateComponents(
+            [.day],
+            from: todayStart,
+            to: calendar.startOfDay(for: date)
+          ).day
+          guard let offset,
+            (0..<IOSCompanionPlanningIndex.planningDayCount).contains(offset)
+          else { continue }
+          ordinalsByDay[offset].append(encodedOrdinal)
         }
       }
-      candidates.sort {
-        if $0.date != $1.date { return $0.date < $1.date }
-        return $0.contact.localId < $1.contact.localId
+      let planningIndex: IOSCompanionPlanningIndex
+      do {
+        planningIndex = try IOSCompanionPlanningIndex(
+          configurationGeneration: workflow.configurationGeneration,
+          baseCivilDate: baseCivilDate,
+          timeZoneIdentifier: timeZoneIdentifier,
+          contactTableDigest: contactTableDigest,
+          contactCount: workflow.contacts.count,
+          ordinalsByDay: ordinalsByDay
+        )
+      } catch {
+        return completion(.failed(Self.internalProblem("COMPANION_PLAN_CAPACITY_INVALID")))
       }
-      var occurrences: [CompanionWorkflowOccurrence] = []
-      var proposals: [CompanionApprovedProposal] = []
       var plans: [CompanionReminderPlan] = []
-      let today = Self.localDate(Date(), calendar: calendar)
-      for candidate in candidates {
-        let civilDate = Self.localDate(candidate.date, calendar: calendar)
-        guard
-          let phoneId = candidate.config.selectedPhoneId,
-          let phone = candidate.contact.phones.first(where: { $0.localId == phoneId })?.e164,
-          let body = Self.render(draft: draft, contact: candidate.contact),
-          Self.smsEstimate(body).segments <= draft.requestedSegmentCap
+      for dayOffset in ordinalsByDay.indices where !ordinalsByDay[dayOffset].isEmpty {
+        guard let date = calendar.date(byAdding: .day, value: dayOffset, to: todayStart)
         else { continue }
-        let key = "\(candidate.contact.localId)|\(civilDate)"
-        let existing = existingByKey[key]
-        let occurrenceId = existing?.occurrenceId ?? UUID().uuidString.lowercased()
-        let proposalId = existing?.proposalId ?? UUID().uuidString.lowercased()
-        occurrences.append(
-          CompanionWorkflowOccurrence(
-            occurrenceId: occurrenceId, proposalId: proposalId,
-            contactId: candidate.contact.localId, civilDate: civilDate,
-            phase: civilDate == today ? .composerReady : .reminderPlanned,
-            updatedAt: Date()
-          )
-        )
-        proposals.append(
-          CompanionApprovedProposal(
-            proposalId: proposalId, revision: snapshot.revision,
+        let civilDate = Self.localDate(date, calendar: calendar)
+        let firstOrdinal = Int(ordinalsByDay[dayOffset][0])
+        guard firstOrdinal < workflow.contacts.count,
+          let occurrenceId = IOSCompanionOccurrenceIdentity.occurrenceId(
+            namespace: snapshot.occurrenceNamespace,
             accountGeneration: binding.accountGeneration,
-            occurrenceId: occurrenceId, occurrenceCivilDate: civilDate,
-            recipient: phone, body: body, state: .ready,
-            reviewNonceDigest: nil, reviewNonceExpiresAt: nil,
-            reviewSessionGeneration: nil, reviewSceneIdentifier: nil,
-            operationId: nil
+            contactIdentifier: workflow.contacts[firstOrdinal].contactId,
+            civilDate: civilDate
           )
-        )
+        else { continue }
         plans.append(
           CompanionReminderPlan(
             occurrenceId: occurrenceId, civilDate: civilDate,
@@ -3340,7 +3576,8 @@ final class IOSCompanionWorkflowEngine {
       self.store.replaceWorkflowPlan(
         binding: binding,
         expectedConfigurationGeneration: workflow.configurationGeneration,
-        occurrences: occurrences, proposals: proposals, plans: plans
+        planningIndex: planningIndex,
+        plans: plans
       ) { replaceResult in
         guard case .success = replaceResult else {
           if case .failure(let error) = replaceResult {
@@ -3401,7 +3638,8 @@ final class IOSCompanionWorkflowEngine {
     let scheduled = response["scheduledCount"] as? Int ?? 0
     let failed = response["failedCount"] as? Int ?? Int.max
     guard ["authorized", "ephemeral", "provisional"].contains(authorization ?? ""),
-      planned > 0, scheduled > 0, failed == 0
+      planned >= 0, failed == 0,
+      planned == 0 ? scheduled == 0 : scheduled > 0
     else {
       return .failed(actionRequired(["ios-configuration-incomplete"]))
     }
@@ -3512,7 +3750,7 @@ final class IOSCompanionWorkflowEngine {
       workflow.activity.append(
         CompanionWorkflowActivity(
           id: UUID().uuidString.lowercased(), kind: activityKind,
-          reason: nil, occurredAt: Date(), actionable: false
+          reason: nil, occurredAt: Date()
         )
       )
     }
@@ -3547,7 +3785,16 @@ final class IOSCompanionWorkflowEngine {
     _ contact: IOSPeoplePrivateContact,
     workflow: CompanionWorkflowState
   ) -> String? {
-    let configuration = workflow.contacts.first { $0.contactId == contact.localId }
+    effectivePhoneId(
+      contact,
+      configuration: workflow.contacts.first { $0.contactId == contact.localId }
+    )
+  }
+
+  private static func effectivePhoneId(
+    _ contact: IOSPeoplePrivateContact,
+    configuration: CompanionWorkflowContact?
+  ) -> String? {
     if let selected = configuration?.selectedPhoneId,
       contact.phones.contains(where: { $0.localId == selected && $0.e164 != nil })
     {
@@ -3639,12 +3886,15 @@ final class IOSCompanionWorkflowEngine {
     contacts: [IOSPeoplePrivateContact]
   ) -> String {
     let byId = Dictionary(uniqueKeysWithValues: contacts.map { ($0.localId, $0) })
+    let configurationById = Dictionary(
+      uniqueKeysWithValues: workflow.contacts.map { ($0.contactId, $0) }
+    )
     var parts = [
       kind, workflow.account.accountGeneration, String(workflow.configurationGeneration),
     ]
     for id in contactIds.sorted() {
       let contact = byId[id]
-      let configuration = workflow.contacts.first { $0.contactId == id }
+      let configuration = configurationById[id]
       let destination = IOSCompanionApprovalDestinationBinding.resolve(
         selectedPhoneId: configuration?.selectedPhoneId,
         phones: contact?.phones ?? []
@@ -3677,6 +3927,80 @@ final class IOSCompanionWorkflowEngine {
       ])
     }
     return canonicalHash(parts)
+  }
+
+  private static func activationCoexistenceValue(
+    _ coexistence: CompanionProjectionStatus.Coexistence
+  ) -> String {
+    switch coexistence {
+    case .clear: return "clear"
+    case .deleting: return "deleting"
+    case .managed: return "managed"
+    case .staleOrUnknown: return "stale-or-unknown"
+    case .unavailable: return "unavailable"
+    }
+  }
+
+  /// Binds the content-free runtime facts shown in the final activation review
+  /// to the same one-use native handle as workflow/contact material. A later
+  /// horizon, coexistence, protected-data, Contacts, foreground, or MessageUI
+  /// change makes confirmation stale instead of allowing a green-looking old
+  /// snapshot to activate reminders.
+  private static func activationReviewHash(
+    contactIds: [String],
+    workflow: CompanionWorkflowState,
+    contacts: [IOSPeoplePrivateContact],
+    status: CompanionProjectionStatus,
+    readiness: [String: Any]
+  ) -> String? {
+    guard let composer = readiness["composer"] as? [String: Any],
+      let composerKind = composer["kind"] as? String,
+      ["allowed", "blocked"].contains(composerKind)
+    else { return nil }
+
+    var readinessParts = [composerKind]
+    if composerKind == "blocked" {
+      guard let issues = composer["issues"] as? [[String: Any]], !issues.isEmpty
+      else { return nil }
+      var canonicalIssues: [String] = []
+      for issue in issues {
+        guard let id = issue["id"] as? String,
+          let code = issue["code"] as? String,
+          let severity = issue["severity"] as? String,
+          let blocks = issue["blocks"] as? [String],
+          !blocks.isEmpty
+        else { return nil }
+        canonicalIssues.append(
+          canonicalHash([id, code, severity] + blocks.sorted())
+        )
+      }
+      readinessParts.append(contentsOf: canonicalIssues.sorted())
+    }
+
+    return canonicalHash([
+      reviewHash(
+        kind: "activation", contactIds: contactIds,
+        workflow: workflow, contacts: contacts
+      ),
+      String(status.reminderPlans.count),
+      status.reminderHorizonState?.rawValue ?? "not-built",
+      activationCoexistenceValue(status.coexistence),
+      canonicalHash(readinessParts),
+    ])
+  }
+
+  private static func activationReviewIsConfirmable(
+    status: CompanionProjectionStatus,
+    readiness: [String: Any]
+  ) -> Bool {
+    guard
+      status.reminderHorizonState == nil || status.reminderHorizonState == .full,
+      status.coexistence == .clear,
+      let composer = readiness["composer"] as? [String: Any],
+      Set(composer.keys) == ["kind"],
+      composer["kind"] as? String == "allowed"
+    else { return false }
+    return true
   }
 
   private static func messageReviewHash(
@@ -3816,6 +4140,478 @@ final class IOSCompanionWorkflowEngine {
       // It is not consulted by any iOS planning or review decision.
       legacyAndroidDailyCap: min(compatibilityCap, 20)
     )
+  }
+
+  func lazyProposalMaterial(
+    proposalId: String,
+    expectedRevision: String?,
+    status: CompanionProjectionStatus,
+    binding: IOSNativeGoogleAccountBinding,
+    now: Date = Date(),
+    requireTrustedFreshness: Bool = false
+  ) -> IOSCompanionLazyProposalMaterial? {
+    guard expectedRevision == nil || status.revision == expectedRevision,
+      let coordinates = IOSCompanionOccurrenceIdentity.untrustedProposalCoordinates(
+        proposalId
+      ),
+      let context = lazyProposalMaterialContext(
+        status: status,
+        binding: binding,
+        localNow: now,
+        requireTrustedFreshness: requireTrustedFreshness
+      ),
+      let material = lazyProposalMaterial(
+        dayOffset: coordinates.dayOffset,
+        contactOrdinal: coordinates.contactOrdinal,
+        context: context,
+        status: status,
+        binding: binding,
+        ordinalMembershipAlreadyVerified: false
+      ),
+      material.proposalId == proposalId,
+      material.occurrenceCivilDate
+        == Self.localDate(context.materializationNow, calendar: calendar)
+    else { return nil }
+    return material
+  }
+
+  private func nextLazyProposalMaterial(
+    status: CompanionProjectionStatus,
+    binding: IOSNativeGoogleAccountBinding,
+    now: Date
+  ) -> IOSCompanionLazyProposalMaterial? {
+    return try? IOSCompanionLazyOrdinalScanner.first(
+      buildContext: {
+        guard let context = self.lazyProposalMaterialContext(
+          status: status,
+          binding: binding,
+          localNow: now,
+          requireTrustedFreshness: false
+        ), let dayOffset = Self.dayOffset(
+          civilDate: Self.localDate(now, calendar: self.calendar),
+          index: context.index
+        ) else { return nil }
+        return (material: context, dayOffset: dayOffset)
+      },
+      ordinals: { context in
+        try context.material.index.ordinals(dayOffset: context.dayOffset)
+      },
+      materialize: { context, contactOrdinal in
+        return self.lazyProposalMaterial(
+          dayOffset: context.dayOffset,
+          contactOrdinal: contactOrdinal,
+          context: context.material,
+          status: status,
+          binding: binding,
+          ordinalMembershipAlreadyVerified: true
+        )
+      }
+    )
+  }
+
+  private func firstLazyProposalMaterial(
+    status: CompanionProjectionStatus,
+    binding: IOSNativeGoogleAccountBinding,
+    startingCivilDate: String,
+    now: Date
+  ) -> IOSCompanionLazyProposalMaterial? {
+    guard let context = lazyProposalMaterialContext(
+      status: status,
+      binding: binding,
+      localNow: now,
+      requireTrustedFreshness: false
+    ), let firstOffset = Self.dayOffset(
+      civilDate: startingCivilDate,
+      index: context.index
+    )
+    else { return nil }
+    for dayOffset in firstOffset..<IOSCompanionPlanningIndex.planningDayCount {
+      guard let ordinals = try? context.index.ordinals(dayOffset: dayOffset)
+      else { return nil }
+      for ordinal in ordinals {
+        if let material = lazyProposalMaterial(
+          dayOffset: dayOffset,
+          contactOrdinal: Int(ordinal),
+          context: context,
+          status: status,
+          binding: binding,
+          ordinalMembershipAlreadyVerified: true
+        ) {
+          return material
+        }
+      }
+    }
+    return nil
+  }
+
+  private func lazyProposalMaterialContext(
+    status: CompanionProjectionStatus,
+    binding: IOSNativeGoogleAccountBinding,
+    localNow: Date,
+    requireTrustedFreshness: Bool
+  ) -> IOSCompanionLazyMaterialContext? {
+    guard !status.resetSafetyRequiresRelease,
+      let workflow = status.workflow,
+      workflow.account.matches(binding),
+      workflow.desired == .remindersOn,
+      workflow.privacyOperations.allSatisfy({
+        ["complete", "failed"].contains($0.phase)
+      }),
+      let index = status.planningIndex,
+      index.timeZoneIdentifier == calendar.timeZone.identifier,
+      index.configurationGeneration == workflow.configurationGeneration,
+      index.contactCount == workflow.contacts.count,
+      let draft = workflow.messageDraft,
+      IOSCompanionMessagePlaceholderPolicy.isValid(
+        text: draft.text,
+        placeholderMode: draft.placeholderMode
+      ),
+      IOSBirthdayMessageContentPolicy.issueCodes(
+        text: draft.text,
+        declaredLanguage: draft.language
+      ).isEmpty,
+      workflow.policy != nil,
+      let normalizedBlockedDestinations =
+        IOSCompanionDestinationBlocklistPolicy.normalized(
+          workflow.blockedDestinations
+        )
+    else { return nil }
+
+    let contactIdentifiers = workflow.contacts.map(\.contactId)
+    guard contactIdentifiers == contactIdentifiers.sorted(),
+      index.contactTableDigest == IOSCompanionOccurrenceIdentity.contactTableDigest(
+        namespace: status.occurrenceNamespace,
+        canonicalContactIdentifiers: contactIdentifiers
+      )
+    else { return nil }
+
+    let materializationNow: Date
+    if requireTrustedFreshness {
+      guard
+        let trustedMaterializationNow =
+          IOSCompanionTrustedClockPolicy.materializationNow(
+            localNow: localNow,
+            trustedServerEstimate: status.trustedNow
+          ),
+        Self.contactsFreshness(
+          peopleStore.projection().sync,
+          trustedNow: status.trustedNow
+        ).allowsCompanionAction
+      else { return nil }
+      materializationNow = trustedMaterializationNow
+    } else {
+      materializationNow = localNow
+    }
+
+    guard let peopleSnapshot = peopleStore.privateSnapshot(),
+      peopleSnapshot.binding == binding
+    else { return nil }
+    let privateContacts = peopleSnapshot.contacts
+    let privateContactsById = Dictionary(
+      uniqueKeysWithValues: privateContacts.map { ($0.localId, $0) }
+    )
+    return IOSCompanionLazyMaterialContext(
+      workflow: workflow,
+      index: index,
+      draft: draft,
+      materializationNow: materializationNow,
+      peopleSnapshotGeneration: peopleSnapshot.generation,
+      privateContactsById: privateContactsById,
+      blockedDestinations: Set(normalizedBlockedDestinations),
+      destinationCounts: Self.enabledDestinationCounts(
+        workflow: workflow,
+        contacts: privateContactsById
+      )
+    )
+  }
+
+  private func lazyProposalMaterial(
+    dayOffset: Int,
+    contactOrdinal: Int,
+    context: IOSCompanionLazyMaterialContext,
+    status: CompanionProjectionStatus,
+    binding: IOSNativeGoogleAccountBinding,
+    ordinalMembershipAlreadyVerified: Bool
+  ) -> IOSCompanionLazyProposalMaterial? {
+    let workflow = context.workflow
+    let index = context.index
+    let draft = context.draft
+    guard contactOrdinal >= 0, contactOrdinal < workflow.contacts.count,
+      let encodedOrdinal = UInt16(exactly: contactOrdinal),
+      ordinalMembershipAlreadyVerified
+        || (try? index.ordinals(dayOffset: dayOffset).contains(encodedOrdinal)) == true,
+      let civilDate = Self.civilDate(dayOffset: dayOffset, index: index),
+      let occurrenceDigest = IOSCompanionOccurrenceIdentity.occurrenceDigest(
+        namespace: status.occurrenceNamespace,
+        accountGeneration: binding.accountGeneration,
+        contactIdentifier: workflow.contacts[contactOrdinal].contactId,
+        civilDate: civilDate
+      ),
+      status.terminalLedger.check(
+        digest: occurrenceDigest,
+        civilDate: civilDate
+      ) == .clear
+    else { return nil }
+
+    let configuration = workflow.contacts[contactOrdinal]
+    guard let contact = context.privateContactsById[configuration.contactId]
+    else { return nil }
+    guard Self.isPlanningEligible(
+      contact: contact,
+      configuration: configuration,
+      workflow: workflow,
+      blockedDestinations: context.blockedDestinations,
+      destinationCounts: context.destinationCounts
+    ),
+      let selectedPhoneId = configuration.selectedPhoneId,
+      let recipient = contact.phones.first(where: {
+        $0.localId == selectedPhoneId
+      })?.e164,
+      IOSCompanionDestinationBlocklistPolicy.isCanonical(recipient),
+      let birthdayId = configuration.selectedBirthdayId,
+      let birthday = contact.birthdays.first(where: { $0.localId == birthdayId }),
+      occurrenceDates(
+        birthday: birthday,
+        leapPolicy: configuration.leapPolicy,
+        from: context.materializationNow
+      ).contains(where: { Self.localDate($0, calendar: calendar) == civilDate }),
+      let body = Self.render(draft: draft, contact: contact),
+      Self.smsEstimate(body).segments <= draft.requestedSegmentCap,
+      let occurrenceId = IOSCompanionOccurrenceIdentity.occurrenceId(
+        namespace: status.occurrenceNamespace,
+        accountGeneration: binding.accountGeneration,
+        contactIdentifier: contact.localId,
+        civilDate: civilDate
+      ),
+      let proposalId = IOSCompanionOccurrenceIdentity.proposalHandle(
+        namespace: status.occurrenceNamespace,
+        accountGeneration: binding.accountGeneration,
+        configurationGeneration: workflow.configurationGeneration,
+        baseCivilDate: index.baseCivilDate,
+        timeZoneIdentifier: index.timeZoneIdentifier,
+        contactTableDigest: index.contactTableDigest,
+        dayOffset: dayOffset,
+        contactOrdinal: contactOrdinal,
+        occurrenceId: occurrenceId
+      )
+    else { return nil }
+    return IOSCompanionLazyProposalMaterial(
+      proposalId: proposalId,
+      accountGeneration: binding.accountGeneration,
+      configurationGeneration: workflow.configurationGeneration,
+      peopleSnapshotGeneration: context.peopleSnapshotGeneration,
+      contactOrdinal: contactOrdinal,
+      contactId: contact.localId,
+      contactMaterialRevision: contact.materialRevision,
+      selectedPhoneId: selectedPhoneId,
+      occurrenceId: occurrenceId,
+      occurrenceDigest: occurrenceDigest,
+      occurrenceCivilDate: civilDate,
+      recipient: recipient,
+      body: body
+    )
+  }
+
+  private func validatedPlanningDescriptorContext(
+    status: CompanionProjectionStatus
+  ) -> (IOSCompanionPlanningIndex, CompanionWorkflowState)? {
+    guard let index = status.planningIndex, let workflow = status.workflow,
+      index.contactCount == workflow.contacts.count,
+      index.contactTableDigest == IOSCompanionOccurrenceIdentity.contactTableDigest(
+        namespace: status.occurrenceNamespace,
+        canonicalContactIdentifiers: workflow.contacts.map(\.contactId)
+      )
+    else { return nil }
+    return (index, workflow)
+  }
+
+  private func plannedOccurrenceCount(
+    civilDate: String,
+    status: CompanionProjectionStatus
+  ) -> Int {
+    guard let (index, workflow) = validatedPlanningDescriptorContext(status: status),
+      let dayOffset = Self.dayOffset(civilDate: civilDate, index: index),
+      let ordinals = try? index.ordinals(dayOffset: dayOffset)
+    else { return 0 }
+    return ordinals.reduce(into: 0) { count, ordinalValue in
+      let ordinal = Int(ordinalValue)
+      guard ordinal < workflow.contacts.count,
+        let digest = IOSCompanionOccurrenceIdentity.occurrenceDigest(
+          namespace: status.occurrenceNamespace,
+          accountGeneration: workflow.account.accountGeneration,
+          contactIdentifier: workflow.contacts[ordinal].contactId,
+          civilDate: civilDate
+        ), status.terminalLedger.check(digest: digest, civilDate: civilDate) == .clear
+      else { return }
+      count += 1
+    }
+  }
+
+  private func plannedOccurrenceDescriptor(
+    occurrenceId: String,
+    status: CompanionProjectionStatus
+  ) -> IOSCompanionPlannedOccurrenceDescriptor? {
+    guard let (index, workflow) = validatedPlanningDescriptorContext(status: status)
+    else { return nil }
+    for dayOffset in 0..<IOSCompanionPlanningIndex.planningDayCount {
+      guard let civilDate = Self.civilDate(dayOffset: dayOffset, index: index),
+        let ordinals = try? index.ordinals(dayOffset: dayOffset)
+      else { return nil }
+      for ordinalValue in ordinals {
+        let ordinal = Int(ordinalValue)
+        guard ordinal < workflow.contacts.count,
+          let digest = IOSCompanionOccurrenceIdentity.occurrenceDigest(
+            namespace: status.occurrenceNamespace,
+            accountGeneration: workflow.account.accountGeneration,
+            contactIdentifier: workflow.contacts[ordinal].contactId,
+            civilDate: civilDate
+          ), status.terminalLedger.check(digest: digest, civilDate: civilDate) == .clear,
+          let candidateId = IOSCompanionOccurrenceIdentity.occurrenceId(
+            namespace: status.occurrenceNamespace,
+            accountGeneration: workflow.account.accountGeneration,
+            contactIdentifier: workflow.contacts[ordinal].contactId,
+            civilDate: civilDate
+          ), candidateId == occurrenceId
+        else { continue }
+        return IOSCompanionPlannedOccurrenceDescriptor(
+          occurrenceId: candidateId,
+          contactId: workflow.contacts[ordinal].contactId,
+          civilDate: civilDate
+        )
+      }
+    }
+    return nil
+  }
+
+  private static func enabledDestinationCounts(
+    workflow: CompanionWorkflowState,
+    contacts: [String: IOSPeoplePrivateContact]
+  ) -> [String: Int] {
+    var counts: [String: Int] = [:]
+    for configuration in workflow.contacts where configuration.enrollment == .enabled {
+      guard let contact = contacts[configuration.contactId],
+        let destination = IOSCompanionApprovalDestinationBinding.resolve(
+          selectedPhoneId: configuration.selectedPhoneId,
+          phones: contact.phones
+        )?.e164
+      else { continue }
+      counts[destination, default: 0] += 1
+    }
+    return counts
+  }
+
+  private static func isPlanningEligible(
+    contact: IOSPeoplePrivateContact,
+    configuration: CompanionWorkflowContact,
+    workflow: CompanionWorkflowState,
+    blockedDestinations: Set<String>,
+    destinationCounts: [String: Int]
+  ) -> Bool {
+    guard configuration.enrollment == .enabled, !contact.deleted,
+      configuration.materialRevision == contact.materialRevision,
+      configuration.approvalInvalidationReasons.isEmpty,
+      approvalMatches(
+        configuration.approvalHash,
+        contact: contact,
+        configuration: configuration,
+        message: workflow.messageDraft,
+        policy: workflow.policy
+      ),
+      let destination = IOSCompanionApprovalDestinationBinding.resolve(
+        selectedPhoneId: configuration.selectedPhoneId,
+        phones: contact.phones
+      )?.e164,
+      !blockedDestinations.contains(destination),
+      destinationCounts[destination] == 1,
+      let birthdayId = configuration.selectedBirthdayId,
+      contact.birthdays.contains(where: { $0.localId == birthdayId })
+    else { return false }
+    return true
+  }
+
+  private static func activationEligibleContactIds(
+    workflow: CompanionWorkflowState,
+    contacts: [IOSPeoplePrivateContact]
+  ) -> [String] {
+    let byId = Dictionary(uniqueKeysWithValues: contacts.map { ($0.localId, $0) })
+    let blocked = Set(
+      IOSCompanionDestinationBlocklistPolicy.normalized(
+        workflow.blockedDestinations
+      ) ?? []
+    )
+    let counts = enabledDestinationCounts(workflow: workflow, contacts: byId)
+    guard let draft = workflow.messageDraft else { return [] }
+    return workflow.contacts.compactMap { configuration in
+      guard let contact = byId[configuration.contactId],
+        isPlanningEligible(
+          contact: contact,
+          configuration: configuration,
+          workflow: workflow,
+          blockedDestinations: blocked,
+          destinationCounts: counts
+        ), let body = render(draft: draft, contact: contact),
+        smsEstimate(body).segments <= draft.requestedSegmentCap
+      else { return nil }
+      return contact.localId
+    }.sorted()
+  }
+
+  private static func contactsFreshness(
+    _ state: IOSPeopleSafeSyncState,
+    trustedNow: Date?
+  ) -> IOSContactsFreshnessAssessment {
+    let source: IOSContactsFreshnessSourceState
+    let lastSuccess: Date?
+    switch state {
+    case .fresh(let completedAt, _):
+      source = .verified
+      lastSuccess = completedAt
+    case .failedRetained(let retainedAt, _):
+      source = .retainedAfterFailure
+      lastSuccess = retainedAt
+    case .authorizationRequired:
+      source = .authorizationRequired
+      lastSuccess = nil
+    case .neverSynced, .syncing:
+      source = .unavailable
+      lastSuccess = nil
+    }
+    return IOSContactsFreshnessPolicy.assess(
+      sourceState: source,
+      lastSuccessAt: lastSuccess,
+      trustedNow: trustedNow
+    )
+  }
+
+  private static func civilDate(
+    dayOffset: Int,
+    index: IOSCompanionPlanningIndex
+  ) -> String? {
+    guard (0..<IOSCompanionPlanningIndex.planningDayCount).contains(dayOffset),
+      let timeZone = TimeZone(identifier: index.timeZoneIdentifier)
+    else { return nil }
+    let parts = index.baseCivilDate.split(separator: "-", omittingEmptySubsequences: false)
+    guard parts.count == 3, let year = Int(parts[0]), let month = Int(parts[1]),
+      let day = Int(parts[2])
+    else { return nil }
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = timeZone
+    guard let base = calendar.date(
+      from: DateComponents(year: year, month: month, day: day, hour: 12)
+    ), let date = calendar.date(byAdding: .day, value: dayOffset, to: base)
+    else { return nil }
+    return localDate(date, calendar: calendar)
+  }
+
+  private static func dayOffset(
+    civilDate: String,
+    index: IOSCompanionPlanningIndex
+  ) -> Int? {
+    for offset in 0..<IOSCompanionPlanningIndex.planningDayCount
+    where Self.civilDate(dayOffset: offset, index: index) == civilDate {
+      return offset
+    }
+    return nil
   }
 
   private func simulate(
@@ -4281,13 +5077,13 @@ final class IOSCompanionWorkflowEngine {
     kind: String,
     reason: String?,
     occurredAt: Date,
-    actionable: Bool
+    recoveryRoute: String?
   ) -> [String: Any] {
     var result: [String: Any] = [
       "id": id, "kind": kind, "occurredAt": dateString(occurredAt),
-      "actionable": actionable,
     ]
     if let reason { result["reason"] = reason }
+    if let recoveryRoute { result["recovery"] = ["route": recoveryRoute] }
     return result
   }
 

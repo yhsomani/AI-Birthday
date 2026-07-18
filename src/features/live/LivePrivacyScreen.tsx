@@ -12,9 +12,12 @@ import { AppText } from '../../design-system/components/AppText';
 import {
   Button,
   Card,
+  ChoiceChip,
+  InlineReviewCard,
   ReadinessBanner,
   Screen,
   SectionHeading,
+  SingleChoiceGroup,
   StatusRow,
 } from '../../design-system/components/Primitives';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
@@ -456,7 +459,12 @@ export function LivePrivacyScreen({
 
   return (
     <Screen includeTopInset testID="live-privacy-screen">
-      <Button label={t('live.common.back')} onPress={onBack} variant="ghost" />
+      <Button
+        label={t('live.common.back')}
+        onPress={onBack}
+        variant="ghost"
+        testID="live-privacy-back"
+      />
       <AppText variant="title" accessibilityRole="header">
         {t('live.privacy.title')}
       </AppText>
@@ -575,18 +583,23 @@ export function LivePrivacyScreen({
           {canStartNewAction ? (
             <>
               <SectionHeading title={t('live.privacy.choose')} />
-              {privacyActions.map(action => (
-                <Button
-                  key={action.kind}
-                  label={t(action.label)}
-                  onPress={() => {
-                    setSelected(action.kind);
-                    setReview(undefined);
-                  }}
-                  variant={selected === action.kind ? 'primary' : 'secondary'}
-                  testID={`live-privacy-${action.kind}`}
-                />
-              ))}
+              <SingleChoiceGroup
+                label={t('live.privacy.choose')}
+                testID="live-privacy-action-group"
+              >
+                {privacyActions.map(action => (
+                  <ChoiceChip
+                    key={action.kind}
+                    label={t(action.label)}
+                    onPress={() => {
+                      setSelected(action.kind);
+                      setReview(undefined);
+                    }}
+                    selected={selected === action.kind}
+                    testID={`live-privacy-${action.kind}`}
+                  />
+                ))}
+              </SingleChoiceGroup>
               {selected && !review ? (
                 <Button
                   label={
@@ -625,12 +638,15 @@ export function LivePrivacyScreen({
             </Card>
           ) : null}
           {review ? (
-            <Card>
-              <AppText variant="heading">
-                {review.source === 'pending-deletion-local-wipe'
+            <InlineReviewCard
+              reviewKey={review.review.handle}
+              testID="live-privacy-review"
+              title={
+                review.source === 'pending-deletion-local-wipe'
                   ? t('live.privacy.pendingWipeReviewTitle')
-                  : t('live.privacy.reviewTitle')}
-              </AppText>
+                  : t('live.privacy.reviewTitle')
+              }
+            >
               <StatusRow
                 title={t(
                   privacyActions.find(
@@ -689,7 +705,7 @@ export function LivePrivacyScreen({
                 onPress={() => setReview(undefined)}
                 variant="secondary"
               />
-            </Card>
+            </InlineReviewCard>
           ) : null}
           {visibleOperation ? (
             <Card>

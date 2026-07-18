@@ -167,6 +167,7 @@ internal object AttentionClassificationPolicy {
     "SENDER_TRANSFER_PENDING" to AttentionClassification(AttentionCategory.TRANSFER, 2),
     "COORDINATION_NETWORK_UNAVAILABLE" to AttentionClassification(AttentionCategory.COORDINATION, 1),
     "COORDINATION_TIER_CONFIGURATION_MISSING" to AttentionClassification(AttentionCategory.COORDINATION, 2),
+    "IOS_COMPOSER_RESERVED" to AttentionClassification(AttentionCategory.COORDINATION, 1),
     "BIRTHDAY_LEASE_UNAVAILABLE" to AttentionClassification(AttentionCategory.COORDINATION, 1),
     "TEST_LEASE_UNAVAILABLE" to AttentionClassification(AttentionCategory.COORDINATION, 1),
     "BIRTHDAY_CLAIM_PENDING" to AttentionClassification(AttentionCategory.COORDINATION, 1),

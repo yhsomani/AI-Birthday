@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-import { ACTIVITY_KINDS } from '../../domain/activity/model';
+import {
+  ACTIVITY_KINDS,
+  ACTIVITY_RECOVERY_ROUTES,
+} from '../../domain/activity/model';
 import {
   ANDROID_BIRTHDAY_JOB_PHASES,
   ANDROID_TEST_PHASES,
@@ -426,6 +429,20 @@ export const activationReviewSchema = z.discriminatedUnion('platform', [
     platform: z.literal('ios'),
     handle: activationReviewHandleSchema,
     reminderRecipientCount: boundedCount,
+    plannedReminderCount: boundedCount,
+    reminderWindowLabel: boundedShortLabel,
+    reminderHorizon: z.enum(['denied', 'full', 'not-built', 'partial']),
+    coexistence: z.enum([
+      'clear',
+      'deleting',
+      'managed',
+      'stale-or-unknown',
+      'unavailable',
+    ]),
+    contactsReady: z.boolean(),
+    messageUiReady: z.boolean(),
+    protectedStorageReady: z.boolean(),
+    readiness: iosReadinessProjectionSchema,
     deliveryMode: z.literal('user-controlled-composer'),
     limitationsDisclosure: boundedDisclosure,
   }),
@@ -492,7 +509,9 @@ export const activityRecordSchema = strictObject({
   kind: z.enum(ACTIVITY_KINDS),
   reason: safeReasonCodeSchema.optional(),
   occurredAt: utcInstantSchema,
-  actionable: z.boolean(),
+  recovery: strictObject({
+    route: z.enum(ACTIVITY_RECOVERY_ROUTES),
+  }).optional(),
 });
 
 export const activityPageSchema = strictObject({

@@ -31,6 +31,7 @@ import {
 } from '../../design-system/tokens/theme';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
+import { bidiIsolate } from '../../localization/bidi';
 import { safeReasonMessageKey } from '../../localization/reasonCopy';
 import type { LiveAppPort } from './LiveAppPort';
 import {
@@ -268,7 +269,12 @@ export function LiveMessageScreen({
 
   return (
     <Screen includeTopInset testID="live-message-screen">
-      <Button label={t('live.common.back')} onPress={onBack} variant="ghost" />
+      <Button
+        label={t('live.common.back')}
+        onPress={onBack}
+        variant="ghost"
+        testID="live-message-back"
+      />
       <AppText variant="title" accessibilityRole="header">
         {t('live.message.title')}
       </AppText>
@@ -509,7 +515,7 @@ export function LiveMessageScreen({
                 >
                   <AppText variant="label">
                     {t('live.message.example', {
-                      name: example.displayName,
+                      name: bidiIsolate(example.displayName),
                       segments: example.segmentCount,
                       encoding: example.encodingLabel,
                     })}

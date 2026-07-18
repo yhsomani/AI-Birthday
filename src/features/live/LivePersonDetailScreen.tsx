@@ -29,6 +29,7 @@ import {
 } from '../../design-system/components/Primitives';
 import { spacing } from '../../design-system/tokens/theme';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
+import { bidiIsolate } from '../../localization/bidi';
 import { formatLiveInstant } from '../../localization/formatLive';
 import {
   approvalInvalidationMessageKey,
@@ -41,7 +42,11 @@ import {
   LiveLoading,
   LiveRefreshProblem,
 } from './LiveProjectionState';
-import { nativeBridgeProblem } from './nativeProblem';
+import {
+  nativeBridgeProblem,
+  nativeContractProblem,
+  nativePlatformMismatchProblem,
+} from './nativeProblem';
 import { useLiveProjection } from './useLiveProjection';
 
 type EnrollmentReviewState = Readonly<{
@@ -183,8 +188,14 @@ export function LivePersonDetailScreen({
     setPending(false);
   };
 
-  const fail = async (actionProblem: NativeProblem) => {
-    if (actionProblem.kind === 'stale-revision') {
+  const fail = async (
+    actionProblem: NativeProblem,
+    refreshAfterAcceptedContractFailure = false,
+  ) => {
+    if (
+      actionProblem.kind === 'stale-revision' ||
+      refreshAfterAcceptedContractFailure
+    ) {
       await detail.reload();
       setEnrollmentReview(undefined);
       setApprovalReview(undefined);
@@ -219,6 +230,13 @@ export function LivePersonDetailScreen({
       await fail(result.problem);
       return;
     }
+    if (
+      result.envelope.value.changedContactIds.length !== 1 ||
+      result.envelope.value.changedContactIds[0] !== contactId
+    ) {
+      await fail(nativeContractProblem, true);
+      return;
+    }
     await reloadAfterAccepted(acceptedMessage);
   };
 
@@ -237,6 +255,18 @@ export function LivePersonDetailScreen({
     }
     if (result.kind === 'error') {
       await fail(result.problem);
+      return;
+    }
+    const returnedContact = result.envelope.value.recipients[0];
+    const validReview =
+      result.envelope.value.recipients.length === 1 &&
+      result.envelope.value.readyCount === 1 &&
+      result.envelope.value.attentionCount === 0 &&
+      returnedContact?.id === contactId &&
+      returnedContact.readiness.kind === 'ready' &&
+      returnedContact.enrollment.kind === 'off';
+    if (!validReview) {
+      await fail(nativeContractProblem);
       return;
     }
     setEnrollmentReview({
@@ -359,6 +389,15 @@ export function LivePersonDetailScreen({
       await fail(result.problem);
       return;
     }
+    const selectedChoiceMatches =
+      result.envelope.value.summary.id === contactId &&
+      (choiceReview.kind === 'phone'
+        ? result.envelope.value.selectedPhoneId === choiceReview.id
+        : result.envelope.value.selectedBirthdayId === choiceReview.id);
+    if (!selectedChoiceMatches) {
+      await fail(nativeContractProblem, true);
+      return;
+    }
     await reloadAfterAccepted(t('live.person.choiceAccepted'));
   };
 
@@ -381,6 +420,8 @@ export function LivePersonDetailScreen({
     }
     const valid =
       result.envelope.value.items.length === 1 &&
+      result.envelope.value.readyCount === 1 &&
+      result.envelope.value.blockedCount === 0 &&
       result.envelope.value.items.every(
         item =>
           item.platform === capability.platform && item.contactId === contactId,
@@ -412,6 +453,10 @@ export function LivePersonDetailScreen({
     }
     if (result.kind === 'error') {
       await fail(result.problem);
+      return;
+    }
+    if (result.envelope.value.platform !== capability.platform) {
+      await fail(nativePlatformMismatchProblem, true);
       return;
     }
     await reloadAfterAccepted(t('live.person.approvalAccepted'));
@@ -915,7 +960,9 @@ export function LivePersonDetailScreen({
               destinationBlockReview === 'block'
                 ? 'live.person.destinationBlockBody'
                 : 'live.person.destinationUnblockBody',
-              { phone: projection.summary.maskedPhone ?? '' },
+              {
+                phone: bidiIsolate(projection.summary.maskedPhone ?? ''),
+              },
             )}
           </AppText>
           <Button

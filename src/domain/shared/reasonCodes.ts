@@ -28,6 +28,7 @@ export const SAFE_REASON_CODES = [
   'invalid-daily-cap',
   'invalid-segment-cap',
   'invalid-window',
+  'ios-composer-reserved',
   'leap-policy-required',
   'low-power-standby-unsafe',
   'native-bridge-unavailable',

@@ -101,10 +101,20 @@ describe.each<SmokePlatform>(['android', 'ios'])(
       const people = valueOf(
         await adapter.listPeople({ filter: 'all', pageSize: 20 }),
       );
+      const activity = valueOf(await adapter.listActivity({ pageSize: 20 }));
       const inventory = valueOf(await adapter.getInventory());
       expect(people).toMatchObject({ items: [], totalCount: 0 });
+      expect(activity).toMatchObject({
+        items: [
+          {
+            id: 'smoke.activity.1',
+            kind: 'settings-changed',
+            occurredAt: '2026-07-12T00:00:00.000Z',
+          },
+        ],
+      });
       expect(inventory).toMatchObject({
-        activityCount: 0,
+        activityCount: 1,
         approvalCount: 0,
         enabledRecipientCount: 0,
         localContactCount: 0,

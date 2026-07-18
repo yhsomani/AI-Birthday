@@ -18,8 +18,10 @@ import { DeletionOrchestrator } from '../services/deletionOrchestrator.js';
 import {
   armSchema,
   accountModeSchema,
+  acquireIOSComposerReservationSchema,
   birthdayClaimSchema,
   companionStatusSchema,
+  commitIOSComposerReservationSchema,
   contactDerivedResetSchema,
   coordinationLifecycleStatusSchema,
   deletionSchema,
@@ -27,6 +29,7 @@ import {
   leaseSchema,
   registrationSchema,
   retrySchema,
+  releaseIOSComposerReservationSchema,
   senderReleaseSchema,
   testClaimSchema,
   testReportSchema,
@@ -294,6 +297,48 @@ export const companionStatus = onCall(commonOptions, async request => {
   const input = parseRequest(companionStatusSchema, request.data);
   return safeCall(() => withoutSecret().companionStatus(uid, input));
 });
+
+export const acquireIOSComposerReservation = onCall(
+  commonOptions,
+  async request => {
+    const uid = requireAuthenticated(request);
+    const input = parseRequest(
+      acquireIOSComposerReservationSchema,
+      request.data,
+    );
+    return safeCall(() =>
+      withoutSecret().acquireIOSComposerReservation(uid, input),
+    );
+  },
+);
+
+export const commitIOSComposerReservation = onCall(
+  commonOptions,
+  async request => {
+    const uid = requireAuthenticated(request);
+    const input = parseRequest(
+      commitIOSComposerReservationSchema,
+      request.data,
+    );
+    return safeCall(() =>
+      withoutSecret().commitIOSComposerReservation(uid, input),
+    );
+  },
+);
+
+export const releaseIOSComposerReservation = onCall(
+  commonOptions,
+  async request => {
+    const uid = requireAuthenticated(request);
+    const input = parseRequest(
+      releaseIOSComposerReservationSchema,
+      request.data,
+    );
+    return safeCall(() =>
+      withoutSecret().releaseIOSComposerReservation(uid, input),
+    );
+  },
+);
 
 export const sweepDeletionDrains = onSchedule(
   {

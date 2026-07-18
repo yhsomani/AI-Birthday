@@ -94,4 +94,25 @@ class SmsOutcomeProjectionPolicyTest {
       SmsOutcomeProjectionPolicy.refine(sent, SmsVisibleOutcome.DELIVERED),
     )
   }
+
+  @Test
+  fun `pre acceptance late projections normalize after durable acceptance`() {
+    val normalizations = listOf(
+      SmsVisibleOutcome.SENT_EVIDENCE_LATE to SmsVisibleOutcome.SENT_FROM_DEVICE,
+      SmsVisibleOutcome.SENT_EVIDENCE_LATE to SmsVisibleOutcome.TEST_PASSED,
+      SmsVisibleOutcome.ZERO_ACCEPTED_LATE to SmsVisibleOutcome.ZERO_ACCEPTED_RADIO_OFF,
+      SmsVisibleOutcome.ZERO_ACCEPTED_LATE to SmsVisibleOutcome.ZERO_ACCEPTED_NO_SERVICE,
+      SmsVisibleOutcome.DELIVERED_LATE to SmsVisibleOutcome.DELIVERED,
+      SmsVisibleOutcome.DELIVERY_FAILED_LATE to SmsVisibleOutcome.DELIVERY_FAILED,
+      SmsVisibleOutcome.PARTIAL_DELIVERY_LATE to SmsVisibleOutcome.PARTIAL_DELIVERY,
+      SmsVisibleOutcome.PARTIAL_UNKNOWN to SmsVisibleOutcome.SUBMITTED,
+    )
+
+    normalizations.forEach { (provisional, accepted) ->
+      assertEquals(
+        accepted,
+        SmsOutcomeProjectionPolicy.refine(provisional, accepted),
+      )
+    }
+  }
 }

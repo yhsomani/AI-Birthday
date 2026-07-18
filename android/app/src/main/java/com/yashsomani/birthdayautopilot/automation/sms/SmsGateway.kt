@@ -48,6 +48,7 @@ internal class AndroidSmsGateway(
   private val submissionGate: SubmissionGate = SubmissionGate(context),
   private val readinessProbe: AndroidReadinessProbe = AndroidReadinessProbe(context),
   private val subscriptionChangeSignalStore: SubscriptionChangeSignalStore,
+  private val platformSubmitter: SmsPlatformSubmitter = AndroidSmsPlatformSubmitter,
 ) {
   private val appContext = context.applicationContext
   private val planSource = AndroidSmsManagerPlanSource(appContext)
@@ -91,7 +92,8 @@ internal class AndroidSmsGateway(
     }
     val environment = verifyEnvironment(payload)
       ?: return SmsSubmissionResult.Refused("SMS_ENVIRONMENT_BLOCKED")
-    if (verifiedPlan(payload) == null) {
+    val initialPlan = verifiedPlan(payload)
+    if (initialPlan == null) {
       return SmsSubmissionResult.Refused("SMS_SEGMENT_PLAN_CHANGED")
     }
     val nowMillis = System.currentTimeMillis()
@@ -121,6 +123,21 @@ internal class AndroidSmsGateway(
         )
       }
     }
+
+    if (
+      SmsPlatformSubmissionPlan.create(
+        exactText = payload.exactText,
+        orderedParts = initialPlan.orderedParts,
+        sentIntents = pendingIntents.sent,
+        deliveryIntents = pendingIntents.delivery,
+      ) == null
+    ) return rollbackAndRefuse(
+      permit,
+      identities,
+      pendingIntents,
+      nowMillis,
+      "SMS_PLATFORM_PLAN_INVALID",
+    )
 
     val bootCount = currentBootCount()
       ?: return rollbackAndRefuse(
@@ -173,53 +190,61 @@ internal class AndroidSmsGateway(
       finalElapsed >= permit.deadlineElapsedRealtimeMillis
     ) return SmsSubmissionResult.OutcomeUnknown("SMS_FINAL_GATE_CLOSED")
 
-    return try {
-      val platformBoundaryRan = if (permit.purpose == OperationPurpose.TEST) {
-        ForegroundActivityRegistry.withCurrentActivity {
-          if (
-            subscriptionChangeSignalStore.pendingGeneration() != null ||
-            !foregroundTestAuthorized(permit, payload, System.currentTimeMillis(), true)
-          ) {
-            false
-          } else {
+    val platformResult = if (permit.purpose == OperationPurpose.TEST) {
+      ForegroundActivityRegistry.withCurrentActivity {
+        SmsPlatformSubmissionBoundary.execute(
+          finalGateOpen = {
+            subscriptionChangeSignalStore.pendingGeneration() == null &&
+              foregroundTestAuthorized(permit, payload, System.currentTimeMillis(), true)
+          },
+          submit = {
             submitToPlatform(
               manager = finalEnvironment.manager,
               destination = payload.destinationE164,
+              exactText = payload.exactText,
               parts = finalPlan.orderedParts,
               sentIntents = pendingIntents.sent,
               deliveryIntents = pendingIntents.delivery,
             )
-            true
-          }
-        } == true
-      } else {
-        if (subscriptionChangeSignalStore.pendingGeneration() != null) {
-          false
-        } else {
+          },
+        )
+      } ?: SmsPlatformBoundaryResult.NotCalled
+    } else {
+      SmsPlatformSubmissionBoundary.execute(
+        finalGateOpen = { subscriptionChangeSignalStore.pendingGeneration() == null },
+        submit = {
           submitToPlatform(
             manager = finalEnvironment.manager,
             destination = payload.destinationE164,
+            exactText = payload.exactText,
             parts = finalPlan.orderedParts,
             sentIntents = pendingIntents.sent,
             deliveryIntents = pendingIntents.delivery,
           )
-          true
-        }
-      }
-      if (!platformBoundaryRan) {
-        return SmsSubmissionResult.OutcomeUnknown("SMS_FINAL_GATE_CLOSED")
-      }
-      val persisted = ledger.markSmsManagerAccepted(
-        permit = permit,
-        expectedAttemptRevision = attempt.revision + 1,
-        submittedAtMillis = System.currentTimeMillis(),
+        },
       )
-      if (persisted) SmsSubmissionResult.Submitted
-      else SmsSubmissionResult.OutcomeUnknown("SMS_ACCEPTED_STATE_UNCERTAIN")
-    } catch (_: RuntimeException) {
-      SmsSubmissionResult.OutcomeUnknown("SMS_PLATFORM_CALL_UNCERTAIN")
-    } catch (_: LinkageError) {
-      SmsSubmissionResult.OutcomeUnknown("SMS_PLATFORM_CALL_UNCERTAIN")
+    }
+
+    return when (platformResult) {
+      SmsPlatformBoundaryResult.NotCalled ->
+        SmsSubmissionResult.OutcomeUnknown("SMS_FINAL_GATE_CLOSED")
+      SmsPlatformBoundaryResult.OutcomeUnknown ->
+        SmsSubmissionResult.OutcomeUnknown("SMS_PLATFORM_CALL_UNCERTAIN")
+      SmsPlatformBoundaryResult.Accepted -> {
+        val persisted = try {
+          ledger.markSmsManagerAccepted(
+            permit = permit,
+            expectedAttemptRevision = attempt.revision + 1,
+            submittedAtMillis = System.currentTimeMillis(),
+          )
+        } catch (_: RuntimeException) {
+          false
+        } catch (_: LinkageError) {
+          false
+        }
+        if (persisted) SmsSubmissionResult.Submitted
+        else SmsSubmissionResult.OutcomeUnknown("SMS_ACCEPTED_STATE_UNCERTAIN")
+      }
     }
   }
 
@@ -425,18 +450,19 @@ internal class AndroidSmsGateway(
       SmsManager.getSmsManagerForSubscriptionId(subscriptionId)
     }
 
-  @SuppressLint("MissingPermission")
   private fun submitToPlatform(
     manager: SmsManager,
     destination: String,
+    exactText: String,
     parts: List<String>,
     sentIntents: ArrayList<PendingIntent>,
     deliveryIntents: ArrayList<PendingIntent>,
   ) {
-    manager.sendMultipartTextMessage(
+    platformSubmitter.submit(
+      manager,
       destination,
-      null,
-      ArrayList(parts),
+      exactText,
+      parts,
       sentIntents,
       deliveryIntents,
     )

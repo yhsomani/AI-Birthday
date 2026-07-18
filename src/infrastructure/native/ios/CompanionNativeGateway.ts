@@ -53,32 +53,6 @@ const composerOpenRequestSchema = composerReviewRequestSchema.extend({
   actionNonce: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
 });
 
-const reminderPlanSchema = z
-  .object({
-    civilDate: localDateSchema,
-    hour: z.number().int().min(0).max(23),
-    minute: z.number().int().min(0).max(59),
-    occurrenceId: opaqueIdSchema,
-  })
-  .strict();
-
-const reminderPlansSchema = z
-  .array(reminderPlanSchema)
-  .max(500)
-  .superRefine((plans, context) => {
-    const seen = new Set<string>();
-    plans.forEach((plan, index) => {
-      if (seen.has(plan.occurrenceId)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'duplicate occurrence',
-          path: [index, 'occurrenceId'],
-        });
-      }
-      seen.add(plan.occurrenceId);
-    });
-  });
-
 const composerOutcomeSchema = z.enum([
   'cancelled',
   'failed',
@@ -123,7 +97,6 @@ export type CompanionComposerOpenRequest = z.input<
   typeof composerOpenRequestSchema
 >;
 export type CompanionComposerOutcome = z.output<typeof composerOutcomeSchema>;
-export type CompanionReminderPlan = z.input<typeof reminderPlanSchema>;
 export type CompanionReminderState = z.output<typeof reminderStateSchema>;
 
 export type CompanionNativeResult<Value> =
@@ -141,12 +114,9 @@ interface RawCompanionMessageModule {
 }
 
 interface RawCompanionReminderModule {
-  cancelAppOwned(): Promise<unknown>;
   getStatus(): Promise<unknown>;
   openNotificationSettings?(): Promise<unknown>;
-  replacePlans(plans: readonly CompanionReminderPlan[]): Promise<unknown>;
   requestAuthorization(): Promise<unknown>;
-  wipeCompanionData(): Promise<unknown>;
 }
 
 const errorCodeFrom = (error: unknown, fallback: string): string => {
@@ -252,35 +222,6 @@ export class CompanionNativeGateway {
     return this.simpleReminderCall('openNotificationSettings');
   }
 
-  public async replaceReminderPlans(
-    plans: readonly CompanionReminderPlan[],
-  ): Promise<CompanionNativeResult<CompanionReminderState>> {
-    const validated = reminderPlansSchema.safeParse(plans);
-    if (!validated.success) {
-      return { code: 'REMINDER_INPUT_INVALID', kind: 'error' };
-    }
-    if (this.reminderModule === null) {
-      return { code: 'IOS_NATIVE_BRIDGE_UNAVAILABLE', kind: 'error' };
-    }
-    try {
-      const raw = await this.reminderModule.replacePlans(validated.data);
-      return this.decodeReminderState(raw);
-    } catch (error) {
-      return {
-        code: errorCodeFrom(error, 'REMINDER_NATIVE_FAILURE'),
-        kind: 'error',
-      };
-    }
-  }
-
-  public cancelReminders(): Promise<CompanionNativeResult<null>> {
-    return this.simpleReminderCall('cancelAppOwned');
-  }
-
-  public wipeCompanionData(): Promise<CompanionNativeResult<null>> {
-    return this.simpleReminderCall('wipeCompanionData');
-  }
-
   private async reminderCall(
     method: 'getStatus' | 'requestAuthorization',
   ): Promise<CompanionNativeResult<CompanionReminderState>> {
@@ -315,10 +256,7 @@ export class CompanionNativeGateway {
   }
 
   private async simpleReminderCall(
-    method:
-      | 'cancelAppOwned'
-      | 'openNotificationSettings'
-      | 'wipeCompanionData',
+    method: 'openNotificationSettings',
   ): Promise<CompanionNativeResult<null>> {
     if (
       this.reminderModule === null ||
@@ -358,13 +296,7 @@ export const createCompanionNativeGateway = (): CompanionNativeGateway => {
   );
   const reminderModule = moduleWithMethods<RawCompanionReminderModule>(
     modules.CompanionReminderModule,
-    [
-      'cancelAppOwned',
-      'getStatus',
-      'replacePlans',
-      'requestAuthorization',
-      'wipeCompanionData',
-    ],
+    ['getStatus', 'requestAuthorization'],
   );
   return new CompanionNativeGateway(messageModule, reminderModule);
 };

@@ -12,7 +12,8 @@
     "deletionTombstones",
     "coordinationOperationReceipts",
     "coordinationLatestReceipts",
-    "deletionReceipts"
+    "deletionReceipts",
+    "iosComposerReservations"
   ],
   "important": "TTL is physical cleanup only. Every authorization and budget decision checks logical expiry transactionally."
 }

@@ -967,7 +967,29 @@ public final class BirthdayNativeService: NSObject {
       }
       return .success(issues)
     case "list":
-      return bridge(workflow.activityProjection(request: request, status: status))
+      let currentReadiness = readiness(status: status, context: context)
+      guard let composer = currentReadiness["composer"] as? BirthdayJSON,
+        let composerKind = composer["kind"] as? String
+      else {
+        return .failure(Self.internalProblem("NATIVE_CONTRACT_INVALID"))
+      }
+      let currentIssueCodes: Set<String>
+      if composerKind == "allowed" {
+        currentIssueCodes = []
+      } else {
+        guard composerKind == "blocked",
+          let issues = composer["issues"] as? [BirthdayJSON]
+        else {
+          return .failure(Self.internalProblem("NATIVE_CONTRACT_INVALID"))
+        }
+        currentIssueCodes = Set(issues.compactMap { $0["code"] as? String })
+      }
+      return bridge(
+        workflow.activityProjection(
+          request: request,
+          status: status,
+          currentIssueCodes: currentIssueCodes
+        ))
     default:
       return .failure(Self.internalProblem("NATIVE_REQUEST_INVALID"))
     }

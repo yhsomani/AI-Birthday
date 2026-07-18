@@ -23,7 +23,10 @@ import {
   LiveLoading,
   LiveRefreshProblem,
 } from './LiveProjectionState';
-import { nativeBridgeProblem } from './nativeProblem';
+import {
+  nativeBridgeProblem,
+  nativePlatformMismatchProblem,
+} from './nativeProblem';
 import {
   needsBatchApproval,
   PEOPLE_REVIEW_BATCH_SIZE,
@@ -229,6 +232,21 @@ export function LiveBatchApprovalScreen({
     }
     if (result.kind === 'error') {
       await failBatch(result.problem, review.processedCount, review.totalCount);
+      return;
+    }
+    if (result.envelope.value.platform !== capability.platform) {
+      setReview(undefined);
+      await candidates.reload();
+      setProblem(nativePlatformMismatchProblem);
+      setIncompleteBatch(
+        review.processedCount > 0
+          ? {
+              processedCount: review.processedCount,
+              totalCount: review.totalCount,
+            }
+          : undefined,
+      );
+      setPending(false);
       return;
     }
     const processedCount = review.processedCount + review.requestedIds.length;

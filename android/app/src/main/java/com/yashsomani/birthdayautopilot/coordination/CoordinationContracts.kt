@@ -73,6 +73,7 @@ enum class CoordinationServerReason {
   MISSING_FENCE,
   MISSING_CLAIM,
   UNKNOWN_HISTORY,
+  IOS_COMPOSER_RESERVED,
   BINDING_MISMATCH,
   TEST_LEASE_OR_MODE_INVALID,
   BOUND_TEST_RECEIPT_REQUIRED,
@@ -89,7 +90,13 @@ enum class CoordinationServerReason {
   DRAIN_NOT_COMPLETE,
   COORDINATION_OPERATION_IN_PROGRESS,
   REQUEST_MISMATCH,
-  GENERATION_EXHAUSTED,
+  GENERATION_EXHAUSTED;
+
+  fun preservesUnclaimedBirthdayForRetry(): Boolean = this in setOf(
+    LEASE_EXPIRED,
+    TOO_EARLY,
+    IOS_COMPOSER_RESERVED,
+  )
 }
 
 enum class RequestInvalidReason {

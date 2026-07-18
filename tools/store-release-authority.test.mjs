@@ -34,10 +34,16 @@ test('the hard release hook cannot run with only semantic evidence inputs', () =
   assert.match(result.stderr, /BIRTHDAY_DISTRIBUTION_AUTHORITY_PUBLIC_KEY/u);
 });
 
-test('the shared authority pin remains deliberately unusable until provisioned', () => {
+test('the shared authority pin is either fail-closed or provisioned with a digest', () => {
   const pin = JSON.parse(
     readFileSync('tools/distribution-authority-pin.json', 'utf8'),
   );
+  assert.deepEqual(Object.keys(pin).sort(), [
+    'algorithm',
+    'publicKeySpkiSha256',
+    'schemaVersion',
+  ]);
+  assert.equal(pin.schemaVersion, 1);
   assert.equal(pin.algorithm, 'Ed25519');
-  assert.equal(pin.publicKeySpkiSha256, 'UNPROVISIONED');
+  assert.match(pin.publicKeySpkiSha256, /^(?:UNPROVISIONED|[0-9a-f]{64})$/u);
 });

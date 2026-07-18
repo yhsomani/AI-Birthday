@@ -45,10 +45,12 @@ handler.
 The record binds all of the following to one 40-character source revision and the exact Android AAB
 and iOS IPA SHA-256 digests:
 
-- Android application ID `com.yashsomani.birthdayautopilot`, version code `1`, version `1.0`, AAB
-  name/digest, and upload signing-certificate digest;
-- iOS bundle ID `com.yashsomani.birthdayautopilot`, short version `1.0`, build `1`, IPA name/digest,
-  and distribution-certificate digest;
+- Android application ID `com.yashsomani.birthdayautopilot`, the approved positive version code and
+  bounded version name, AAB name/digest, and Play signing-certificate digest;
+- iOS bundle ID `com.yashsomani.birthdayautopilot`, the approved bounded short version and positive
+  canonical build number, IPA name/digest, and distribution-certificate digest. The checked-in draft
+  starts at `1.0` / build `1`, but later signed release coordinates do not require a validator code
+  change;
 - named launch countries and the approved public developer identity;
 - provisioned HTTPS public base, store support, privacy, terms, account-deletion, and separately
   identity-verified support URLs, plus a public support email;
@@ -162,8 +164,13 @@ generated manifest is evidence preparation, not self-approval.
 
 ## Current official requirements reviewed
 
-The schema records `taxonomyReviewedAt` because console fields and asset rules can change. Review
-the current primary documentation immediately before each submission:
+The schema records `taxonomyReviewedAt` because console fields and asset rules can change. Each
+Google Play Data Safety and App Privacy taxonomy review must be completed no later than the
+package's `generatedAt` and validation time. The package's `validUntil` may be at most seven
+24-hour days after that review; the exact seven-day boundary is accepted. A package that would
+outlive either taxonomy review must retain a new console export, update `taxonomyReviewedAt`, and
+receive new scope-bound approvals. Review the current primary documentation immediately before
+each submission:
 
 - [Google Play preview assets](https://support.google.com/googleplay/android-developer/answer/9866151?hl=en)
 - [Google Play Data Safety](https://support.google.com/googleplay/android-developer/answer/10787469?hl=en)

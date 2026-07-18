@@ -3,6 +3,8 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   copyFileSync,
+  linkSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -18,6 +20,12 @@ import {
   IOS_RELEASE_REFERENCE_NAMES,
   validateIOSReleaseEvidence,
 } from './ios-release-evidence.mjs';
+import {
+  createMobileScenarioFixture,
+  createPerformanceEvidenceFixture,
+  mergeEvidenceMaps,
+  writeEvidenceFiles,
+} from './release-evidence-test-fixtures.mjs';
 import { validateIOSApplicationPolicy } from './verify-ios-release-artifact.mjs';
 
 const NOW = Date.parse('2026-07-12T12:00:00Z');
@@ -25,14 +33,61 @@ const SOURCE = 'ab'.repeat(20);
 const TEAM = 'A1B2C3D4E5';
 const BUNDLE = 'com.yashsomani.birthdayautopilot';
 const digest = value => createHash('sha256').update(value).digest('hex');
+const samples = (count, value) => Array.from({ length: count }, () => value);
 const oauthClientId = '123456789-test.apps.googleusercontent.com';
 const reversedClientId = 'com.googleusercontent.apps.123456789-test';
+const scenarioEvidence = evidenceKind => ({
+  ...createMobileScenarioFixture(evidenceKind, {
+    sourceRevision: SOURCE,
+    artifactSha256: digest('ipa'),
+    signingCertificateSha256: digest('exported-certificate'),
+    artifactVersion: '1.0 (1)',
+    evidenceSetId: 'ios-2026-07-12',
+    observedAt: '2026-07-12T00:00:00Z',
+  }),
+});
+const performanceEvidence = () =>
+  createPerformanceEvidenceFixture('ios', {
+    sourceRevision: SOURCE,
+    artifactSha256: digest('ipa'),
+    applicationId: BUNDLE,
+    version: '1.0',
+    evidenceSetId: 'ios-2026-07-12',
+    measuredAt: '2026-07-12T00:00:00Z',
+  });
+const structuredFixtures = () => ({
+  physicalDeviceMatrix: scenarioEvidence('ios-physical'),
+  performance: performanceEvidence(),
+  accessibility: scenarioEvidence('ios-accessibility'),
+});
+const structuredEvidence = () => ({
+  ...Object.fromEntries(
+    Object.entries(structuredFixtures()).map(([name, fixture]) => [
+      name,
+      fixture.document,
+    ]),
+  ),
+});
+const supportingFileContents = () =>
+  mergeEvidenceMaps(
+    ...Object.values(structuredFixtures()).map(fixture => fixture.fileContents),
+  );
+const supportingEvidenceFiles = () =>
+  mergeEvidenceMaps(
+    ...Object.values(structuredFixtures()).map(
+      fixture => fixture.evidenceFiles,
+    ),
+  );
+const referenceContent = name => {
+  const structured = structuredEvidence()[name];
+  return structured === undefined ? name : JSON.stringify(structured);
+};
 
 const references = () =>
   Object.fromEntries(
     IOS_RELEASE_REFERENCE_NAMES.map(name => [
       name,
-      { path: `${name}.json`, sha256: digest(name) },
+      { path: `${name}.json`, sha256: digest(referenceContent(name)) },
     ]),
   );
 
@@ -128,7 +183,10 @@ const document = () => {
 
 const referenceDigests = () =>
   Object.fromEntries(
-    IOS_RELEASE_REFERENCE_NAMES.map(name => [name, digest(name)]),
+    IOS_RELEASE_REFERENCE_NAMES.map(name => [
+      name,
+      digest(referenceContent(name)),
+    ]),
   );
 
 test('accepts exact inspected bytes, signing identity, Firebase identity, evidence files, and live approvals', () => {
@@ -136,6 +194,8 @@ test('accepts exact inspected bytes, signing identity, Firebase identity, eviden
     validateIOSReleaseEvidence(document(), {
       observed: observed(),
       referenceDigests: referenceDigests(),
+      structuredEvidence: structuredEvidence(),
+      evidenceFiles: supportingEvidenceFiles(),
       now: NOW,
     }).errors,
     [],
@@ -155,6 +215,8 @@ test('fails closed on artifact, source, signing, Firebase, or referenced-byte dr
   const errors = validateIOSReleaseEvidence(value, {
     observed: inspection,
     referenceDigests: digests,
+    structuredEvidence: structuredEvidence(),
+    evidenceFiles: supportingEvidenceFiles(),
     now: NOW,
   }).errors.join('\n');
   assert.match(errors, /sourceRevision does not match/u);
@@ -162,6 +224,27 @@ test('fails closed on artifact, source, signing, Firebase, or referenced-byte dr
   assert.match(errors, /firebase\.projectId does not match/u);
   assert.match(errors, /signing\.teamIdentifier does not match/u);
   assert.match(errors, /privacyReview\.sha256 does not match/u);
+});
+
+test('iOS artifact gate executes structured scenarios and performance budgets', () => {
+  const evidence = structuredEvidence();
+  evidence.performance.shared.search10000Ms = samples(30, 151);
+  evidence.physicalDeviceMatrix.rows[0].deviceModel = 'fixture phone';
+  const errors = validateIOSReleaseEvidence(document(), {
+    observed: observed(),
+    referenceDigests: referenceDigests(),
+    structuredEvidence: evidence,
+    evidenceFiles: supportingEvidenceFiles(),
+    now: NOW,
+  }).errors.join('\n');
+  assert.match(
+    errors,
+    /references\.performance: search10000Ms P95 151 exceeds 150/u,
+  );
+  assert.match(
+    errors,
+    /references\.physicalDeviceMatrix: rows\[0\]\.deviceModel must identify a real observed/u,
+  );
 });
 
 test('rejects template sentinels, stale or overlong approval, and approval beyond profile expiry', () => {
@@ -185,20 +268,53 @@ test('rejects template sentinels, stale or overlong approval, and approval beyon
   assert.match(errors, /outlives the .* provisioning profile/u);
 });
 
-test('collects only stable in-root regular supporting evidence and rejects symlinks', () => {
+test('collects the exact primary, scenario-raw, and performance-support inventory and rejects extras or links', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'birthday-ios-evidence-'));
   try {
     const refs = references();
     for (const name of IOS_RELEASE_REFERENCE_NAMES) {
-      writeFileSync(path.join(root, refs[name].path), name);
+      writeFileSync(path.join(root, refs[name].path), referenceContent(name));
     }
+    writeEvidenceFiles(root, supportingFileContents());
     assert.deepEqual(
       collectIOSReleaseReferenceDigests(root, refs),
       referenceDigests(),
     );
 
+    writeFileSync(path.join(root, 'unreferenced.json'), 'extra');
+    assert.throws(
+      () => collectIOSReleaseReferenceDigests(root, refs),
+      /exactly the primary, scenario-raw, and performance-support files/u,
+    );
+    rmSync(path.join(root, 'unreferenced.json'));
+
+    mkdirSync(path.join(root, 'unreferenced-directory'));
+    assert.throws(
+      () => collectIOSReleaseReferenceDigests(root, refs),
+      /exactly the primary, scenario-raw, and performance-support files/u,
+    );
+    rmSync(path.join(root, 'unreferenced-directory'), { recursive: true });
+
     rmSync(path.join(root, refs.privacyReview.path));
-    writeFileSync(path.join(root, 'real-privacy.json'), 'privacyReview');
+    linkSync(
+      path.join(root, refs.artifactProvenance.path),
+      path.join(root, refs.privacyReview.path),
+    );
+    assert.throws(
+      () => collectIOSReleaseReferenceDigests(root, refs),
+      /must not be hard linked/u,
+    );
+    rmSync(path.join(root, refs.privacyReview.path));
+    writeFileSync(
+      path.join(root, refs.privacyReview.path),
+      referenceContent('privacyReview'),
+    );
+
+    rmSync(path.join(root, refs.privacyReview.path));
+    writeFileSync(
+      path.join(root, 'real-privacy.json'),
+      referenceContent('privacyReview'),
+    );
     symlinkSync('real-privacy.json', path.join(root, refs.privacyReview.path));
     assert.throws(
       () => collectIOSReleaseReferenceDigests(root, refs),
@@ -372,11 +488,96 @@ test('repository contract keeps the template unusable and release verification s
     'utf8',
   );
   const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const buildCandidateJob = workflow.slice(
+    workflow.indexOf('  build-candidate:'),
+    workflow.indexOf('\n  verify-release:'),
+  );
+  const verifyReleaseJob = workflow.slice(
+    workflow.indexOf('  verify-release:'),
+  );
+  const buildCandidateHeader = buildCandidateJob.slice(
+    0,
+    buildCandidateJob.indexOf('\n    steps:'),
+  );
+  const verifyReleaseHeader = verifyReleaseJob.slice(
+    0,
+    verifyReleaseJob.indexOf('\n    steps:'),
+  );
+  const installStep = buildCandidateJob.slice(
+    buildCandidateJob.indexOf(
+      '- name: Install locked mobile and iOS dependency graphs',
+    ),
+    buildCandidateJob.indexOf(
+      '- name: Fail closed unless protected signing, provider, and review inputs exist',
+    ),
+  );
+  const candidateDownloadStep = verifyReleaseJob.slice(
+    verifyReleaseJob.indexOf(
+      '- name: Verify candidate provenance and download exact candidate',
+    ),
+    verifyReleaseJob.indexOf(
+      '- name: Download authority-reviewed supporting bytes',
+    ),
+  );
+  const supportingDownloadStep = verifyReleaseJob.slice(
+    verifyReleaseJob.indexOf(
+      '- name: Download authority-reviewed supporting bytes',
+    ),
+    verifyReleaseJob.indexOf(
+      '- name: Decode authority-signed final evidence and archive',
+    ),
+  );
   assert.equal(schema.properties.status.const, 'approved');
   assert.match(workflow, /candidate is not a releasable artifact/u);
   assert.match(workflow, /verify-authority-approved-artifacts/u);
   assert.match(workflow, /environment: ios-production-release/u);
   assert.match(workflow, /gh run download/u);
+  assert.match(workflow, /gh release download/u);
+  assert.match(workflow, /IOS_SUPPORTING_EVIDENCE_REPOSITORY/u);
+  assert.match(workflow, /IOS_SUPPORTING_EVIDENCE_READ_TOKEN/u);
+  assert.doesNotMatch(workflow, /ios-release-supporting-evidence/u);
+  assert.match(
+    workflow,
+    /repos\/\$GITHUB_REPOSITORY\/actions\/runs\/\$INPUT_CANDIDATE_RUN_ID/u,
+  );
+  assert.match(workflow, /\.head_sha[\s\S]*?= "\$GITHUB_SHA"/u);
+  assert.match(
+    workflow,
+    /\.head_repository\.full_name[\s\S]*?= "\$GITHUB_REPOSITORY"/u,
+  );
+  assert.match(workflow, /\.conclusion[\s\S]*?= success/u);
+  assert.match(workflow, /\.path[\s\S]*?ios-release-evidence\.yml/u);
+  assert.doesNotMatch(buildCandidateHeader, /\$\{\{\s*secrets\./u);
+  assert.doesNotMatch(verifyReleaseHeader, /\$\{\{\s*secrets\./u);
+  assert.match(installStep, /npm ci/u);
+  assert.doesNotMatch(installStep, /\$\{\{\s*secrets\./u);
+  assert.match(candidateDownloadStep, /GH_TOKEN: \$\{\{ github\.token \}\}/u);
+  assert.doesNotMatch(
+    candidateDownloadStep,
+    /IOS_SUPPORTING_EVIDENCE_READ_TOKEN/u,
+  );
+  assert.match(supportingDownloadStep, /IOS_SUPPORTING_EVIDENCE_READ_TOKEN/u);
+  assert.doesNotMatch(supportingDownloadStep, /github\.token/u);
+  assert.equal(
+    [...workflow.matchAll(/persist-credentials: false/gmu)].length,
+    2,
+  );
+  assert.ok(
+    buildCandidateJob.indexOf(
+      '- name: Install locked mobile and iOS dependency graphs',
+    ) <
+      buildCandidateJob.indexOf(
+        '- name: Decode protected inputs and validate signing coordinates',
+      ),
+  );
+  assert.ok(
+    buildCandidateJob.indexOf(
+      '- name: Remove ephemeral signing and provider material',
+    ) <
+      buildCandidateJob.indexOf(
+        '- name: Generate candidate-only supply-chain and provenance evidence',
+      ),
+  );
   assert.match(workflow, /npm run ios:release:inspect/u);
   assert.match(workflow, /candidate-observation-not-release\.json/u);
   assert.match(workflow, /npm run ios:release:verify/u);

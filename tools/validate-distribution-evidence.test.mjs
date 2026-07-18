@@ -7,15 +7,18 @@ import {
 } from 'node:crypto';
 import {
   copyFileSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import test from 'node:test';
+import { dirname, join, resolve } from 'node:path';
+import test, { after } from 'node:test';
 
 import {
   hasUnsafeAuthorityPinIndexState,
@@ -23,6 +26,11 @@ import {
   validateDistributionEvidence,
   verifyDistributionEvidenceAuthority,
 } from './validate-distribution-evidence.mjs';
+import {
+  createMobileScenarioFixture,
+  createPerformanceEvidenceFixture,
+  writeEvidenceFiles,
+} from './release-evidence-test-fixtures.mjs';
 
 const NOW = Date.parse('2026-07-11T12:00:00Z');
 const INSTALLED_CERTIFICATE = 'ab'.repeat(32);
@@ -30,15 +38,147 @@ const UPLOAD_CERTIFICATE = 'cd'.repeat(32);
 const SOURCE_REVISION = 'c0ffee12'.repeat(5);
 const APK_SHA256 = 'fe'.repeat(32);
 const AAB_SHA256 = 'ef'.repeat(32);
-const DIGESTS = {
-  policyApprovalSha256: '11'.repeat(32),
-  certifiedDeviceMatrixSha256: '22'.repeat(32),
-  carrierMatrixSha256: '33'.repeat(32),
-  legalReviewSha256: '44'.repeat(32),
-  performanceEvidenceSha256: '55'.repeat(32),
-  accessibilityEvidenceSha256: '66'.repeat(32),
-  supplyChainEvidenceSha256: '77'.repeat(32),
+const samples = (count, value) => Array.from({ length: count }, () => value);
+const scenarioEvidence = (
+  evidenceKind,
+  {
+    sourceRevision = SOURCE_REVISION,
+    artifactSha256 = APK_SHA256,
+    certificateSha256 = INSTALLED_CERTIFICATE,
+    artifactVersion = '1.0',
+    evidenceSetId = 'android-2026-001',
+  } = {},
+) =>
+  createMobileScenarioFixture(evidenceKind, {
+    sourceRevision,
+    artifactSha256,
+    signingCertificateSha256: certificateSha256,
+    artifactVersion,
+    evidenceSetId,
+    observedAt: '2026-07-11T00:00:00Z',
+  });
+const performanceEvidence = ({
+  applicationId = 'com.yashsomani.birthdayautopilot',
+  sourceRevision = SOURCE_REVISION,
+  artifactSha256 = APK_SHA256,
+  version = '1.0',
+  evidenceSetId = 'android-2026-001',
+} = {}) =>
+  createPerformanceEvidenceFixture('android', {
+    sourceRevision,
+    artifactSha256,
+    applicationId,
+    version,
+    evidenceSetId,
+    measuredAt: '2026-07-11T00:00:00Z',
+  });
+const evidenceObjects = () => [
+  ['policyApprovalSha256', 'policy/BA-2026-001', 'policy approval\n'],
+  [
+    'certifiedDeviceMatrixSha256',
+    'device-matrix/BA-2026-001',
+    scenarioEvidence('android-physical'),
+  ],
+  [
+    'carrierMatrixSha256',
+    'carrier-matrix/BA-2026-001',
+    scenarioEvidence('android-carrier'),
+  ],
+  ['legalReviewSha256', 'legal/BA-2026-001', 'legal review\n'],
+  [
+    'performanceEvidenceSha256',
+    'performance/BA-2026-001',
+    performanceEvidence(),
+  ],
+  [
+    'accessibilityEvidenceSha256',
+    'accessibility/BA-2026-001',
+    scenarioEvidence('android-accessibility'),
+  ],
+  [
+    'supplyChainEvidenceSha256',
+    'supply-chain/BA-2026-001',
+    'supply chain evidence\n',
+  ],
+];
+const createEvidenceRoot = root => {
+  mkdirSync(root, { recursive: true });
+  const digests = {};
+  for (const [digestField, relativePath, value] of evidenceObjects()) {
+    const fixture = typeof value === 'string' ? undefined : value;
+    const content =
+      fixture === undefined ? value : JSON.stringify(fixture.document);
+    const file = join(root, relativePath);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, content);
+    if (fixture !== undefined) writeEvidenceFiles(root, fixture.fileContents);
+    digests[digestField] = createHash('sha256').update(content).digest('hex');
+  }
+  return digests;
 };
+const bindStructuredEvidenceForApproval = (root, candidate, suffix) => {
+  const artifactSha256 = 'ba'.repeat(32);
+  const objects = [
+    [
+      'certifiedDeviceMatrix',
+      `device-matrix/BA-${suffix}`,
+      scenarioEvidence('android-physical', {
+        sourceRevision: candidate.sourceRevision,
+        artifactSha256,
+        certificateSha256: candidate.signingCertificateSha256,
+        artifactVersion: candidate.versionName,
+        evidenceSetId: `android-${suffix}`,
+      }),
+    ],
+    [
+      'carrierMatrix',
+      `carrier-matrix/BA-${suffix}`,
+      scenarioEvidence('android-carrier', {
+        sourceRevision: candidate.sourceRevision,
+        artifactSha256,
+        certificateSha256: candidate.signingCertificateSha256,
+        artifactVersion: candidate.versionName,
+        evidenceSetId: `android-${suffix}`,
+      }),
+    ],
+    [
+      'performanceEvidence',
+      `performance/BA-${suffix}`,
+      performanceEvidence({
+        applicationId: candidate.applicationId,
+        sourceRevision: candidate.sourceRevision,
+        artifactSha256,
+        version: candidate.versionName,
+        evidenceSetId: `android-${suffix}`,
+      }),
+    ],
+    [
+      'accessibilityEvidence',
+      `accessibility/BA-${suffix}`,
+      scenarioEvidence('android-accessibility', {
+        sourceRevision: candidate.sourceRevision,
+        artifactSha256,
+        certificateSha256: candidate.signingCertificateSha256,
+        artifactVersion: candidate.versionName,
+        evidenceSetId: `android-${suffix}`,
+      }),
+    ],
+  ];
+  for (const [field, reference, fixture] of objects) {
+    const content = JSON.stringify(fixture.document);
+    const file = join(root, reference);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, content);
+    writeEvidenceFiles(root, fixture.fileContents);
+    candidate[`${field}Reference`] = reference;
+    candidate[`${field}Sha256`] = createHash('sha256')
+      .update(content)
+      .digest('hex');
+  }
+};
+const EVIDENCE_ROOT = mkdtempSync(join(tmpdir(), 'birthday-evidence-root-'));
+const DIGESTS = createEvidenceRoot(EVIDENCE_ROOT);
+after(() => rmSync(EVIDENCE_ROOT, { force: true, recursive: true }));
 const expected = {
   tier: 'prod',
   applicationId: 'com.yashsomani.birthdayautopilot',
@@ -49,6 +189,7 @@ const expected = {
   sourceRevision: SOURCE_REVISION,
   minimumSupportedApi: 29,
   targetApi: 36,
+  evidenceRoot: EVIDENCE_ROOT,
 };
 
 const approval = (tier = 'prod') => ({
@@ -87,7 +228,9 @@ const approval = (tier = 'prod') => ({
   ...DIGESTS,
   approvedAt: '2026-07-01T00:00:00Z',
   validUntil: '2026-08-01T00:00:00Z',
-  launchCountries: ['IN'],
+  // A test fixture is not a launch-market decision. Production evidence binds
+  // the countries approved by the legal and carrier reviews.
+  launchCountries: ['US'],
 });
 
 const validDocument = () => ({
@@ -255,6 +398,67 @@ test('accepts prepackage evidence bound to source, version, certificate, and ref
   const result = validateDistributionEvidence(validDocument(), expected, NOW);
   assert.deepEqual(result.errors, []);
   assert.equal(result.approval?.versionName, '1.0');
+});
+
+test('Android gate parses scenario JSON and executes the performance validator', () => {
+  const directory = mkdtempSync(
+    join(tmpdir(), 'birthday-structured-evidence-'),
+  );
+  try {
+    createEvidenceRoot(directory);
+    const value = validDocument();
+    const performancePath = join(directory, 'performance/BA-2026-001');
+    const performance = JSON.parse(readFileSync(performancePath, 'utf8'));
+    performance.shared.search10000Ms = samples(30, 151);
+    const performanceBytes = JSON.stringify(performance);
+    writeFileSync(performancePath, performanceBytes);
+    value.approvals[0].performanceEvidenceSha256 = createHash('sha256')
+      .update(performanceBytes)
+      .digest('hex');
+    assert.match(
+      validateDistributionEvidence(
+        value,
+        { ...expected, evidenceRoot: directory },
+        NOW,
+      ).errors.join('\n'),
+      /performanceEvidenceReference: search10000Ms P95 151 exceeds 150/u,
+    );
+
+    const physicalPath = join(directory, 'device-matrix/BA-2026-001');
+    const opaqueBytes = 'physical matrix passed\n';
+    writeFileSync(physicalPath, opaqueBytes);
+    value.approvals[0].certifiedDeviceMatrixSha256 = createHash('sha256')
+      .update(opaqueBytes)
+      .digest('hex');
+    assert.match(
+      validateDistributionEvidence(
+        value,
+        { ...expected, evidenceRoot: directory },
+        NOW,
+      ).errors.join('\n'),
+      /certifiedDeviceMatrixReference cannot be validated: must contain valid structured JSON/u,
+    );
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test('requires launch-country evidence without selecting a market in source', () => {
+  const nonIndia = validDocument();
+  nonIndia.approvals[0].launchCountries = ['BR', 'US'];
+  assert.deepEqual(
+    validateDistributionEvidence(nonIndia, expected, NOW).errors,
+    [],
+  );
+
+  for (const invalidCountries of [[], ['US', 'US'], ['usa']]) {
+    const invalid = validDocument();
+    invalid.approvals[0].launchCountries = invalidCountries;
+    assert.match(
+      validateDistributionEvidence(invalid, expected, NOW).errors.join('\n'),
+      /non-empty list of unique ISO 3166-1 alpha-2 codes/u,
+    );
+  }
 });
 
 test('direct post-build validation binds the installed signer and exact APK SHA-256', () => {
@@ -478,14 +682,26 @@ test('validates every approval globally even when another tier is selected', () 
 });
 
 test('binds only the selected tier build signer while validating every tier structurally', () => {
-  const document = validDocument();
-  document.approvals.unshift(approval('lab'));
-  document.approvals[0].signingCertificateSha256 = 'de'.repeat(32);
-  document.approvals[0].uploadSigningCertificateSha256 = 'ad'.repeat(32);
-  assert.deepEqual(
-    validateDistributionEvidence(document, expected, NOW).errors,
-    [],
-  );
+  const directory = mkdtempSync(join(tmpdir(), 'birthday-tier-evidence-'));
+  try {
+    createEvidenceRoot(directory);
+    const document = validDocument();
+    const lab = approval('lab');
+    lab.signingCertificateSha256 = 'de'.repeat(32);
+    lab.uploadSigningCertificateSha256 = 'ad'.repeat(32);
+    bindStructuredEvidenceForApproval(directory, lab, 'lab');
+    document.approvals.unshift(lab);
+    assert.deepEqual(
+      validateDistributionEvidence(
+        document,
+        { ...expected, evidenceRoot: directory },
+        NOW,
+      ).errors,
+      [],
+    );
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
 
   const selected = directDocument();
   selected.approvals[0].signingCertificateSha256 = 'de'.repeat(32);
@@ -514,6 +730,125 @@ test('requires every policy, device, carrier, performance, accessibility, supply
         `prod approval ${field} must be a lowercase SHA-256 digest`,
       ),
     );
+  }
+});
+
+test('binds every reference to the exact dedicated evidence-root inventory', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'birthday-evidence-exact-'));
+  try {
+    const evidenceRoot = join(directory, 'supporting-evidence');
+    createEvidenceRoot(evidenceRoot);
+    const localExpected = { ...expected, evidenceRoot };
+    assert.deepEqual(
+      validateDistributionEvidence(validDocument(), localExpected, NOW).errors,
+      [],
+    );
+
+    writeFileSync(join(evidenceRoot, 'unreferenced.txt'), 'not approved\n');
+    assert.match(
+      validateDistributionEvidence(
+        validDocument(),
+        localExpected,
+        NOW,
+      ).errors.join('\n'),
+      /evidence root contains an unreferenced file: unreferenced\.txt/u,
+    );
+    unlinkSync(join(evidenceRoot, 'unreferenced.txt'));
+
+    mkdirSync(join(evidenceRoot, 'empty-extra'));
+    assert.match(
+      validateDistributionEvidence(
+        validDocument(),
+        localExpected,
+        NOW,
+      ).errors.join('\n'),
+      /contains an unreferenced directory/u,
+    );
+    rmSync(join(evidenceRoot, 'empty-extra'), { recursive: true });
+
+    writeFileSync(
+      join(evidenceRoot, 'policy/BA-2026-001'),
+      'changed policy approval\n',
+    );
+    assert.match(
+      validateDistributionEvidence(
+        validDocument(),
+        localExpected,
+        NOW,
+      ).errors.join('\n'),
+      /policyApprovalReference digest does not match/u,
+    );
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test('rejects escaping references, symlinks, and hard-linked evidence bytes', () => {
+  const escaping = validDocument();
+  escaping.approvals[0].policyApprovalReference = '../outside-policy';
+  assert.match(
+    validateDistributionEvidence(escaping, expected, NOW).errors.join('\n'),
+    /policyApprovalReference is invalid/u,
+  );
+
+  const directory = mkdtempSync(join(tmpdir(), 'birthday-evidence-links-'));
+  try {
+    const evidenceRoot = join(directory, 'supporting-evidence');
+    createEvidenceRoot(evidenceRoot);
+    const localExpected = { ...expected, evidenceRoot };
+    const policyFile = join(evidenceRoot, 'policy/BA-2026-001');
+    const outside = join(directory, 'outside-policy');
+    writeFileSync(outside, 'policy approval\n');
+
+    unlinkSync(policyFile);
+    symlinkSync(outside, policyFile);
+    assert.match(
+      validateDistributionEvidence(
+        validDocument(),
+        localExpected,
+        NOW,
+      ).errors.join('\n'),
+      /contains a symbolic link/u,
+    );
+
+    unlinkSync(policyFile);
+    linkSync(outside, policyFile);
+    assert.match(
+      validateDistributionEvidence(
+        validDocument(),
+        localExpected,
+        NOW,
+      ).errors.join('\n'),
+      /non-hard-linked regular file/u,
+    );
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test('allows shared policy bytes but requires tier-specific artifact observations', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'birthday-tier-evidence-'));
+  try {
+    createEvidenceRoot(directory);
+    const shared = validDocument();
+    const lab = approval('lab');
+    bindStructuredEvidenceForApproval(directory, lab, 'lab');
+    shared.approvals.unshift(lab);
+    const localExpected = { ...expected, evidenceRoot: directory };
+    assert.deepEqual(
+      validateDistributionEvidence(shared, localExpected, NOW).errors,
+      [],
+    );
+
+    shared.approvals[0].policyApprovalSha256 = 'a1'.repeat(32);
+    assert.match(
+      validateDistributionEvidence(shared, localExpected, NOW).errors.join(
+        '\n',
+      ),
+      /reuses policy\/BA-2026-001 with a different digest/u,
+    );
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
   }
 });
 
@@ -611,11 +946,21 @@ test('schema v4 declares split Play signers, AAB/APK digests, and every release 
       .type,
     'string',
   );
+  const launchCountries =
+    schema.properties.approvals.items.properties.launchCountries;
+  assert.equal(launchCountries.minItems, 1);
+  assert.equal(launchCountries.uniqueItems, true);
+  assert.equal(launchCountries.contains, undefined);
+  assert.equal(schema.$defs.reference.maxLength, 512);
+  assert.equal(
+    new RegExp(schema.$defs.reference.pattern, 'u').test('../escape'),
+    false,
+  );
   const playRule = schema.properties.approvals.items.allOf.at(-1);
   assert.ok(playRule.then.required.includes('uploadSigningCertificateSha256'));
 });
 
-test('CLI uses only the fixed repository pin and fails closed while it is unprovisioned', () => {
+test('CLI uses only the fixed repository pin and rejects an unrelated authority', () => {
   const directory = mkdtempSync(join(tmpdir(), 'birthday-authority-cli-'));
   try {
     const rawEvidence = Buffer.from(JSON.stringify(validDocument()));
@@ -636,6 +981,8 @@ test('CLI uses only the fixed repository pin and fails closed while it is unprov
         signatureFile,
         '--public-key',
         publicKeyFile,
+        '--evidence-root',
+        EVIDENCE_ROOT,
         '--tier',
         'prod',
         '--package',
@@ -652,7 +999,10 @@ test('CLI uses only the fixed repository pin and fails closed while it is unprov
       { encoding: 'utf8' },
     );
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /digest pin is unprovisioned/u);
+    assert.match(
+      result.stderr,
+      /digest pin is unprovisioned|does not match the tracked pin/u,
+    );
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }
@@ -664,12 +1014,24 @@ test('CLI accepts a provisioned tracked pin only from its exact clean Git revisi
     const repository = join(directory, 'repository');
     const toolsDirectory = join(repository, 'tools');
     const externalEvidence = join(directory, 'release-evidence');
+    const supportingEvidence = join(directory, 'supporting-evidence');
     mkdirSync(toolsDirectory, { recursive: true });
     mkdirSync(externalEvidence);
+    createEvidenceRoot(supportingEvidence);
     copyFileSync(
       resolve('tools/validate-distribution-evidence.mjs'),
       join(toolsDirectory, 'validate-distribution-evidence.mjs'),
     );
+    for (const dependency of [
+      'mobile-release-scenario-evidence.mjs',
+      'validate-performance-evidence.mjs',
+      'performance-budgets.json',
+    ]) {
+      copyFileSync(
+        resolve('tools', dependency),
+        join(toolsDirectory, dependency),
+      );
+    }
 
     const { privateKey, publicKey } = generateKeyPairSync('ed25519');
     const publicKeyBytes = publicKey.export({ format: 'pem', type: 'spki' });
@@ -702,6 +1064,11 @@ test('CLI accepts a provisioned tracked pin only from its exact clean Git revisi
 
     const document = validDocument();
     document.approvals[0].sourceRevision = sourceRevision;
+    bindStructuredEvidenceForApproval(
+      supportingEvidence,
+      document.approvals[0],
+      '2026-001',
+    );
     const validationTime = Date.now();
     document.approvals[0].approvedAt = new Date(
       validationTime - 24 * 60 * 60 * 1000,
@@ -726,6 +1093,8 @@ test('CLI accepts a provisioned tracked pin only from its exact clean Git revisi
       signatureFile,
       '--public-key',
       publicKeyFile,
+      '--evidence-root',
+      supportingEvidence,
       '--tier',
       'prod',
       '--package',
@@ -807,12 +1176,15 @@ test('Gradle prepackage and standalone post-build checks share the same fail-clo
   assert.match(gradle, /validate-distribution-evidence\.mjs/u);
   assert.match(gradle, /BIRTHDAY_DISTRIBUTION_EVIDENCE_SIGNATURE_FILE/u);
   assert.match(gradle, /BIRTHDAY_DISTRIBUTION_AUTHORITY_PUBLIC_KEY_FILE/u);
+  assert.match(gradle, /BIRTHDAY_DISTRIBUTION_EVIDENCE_ROOT/u);
   assert.match(gradle, /def releaseVersionCode = 1/u);
   assert.match(gradle, /def releaseBaseVersionName = "1\.0"/u);
   assert.doesNotMatch(gradle, /evidenceApprovalKeys|safeEvidenceReference/u);
   assert.match(verifier, /validate-distribution-evidence\.mjs/u);
   assert.match(verifier, /--artifact-mode "\$artifact_mode"/u);
   assert.match(verifier, /--artifact-file "\$apk"/u);
+  assert.match(verifier, /--evidence-root "\$restricted_evidence_root"/u);
+  assert.match(gradle, /--evidence-root/u);
   assert.match(gradle, /--artifact-mode[\s\S]*"prepackage"/u);
   assert.match(gradle, /approval\.signingCertificateSha256/u);
   assert.doesNotMatch(
@@ -835,9 +1207,12 @@ test('Gradle prepackage and standalone post-build checks share the same fail-clo
   assert.match(validator, /must not contain private-key material/u);
   assert.match(validator, /versionName: '1\.0-lab'/u);
   assert.match(validator, /versionName: '1\.0'/u);
-  assert.deepEqual(pin, {
-    schemaVersion: 1,
-    algorithm: 'Ed25519',
-    publicKeySpkiSha256: 'UNPROVISIONED',
-  });
+  assert.deepEqual(Object.keys(pin).sort(), [
+    'algorithm',
+    'publicKeySpkiSha256',
+    'schemaVersion',
+  ]);
+  assert.equal(pin.schemaVersion, 1);
+  assert.equal(pin.algorithm, 'Ed25519');
+  assert.match(pin.publicKeySpkiSha256, /^(?:UNPROVISIONED|[0-9a-f]{64})$/u);
 });

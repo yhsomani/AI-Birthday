@@ -12,7 +12,14 @@ reach restricted SMS, production identity, or a production service.
 This is the narrow integration check between component tests and real-service
 evidence. It proves that both mobile shells can load the production React tree,
 resolve a platform native module, decode every reviewed projection through the
-real `BirthdayNativeAdapter`, and navigate Home, People, and Settings.
+real `BirthdayNativeAdapter`, and navigate Home, People, Settings, Activity,
+Activity detail, Message, Automation, Attention, Diagnostics, Privacy, and
+Help/legal. The Settings-origin leaves are pushed above Settings, so their
+visible Back action and native stack Back return to the same origin tab.
+The first Android launch may require Metro to compile the uncached production
+entry. The flow therefore waits explicitly for at most 120 seconds for the live
+shell before applying normal assertions; it never retries with warm state or
+changes the isolated app, fixture, provider, or network boundary.
 
 The lane is deliberately fail-closed:
 
@@ -31,10 +38,12 @@ The lane is deliberately fail-closed:
   key, and its entitlements file is empty.
 - Both hosts consume
   `e2e/production-smoke/production-smoke-projections.json`. The checked-in
-  document contains zero contacts, activity, templates, approvals, or storage
-  bytes and no phone/message/token fields. Read calls are restricted to an
-  explicit projection map. Every user intent, including OAuth, permissions,
-  messaging, scheduling, and deletion, returns the same schema-valid
+  document contains zero contacts, templates, approvals, or storage bytes and
+  no phone/message/token fields. Its one exact activity item is a content-free
+  `settings-changed` route record used only to exercise the production Activity
+  detail decoder and screen. Read calls are restricted to an explicit
+  projection map. Every user intent, including OAuth, permissions, messaging,
+  scheduling, and deletion, returns the same schema-valid
   `distribution-channel-unapproved` unsupported problem without dispatch.
 - The fixture is included only by the Android `smoke` source set and the iOS
   Smoke copy phase. E2E continues to load `e2e/index.js`; every normal product
@@ -78,7 +87,10 @@ xcrun simctl install <SIMULATOR_UDID> \
 npm run smoke:ios
 ```
 
-The production-path smoke is integration evidence only. It does not authorize
+The production-path navigation flow runs once at the platform large-text setting
+and once at the default setting. It verifies scrollable route reachability, not
+TalkBack, VoiceOver, visual polish, or physical-device accessibility. The
+production-path smoke is integration evidence only. It does not authorize
 or prove OAuth, Contacts, Firebase/App Check, Gemini, notifications, MessageUI,
 SMS, background scheduling, carrier delivery, account deletion, release
 signing, or store distribution. Those remain covered by their platform tests
@@ -153,7 +165,7 @@ cd android && ./gradlew :app:installE2eDebug --no-configuration-cache
 adb reverse tcp:8081 tcp:8081
 cd ..
 tools/run-mobile-e2e.sh android smoke
-adb shell settings put system font_scale 1.3
+adb shell settings put system font_scale 2.0
 tools/run-mobile-e2e.sh android large-text
 ```
 

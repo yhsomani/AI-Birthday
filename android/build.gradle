@@ -96,6 +96,45 @@ tasks.register("dumpBirthdayAabManifest", JavaExec) {
     }
 }
 
+// Decode the compiled resource table from the exact AAB so release tooling can
+// bind Firebase identity to shipped bytes rather than trusting the build input.
+tasks.register("dumpBirthdayAabResources", JavaExec) {
+    group = "verification"
+    description = "Prints compiled resource values from one externally supplied AAB."
+    classpath = buildscript.configurations.classpath
+    mainClass = "com.android.tools.build.bundletool.BundleToolMain"
+    outputs.upToDateWhen { false }
+
+    doFirst {
+        def bundletoolArtifacts = buildscript.configurations.classpath.resolvedConfiguration.resolvedArtifacts.findAll { artifact ->
+            artifact.moduleVersion.id.group == "com.android.tools.build" &&
+                artifact.name == "bundletool"
+        }.toList()
+        if (bundletoolArtifacts.size() != 1 ||
+            bundletoolArtifacts[0].moduleVersion.id.version != "1.18.1") {
+            throw new GradleException("The AAB inspector requires exactly bundletool 1.18.1 from the locked buildscript graph.")
+        }
+        def requestedPath = providers.gradleProperty("birthdayAabPath").orNull
+        if (requestedPath == null || requestedPath.trim().isEmpty()) {
+            throw new GradleException("-PbirthdayAabPath=<absolute-aab-path> is required.")
+        }
+        def requestedBundle = file(requestedPath).absoluteFile
+        def bundle = requestedBundle.canonicalFile
+        if (requestedBundle.toPath().normalize() != bundle.toPath() ||
+            java.nio.file.Files.isSymbolicLink(requestedBundle.toPath()) ||
+            !java.nio.file.Files.isRegularFile(requestedBundle.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS) ||
+            bundle.length() <= 0) {
+            throw new GradleException("birthdayAabPath must name a canonical, non-symlinked, non-empty regular file.")
+        }
+        args = [
+            "dump",
+            "resources",
+            "--bundle=${bundle.absolutePath}",
+            "--values",
+        ]
+    }
+}
+
 // Keep every direct and transitive Maven coordinate reproducible. Lock files are
 // refreshed by running the normal build/test/lint matrix with `--write-locks`;
 // artifact bytes are independently pinned by Gradle verification metadata.

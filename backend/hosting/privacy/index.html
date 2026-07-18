@@ -152,8 +152,8 @@
           boundary.
         </p>
         <p
-          data-en="The server-only coordination service keeps content-free account mode, active Android installation and sender epoch, short authorization timing, usage budgets, and keyed opaque birthday or destination guards. Only for people enabled on Android, the mobile app sends fixed-length pseudonymous occurrence and destination bases plus bounded timing and sender-fence values; the server immediately transforms the bases with a secret HMAC. These records can be linked within the protected account for duplicate prevention and are not anonymous. iOS does not register recipients with this service and cannot send automatically, but it can make content-free account-status and cleanup requests for safe Android coexistence. Firestore never stores raw contacts, People IDs, birthdays, phone numbers, message text, prompts, or approval content, and mobile clients have no direct Firestore access."
-          data-hi="केवल-सर्वर समन्वय सेवा सामग्री-रहित खाता मोड, सक्रिय Android इंस्टॉलेशन और sender epoch, छोटी अनुमति समय-सीमा, उपयोग सीमा और कुंजी-आधारित अपारदर्शी जन्मदिन या गंतव्य सुरक्षा रिकॉर्ड रखती है। केवल Android पर चालू लोगों के लिए मोबाइल ऐप तय लंबाई वाले छद्मनामित घटना और गंतव्य आधार, साथ में सीमित समय और भेजने वाले की सुरक्षा सीमा भेजता है; सर्वर आधारों को तुरंत गुप्त HMAC से बदलता है। डुप्लिकेट रोकने के लिए ये रिकॉर्ड सुरक्षित खाते में जोड़े जा सकते हैं और अनाम नहीं हैं। iOS इस सेवा में लोगों को पंजीकृत नहीं करता और अपने-आप संदेश नहीं भेज सकता, लेकिन सुरक्षित Android सह-अस्तित्व के लिए सामग्री-रहित खाता-स्थिति और सफ़ाई अनुरोध कर सकता है। Firestore में कच्चे संपर्क, People ID, जन्मदिन, फ़ोन नंबर, संदेश, प्रॉम्प्ट या स्वीकृति सामग्री नहीं रखी जाती और मोबाइल क्लाइंट को सीधे Firestore पहुँच नहीं होती।"
+          data-en="The server-only coordination service keeps content-free account mode, active Android installation and sender epoch, short authorization timing, usage budgets, and keyed opaque birthday or destination guards. Only for people enabled on Android, the mobile app sends fixed-length pseudonymous occurrence and destination bases plus bounded timing and sender-fence values; the server immediately transforms the bases with a secret HMAC. These records can be linked within the protected account for duplicate prevention and are not anonymous. iOS does not register recipients with this service and cannot send automatically, but it makes content-free account-status, composer-reservation, and cleanup requests for safe Android coexistence. A composer reservation stores only a one-way SHA-256 owner-capability key, PREPARED or COMMITTED phase, ledger generation, and logical/cleanup timestamps. It stores no contact or message content. Tapping Review message commits an account-wide hold before presentation that pauses Android sending for up to 72 hours; Cancel, presentation failure, an unknown result, or local-data removal does not release it. Account deletion removes it transactionally. Firestore never stores raw contacts, People IDs, birthdays, phone numbers, message text, prompts, or approval content, and mobile clients have no direct Firestore access."
+          data-hi="केवल-सर्वर समन्वय सेवा सामग्री-रहित खाता मोड, सक्रिय Android इंस्टॉलेशन और sender epoch, छोटी अनुमति समय-सीमा, उपयोग सीमा और कुंजी-आधारित अपारदर्शी जन्मदिन या गंतव्य सुरक्षा रिकॉर्ड रखती है। केवल Android पर चालू लोगों के लिए मोबाइल ऐप तय लंबाई वाले छद्मनामित घटना और गंतव्य आधार, साथ में सीमित समय और भेजने वाले की सुरक्षा सीमा भेजता है; सर्वर आधारों को तुरंत गुप्त HMAC से बदलता है। डुप्लिकेट रोकने के लिए ये रिकॉर्ड सुरक्षित खाते में जोड़े जा सकते हैं और अनाम नहीं हैं। iOS इस सेवा में लोगों को पंजीकृत नहीं करता और अपने-आप संदेश नहीं भेज सकता, लेकिन सुरक्षित Android सह-अस्तित्व के लिए सामग्री-रहित खाता-स्थिति, कंपोज़र-रिज़र्वेशन और सफ़ाई अनुरोध करता है। कंपोज़र रिज़र्वेशन में केवल एकतरफ़ा SHA-256 मालिक-क्षमता कुंजी, PREPARED या COMMITTED चरण, लेजर पीढ़ी और तार्किक/सफ़ाई समय रखे जाते हैं। उसमें संपर्क या संदेश सामग्री नहीं रहती। संदेश की समीक्षा दबाते ही प्रस्तुति से पहले पूरे खाते की रोक लागू होती है जो Android भेजना 72 घंटे तक रोकती है; Cancel, प्रस्तुति विफलता, अज्ञात परिणाम या स्थानीय डेटा मिटाने से यह नहीं हटती। खाता मिटाना इसे लेन-देन में हटाता है। Firestore में कच्चे संपर्क, People ID, जन्मदिन, फ़ोन नंबर, संदेश, प्रॉम्प्ट या स्वीकृति सामग्री नहीं रखी जाती और मोबाइल क्लाइंट को सीधे Firestore पहुँच नहीं होती।"
         >
           The server-only coordination service keeps content-free account mode,
           active Android installation and sender epoch, short authorization
@@ -164,11 +164,18 @@
           transforms the bases with a secret HMAC. These records can be linked
           within the protected account for duplicate prevention and are not
           anonymous. iOS does not register recipients with this service and
-          cannot send automatically, but it can make content-free account-status
-          and cleanup requests for safe Android coexistence. Firestore never
-          stores raw contacts, People IDs, birthdays, phone numbers, message
-          text, prompts, or approval content, and mobile clients have no direct
-          Firestore access.
+          cannot send automatically, but it makes content-free account-status,
+          composer-reservation, and cleanup requests for safe Android
+          coexistence. A composer reservation stores only a one-way SHA-256
+          owner-capability key, PREPARED or COMMITTED phase, ledger generation,
+          and logical/cleanup timestamps. It stores no contact or message
+          content. Tapping Review message commits an account-wide hold before
+          presentation that pauses Android sending for up to 72 hours; Cancel,
+          presentation failure, an unknown result, or local-data removal does
+          not release it. Account deletion
+          removes it transactionally. Firestore never stores raw contacts,
+          People IDs, birthdays, phone numbers, message text, prompts, or
+          approval content, and mobile clients have no direct Firestore access.
         </p>
 
         <h2 data-en="Gemini assistance" data-hi="Gemini सहायता">
@@ -232,6 +239,17 @@
             cleanup-eligible after 24 hours. Test records are kept for 30 days.
             Inactive or revoked Android installation records are kept for no
             more than 90 or 30 days respectively.
+          </li>
+          <li
+            data-en="Each successful iOS composer-reservation acquisition has a server-authoritative logical expiry no more than 72 hours after that server time. A committed reservation remains effective until logical expiry even if physical Firestore TTL cleanup is delayed, the composer is cancelled or fails, its outcome is unknown, or local app data is removed. Account deletion can remove it earlier."
+            data-hi="हर सफल iOS कंपोज़र-रिज़र्वेशन अधिग्रहण की सर्वर-अधिकृत तार्किक समाप्ति उस सर्वर समय के अधिकतम 72 घंटे बाद होती है। COMMITTED रिज़र्वेशन तार्किक समाप्ति तक प्रभावी रहता है, चाहे Firestore TTL सफ़ाई देर से हो, कंपोज़र Cancel या विफल हो, परिणाम अज्ञात हो या स्थानीय ऐप डेटा मिट जाए। खाता मिटाना इसे पहले हटा सकता है।"
+          >
+            Each successful iOS composer-reservation acquisition has a
+            server-authoritative logical expiry no more than 72 hours after
+            that server time. A committed reservation remains effective until
+            logical expiry even if physical Firestore TTL cleanup is delayed,
+            the composer is cancelled or fails, its outcome is unknown, or
+            local app data is removed. Account deletion can remove it earlier.
           </li>
           <li
             data-en="External deletion identity and support evidence is removed within 30 days after resolution. A content-free request time and outcome receipt may remain for one year for compliance evidence."

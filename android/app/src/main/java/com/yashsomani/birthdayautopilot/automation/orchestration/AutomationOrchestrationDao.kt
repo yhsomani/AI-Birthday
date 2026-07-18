@@ -870,6 +870,50 @@ abstract class AutomationOrchestrationDao {
   }
 
   @Transaction
+  open suspend fun recordRegistrationSafeCode(
+    accountId: String,
+    safeCode: String,
+    deviceWallMillis: Long,
+  ): Boolean {
+    if (activeAccount()?.accountId != accountId) return false
+    val current = coordinationState(accountId)
+    if (current != null) {
+      if (current.revision == Long.MAX_VALUE) return false
+      upsertCoordinationState(
+        current.copy(
+          lastSafeCode = safeCode,
+          revision = current.revision + 1,
+          updatedAtMillis = deviceWallMillis,
+        ),
+      )
+      return true
+    }
+    val local = localInstallation()?.takeIf { it.accountId == accountId } ?: return false
+    val active = local.state == InstallationRecordState.ACTIVE && local.senderEpoch != null
+    upsertCoordinationState(
+      CoordinationStateEntity(
+        accountId = accountId,
+        mode = local.accountMode,
+        activeInstallationId = local.installationId.takeIf { active },
+        senderEpoch = local.senderEpoch.takeIf { active },
+        resetGeneration = local.resetGeneration,
+        continuityGeneration = null,
+        ownerLeaseUntilMillis = local.ownerLeaseUntilMillis.takeIf { active },
+        nextArmNotBeforeMillis = null,
+        latestIssuedSubmitNotAfterMillis = null,
+        birthdayAutomationNotBeforeMillis = null,
+        transferDrainUntilMillis = null,
+        deletionDrainUntilMillis = null,
+        lastSuccessfulCoordinationMillis = null,
+        lastSafeCode = safeCode,
+        revision = 0,
+        updatedAtMillis = deviceWallMillis,
+      ),
+    )
+    return true
+  }
+
+  @Transaction
   open suspend fun applyRegistration(
     accountId: String,
     installationId: String,

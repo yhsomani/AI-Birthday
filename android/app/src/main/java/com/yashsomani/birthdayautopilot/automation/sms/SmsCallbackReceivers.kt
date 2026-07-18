@@ -10,6 +10,7 @@ import com.yashsomani.birthdayautopilot.AppGraph
 import com.yashsomani.birthdayautopilot.automation.workers.AutomationScheduler
 import com.yashsomani.birthdayautopilot.automation.workers.SmsOutcomeWorkScheduler
 import com.yashsomani.birthdayautopilot.attention.AndroidAttentionNotifier
+import com.yashsomani.birthdayautopilot.storage.database.BirthdayDatabase
 import com.yashsomani.birthdayautopilot.storage.database.CallbackKind
 import com.yashsomani.birthdayautopilot.storage.database.DeliveryEventEntity
 import com.yashsomani.birthdayautopilot.storage.database.DeliveryEvidenceClass
@@ -49,7 +50,7 @@ class SmsDeliveryCallbackReceiver : BroadcastReceiver() {
   }
 }
 
-private data class CallbackObservation(
+internal data class SmsCallbackObservation(
   val action: String,
   val dataUri: String,
   val resultCode: Int,
@@ -58,9 +59,119 @@ private data class CallbackObservation(
   val format: String?,
 )
 
-private object SmsCallbackDispatcher {
+/** Copies the minimal callback envelope before goAsync returns; no message or recipient is read. */
+internal object SmsCallbackIntentCapture {
   private const val MAX_PDU_BYTES = 4 * 1024
   private const val MAX_ROUTE_CHARS = 512
+  private const val ACTION_PREFIX = "com.yashsomani.birthdayautopilot.callback."
+  private const val DATA_PREFIX = "birthday-autopilot://callback/"
+
+  fun captureSafely(
+    intent: Intent,
+    resultCode: Int,
+    kind: CallbackKind,
+  ): SmsCallbackObservation? = try {
+    capture(intent, resultCode, kind)
+  } catch (_: RuntimeException) {
+    null
+  } catch (_: LinkageError) {
+    null
+  }
+
+  private fun capture(
+    intent: Intent,
+    resultCode: Int,
+    kind: CallbackKind,
+  ): SmsCallbackObservation? {
+    val kindPrefix = "$ACTION_PREFIX${kind.name.lowercase(Locale.ROOT)}."
+    val action = intent.action?.takeIf {
+      it.length in 1..200 && it.startsWith(kindPrefix)
+    } ?: return null
+    val dataUri = intent.dataString?.takeIf {
+      it.length in 1..MAX_ROUTE_CHARS && it.startsWith(DATA_PREFIX)
+    } ?: return null
+    val pdu = if (kind == CallbackKind.DELIVERY) {
+      val rawPdu = intent.getByteArrayExtra("pdu")
+      val boundedCopy = rawPdu?.takeIf { it.size in 1..MAX_PDU_BYTES }?.clone()
+      rawPdu?.fill(0)
+      boundedCopy
+    } else {
+      null
+    }
+    val format = if (kind == CallbackKind.DELIVERY) {
+      intent.getStringExtra("format")?.takeIf { it == "3gpp" || it == "3gpp2" }
+    } else {
+      null
+    }
+    return SmsCallbackObservation(action, dataUri, resultCode, kind, pdu, format)
+  }
+}
+
+/**
+ * Stateless durable router used by the production receiver and native tests. A recreated process
+ * can construct a new router over the same Room database and resolve the opaque callback token.
+ */
+internal class SmsCallbackRoomRouter(
+  database: BirthdayDatabase,
+  private val wallClockMillis: () -> Long = System::currentTimeMillis,
+) {
+  private val ledger = database.safetyLedgerDao()
+  private val processor = SmsOutcomeProcessor(database, wallClockMillis)
+
+  suspend fun route(observation: SmsCallbackObservation): SmsOutcomeProcessingResult? {
+    val observedAtMillis = wallClockMillis()
+    val token = ledger.findLiveCallbackToken(
+      action = observation.action,
+      dataUri = observation.dataUri,
+      kind = observation.kind,
+      observedAtMillis = observedAtMillis,
+    ) ?: return null
+    val evidence = when (observation.kind) {
+      CallbackKind.SENT -> SmsCallbackEvidenceClassifier.sent(observation.resultCode)
+      CallbackKind.DELIVERY -> SmsCallbackEvidenceClassifier.delivery(
+        observation.pdu,
+        observation.format,
+      )
+    }
+    val event = DeliveryEventEntity(
+      eventId = UUID.randomUUID().toString().lowercase(),
+      callbackTokenId = token.callbackTokenId,
+      evidenceKey = SmsCallbackEvidenceKey.create(
+        token.callbackTokenId,
+        evidence.first,
+        observation.resultCode,
+        evidence.second,
+      ),
+      evidenceClass = evidence.first,
+      androidResultCode = observation.resultCode,
+      modemStatus = evidence.second,
+      receivedAtMillis = observedAtMillis,
+    )
+    return processor.recordCallbackAndReduce(
+      sendAttemptId = token.sendAttemptId,
+      event = event,
+      observedAtMillis = observedAtMillis,
+    )
+  }
+}
+
+internal object SmsCallbackEvidenceKey {
+  fun create(
+    tokenId: String,
+    evidence: DeliveryEvidenceClass,
+    resultCode: Int,
+    modemStatus: Int?,
+  ): String {
+    val value = "$tokenId|${evidence.name}|$resultCode|${modemStatus ?: "none"}"
+    return MessageDigest.getInstance("SHA-256")
+      .digest(value.toByteArray(StandardCharsets.US_ASCII))
+      .joinToString("") { byte ->
+        String.format(Locale.ROOT, "%02x", byte.toInt() and 0xff)
+      }
+  }
+}
+
+private object SmsCallbackDispatcher {
   private val executor = ThreadPoolExecutor(
     1,
     2,
@@ -77,13 +188,7 @@ private object SmsCallbackDispatcher {
     kind: CallbackKind,
     pendingResult: BroadcastReceiver.PendingResult,
   ) {
-    val observation = try {
-      capture(intent, resultCode, kind)
-    } catch (_: RuntimeException) {
-      null
-    } catch (_: LinkageError) {
-      null
-    }
+    val observation = SmsCallbackIntentCapture.captureSafely(intent, resultCode, kind)
     if (observation == null) {
       pendingResult.finish()
       return
@@ -107,87 +212,17 @@ private object SmsCallbackDispatcher {
     }
   }
 
-  private fun capture(
-    intent: Intent,
-    resultCode: Int,
-    kind: CallbackKind,
-  ): CallbackObservation? {
-    val action = intent.action?.takeIf { it.length in 1..200 } ?: return null
-    val dataUri = intent.dataString?.takeIf { it.length in 1..MAX_ROUTE_CHARS } ?: return null
-    val pdu = if (kind == CallbackKind.DELIVERY) {
-      val rawPdu = intent.getByteArrayExtra("pdu")
-      val boundedCopy = rawPdu?.takeIf { it.size in 1..MAX_PDU_BYTES }?.clone()
-      rawPdu?.fill(0)
-      boundedCopy
-    } else {
-      null
-    }
-    val format = if (kind == CallbackKind.DELIVERY) {
-      intent.getStringExtra("format")?.takeIf { it == "3gpp" || it == "3gpp2" }
-    } else {
-      null
-    }
-    return CallbackObservation(action, dataUri, resultCode, kind, pdu, format)
-  }
-
-  private fun persist(context: Context, observation: CallbackObservation) = runBlocking {
+  private fun persist(context: Context, observation: SmsCallbackObservation) = runBlocking {
     if (
       LifecycleStateStore(context).journalStatus() == LifecycleJournalStatus.UNREADABLE
     ) return@runBlocking
     val database = AppGraph.get(context).database
-    val ledger = database.safetyLedgerDao()
-    val observedAtMillis = System.currentTimeMillis()
-    val token = ledger.findLiveCallbackToken(
-      action = observation.action,
-      dataUri = observation.dataUri,
-      kind = observation.kind,
-      observedAtMillis = observedAtMillis,
-    ) ?: return@runBlocking
-    val evidence = when (observation.kind) {
-      CallbackKind.SENT -> SmsCallbackEvidenceClassifier.sent(observation.resultCode)
-      CallbackKind.DELIVERY -> SmsCallbackEvidenceClassifier.delivery(
-        observation.pdu,
-        observation.format,
-      )
-    }
-    val event = DeliveryEventEntity(
-      eventId = UUID.randomUUID().toString().lowercase(),
-      callbackTokenId = token.callbackTokenId,
-      evidenceKey = evidenceKey(
-        token.callbackTokenId,
-        evidence.first,
-        observation.resultCode,
-        evidence.second,
-      ),
-      evidenceClass = evidence.first,
-      androidResultCode = observation.resultCode,
-      modemStatus = evidence.second,
-      receivedAtMillis = observedAtMillis,
-    )
-    val result = SmsOutcomeProcessor(database).recordCallbackAndReduce(
-      sendAttemptId = token.sendAttemptId,
-      event = event,
-      observedAtMillis = observedAtMillis,
-    )
+    val result = SmsCallbackRoomRouter(database).route(observation) ?: return@runBlocking
     result.attentionSafeCode?.let { AndroidAttentionNotifier(context).onSafeCode(it) }
     SmsOutcomeWorkScheduler.scheduleFrom(context, result)
     if (result.callbackInserted) {
       AutomationScheduler.enqueueImmediateLocal(context, "CALLBACK")
     }
-  }
-
-  private fun evidenceKey(
-    tokenId: String,
-    evidence: DeliveryEvidenceClass,
-    resultCode: Int,
-    modemStatus: Int?,
-  ): String {
-    val value = "$tokenId|${evidence.name}|$resultCode|${modemStatus ?: "none"}"
-    return MessageDigest.getInstance("SHA-256")
-      .digest(value.toByteArray(StandardCharsets.US_ASCII))
-      .joinToString("") { byte ->
-        String.format(Locale.ROOT, "%02x", byte.toInt() and 0xff)
-      }
   }
 }
 

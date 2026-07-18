@@ -13,6 +13,10 @@
     "backend:check": "npm --prefix backend/functions run check",
     "backend:test:emulator": "npm --prefix backend/functions run test:emulator",
     "hosting:check": "npm --prefix backend/hosting run check",
+    "hosting:release:artifact": "node tools/hosting-deployment-artifact.mjs",
+    "hosting:release:provenance": "node tools/create-hosting-deployment-provenance.mjs",
+    "hosting:release:current-live": "node tools/create-hosting-current-live-observation.mjs",
+    "hosting:release:report": "node tools/compose-hosting-release-report.mjs",
     "cloud:evidence:source": "node tools/print-cloud-release-source.mjs",
     "cloud:evidence:validate": "node tools/validate-cloud-release-evidence.mjs",
     "bundle:check": "node tools/verify-react-native-bundles.mjs",
@@ -31,6 +35,8 @@
     "ios:pods": "cd ios && bundle exec pod install --deployment",
     "ios:release:inspect": "node tools/verify-ios-release-artifact.mjs --mode inspect",
     "ios:release:verify": "node tools/verify-ios-release-artifact.mjs --mode verify",
+    "release:closure:template:check": "node tools/validate-production-release-closure.mjs --mode template --file tools/production-release-closure.template.json",
+    "release:closure:validate": "node tools/validate-production-release-closure.mjs --mode release",
     "doctor": "node tools/doctor.mjs",
     "doctor:android": "node tools/doctor.mjs --platform=android",
     "doctor:ios": "node tools/doctor.mjs --platform=ios",
@@ -50,7 +56,7 @@
     "store:template:check": "node tools/validate-store-submission-evidence.mjs --file tools/store-submission-evidence.template.json --mode template",
     "store:release:check": "node tools/check-store-release.mjs",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run format:check && npm run typecheck && npm run codegen:check && npm run store:template:check && npm run bundle:check && npm run test:tools && npm run security:secrets && npm run security:licenses && npm run test:ci",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run codegen:check && npm run store:template:check && npm run release:closure:template:check && npm run bundle:check && npm run test:tools && npm run security:secrets && npm run security:licenses && npm run test:ci",
     "check:portable": "npm run check && npm run backend:check && npm run hosting:check"
   },
   "dependencies": {

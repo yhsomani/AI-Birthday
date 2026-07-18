@@ -22,6 +22,7 @@ const executable = (path, source) => {
 };
 
 const runFixture = ({
+  firebaseState = 'valid',
   manifestState = 'valid',
   signatureState = 'valid',
   signerCount = 1,
@@ -44,7 +45,9 @@ const runFixture = ({
     mkdirSync(readelfDirectory, { recursive: true });
 
     const aab = join(directory, 'candidate.aab');
+    const evidenceRoot = join(directory, 'supporting-evidence');
     const validatorArguments = join(directory, 'validator-arguments.txt');
+    mkdirSync(evidenceRoot);
     writeFileSync(aab, 'not-a-real-zip-the-test-tools-own-the-boundary');
     executable(
       join(bin, 'zipinfo'),
@@ -86,6 +89,15 @@ const runFixture = ({
   esac
   exit
 fi
+if [[ $1 == */inspect-android-aab-firebase.mjs ]]; then
+  case \${AAB_TEST_FIREBASE_STATE:?} in
+    valid) printf '%s\t%s\t%s\t%s\n' birthday-production 123456789012 1:123456789012:android:abcdef1234567890 123456789012-release.apps.googleusercontent.com ;;
+    wrong-project) printf '%s\t%s\t%s\t%s\n' attacker-production 999999999999 1:999999999999:android:abcdef1234567890 999999999999-release.apps.googleusercontent.com ;;
+    rejected) printf '%s\n' 'FAIL compiled Firebase resources are invalid' >&2; exit 1 ;;
+    *) exit 93 ;;
+  esac
+  exit
+fi
 printf '%s\\n' "$@" > '${validatorArguments}'`,
     );
 
@@ -99,12 +111,14 @@ printf '%s\\n' "$@" > '${validatorArguments}'`,
         join(directory, 'evidence.json'),
         join(directory, 'evidence.sig'),
         join(directory, 'authority.pem'),
+        evidenceRoot,
         'prod',
       ],
       {
         encoding: 'utf8',
         env: {
           ...process.env,
+          AAB_TEST_FIREBASE_STATE: firebaseState,
           AAB_TEST_MANIFEST_STATE: manifestState,
           ANDROID_HOME: sdk,
           JAVA_HOME: javaHome,
@@ -141,7 +155,19 @@ test('AAB verifier binds exact bytes to the upload signer and Play evidence mode
     /--artifact-signing-certificate\n(?:ab){32}/u,
   );
   assert.match(validatorArguments, /--artifact-file/u);
+  assert.match(validatorArguments, /--evidence-root\n.*supporting-evidence/u);
   assert.match(result.stdout, /version=1 min=29 target=36/u);
+  assert.match(
+    result.stdout,
+    /PASS Android Firebase project=birthday-production number=123456789012 app-id=1:123456789012:android:abcdef1234567890 web-oauth-client=123456789012-release\.apps\.googleusercontent\.com/u,
+  );
+});
+
+test('AAB verifier fails closed when compiled Firebase identity cannot be decoded', () => {
+  const rejected = runFixture({ firebaseState: 'rejected' });
+  assert.notEqual(rejected.result.status, 0);
+  assert.match(rejected.result.stderr, /Firebase resources are invalid/u);
+  assert.equal(rejected.validatorArguments, '');
 });
 
 test('AAB verifier rejects an unsigned artifact and multiple signers', () => {
@@ -180,6 +206,7 @@ test('AAB verifier requires required bundle structure and arm64-only 16 KB ELF i
   assert.match(source, /alignment < 0x4000/u);
   assert.match(source, /artifactAabSha256|play-aab/u);
   assert.match(source, /inspect-android-aab-manifest\.mjs/u);
+  assert.match(source, /inspect-android-aab-firebase\.mjs/u);
   assert.match(source, /--version-code "\$version_code"/u);
   assert.match(source, /--version-name "\$version_name"/u);
   assert.doesNotMatch(source, /--version-code 1/u);

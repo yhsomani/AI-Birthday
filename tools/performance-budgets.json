@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "minimumSamples": {
     "latencyP95": 30,
     "claimArmLatency": 100,

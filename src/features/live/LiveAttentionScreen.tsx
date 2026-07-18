@@ -166,7 +166,12 @@ export function LiveAttentionScreen({
 
   return (
     <Screen includeTopInset testID="live-attention-screen">
-      <Button label={t('live.common.back')} onPress={onBack} variant="ghost" />
+      <Button
+        label={t('live.common.back')}
+        onPress={onBack}
+        variant="ghost"
+        testID="live-attention-back"
+      />
       <AppText variant="title" accessibilityRole="header">
         {t('live.attention.title')}
       </AppText>

@@ -96,6 +96,17 @@ test('shared smoke projections are content-free and fail every intent closed', (
     );
     assert.deepEqual(fixture.platforms[platform]['contacts:list'].items, []);
     assert.equal(fixture.platforms[platform]['contacts:list'].totalCount, 0);
+    assert.deepEqual(fixture.platforms[platform]['activity:list'].items, [
+      {
+        id: 'smoke.activity.1',
+        kind: 'settings-changed',
+        occurredAt: '2026-07-12T00:00:00.000Z',
+      },
+    ]);
+    assert.equal(
+      fixture.platforms[platform]['privacy:inventory'].activityCount,
+      1,
+    );
     assert.equal(
       fixture.platforms[platform]['privacy:inventory'].localStorageBytes,
       0,
@@ -121,6 +132,10 @@ test('Android smoke loads production index with only the synthetic bridge', () =
   assert.match(gradle, /applicationIdSuffix "\.smoke"/u);
   assert.match(gradle, /"smokeDebug"/u);
   assert.match(gradle, /environment == "smoke"/u);
+  assert.match(
+    gradle,
+    /if \(environment == "smoke"\)[\s\S]*variantBuilder\.enableUnitTest = false[\s\S]*variantBuilder\.enableAndroidTest = false/u,
+  );
   assert.match(gradle, /smoke\.assets\.srcDirs/u);
   assert.match(app, /jsMainModulePath = "index"/u);
   assert.match(app, /SmokeBirthdayNativePackage/u);
@@ -223,11 +238,54 @@ test('production-path Maestro flow is app-ID-bound and navigation-only', () => {
   for (const id of [
     'live-app-shell',
     'live-home-screen',
+    'live-activity-screen',
+    'live-activity-detail-screen',
+    'live-message-screen',
+    'live-automation-screen',
+    'live-attention-screen',
+    'live-diagnostics-screen',
     'live-people-screen',
     'live-settings-screen',
+    'live-privacy-screen',
+    'live-help-legal-screen',
   ]) {
     assert.match(flows[0], new RegExp(id, 'u'));
   }
+  const commandBlocks = flows[0].split(/\n(?=- )/u);
+  const scrollBlocks = commandBlocks.filter(block =>
+    block.startsWith('- scrollUntilVisible:'),
+  );
+  for (const id of [
+    'live-home-activity',
+    'live-home-message',
+    'live-home-automation',
+  ]) {
+    assert.equal(
+      scrollBlocks.some(block => block.includes(`id: ${id}`)),
+      true,
+      `${id} must have its own scroll command`,
+    );
+  }
+  for (const id of [
+    'live-activity-smoke.activity.1',
+    'live-settings-privacy',
+    'live-settings-help-legal',
+    'live-settings-attention',
+    'live-settings-diagnostics',
+  ]) {
+    assert.equal(
+      commandBlocks.some(
+        block => block.startsWith('- tapOn:') && block.includes(`id: ${id}`),
+      ),
+      true,
+      `${id} must have its own tap command`,
+    );
+  }
+  assert.match(
+    flows[0],
+    /extendedWaitUntil:\s*\n\s+visible:\s*\n\s+id: live-app-shell\s*\n\s+timeout: 120000/u,
+  );
+  assert.equal((flows[0].match(/extendedWaitUntil:/gu) ?? []).length, 1);
   assert.doesNotMatch(
     flows[0],
     /openLink|runScript|evalScript|http:|https:|SEND_SMS|READ_PHONE_STATE/u,
@@ -243,4 +301,34 @@ test('production-path Maestro flow is app-ID-bound and navigation-only', () => {
     runner,
     /birthdayautopilot\.(?:dev|e2e|lab|prod|staging)'/u,
   );
+});
+
+test('CI blocks unsafe history and exercises both production-path smoke hosts', () => {
+  const ci = read('.github/workflows/ci.yml');
+  const historyJob = ci.slice(
+    ci.indexOf('  history-secrets:'),
+    ci.indexOf('  backend-node22:'),
+  );
+  assert.match(
+    historyJob,
+    /history-secrets:[\s\S]*?fetch-depth: 0[\s\S]*?persist-credentials: false[\s\S]*?npm run security:history/u,
+  );
+  assert.match(historyJob, /test "\$\(node --version\)" = "v24\.18\.0"/u);
+  assert.match(historyJob, /test "\$\(npm --version\)" = "11\.6\.0"/u);
+  assert.doesNotMatch(
+    historyJob,
+    /continue-on-error|security:history[^\n]*\|\||history.*allowlist/iu,
+  );
+  assert.match(ci, /:app:compileSmokeDebugKotlin/u);
+  assert.match(ci, /:app:assembleSmokeDebug/u);
+  assert.match(ci, /:app:lintSmokeDebug/u);
+  assert.match(ci, /:app:processSmokeDebugMainManifest/u);
+  assert.match(ci, /npm run smoke:manifest:verify/u);
+  assert.match(ci, /npm run smoke:android/u);
+  assert.match(ci, /-scheme BirthdayAutopilotProductionSmoke/u);
+  assert.match(ci, /npm run smoke:ios/u);
+  assert.match(ci, /Info-Smoke\.plist/u);
+  assert.match(ci, /BirthdayAutopilot-Smoke\.entitlements/u);
+  assert.match(ci, /copy-production-smoke-fixture\.sh/u);
+  assert.match(ci, /BirthdayAutopilotProductionSmoke\.xcscheme/u);
 });

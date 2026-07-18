@@ -11,6 +11,7 @@ export interface AccountPaths {
   readonly tombstone: DocumentReference;
   readonly presence: DocumentReference;
   readonly operation: DocumentReference;
+  readonly iosComposerReservation: DocumentReference;
   readonly operationReceipt: (requestKey: string) => DocumentReference;
   readonly latestOperationReceipt: DocumentReference;
   readonly installations: CollectionReference;
@@ -37,6 +38,7 @@ export function accountPaths(db: Firestore, uid: string): AccountPaths {
     tombstone: db.collection('deletionTombstones').doc(uid),
     presence: db.collection('coordinationPresence').doc(uid),
     operation: db.collection('coordinationOperationFences').doc(uid),
+    iosComposerReservation: db.collection('iosComposerReservations').doc(uid),
     operationReceipt: requestKey =>
       db.collection('coordinationOperationReceipts').doc(requestKey),
     latestOperationReceipt: db

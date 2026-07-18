@@ -496,7 +496,6 @@ struct CompanionWorkflowActivity: Codable {
   let kind: String
   let reason: String?
   let occurredAt: Date
-  let actionable: Bool
 }
 
 struct CompanionWorkflowPrivacyOperation: Codable {
@@ -661,4 +660,26 @@ struct CompanionWorkflowReadSnapshot {
   let proposals: [CompanionApprovedProposal]
   let composerRecords: [CompanionComposerRecord]
   let reminderPlans: [CompanionReminderPlan]
+  let occurrenceNamespace: Data
+  let planningIndex: IOSCompanionPlanningIndex?
+  let terminalLedger: IOSCompanionTerminalLedger
+}
+
+/// Exact, short-lived native material reconstructed from the compact planning
+/// index. It is never supplied by React Native and is persisted only while a
+/// foreground MessageUI review nonce is active.
+struct IOSCompanionLazyProposalMaterial: Equatable {
+  let proposalId: String
+  let accountGeneration: String
+  let configurationGeneration: UInt64
+  let peopleSnapshotGeneration: String
+  let contactOrdinal: Int
+  let contactId: String
+  let contactMaterialRevision: UInt64
+  let selectedPhoneId: String
+  let occurrenceId: String
+  let occurrenceDigest: Data
+  let occurrenceCivilDate: String
+  let recipient: String
+  let body: String
 }

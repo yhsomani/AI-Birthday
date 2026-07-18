@@ -15,8 +15,10 @@ developer identity, legal approvals, Hindi review, reCAPTCHA Enterprise site
 key, and identity-verified support/admin workflow are external release gates.
 The normal build deliberately omits `public/runtime-config.json`, so a preview
 shows legal information but the deletion control fails closed. Firebase Hosting
-predeploy runs `build:release`, which refuses to deploy unless every release
-gate in the private config is explicitly satisfied.
+release packaging runs `build:release`, which refuses to package unless every
+release gate in the private config is explicitly satisfied. Production never
+reruns a predeploy hook: it consumes only a verified canonical artifact whose
+deployment config contains no hooks.
 
 ## Security model
 
@@ -147,13 +149,14 @@ Before setting either tested boolean to `true`:
 7. Put the same exact `/delete/` URL in Play Console, App Store privacy/support
    metadata, OAuth branding, the mobile Settings surface, and reviewer notes.
 
-An authorized deployment then uses an explicit project and the private config:
-
-```sh
-cd backend
-BIRTHDAY_HOSTING_RELEASE_CONFIG_PATH=/secure/out-of-repository/release-config.json \
-  npx firebase-tools deploy --project <explicit-tier-project-id> --only hosting
-```
+Do not deploy with a local `npx firebase-tools` command. Dispatch
+`.github/workflows/hosting-production-deploy.yml` with the exact clean revision,
+project ID, site ID, approved origin, and protected release-config SHA-256. The
+protected workflow pins Firebase CLI `15.23.0`, deploys only files re-extracted
+from `hosting-deployment-artifact.json`, and retains the exact manifest,
+Firebase-created version, live release, and operation-window provenance needed
+by the signed cloud gate and final production closure. See
+[`docs/CLOUD_RELEASE_EVIDENCE.md`](../../docs/CLOUD_RELEASE_EVIDENCE.md).
 
 The configured support workflow is intentionally not implemented as an
 unauthenticated static form. Collecting identity evidence without a protected

@@ -27,11 +27,12 @@ const stableRequestId = z
   .regex(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
   );
-const deletionReceiptId = z
+const canonicalLowercaseUUID = z
   .string()
   .regex(
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
   );
+const deletionReceiptId = canonicalLowercaseUUID;
 const sha256Hex = z.string().regex(/^[a-f0-9]{64}$/u);
 const opaqueKey = z
   .string()
@@ -186,6 +187,24 @@ export const companionStatusSchema = z
   })
   .strict();
 
+const iosComposerReservationBody = {
+  contractVersion,
+  ledgerGeneration,
+  reservationId: canonicalLowercaseUUID,
+} as const;
+
+export const acquireIOSComposerReservationSchema = z
+  .object(iosComposerReservationBody)
+  .strict();
+
+export const commitIOSComposerReservationSchema = z
+  .object(iosComposerReservationBody)
+  .strict();
+
+export const releaseIOSComposerReservationSchema = z
+  .object({ contractVersion, reservationId: canonicalLowercaseUUID })
+  .strict();
+
 export const coordinationLifecycleStatusSchema = z
   .object({
     contractVersion,
@@ -208,6 +227,15 @@ export type ContactDerivedResetRequest = z.infer<
 >;
 export type SenderReleaseRequest = z.infer<typeof senderReleaseSchema>;
 export type CompanionStatusRequest = z.infer<typeof companionStatusSchema>;
+export type AcquireIOSComposerReservationRequest = z.infer<
+  typeof acquireIOSComposerReservationSchema
+>;
+export type CommitIOSComposerReservationRequest = z.infer<
+  typeof commitIOSComposerReservationSchema
+>;
+export type ReleaseIOSComposerReservationRequest = z.infer<
+  typeof releaseIOSComposerReservationSchema
+>;
 export type CoordinationLifecycleStatusRequest = z.infer<
   typeof coordinationLifecycleStatusSchema
 >;

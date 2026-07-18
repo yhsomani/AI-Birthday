@@ -34,7 +34,10 @@ test('Android projections and readiness derive age from trusted monotonic time',
   assert.match(androidPolicy, /NORMAL_MAXIMUM_AGE_MILLIS = 7L \* 24L/u);
   assert.match(androidPolicy, /MAXIMUM_UNATTENDED_AGE_MILLIS = 30L \* 24L/u);
   assert.match(androidPolicy, /lastSuccessMillis > trustedNowMillis/u);
-  assert.match(androidPolicy, /Math\.subtractExact\(trustedNowMillis, lastSuccessMillis\)/u);
+  assert.match(
+    androidPolicy,
+    /Math\.subtractExact\(trustedNowMillis, lastSuccessMillis\)/u,
+  );
   assert.match(
     androidBridge,
     /TrustedTimeEstimator\.estimate\([\s\S]*?SystemClock\.elapsedRealtime\(\)[\s\S]*?trustedBootCount\(\)/u,
@@ -94,7 +97,10 @@ test('iOS bridge uses recent authenticated time and never ages from device wall 
   assert.match(iosPolicy, /enum IOSContactsFreshnessPolicy/u);
   assert.match(iosPolicy, /age <= normalMaximumAge/u);
   assert.match(iosPolicy, /age <= companionMaximumAge/u);
-  assert.match(iosPolicy, /receiptAge >= 0, receiptAge <= maximumObservationAge/u);
+  assert.match(
+    iosPolicy,
+    /receiptAge >= 0, receiptAge <= maximumObservationAge/u,
+  );
   assert.match(
     iosStore,
     /IOSContactsFreshnessPolicy\.estimateTrustedNow\([\s\S]*?control\.trustedServerTime/u,

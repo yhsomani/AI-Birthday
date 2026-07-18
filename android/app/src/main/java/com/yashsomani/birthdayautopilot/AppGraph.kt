@@ -38,6 +38,7 @@ import com.yashsomani.birthdayautopilot.lifecycle.LifecycleRepairIdentityPolicy
 import com.yashsomani.birthdayautopilot.lifecycle.SenderReleaseRecoveryStartupPolicy
 import com.yashsomani.birthdayautopilot.gemini.AndroidGeminiOperationalGate
 import com.yashsomani.birthdayautopilot.gemini.AndroidGeminiSuggestionGateway
+import com.yashsomani.birthdayautopilot.gemini.clearAndroidGeminiLocalRateState
 import com.yashsomani.birthdayautopilot.localization.AndroidNativeLocaleProvider
 import com.yashsomani.birthdayautopilot.people.AndroidNetworkAvailability
 import com.yashsomani.birthdayautopilot.people.AndroidPeopleSyncService
@@ -152,6 +153,9 @@ class AppGraph private constructor(context: Context) {
       context = appContext,
       exactAccountSessionMatches = {
         runBlocking { peopleSyncDao.activeAccount()?.let(::identitySessionMatches) == true }
+      },
+      accountGeneration = {
+        installationIdentityStore.currentOrNull()?.callbackGeneration
       },
       operationalGate = geminiOperationalGate,
     )
@@ -396,6 +400,7 @@ class AppGraph private constructor(context: Context) {
     }
     if (databaseFiles.any(java.io.File::exists)) return false
     if (runCatching { DatabaseKeyManager(appContext).clear() }.isFailure) return false
+    if (!clearAndroidGeminiLocalRateState(appContext)) return false
 
     val before = installationIdentityStore.currentOrNull() ?: return false
     val after = when {
@@ -475,6 +480,7 @@ class AppGraph private constructor(context: Context) {
       current.installationId != expectedInstallationId ||
       current.callbackGeneration != expectedCallbackGeneration
     ) return false
+    if (!clearAndroidGeminiLocalRateState(appContext)) return false
     return try {
       database.close()
       appContext.deleteDatabase(BirthdayDatabase.DATABASE_NAME)

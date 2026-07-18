@@ -8,6 +8,12 @@ export const nativeBridgeProblem: NativeProblem = {
     'NATIVE_BRIDGE_UNAVAILABLE' as import('../../domain/shared/brand').SafeSupportCode,
 };
 
+export const nativeContractProblem: NativeProblem = {
+  kind: 'internal',
+  supportCode:
+    'NATIVE_CONTRACT_INVALID' as import('../../domain/shared/brand').SafeSupportCode,
+};
+
 export const nativePlatformMismatchProblem: NativeProblem = {
   kind: 'internal',
   supportCode:

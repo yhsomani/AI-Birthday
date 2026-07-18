@@ -121,3 +121,58 @@ test('every mobile Stitch owner is reachable from the production app root', () =
     );
   }
 });
+
+test('high-risk Stitch owners contain their real production state and route anchors', () => {
+  const crosswalk = JSON.parse(read('stitch/IMPLEMENTATION_CROSSWALK.json'));
+  const entry = id => crosswalk.entries.find(candidate => candidate.id === id);
+  const privacy = read('src/features/live/LivePrivacyScreen.tsx');
+  const activity = read('src/features/live/LiveActivityScreen.tsx');
+  const automation = read('src/features/live/LiveAutomationScreen.tsx');
+  const activationModel = read('src/domain/automation/model.ts');
+  const shell = read('src/features/live/LiveAppShell.tsx');
+
+  assert.deepEqual(entry('A06')?.implementation, [
+    'src/features/live/LivePrivacyScreen.tsx',
+  ]);
+  assert.match(privacy, /kind: 'clear-activity'/u);
+  assert.match(privacy, /prepareAction/u);
+  assert.match(privacy, /confirmAction/u);
+
+  assert.ok(
+    entry('T06')?.implementation.includes(
+      'src/features/live/LivePrivacyScreen.tsx',
+    ),
+  );
+  for (const action of [
+    'disconnect-contacts',
+    'revoke-google-access',
+    'sign-out-retain',
+    'sign-out-wipe',
+  ]) {
+    assert.match(privacy, new RegExp(`kind: '${action}'`, 'u'));
+  }
+  assert.match(shell, /onOpenPrivacy=\{\(\) =>/u);
+  assert.match(shell, /name="Privacy" component=\{LivePrivacyRoute\}/u);
+
+  assert.match(activity, /activityDetailDisclosure/u);
+  assert.match(activity, /composer-reported-sent/u);
+  assert.match(activity, /composer-outcome-unknown/u);
+  assert.match(activity, /live-activity-detail-ios-visibility/u);
+
+  for (const field of [
+    'plannedReminderCount',
+    'reminderWindowLabel',
+    'reminderHorizon',
+    'coexistence',
+    'contactsReady',
+    'messageUiReady',
+    'protectedStorageReady',
+    'readiness',
+  ]) {
+    assert.match(activationModel, new RegExp(`\\b${field}\\b`, 'u'));
+    assert.match(automation, new RegExp(`review\\.${field}`, 'u'));
+  }
+  assert.match(automation, /iosActivationSnapshotComplete/u);
+  assert.match(automation, /live-ios-activation-snapshot-blocked/u);
+  assert.match(automation, /live-open-composer/u);
+});

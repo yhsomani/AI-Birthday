@@ -17,6 +17,11 @@ legal, or store evidence.
   at-most-one submission safety.
 - Do not delete or rewrite an Armed claim, destination guard, Arm outcome,
   deletion tombstone, or unresolved local barrier to make recovery appear clean.
+- Never manually delete, release, shorten, or rewrite a logically live
+  `COMMITTED` or ambiguous-sticky iOS composer reservation for availability. A
+  live hold can represent a MessageUI action whose final payload/result is
+  unknowable; Android must remain paused even after Cancel, failure, Unknown,
+  process death, sign-out, revoke, or local wipe.
 - Two authorized people review every production containment or recovery change.
   Retain the content-free change request, exact before/after configuration bytes,
   source revision, UTC times, operator identities, and approval reference.
@@ -108,6 +113,55 @@ key. These identities are not interchangeable.
 - When the approved window closes, record Missed. Do not catch up automatically.
 - Restore traffic gradually and monitor content-free latency, contention, auth,
   App Check, quota, old-epoch, and no-write/unknown classes.
+
+## iOS composer reservation or unexpectedly paused Android account
+
+Treat the top-level iOS composer reservation as an account-global duplicate-
+safety hold, not a lock that an operator may clear for convenience.
+
+1. Confirm the exact tier, signed iOS/Android artifacts, ledger generation, and
+   App Check evidence without collecting the capability UUID, Firebase UID,
+   contact, birthday, destination, phone, recipient, draft, MessageUI result, or
+   screenshots containing them. Incident records may use only content-free
+   aggregate phase/refusal/expiry classes.
+2. Read the reservation only through the reviewed least-privilege audit path.
+   Validate schema, domain-separated SHA-256 owner key shape, `PREPARED` or
+   `COMMITTED` phase, ledger generation, and server logical expiry. Firestore TTL
+   lag or document presence after logical expiry is not authorization state.
+3. Permit early release only when the signed iOS client presents the exact
+   owner capability, local state is still `PREPARED`, no sticky transition was
+   attempted, and the authenticated consumed-App-Check callable returns exact
+   `RELEASED`. An operator, support agent, changed/lost capability, timeout, or
+   ambiguous response cannot substitute for that proof.
+4. Never release a live `COMMITTED` or ambiguous-sticky hold. Cancel, Failed,
+   reported Sent, Unknown, UIKit presentation failure, background dismissal,
+   crash, reinstall, local-data wipe, sign-out, or Google revoke does not make
+   it safe. Explain that another iPhone and an earlier protected review on the
+   same phone are intentionally indistinguishable after capability loss.
+5. Android becomes eligible only after server logical expiry (subject to every
+   other Android readiness/coordination rule), not after delayed TTL cleanup.
+   The iOS client must dismiss MessageUI to Unknown on resign-active and at
+   least five minutes before expiry using its monotonic safety deadline.
+6. Account deletion is the sole operation allowed to dominate a live sticky or
+   `COMMITTED` hold early:
+   its Firestore transaction deletes the reservation while establishing the
+   no-new-child deletion fence, and final deletion verifies reservation absence.
+   Do not imitate deletion by deleting only this document.
+7. If reservation schema, ledger generation, transaction ordering, or history
+   is corrupt or cannot be proven, disable new arms and set continuity to
+   `FROZEN`. Preserve records, fix forward, and run reviewed continuity recovery;
+   never infer safety from an empty or malformed document.
+
+Recovery requires production Firestore contention evidence for both concurrent
+orders of acquire versus first Android registration and every Android mutation;
+exact-owner reuse and changed/lost capability refusal; local-sticky-before-
+server-commit crash boundaries; PREPARED-only release; 72-hour logical expiry
+with delayed TTL; background/five-minute-early dismissal; completed destructive-
+operation receipt replay under a later reservation; journal destruction and
+verified absence during every privacy wipe/recovery path without a server-
+release claim; and account deletion racing/removing the reservation. Support
+must disclose that Android birthdays may be missed during the hold and must not
+promise an early unlock.
 
 ## Ledger corruption, disaster recovery, or duplicate report
 
@@ -205,12 +259,20 @@ Before restoring production behavior, prove all of the following:
   `npm run cloud:evidence:validate -- ...`; a protected read-only observation
   artifact alone is not approval, and no operator infers missing project/app/
   billing/Hosting identities from a local CLI default;
+- production Hosting was deployed by the protected keyless workflow from its
+  canonical artifact, and the signed cloud `hosting-release` evidence hashes
+  the retained manifest/provenance whose Firebase CLI version matches the live
+  `DEPLOY` release and exact created Hosting version;
 - exact tier, source, artifact, installed signer, Firebase/OAuth/App Check, and
   distribution evidence match;
 - GlobalControl continuity and generation are known, with no unresolved migration
   or unexplained missing record;
 - no new claim/Arm was possible during containment except a documented pre-issued
   permit within its frozen deadline;
+- every live iOS composer reservation remained authoritative until exact
+  PREPARED-owner release, server logical expiry, or transactionally dominant
+  account deletion; no operator used TTL lag, local journal loss, Cancel,
+  Failed, Sent, Unknown, or crash as an early-release proof;
 - backend and mobile contract/emulator/device suites pass at the current source;
 - the current lock-bound native advisory reports pass independently for Android
   production runtime, broader Android/build tooling, and iOS CocoaPods with no

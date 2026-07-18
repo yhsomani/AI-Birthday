@@ -88,7 +88,12 @@ export function LiveDiagnosticsScreen({
 
   return (
     <Screen includeTopInset testID="live-diagnostics-screen">
-      <Button label={t('live.common.back')} onPress={onBack} variant="ghost" />
+      <Button
+        label={t('live.common.back')}
+        onPress={onBack}
+        variant="ghost"
+        testID="live-diagnostics-back"
+      />
       <AppText variant="title" accessibilityRole="header">
         {t('live.diagnostics.title')}
       </AppText>

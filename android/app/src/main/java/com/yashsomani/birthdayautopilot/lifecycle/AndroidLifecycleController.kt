@@ -2249,7 +2249,6 @@ internal class AndroidLifecycleController(
       )
       .put("kind", kind)
       .put("occurredAt", Instant.ofEpochMilli(row.occurredAtMillis.coerceAtLeast(0)).toString())
-      .put("actionable", kind in ACTIONABLE_ACTIVITY_KINDS)
       .apply { reason?.let { put("reason", it) } }
   }
 
@@ -2533,19 +2532,6 @@ internal class AndroidLifecycleController(
       "sim-changed",
       "sim-invalid",
       "clock-untrusted",
-    )
-    val ACTIONABLE_ACTIVITY_KINDS = setOf(
-      "coordination-blocked",
-      "armed-suppressed",
-      "missed",
-      "delivery-failed",
-      "partial-delivery",
-      "delivery-unknown",
-      "submission-failed",
-      "submission-unknown",
-      "paused",
-      "approval-invalidated",
-      "transfer",
     )
     val REMOTE_PRIVACY_ACTIONS = setOf(
       "disconnect-contacts",

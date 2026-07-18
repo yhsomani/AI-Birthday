@@ -28,6 +28,7 @@ export type OperationRefusalReason =
   | 'REQUEST_MISMATCH'
   | 'RESET_SUPPRESSED'
   | 'CONTINUITY_UNAVAILABLE'
+  | 'IOS_COMPOSER_RESERVED'
   | 'GENERATION_EXHAUSTED';
 
 export type BeginOperationDecision =

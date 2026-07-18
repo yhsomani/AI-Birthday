@@ -1,20 +1,37 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { AccessibilityInfo, Platform, StyleSheet } from 'react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 
 import { ThemeProvider } from '../../app/providers/ThemeProvider';
 import { LocalizationProvider } from '../../localization/LocalizationProvider';
 import {
   Button,
   ChoiceChip,
+  InlineReviewCard,
   LabeledSwitch,
   PersonRow,
   SearchField,
+  SingleChoiceGroup,
 } from './Primitives';
 
 jest.mock('react-native-localize', () => ({
   getLocales: () => [{ languageCode: 'en' }],
 }));
+
+const originalPlatform = Platform.OS;
+
+afterEach(() => {
+  jest.restoreAllMocks();
+  Object.defineProperty(Platform, 'OS', {
+    configurable: true,
+    value: originalPlatform,
+  });
+});
 
 function Providers({ children }: React.PropsWithChildren) {
   return (
@@ -58,12 +75,20 @@ it('exposes a disabled semantic button with a 48 point target', async () => {
 it('exposes radio and checkbox state on minimum-size selectable controls', async () => {
   await render(
     <Providers>
-      <ChoiceChip
-        label="Selected policy"
-        onPress={jest.fn()}
-        selected
-        testID="semantic-choice"
-      />
+      <SingleChoiceGroup label="Choose one policy" testID="semantic-group">
+        <ChoiceChip
+          label="Selected policy"
+          onPress={jest.fn()}
+          selected
+          testID="semantic-choice"
+        />
+        <ChoiceChip
+          label="Other policy"
+          onPress={jest.fn()}
+          selected={false}
+          testID="semantic-choice-other"
+        />
+      </SingleChoiceGroup>
       <PersonRow
         accessibilityLabel="Select Asha"
         birthday="12 July"
@@ -78,9 +103,19 @@ it('exposes radio and checkbox state on minimum-size selectable controls', async
     </Providers>,
   );
 
+  const group = screen.getByTestId('semantic-group');
+  expect(group.props.accessible).toBe(false);
+  expect(group.props.accessibilityRole).toBe('radiogroup');
+  expect(group.props.accessibilityLabel).toBe('Choose one policy');
+
   const choice = screen.getByTestId('semantic-choice');
   expect(choice.props.accessibilityRole).toBe('radio');
+  expect(choice.props.accessibilityLabel).toBe('Selected policy');
   expect(choice.props.accessibilityState).toEqual({ selected: true });
+  expect(screen.getByTestId('semantic-choice-selected-indicator')).toBeTruthy();
+  expect(
+    screen.queryByTestId('semantic-choice-other-selected-indicator'),
+  ).toBeNull();
   expect(flattenedStyle('semantic-choice').minHeight).toBeGreaterThanOrEqual(
     48,
   );
@@ -91,6 +126,60 @@ it('exposes radio and checkbox state on minimum-size selectable controls', async
   expect(flattenedStyle('semantic-person').minHeight).toBeGreaterThanOrEqual(
     48,
   );
+});
+
+it('focuses and announces a newly revealed inline review exactly once', async () => {
+  Object.defineProperty(Platform, 'OS', {
+    configurable: true,
+    value: 'ios',
+  });
+  const reactNative = require('react-native') as {
+    findNodeHandle: (component: unknown) => number | null;
+  };
+  jest.spyOn(reactNative, 'findNodeHandle').mockReturnValue(73);
+  jest
+    .spyOn(AccessibilityInfo, 'isScreenReaderEnabled')
+    .mockResolvedValue(true);
+  const focus = jest
+    .spyOn(AccessibilityInfo, 'setAccessibilityFocus')
+    .mockImplementation(() => undefined);
+  const announce = jest
+    .spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions')
+    .mockImplementation(() => undefined);
+
+  await render(
+    <Providers>
+      <InlineReviewCard
+        reviewKey="review-1"
+        testID="semantic-inline-review"
+        title="Confirm local data removal"
+      >
+        <Button label="Confirm" onPress={jest.fn()} />
+      </InlineReviewCard>
+    </Providers>,
+  );
+
+  const review = screen.getByTestId('semantic-inline-review');
+  fireEvent(review, 'layout', {
+    nativeEvent: {
+      layout: { height: 240, width: 320, x: 0, y: 640 },
+    },
+  });
+
+  await waitFor(() => expect(focus).toHaveBeenCalledWith(73));
+  expect(announce).toHaveBeenCalledWith('Confirm local data removal', {
+    queue: true,
+  });
+  const heading = screen.getByTestId('semantic-inline-review-focus');
+  expect(heading.props.accessibilityRole).toBe('header');
+  expect(heading.props.accessibilityLabel).toBe('Confirm local data removal');
+
+  fireEvent(review, 'layout', {
+    nativeEvent: {
+      layout: { height: 240, width: 320, x: 0, y: 640 },
+    },
+  });
+  expect(focus).toHaveBeenCalledTimes(1);
 });
 
 it('routes search through the enforced accessible text-input boundary', async () => {

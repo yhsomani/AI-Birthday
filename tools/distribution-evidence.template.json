@@ -25,13 +25,13 @@
       "privacyMaterialsApproved": true,
       "policyApprovalReference": "<immutable-policy-evidence-reference>",
       "policyApprovalSha256": "<sha256-of-exact-policy-evidence-bytes>",
-      "certifiedDeviceMatrixReference": "<immutable-device-matrix-reference>",
+      "certifiedDeviceMatrixReference": "<android-physical-mobile-scenario-evidence-v2-json>",
       "certifiedDeviceMatrixSha256": "<sha256-of-exact-device-matrix-bytes>",
-      "carrierMatrixReference": "<immutable-carrier-matrix-reference>",
+      "carrierMatrixReference": "<android-carrier-mobile-scenario-evidence-v2-json>",
       "carrierMatrixSha256": "<sha256-of-exact-carrier-matrix-bytes>",
-      "performanceEvidenceReference": "<immutable-performance-evidence-reference>",
+      "performanceEvidenceReference": "<validated-android-performance-evidence-v2-json>",
       "performanceEvidenceSha256": "<sha256-of-exact-performance-evidence-bytes>",
-      "accessibilityEvidenceReference": "<immutable-accessibility-evidence-reference>",
+      "accessibilityEvidenceReference": "<android-accessibility-mobile-scenario-evidence-v2-json>",
       "accessibilityEvidenceSha256": "<sha256-of-exact-accessibility-evidence-bytes>",
       "supplyChainEvidenceReference": "<immutable-native-sbom-and-lock-evidence-reference>",
       "supplyChainEvidenceSha256": "<sha256-of-exact-native-supply-chain-evidence-bytes>",
@@ -41,7 +41,7 @@
       "artifactApkSha256": "<direct-post-build-or-play-delivered-base-apk-sha256; omit-from-prepackage-evidence>",
       "approvedAt": "<UTC-RFC3339-instant>",
       "validUntil": "<UTC-RFC3339-instant-no-more-than-one-year-later>",
-      "launchCountries": ["IN"]
+      "launchCountries": ["<approved-ISO-3166-1-alpha-2-country>"]
     }
   ]
 }

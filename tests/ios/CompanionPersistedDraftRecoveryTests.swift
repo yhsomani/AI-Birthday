@@ -84,8 +84,7 @@ enum CompanionPersistedDraftRecoveryTests {
       id: "activity-1",
       kind: "sync",
       reason: nil,
-      occurredAt: originalDate,
-      actionable: false
+      occurredAt: originalDate
     )]
     workflow.privacyOperations = [CompanionWorkflowPrivacyOperation(
       id: "privacy-1",

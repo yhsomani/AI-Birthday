@@ -1,13 +1,21 @@
 import { createHash } from 'node:crypto';
 import {
   closeSync,
+  constants,
   fstatSync,
   lstatSync,
   openSync,
+  readdirSync,
   readSync,
   realpathSync,
 } from 'node:fs';
 import path from 'node:path';
+import { validateMobileReleaseScenarioEvidence } from './mobile-release-scenario-evidence.mjs';
+import {
+  performanceEvidenceReferenceBindings,
+  validatePerformanceEvidence,
+  validatePerformanceEvidenceReferenceFiles,
+} from './validate-performance-evidence.mjs';
 
 export const IOS_RELEASE_REFERENCE_NAMES = Object.freeze([
   'artifactProvenance',
@@ -138,6 +146,7 @@ const SAFE_RELATIVE_PATH = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,511}$/u;
 const UTC_INSTANT =
   /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?Z$/u;
 const MAXIMUM_REFERENCE_BYTES = 1024 * 1024 * 1024;
+const MAXIMUM_STRUCTURED_REFERENCE_BYTES = 2 * 1024 * 1024;
 
 const isObject = value =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -442,6 +451,71 @@ const validateReferences = (references, referenceDigests, errors) => {
   }
 };
 
+const validateStructuredReferences = (
+  document,
+  structuredEvidence,
+  evidenceFiles,
+  errors,
+  now,
+) => {
+  if (!isObject(structuredEvidence)) {
+    errors.push(
+      'structured physical/performance/accessibility evidence is missing',
+    );
+    return;
+  }
+  for (const [referenceName, evidenceKind] of [
+    ['physicalDeviceMatrix', 'ios-physical'],
+    ['accessibility', 'ios-accessibility'],
+  ]) {
+    const result = validateMobileReleaseScenarioEvidence(
+      structuredEvidence[referenceName],
+      {
+        expectedKind: evidenceKind,
+        expectedPlatform: 'ios',
+        expectedSourceRevision: document.sourceRevision,
+        expectedArtifactSha256: document.artifact?.ipaSha256,
+        expectedSigningCertificateSha256:
+          document.signing?.exportedCertificateSha256,
+        expectedArtifactVersion: `${String(
+          document.artifact?.marketingVersion,
+        )} (${String(document.artifact?.buildNumber)})`,
+        evidenceFiles,
+        nowMillis: now,
+      },
+    );
+    for (const error of result.errors) {
+      errors.push(`references.${referenceName}: ${error}`);
+    }
+  }
+  const performanceDocument = structuredEvidence.performance;
+  const performance = validatePerformanceEvidence(performanceDocument, {
+    expectedPlatform: 'ios',
+    expectedApplicationId: document.artifact?.bundleIdentifier,
+    expectedSourceRevision: document.sourceRevision,
+    expectedArtifactSha256: document.artifact?.ipaSha256,
+    nowMillis: now,
+  });
+  for (const error of performance.errors) {
+    errors.push(`references.performance: ${error}`);
+  }
+  const performanceReferences = validatePerformanceEvidenceReferenceFiles(
+    performanceDocument,
+    evidenceFiles,
+  );
+  for (const error of performanceReferences.errors) {
+    errors.push(`references.performance: ${error}`);
+  }
+  if (
+    performanceDocument?.artifact?.version !==
+    document.artifact?.marketingVersion
+  ) {
+    errors.push(
+      'references.performance artifact version crosses the release version',
+    );
+  }
+};
+
 const validateApprovals = (approvals, errors, now, validityLimits) => {
   if (!exactKeys(approvals, APPROVAL_KEYS, 'approvals', errors)) return;
   const approvedAt = parseInstant(
@@ -516,7 +590,14 @@ const compareObserved = (document, observed, errors) => {
 
 export function validateIOSReleaseEvidence(
   document,
-  { observed, referenceDigests, now = Date.now() } = {},
+  {
+    observed,
+    referenceDigests,
+    structuredEvidence,
+    evidenceFiles,
+    allowUnresolvedStructuredEvidence = false,
+    now = Date.now(),
+  } = {},
 ) {
   const errors = [];
   if (!exactKeys(document, TOP_LEVEL_KEYS, 'evidence', errors)) {
@@ -536,6 +617,15 @@ export function validateIOSReleaseEvidence(
   const validityLimits = validateSigning(document.signing, errors, now);
   validateSecurity(document.security, errors);
   validateReferences(document.references, referenceDigests, errors);
+  if (!allowUnresolvedStructuredEvidence) {
+    validateStructuredReferences(
+      document,
+      structuredEvidence,
+      evidenceFiles,
+      errors,
+      now,
+    );
+  }
   validateApprovals(document.approvals, errors, now, validityLimits);
   compareObserved(document, observed, errors);
   return { errors };
@@ -568,28 +658,38 @@ const resolveRegularReference = (root, referencePath) => {
   const metadata = lstatSync(resolved, { bigint: true });
   if (
     !metadata.isFile() ||
+    metadata.nlink !== 1n ||
     metadata.size <= 0n ||
     metadata.size > BigInt(MAXIMUM_REFERENCE_BYTES)
   ) {
     throw new Error(
-      `${referencePath} must be a non-empty bounded regular file`,
+      `${referencePath} must be a non-empty bounded, non-hard-linked regular file`,
     );
   }
   return { path: resolved, metadata };
 };
 
+const sameFilesystemObject = (left, right) =>
+  left.dev === right.dev &&
+  left.ino === right.ino &&
+  left.mode === right.mode &&
+  left.nlink === right.nlink &&
+  left.size === right.size &&
+  left.mtimeNs === right.mtimeNs &&
+  left.ctimeNs === right.ctimeNs;
+
 const hashStableFile = (file, expectedMetadata) => {
   let descriptor;
   try {
-    descriptor = openSync(file, 'r');
+    // POSIX open flags are bit masks.
+    // eslint-disable-next-line no-bitwise
+    const openFlags = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0);
+    descriptor = openSync(file, openFlags);
     const before = fstatSync(descriptor, { bigint: true });
     if (
       !before.isFile() ||
-      before.dev !== expectedMetadata.dev ||
-      before.ino !== expectedMetadata.ino ||
-      before.size !== expectedMetadata.size ||
-      before.mtimeNs !== expectedMetadata.mtimeNs ||
-      before.ctimeNs !== expectedMetadata.ctimeNs
+      before.nlink !== 1n ||
+      !sameFilesystemObject(before, expectedMetadata)
     ) {
       throw new Error('supporting evidence changed before hashing');
     }
@@ -601,14 +701,12 @@ const hashStableFile = (file, expectedMetadata) => {
       if (bytesRead > 0) digest.update(buffer.subarray(0, bytesRead));
     } while (bytesRead > 0);
     const after = fstatSync(descriptor, { bigint: true });
-    if (
-      after.dev !== before.dev ||
-      after.ino !== before.ino ||
-      after.size !== before.size ||
-      after.mtimeNs !== before.mtimeNs ||
-      after.ctimeNs !== before.ctimeNs
-    ) {
+    if (!sameFilesystemObject(after, before)) {
       throw new Error('supporting evidence changed while hashing');
+    }
+    const pathAfter = lstatSync(file, { bigint: true });
+    if (pathAfter.isSymbolicLink() || !sameFilesystemObject(pathAfter, after)) {
+      throw new Error('supporting evidence path changed while hashing');
     }
     return digest.digest('hex');
   } finally {
@@ -616,12 +714,163 @@ const hashStableFile = (file, expectedMetadata) => {
   }
 };
 
-export function collectIOSReleaseReferenceDigests(rootPath, references) {
-  const root = realpathSync(rootPath);
-  if (!lstatSync(root).isDirectory()) {
-    throw new Error('supporting-evidence root must be a directory');
+const readStableStructuredJson = (file, expectedMetadata, label) => {
+  let descriptor;
+  try {
+    descriptor = openSync(
+      file,
+      // POSIX open flags are bit masks.
+      // eslint-disable-next-line no-bitwise
+      constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+    );
+    const before = fstatSync(descriptor, { bigint: true });
+    if (
+      !before.isFile() ||
+      before.nlink !== 1n ||
+      before.size <= 0n ||
+      before.size > BigInt(MAXIMUM_STRUCTURED_REFERENCE_BYTES) ||
+      !sameFilesystemObject(before, expectedMetadata)
+    ) {
+      throw new Error(`${label} must be a bounded non-linked JSON file`);
+    }
+    const chunks = [];
+    const buffer = Buffer.allocUnsafe(64 * 1024);
+    let total = 0;
+    while (true) {
+      const count = readSync(descriptor, buffer, 0, buffer.byteLength, null);
+      if (count === 0) break;
+      chunks.push(Buffer.from(buffer.subarray(0, count)));
+      total += count;
+    }
+    const after = fstatSync(descriptor, { bigint: true });
+    const pathAfter = lstatSync(file, { bigint: true });
+    if (
+      BigInt(total) !== before.size ||
+      !sameFilesystemObject(after, before) ||
+      pathAfter.isSymbolicLink() ||
+      !sameFilesystemObject(pathAfter, after)
+    ) {
+      throw new Error(`${label} changed while it was read`);
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(Buffer.concat(chunks, total).toString('utf8'));
+    } catch {
+      throw new Error(`${label} must contain valid JSON`);
+    }
+    if (!isObject(parsed))
+      throw new Error(`${label} must contain a JSON object`);
+    return parsed;
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+};
+
+const readEvidenceInventory = root => {
+  const files = [];
+  const directories = [];
+  const metadataByPath = new Map();
+  const visit = (directory, relativeDirectory = '') => {
+    const before = lstatSync(directory, { bigint: true });
+    if (!before.isDirectory() || before.isSymbolicLink()) {
+      throw new Error(
+        `${
+          relativeDirectory || 'supporting-evidence root'
+        } must be a non-symlink directory`,
+      );
+    }
+    metadataByPath.set(relativeDirectory, before);
+    for (const entry of readdirSync(directory).sort()) {
+      const candidate = path.join(directory, entry);
+      const metadata = lstatSync(candidate, { bigint: true });
+      const relative = relativeDirectory
+        ? `${relativeDirectory}/${entry}`
+        : entry;
+      if (metadata.isSymbolicLink()) {
+        throw new Error(`${relative} must not contain symbolic links`);
+      }
+      if (metadata.isDirectory()) {
+        directories.push(relative);
+        visit(candidate, relative);
+      } else if (metadata.isFile()) {
+        if (metadata.nlink !== 1n) {
+          throw new Error(`${relative} must not be hard linked`);
+        }
+        files.push(relative);
+        metadataByPath.set(relative, metadata);
+      } else {
+        throw new Error(`${relative} has an unsupported filesystem type`);
+      }
+    }
+    const after = lstatSync(directory, { bigint: true });
+    if (!sameFilesystemObject(after, before)) {
+      throw new Error(
+        `${
+          relativeDirectory || 'supporting-evidence root'
+        } changed while inventorying`,
+      );
+    }
+  };
+  visit(root);
+  return {
+    directories: directories.sort(),
+    files: files.sort(),
+    metadataByPath,
+  };
+};
+
+const expectedDirectoriesFor = expectedPaths => {
+  const directories = new Set();
+  for (const expectedPath of expectedPaths) {
+    if (typeof expectedPath !== 'string') continue;
+    const parts = expectedPath.split('/');
+    for (let length = 1; length < parts.length; length += 1) {
+      directories.add(parts.slice(0, length).join('/'));
+    }
+  }
+  return [...directories].sort();
+};
+
+const sameStringArray = (left, right) =>
+  left.length === right.length &&
+  left.every((value, index) => value === right[index]);
+
+const sameInventory = (left, right) => {
+  if (
+    !sameStringArray(left.files, right.files) ||
+    !sameStringArray(left.directories, right.directories) ||
+    left.metadataByPath.size !== right.metadataByPath.size
+  ) {
+    return false;
+  }
+  for (const [relative, metadata] of left.metadataByPath) {
+    const later = right.metadataByPath.get(relative);
+    if (later === undefined || !sameFilesystemObject(metadata, later)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+export function collectIOSReleaseSupportingEvidence(rootPath, references) {
+  const suppliedRoot = path.resolve(rootPath);
+  const suppliedRootMetadata = lstatSync(suppliedRoot, { bigint: true });
+  if (
+    !suppliedRootMetadata.isDirectory() ||
+    suppliedRootMetadata.isSymbolicLink()
+  ) {
+    throw new Error('supporting-evidence root must be a non-symlink directory');
+  }
+  const root = realpathSync(suppliedRoot);
+  const initialInventory = readEvidenceInventory(root);
+  const primaryPaths = IOS_RELEASE_REFERENCE_NAMES.map(
+    name => references?.[name]?.path,
+  );
+  if (primaryPaths.length !== new Set(primaryPaths).size) {
+    throw new Error('supporting-evidence primary references must be distinct');
   }
   const result = {};
+  const structuredEvidence = {};
   for (const name of IOS_RELEASE_REFERENCE_NAMES) {
     const reference = references?.[name];
     if (!isObject(reference) || typeof reference.path !== 'string') {
@@ -629,6 +878,55 @@ export function collectIOSReleaseReferenceDigests(rootPath, references) {
     }
     const resolved = resolveRegularReference(root, reference.path);
     result[name] = hashStableFile(resolved.path, resolved.metadata);
+    if (
+      ['physicalDeviceMatrix', 'performance', 'accessibility'].includes(name)
+    ) {
+      structuredEvidence[name] = readStableStructuredJson(
+        resolved.path,
+        resolved.metadata,
+        `references.${name}`,
+      );
+    }
   }
-  return result;
+  const rawScenarioPaths = [
+    ...(structuredEvidence.physicalDeviceMatrix?.rows ?? []),
+    ...(structuredEvidence.accessibility?.rows ?? []),
+  ].map(row => row?.rawEvidenceReference);
+  const performancePaths = performanceEvidenceReferenceBindings(
+    structuredEvidence.performance,
+  ).map(binding => binding.reference);
+  const expectedPaths = [
+    ...primaryPaths,
+    ...rawScenarioPaths,
+    ...performancePaths,
+  ].sort();
+  const expectedDirectories = expectedDirectoriesFor(expectedPaths);
+  if (
+    expectedPaths.some(value => typeof value !== 'string') ||
+    expectedPaths.length !== new Set(expectedPaths).size ||
+    !sameStringArray(initialInventory.files, expectedPaths) ||
+    !sameStringArray(initialInventory.directories, expectedDirectories)
+  ) {
+    throw new Error(
+      'supporting-evidence root must contain exactly the primary, scenario-raw, and performance-support files',
+    );
+  }
+  const evidenceFiles = new Map();
+  for (const expectedPath of expectedPaths) {
+    const resolved = resolveRegularReference(root, expectedPath);
+    evidenceFiles.set(expectedPath, {
+      bytes: Number(resolved.metadata.size),
+      sha256: hashStableFile(resolved.path, resolved.metadata),
+    });
+  }
+  const finalInventory = readEvidenceInventory(root);
+  if (!sameInventory(initialInventory, finalInventory)) {
+    throw new Error('supporting evidence changed during verification');
+  }
+  return { evidenceFiles, referenceDigests: result, structuredEvidence };
+}
+
+export function collectIOSReleaseReferenceDigests(rootPath, references) {
+  return collectIOSReleaseSupportingEvidence(rootPath, references)
+    .referenceDigests;
 }

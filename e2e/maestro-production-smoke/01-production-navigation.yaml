@@ -5,8 +5,56 @@ tags:
 ---
 - launchApp:
     clearState: true
+- extendedWaitUntil:
+    visible:
+      id: live-app-shell
+    timeout: 120000
 - assertVisible:
     id: live-app-shell
+- assertVisible:
+    id: live-home-screen
+- scrollUntilVisible:
+    element:
+      id: live-home-activity
+    direction: DOWN
+- tapOn:
+    id: live-home-activity
+- assertVisible:
+    id: live-activity-screen
+- tapOn:
+    id: live-activity-smoke.activity.1
+- assertVisible:
+    id: live-activity-detail-screen
+- tapOn:
+    id: live-activity-detail-back
+- assertVisible:
+    id: live-activity-screen
+- tapOn:
+    id: live-activity-back
+- assertVisible:
+    id: live-home-screen
+- scrollUntilVisible:
+    element:
+      id: live-home-message
+    direction: DOWN
+- tapOn:
+    id: live-home-message
+- assertVisible:
+    id: live-message-screen
+- tapOn:
+    id: live-message-back
+- assertVisible:
+    id: live-home-screen
+- scrollUntilVisible:
+    element:
+      id: live-home-automation
+    direction: DOWN
+- tapOn:
+    id: live-home-automation
+- assertVisible:
+    id: live-automation-screen
+- tapOn:
+    id: live-automation-back
 - assertVisible:
     id: live-home-screen
 - tapOn:
@@ -15,6 +63,46 @@ tags:
     id: live-people-screen
 - tapOn:
     id: live-tab-settings
+- assertVisible:
+    id: live-settings-screen
+- tapOn:
+    id: live-settings-privacy
+- assertVisible:
+    id: live-privacy-screen
+- tapOn:
+    id: live-privacy-back
+- assertVisible:
+    id: live-settings-screen
+- tapOn:
+    id: live-tab-home
+- assertVisible:
+    id: live-home-screen
+- tapOn:
+    id: live-tab-settings
+- assertVisible:
+    id: live-settings-screen
+- tapOn:
+    id: live-settings-help-legal
+- assertVisible:
+    id: live-help-legal-screen
+- tapOn:
+    id: live-help-back
+- assertVisible:
+    id: live-settings-screen
+- tapOn:
+    id: live-settings-attention
+- assertVisible:
+    id: live-attention-screen
+- tapOn:
+    id: live-attention-back
+- assertVisible:
+    id: live-settings-screen
+- tapOn:
+    id: live-settings-diagnostics
+- assertVisible:
+    id: live-diagnostics-screen
+- tapOn:
+    id: live-diagnostics-back
 - assertVisible:
     id: live-settings-screen
 - tapOn:

@@ -10,7 +10,30 @@ const FIRST_NAME_PLACEHOLDER = '{firstName}';
 const PLACEHOLDER_PATTERN = /\{[^{}]+\}/gu;
 const BIDI_CONTROL_PATTERN = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u;
 const FORBIDDEN_INVISIBLE_PATTERN = /[\u200B\u2060\uFEFF]/u;
-const UNSAFE_UNICODE_CATEGORY_PATTERN = /[\p{Cc}\p{Zl}\p{Zp}]/u;
+
+// Keep Unicode-property expressions in RegExp constructor strings. Metro's
+// compatibility transform expands property escapes into very large character
+// tables even though every supported Hermes/JSC runtime implements them. An
+// unexpectedly old runtime fails closed instead of crashing the whole app.
+const unicodePattern = (source: string, flags: string): RegExp | undefined => {
+  try {
+    return new RegExp(source, flags);
+  } catch {
+    return undefined;
+  }
+};
+
+const UNSAFE_UNICODE_CATEGORY_PATTERN = unicodePattern(
+  '[\\p{Cc}\\p{Zl}\\p{Zp}]',
+  'u',
+);
+const UNICODE_SEPARATOR_PATTERN = unicodePattern('[\\p{Z}\\s]+', 'gu');
+const UNICODE_LETTER_PATTERN = unicodePattern('\\p{L}', 'gu');
+const DEVANAGARI_LETTER_PATTERN = unicodePattern(
+  '^\\p{Script=Devanagari}$',
+  'u',
+);
+const LATIN_LETTER_PATTERN = unicodePattern('^\\p{Script=Latin}$', 'u');
 export const BIRTHDAY_MESSAGE_SEMANTIC_POLICY_VERSION =
   'birthday-message-semantic-v2' as const;
 
@@ -41,18 +64,26 @@ const BIRTHDAY_INTENT_EN =
 const BIRTHDAY_INTENT_HI = /(?:जन्म\s*दिन|जन्मदिवस)/u;
 const URL_SCHEME_OR_WWW =
   /(?:\b(?:https?|ftp)\s*:\s*\/\s*\/|\b(?:mailto|tel|sms|smsto)\s*:|\bwww\.)\S+/iu;
-const URL_DOMAIN =
-  /\b(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,62}[\p{L}\p{N}])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})(?:[/?:#]\S*)?/giu;
-const URL_OBFUSCATED_DOMAIN =
-  /\b[\p{L}\p{N}][\p{L}\p{N}-]{0,62}\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\)|\s+dot\s+)\s*(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})\b/iu;
+const URL_DOMAIN = unicodePattern(
+  '\\b(?:[\\p{L}\\p{N}](?:[\\p{L}\\p{N}-]{0,62}[\\p{L}\\p{N}])?\\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})(?:[/?:#]\\S*)?',
+  'giu',
+);
+const URL_OBFUSCATED_DOMAIN = unicodePattern(
+  '\\b[\\p{L}\\p{N}][\\p{L}\\p{N}-]{0,62}\\s*(?:\\[\\s*dot\\s*\\]|\\(\\s*dot\\s*\\)|\\s+dot\\s+)\\s*(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})\\b',
+  'iu',
+);
 const IPV4 = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/u;
 const EMAIL = /\b[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\b/iu;
-const TRACKING_OR_AFFILIATE =
-  /(?:\butm_[a-z0-9_]+\s*=|\b(?:gclid|fbclid|msclkid|ref|referrer|affiliate_id|aff_id)\s*=|#[\p{L}\p{N}_]+|\b(?:affiliate|referral|sponsored)\s+(?:link|code|post)|\buse\s+(?:my|code)\s+(?:affiliate\s+)?code\b|\bearns?\s+(?:a\s+)?commission\b|(?:रेफरल|एफिलिएट|संबद्ध)\s*(?:लिंक|कोड)|(?:प्रायोजित|कमीशन))/iu;
+const TRACKING_OR_AFFILIATE = unicodePattern(
+  '(?:\\butm_[a-z0-9_]+\\s*=|\\b(?:gclid|fbclid|msclkid|ref|referrer|affiliate_id|aff_id)\\s*=|#[\\p{L}\\p{N}_]+|\\b(?:affiliate|referral|sponsored)\\s+(?:link|code|post)|\\buse\\s+(?:my|code)\\s+(?:affiliate\\s+)?code\\b|\\bearns?\\s+(?:a\\s+)?commission\\b|(?:रेफरल|एफिलिएट|संबद्ध)\\s*(?:लिंक|कोड)|(?:प्रायोजित|कमीशन))',
+  'iu',
+);
 const PROMOTION =
   /\b(?:limited(?:[- ]time)? offer|special offer|special deal|flash sale|birthday sale|discount(?: code)?|coupon(?: code)?|promo(?: code)?|buy now|shop now|order now|free offer|free gift|claim (?:your )?(?:offer|gift|discount)|save [0-9]{1,3}%|[0-9]{1,3}% off|subscribe(?: now| today)?|start (?:a|your) subscription)\b|(?:सीमित|खास|विशेष)\s*(?:समय का\s*)?ऑफर|अभी\s*(?:खरीदें|ऑर्डर करें)|(?:विशेष\s*)?छूट|कूपन|प्रोमो\s*कोड|मुफ़्त\s*(?:ऑफर|उपहार)|फ्लैश\s*सेल|सदस्यता\s*लें/iu;
-const PHONE_NUMBER =
-  /(?:^|[^\p{L}\p{N}])(?:\+?[0-9०-९][\s().-]*){10,15}(?:$|[^\p{L}\p{N}])/u;
+const PHONE_NUMBER = unicodePattern(
+  '(?:^|[^\\p{L}\\p{N}])(?:\\+?[0-9०-९][\\s().-]*){10,15}(?:$|[^\\p{L}\\p{N}])',
+  'u',
+);
 const NUMERIC_DATE =
   /\b(?:[0-9]{4}[-/.][0-9]{1,2}[-/.][0-9]{1,2}|[0-9]{1,2}[-/.][0-9]{1,2}[-/.][0-9]{2,4})\b/u;
 const ENGLISH_DATE =
@@ -90,11 +121,12 @@ const semanticView = (text: string): string =>
   text
     .normalize('NFKC')
     .toLocaleLowerCase('en-US')
-    .replace(/[\p{Z}\s]+/gu, ' ')
+    .replace(UNICODE_SEPARATOR_PATTERN ?? /\s+/gu, ' ')
     .trim();
 
 const BENIGN_DOTTED_TERMS = new Set(['node.js', 'dr.strange']);
 const containsNonBenignUrlDomain = (text: string): boolean =>
+  URL_DOMAIN === undefined ||
   Array.from(text.matchAll(URL_DOMAIN)).some(
     match => !BENIGN_DOTTED_TERMS.has(match[0].toLocaleLowerCase('en-US')),
   );
@@ -113,19 +145,19 @@ export const classifyBirthdayMessageContent = (
   if (
     URL_SCHEME_OR_WWW.test(value) ||
     containsNonBenignUrlDomain(value) ||
-    URL_OBFUSCATED_DOMAIN.test(value) ||
+    URL_OBFUSCATED_DOMAIN?.test(value) !== false ||
     IPV4.test(value) ||
     EMAIL.test(value)
   ) {
     categories.push('url');
   }
-  if (TRACKING_OR_AFFILIATE.test(value))
+  if (TRACKING_OR_AFFILIATE?.test(value) !== false)
     categories.push('tracking-or-affiliate');
   if (PROMOTION.test(value)) {
     categories.push('promotion');
   }
   if (
-    PHONE_NUMBER.test(value) ||
+    PHONE_NUMBER?.test(value) !== false ||
     NUMERIC_DATE.test(value) ||
     ENGLISH_DATE.test(value) ||
     HINDI_DATE.test(value) ||
@@ -149,6 +181,7 @@ export const classifyBirthdayMessageContent = (
 };
 
 const hasUnsafeControlCharacter = (value: string): boolean =>
+  UNSAFE_UNICODE_CATEGORY_PATTERN === undefined ||
   Array.from(value).some(
     character =>
       UNSAFE_UNICODE_CATEGORY_PATTERN.test(character) ||
@@ -160,13 +193,17 @@ const matchesDeclaredLanguage = (
   language: MessageDraftInput['language'],
 ): boolean => {
   const templateOnly = value.replaceAll(FIRST_NAME_PLACEHOLDER, '');
-  const letters = templateOnly.match(/\p{L}/gu) ?? [];
+  const letterPattern = UNICODE_LETTER_PATTERN;
+  const scriptPattern =
+    language === 'hi' ? DEVANAGARI_LETTER_PATTERN : LATIN_LETTER_PATTERN;
+  if (letterPattern === undefined || scriptPattern === undefined) {
+    return false;
+  }
+  const letters = templateOnly.match(letterPattern) ?? [];
   if (letters.length === 0) {
     return false;
   }
-  const script =
-    language === 'hi' ? /^\p{Script=Devanagari}$/u : /^\p{Script=Latin}$/u;
-  return letters.every(letter => script.test(letter));
+  return letters.every(letter => scriptPattern.test(letter));
 };
 
 const issue = (code: FieldIssue['code']): FieldIssue => ({

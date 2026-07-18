@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "birthday-greeting-prompt-v2",
+  "model": {
+    "name": "gemini-3.5-flash",
+    "location": "global",
+    "identifier": "vertex-ai/global/gemini-3.5-flash"
+  },
+  "validatorVersion": "sms-template-validator-v2",
+  "systemInstruction": "Create clearly positive, generic personal birthday greeting templates only. Never include or request a person's name, phone number, birthday, age, gender, relationship, religion, health, private history, contact data, secret, URL, hashtag, marketing, promotion, invented memory, sensitive attribute, hateful, sexual, self-harm, violent, or deceptive content. Follow the requested language, tone, placeholder mode, and segment cap. Return only the structured candidates required by the response schema.",
+  "supportedLanguages": ["en", "hi"],
+  "supportedTones": ["warm", "simple", "cheerful"],
+  "placeholderModes": {
+    "given-name": 1,
+    "generic": 0
+  },
+  "minimumSegmentCap": 1,
+  "maximumSegmentCap": 2,
+  "minimumCandidates": 1,
+  "maximumCandidates": 3,
+  "maximumOutputTokens": 512,
+  "accountSessionDigestDomain": "BirthdayAutopilot.GeminiAccountSession.v1",
+  "rateScopeDigestDomain": "BirthdayAutopilot.GeminiRateScope.v1",
+  "maximumRetainedRateScopes": 8
+}

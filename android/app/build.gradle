@@ -273,6 +273,8 @@ def distributionEvidenceSignaturePath =
     System.getenv("BIRTHDAY_DISTRIBUTION_EVIDENCE_SIGNATURE_FILE")
 def distributionAuthorityPublicKeyPath =
     System.getenv("BIRTHDAY_DISTRIBUTION_AUTHORITY_PUBLIC_KEY_FILE")
+def distributionEvidenceRootPath =
+    System.getenv("BIRTHDAY_DISTRIBUTION_EVIDENCE_ROOT")
 def expectedApplicationIds = [
     lab: "com.yashsomani.birthdayautopilot.lab",
     prod: "com.yashsomani.birthdayautopilot",
@@ -289,7 +291,12 @@ def validateDistributionEvidence = { String tier ->
     ]
     def missingInputs = authorityInputs.findAll { ignored, value ->
         value == null || value.isBlank() || !file(value).isFile()
-    }.keySet()
+    }.keySet().toList()
+    if (distributionEvidenceRootPath == null ||
+        distributionEvidenceRootPath.isBlank() ||
+        !file(distributionEvidenceRootPath).isDirectory()) {
+        missingInputs.add("evidenceRoot")
+    }
     if (!missingInputs.isEmpty()) {
         return [
             approval: null,
@@ -314,6 +321,8 @@ def validateDistributionEvidence = { String tier ->
                 file(distributionEvidenceSignaturePath).absolutePath,
                 "--public-key",
                 file(distributionAuthorityPublicKeyPath).absolutePath,
+                "--evidence-root",
+                file(distributionEvidenceRootPath).absolutePath,
                 "--tier",
                 tier,
                 "--package",
@@ -417,7 +426,7 @@ gradle.taskGraph.whenReady { graph ->
         throw new GradleException(
             "Restricted SMS release gates are incomplete. Configure certificate-bound signing, " +
             "authority-signed structured distribution evidence, its detached signature and " +
-            "pinned authority public key, plus the requested tier Firebase config. " +
+            "pinned authority public key, its exact supporting-evidence root, plus the requested tier Firebase config. " +
             "Checks: ${gateErrors.unique().join('; ')}"
         )
     }
@@ -587,6 +596,14 @@ androidComponents {
         def environment = variantBuilder.productFlavors.find { flavor ->
             flavor.first == "environment"
         }?.second
+        if (environment == "smoke") {
+            // The production-path smoke host has no native test surface. It is
+            // exercised as an installed app by the shared Maestro flow, so
+            // generating host/device test variants would create unreviewed,
+            // unlocked dependency configurations for code that cannot run.
+            variantBuilder.enableUnitTest = false
+            variantBuilder.enableAndroidTest = false
+        }
         if ((environment == "e2e" || environment == "smoke") &&
             variantBuilder.buildType != "debug") {
             variantBuilder.enable = false

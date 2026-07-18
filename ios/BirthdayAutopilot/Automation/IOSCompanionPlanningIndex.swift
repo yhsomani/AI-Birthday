@@ -388,3 +388,77 @@ struct IOSCompanionPlanningIndex: Codable, Equatable {
     return value
   }
 }
+
+/// Builds one immutable resolution context for an ordinal scan and keeps
+/// looking when an individual candidate fails exact material validation.
+/// Keeping this primitive pure makes the 10k invalid-prefix behavior directly
+/// executable without loading UIKit, React, or a protected store.
+enum IOSCompanionLazyOrdinalScanner {
+  static func first<Context, Material>(
+    buildContext: () -> Context?,
+    ordinals: (Context) throws -> [UInt16],
+    materialize: (Context, Int) -> Material?
+  ) rethrows -> Material? {
+    guard let context = buildContext() else { return nil }
+    let candidates = try ordinals(context)
+    guard candidates.count <= IOSCompanionPlanningIndex.maximumContactCount else {
+      return nil
+    }
+    for ordinal in candidates {
+      if let material = materialize(context, Int(ordinal)) {
+        return material
+      }
+    }
+    return nil
+  }
+}
+
+/// Resolves configured contacts with one bounded pass over the configuration
+/// table. Callers can then mutate the returned indices without repeated linear
+/// searches or index-invalidating insertions.
+enum IOSCompanionConfiguredContactScanner {
+  static func matchingIndices<Configuration, Contact>(
+    configurations: [Configuration],
+    contactsByIdentifier: [String: Contact],
+    identifier: (Configuration) -> String,
+    matches: (Configuration, Contact) -> Bool
+  ) -> [Int]? {
+    guard configurations.count <= IOSCompanionPlanningIndex.maximumContactCount,
+      contactsByIdentifier.count <= IOSCompanionPlanningIndex.maximumContactCount
+    else { return nil }
+
+    var result: [Int] = []
+    result.reserveCapacity(configurations.count)
+    for index in configurations.indices {
+      let configuration = configurations[index]
+      guard let contact = contactsByIdentifier[identifier(configuration)],
+        matches(configuration, contact)
+      else { continue }
+      result.append(index)
+    }
+    return result
+  }
+}
+
+/// Final composer material may use local calendar calculations only after the
+/// device clock agrees with the recent authenticated server-time estimate.
+enum IOSCompanionTrustedClockPolicy {
+  static let maximumLocalSkew: TimeInterval = 5 * 60
+
+  static func materializationNow(
+    localNow: Date,
+    trustedServerEstimate: Date?
+  ) -> Date? {
+    guard let trustedServerEstimate,
+      valid(localNow), valid(trustedServerEstimate)
+    else { return nil }
+    let skew = localNow.timeIntervalSince(trustedServerEstimate)
+    guard skew.isFinite, abs(skew) <= maximumLocalSkew else { return nil }
+    return trustedServerEstimate
+  }
+
+  private static func valid(_ date: Date) -> Bool {
+    let value = date.timeIntervalSince1970
+    return value.isFinite && value >= 0
+  }
+}

@@ -16,6 +16,10 @@ class AttentionClassificationPolicyTest {
       AttentionClassificationPolicy.classify("COORDINATION_NETWORK_UNAVAILABLE"),
     )
     assertEquals(
+      AttentionClassification(AttentionCategory.COORDINATION, 1),
+      AttentionClassificationPolicy.classify("IOS_COMPOSER_RESERVED"),
+    )
+    assertEquals(
       AttentionClassification(AttentionCategory.SIM, 2),
       AttentionClassificationPolicy.classify("SMS_DEADLINE_OR_SIM_CHANGED"),
     )

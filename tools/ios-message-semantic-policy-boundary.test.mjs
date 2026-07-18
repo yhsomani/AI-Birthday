@@ -36,8 +36,8 @@ test('iOS semantic policy is versioned and applied to rendered proposals and com
     /private static func render[\s\S]*?IOSBirthdayMessageContentPolicy\.renderedBody/u,
   );
   assert.match(
-    composer,
-    /private func reviewMaterial[\s\S]*?IOSBirthdayMessageContentPolicy\.renderedBody/u,
+    workflow,
+    /private func lazyProposalMaterial[\s\S]*?let body = Self\.render[\s\S]*?Self\.smsEstimate\(body\)/u,
   );
   assert.ok(
     (

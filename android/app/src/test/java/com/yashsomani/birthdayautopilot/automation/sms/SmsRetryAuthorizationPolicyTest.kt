@@ -7,11 +7,30 @@ import com.yashsomani.birthdayautopilot.coordination.ServerClaimState
 import com.yashsomani.birthdayautopilot.storage.database.CoordinationPermitEntity
 import com.yashsomani.birthdayautopilot.storage.database.CoordinationPermitState
 import com.yashsomani.birthdayautopilot.storage.database.OperationPurpose
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SmsRetryAuthorizationPolicyTest {
+  @Test
+  fun `retry unresolved arm cutoff never outlives birthday window`() {
+    assertEquals(
+      3_500,
+      BirthdayRetryPermitPolicy.unresolvedArmCutoffMillis(
+        maxPossibleSubmitNotAfterMillis = 4_000,
+        resolvedWindowEndMillis = 3_500,
+      ),
+    )
+    assertEquals(
+      3_500,
+      BirthdayRetryPermitPolicy.unresolvedArmCutoffMillis(
+        maxPossibleSubmitNotAfterMillis = 3_500,
+        resolvedWindowEndMillis = 4_000,
+      ),
+    )
+  }
+
   @Test
   fun `only exact bound attempt two retry claim is accepted`() {
     val permit = permit()

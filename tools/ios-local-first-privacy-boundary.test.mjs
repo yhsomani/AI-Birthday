@@ -227,8 +227,8 @@ test('sign-out wipe attempts every local cleanup even when an SDK sign-out fails
 
   const signOutAction = section(
     workflow,
-    'case "sign-out-wipe":',
-    'case "wipe-local-data":',
+    'case "sign-out-wipe":\n      // Remove reminders',
+    'case "wipe-local-data":\n      reminderCoordinator',
   );
   const cancel = signOutAction.indexOf('cancelPlansAndNotifications');
   const identityCleanup = signOutAction.indexOf(

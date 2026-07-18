@@ -14,7 +14,6 @@ const models = read(
 const workflow = read(
   'ios/BirthdayAutopilot/Automation/IOSCompanionWorkflowEngine.swift',
 );
-const composer = read('ios/BirthdayAutopilot/CompanionMessageModule.swift');
 const podfile = read('ios/Podfile');
 const podLock = read('ios/Podfile.lock');
 const project = read('ios/BirthdayAutopilot.xcodeproj/project.pbxproj');
@@ -128,7 +127,7 @@ test('iOS approvals and final composer review bind the exact normalized E.164 de
     /destination\?\.e164 \?\? "none"[\s\S]*?IOSCompanionApprovalDestinationBinding\.version/u,
   );
   assert.match(
-    composer,
-    /contact\.phones\.first\(where: \{ \$0\.localId == phoneId \}\)\?\.e164 == proposal\.recipient/u,
+    workflow,
+    /let selectedPhoneId = configuration\.selectedPhoneId[\s\S]*?let recipient = contact\.phones\.first[\s\S]*?IOSCompanionDestinationBlocklistPolicy\.isCanonical\(recipient\)[\s\S]*?selectedPhoneId: selectedPhoneId[\s\S]*?recipient: recipient/u,
   );
 });

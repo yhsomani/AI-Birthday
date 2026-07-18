@@ -82,7 +82,10 @@ legal/privacy/Hindi review evidence, reCAPTCHA Enterprise App Check site key,
 and a tested identity-verified support/admin deletion workflow. No domain,
 developer identity, support address, Firebase web config, or approval is
 invented in source. See [`backend/hosting/README.md`](backend/hosting/README.md)
-for the exact release contract.
+for the exact release contract. Production Hosting is deployed only by the
+protected keyless workflow from a deterministic package; its report binds the
+package/manifest, source/config/tree digests, selected project/site, and exact
+Firebase-created version/live release into the cloud and final closure gates.
 
 Production Firebase/Google Cloud configuration has a separate executable release
 gate; a successful emulator run or source review is not cloud evidence. The
@@ -90,7 +93,7 @@ tracked template contains no invented project, app, OAuth, billing, Hosting,
 quota, SLO, or approver values and is intentionally incapable of approval. A
 protected manual workflow can collect only read-only production observations
 through keyless Workload Identity Federation. Final validation additionally
-requires a clean exact source revision, 42 digest-bound external evidence files,
+requires a clean exact source revision, 43 digest-bound external evidence files,
 seven distinct expiring approvals, and an Ed25519 signature from the existing
 pinned release authority. The authority pin remains `UNPROVISIONED`, and no
 cloud project has been mutated or represented as ready. See the
@@ -147,9 +150,11 @@ npm run android
 
 `devDebug` runs the real native projection boundary but never merges `SEND_SMS`; fixture screens exist only in automated preview/tests and are not mounted by the app entry point. The restricted permission exists only in the `labRelease` and `prodRelease` variants; every non-release `lab`/`prod` variant is removed from the Gradle graph.
 
-Restricted packaging remains fail-closed until all signing variables, `BIRTHDAY_SIGNING_CERT_SHA256`, the requested tier's Firebase configuration, and the three authority inputs are present: `BIRTHDAY_DISTRIBUTION_EVIDENCE_FILE`, `BIRTHDAY_DISTRIBUTION_EVIDENCE_SIGNATURE_FILE`, and `BIRTHDAY_DISTRIBUTION_AUTHORITY_PUBLIC_KEY_FILE`. The repository's [authority digest pin](tools/distribution-authority-pin.json) is deliberately `UNPROVISIONED`; a release authority must provision and commit the SHA-256 of its Ed25519 SubjectPublicKeyInfo before any lab/prod package can build. No private authority key belongs in this repository, CI, or the mobile signing environment. For Google Play, the configured keystore and `BIRTHDAY_SIGNING_CERT_SHA256` identify the AAB **upload** key; for direct/managed APK release they identify the installed-app key.
+Restricted packaging remains fail-closed until all signing variables, `BIRTHDAY_SIGNING_CERT_SHA256`, the requested tier's Firebase configuration, and the authority inputs are present: `BIRTHDAY_DISTRIBUTION_EVIDENCE_FILE`, `BIRTHDAY_DISTRIBUTION_EVIDENCE_SIGNATURE_FILE`, `BIRTHDAY_DISTRIBUTION_AUTHORITY_PUBLIC_KEY_FILE`, and `BIRTHDAY_DISTRIBUTION_EVIDENCE_ROOT`. The evidence root must contain exactly every referenced policy/device/carrier/performance/accessibility/supply-chain/legal object at its signed normalized relative path and exact digest, with no extra, escaping, symlinked, hard-linked, or mutable file. The repository's [authority digest pin](tools/distribution-authority-pin.json) is deliberately `UNPROVISIONED`; a release authority must provision and commit the SHA-256 of its Ed25519 SubjectPublicKeyInfo before any lab/prod package can build. No private authority key belongs in this repository, CI, or the mobile signing environment. For Google Play, the configured keystore and `BIRTHDAY_SIGNING_CERT_SHA256` identify the AAB **upload** key; for direct/managed APK release they identify the installed-app key.
 
 The authority signs the evidence file's exact raw bytes. Schema-v4 evidence binds every included approval—not only the requested tier—to the clean Git revision, exact tier/package/version name/version code, installed-app certificate, validity period, and immutable SHA-256 digests for policy, device, carrier, performance, accessibility, native supply-chain, and legal evidence. Google Play additionally requires a distinct `uploadSigningCertificateSha256`: Gradle validates the AAB build keystore against it but embeds the authority-approved Play app-signing certificate in runtime readiness. Direct/managed channels forbid the upload field and require the packaged APK signer to equal the installed signer. Final evidence binds the exact direct APK, Play AAB, or Play-delivered base APK bytes as applicable. See the subordinate [restricted-release evidence runbook](docs/ANDROID_RESTRICTED_RELEASE_EVIDENCE.md), [performance protocol](docs/PERFORMANCE_RELEASE_EVIDENCE.md), and [non-usable template](tools/distribution-evidence.template.json). Channel-specific verification uses `tools/verify-android-aab.sh` for the upload-key-signed Play AAB, `tools/verify-android-apk.sh --play-delivered-evidence` for a physical Play installation, or `tools/verify-android-apk.sh --restricted-evidence` for direct/managed APKs. The AAB verifier decodes the protobuf base manifest with locked, checksum-verified bundletool `1.18.1` and independently enforces the exact package/version/SDK/release-flag and restricted/forbidden-permission contract; an operator-supplied package argument is not artifact proof. Internal App Sharing's separate test signer cannot qualify as production. Self-authored JSON or a signature from an unpinned key cannot authorize packaging, upload, or distribution.
+
+The manual [Android signed artifact pipeline](.github/workflows/android-release-evidence.yml) mirrors the iOS two-operation trust separation. Its protected build operation creates a short-lived, explicitly non-release Play AAB or direct/managed APK from exact authority inputs and exact reviewed assets downloaded from an access-controlled release in the separately administered evidence repository. A separate protected operation downloads that exact candidate and the same evidence-release tag through a step-scoped read-only token, checks the candidate run/revision and byte bindings, and runs the channel-specific standalone verifier against final artifact-bound authority evidence. It never rebuilds or deploys the artifact. Play-delivered APK approval still requires the runbook's physical-device verification after Play processing; a hosted AAB check cannot replace installed-app proof.
 
 ## Run iOS
 

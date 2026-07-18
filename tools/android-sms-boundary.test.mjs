@@ -11,7 +11,7 @@ const walk = directory =>
     return entry.isDirectory() ? walk(path) : [path];
   });
 
-test('only the typed native gateway contains an SMS submission call', () => {
+test('only the injected typed platform adapter contains an SMS submission call', () => {
   const sourceRoot = 'android/app/src/main/java';
   const callSites = walk(sourceRoot)
     .filter(path => extname(path) === '.kt' || extname(path) === '.java')
@@ -22,13 +22,99 @@ test('only the typed native gateway contains an SMS submission call', () => {
       return matches.map(() => path);
     });
 
-  assert.deepEqual(callSites, [
+  assert.equal(callSites.length, 2);
+  assert.deepEqual(
+    [...new Set(callSites)],
+    [
+      'android/app/src/main/java/com/yashsomani/birthdayautopilot/automation/sms/SmsPlatformSubmitter.kt',
+    ],
+  );
+  const adapter = read(callSites[0]);
+  const gateway = read(
     'android/app/src/main/java/com/yashsomani/birthdayautopilot/automation/sms/SmsGateway.kt',
-  ]);
-  const gateway = read(callSites[0]);
+  );
+  assert.match(adapter, /SmsPlatformSubmitter/u);
+  assert.match(adapter, /AndroidSmsPlatformSubmitter/u);
+  assert.match(adapter, /SmsPlatformSubmissionBoundary/u);
+  assert.equal((adapter.match(/\.sendTextMessage\s*\(/gu) ?? []).length, 1);
+  assert.equal(
+    (adapter.match(/\.sendMultipartTextMessage\s*\(/gu) ?? []).length,
+    1,
+  );
+  assert.match(
+    adapter,
+    /SmsPlatformSubmission\.Single[\s\S]*?sendSingle[\s\S]*?SmsPlatformSubmission\.Multipart[\s\S]*?sendMultipart/u,
+  );
+  assert.match(adapter, /orderedParts\.size !in 1\.\.2/u);
+  assert.match(adapter, /sentIntents\.size != orderedParts\.size/u);
+  assert.match(adapter, /deliveryIntents\.size != orderedParts\.size/u);
   assert.match(gateway, /ArmedAttemptPermit/u);
   assert.match(gateway, /commitApiBoundary/u);
   assert.match(gateway, /registerCallbackTokens/u);
+  assert.match(
+    gateway,
+    /platformSubmitter: SmsPlatformSubmitter = AndroidSmsPlatformSubmitter/u,
+  );
+  assert.match(gateway, /SmsPlatformSubmissionBoundary\.execute/u);
+  assert.doesNotMatch(gateway, /\.send(?:Multipart)?TextMessage\s*\(/u);
+});
+
+test('real callback capture and durable Room routing have executable native coverage', () => {
+  const receivers = read(
+    'android/app/src/main/java/com/yashsomani/birthdayautopilot/automation/sms/SmsCallbackReceivers.kt',
+  );
+  const boundaryTests = read(
+    'android/app/src/test/java/com/yashsomani/birthdayautopilot/automation/sms/SmsPlatformSubmissionBoundaryTest.kt',
+  );
+  const callbackTests = read(
+    'android/app/src/androidTest/java/com/yashsomani/birthdayautopilot/automation/sms/SmsCallbackRuntimeInstrumentationTest.kt',
+  );
+  const platformRuntimeTests = read(
+    'android/app/src/androidTest/java/com/yashsomani/birthdayautopilot/automation/sms/SmsPlatformSubmissionRuntimeInstrumentationTest.kt',
+  );
+
+  assert.match(receivers, /SmsCallbackIntentCapture\.captureSafely/u);
+  assert.match(receivers, /SmsCallbackRoomRouter\(database\)\.route/u);
+  assert.match(receivers, /findLiveCallbackToken/u);
+  assert.match(receivers, /recordCallbackAndReduce/u);
+  assert.match(boundaryTests, /acceptedCallRunsExactlyOnce/u);
+  assert.match(
+    boundaryTests,
+    /exactSinglePartUsesSingleDispatcherWithOneCallbackOfEachKind/u,
+  );
+  assert.match(
+    boundaryTests,
+    /twoPartPlanUsesOneMultipartDispatcherWithOrderedCallbacks/u,
+  );
+  assert.match(
+    boundaryTests,
+    /emptyOverCapMismatchedTextAndCallbackCountsAreRejectedBeforeDispatch/u,
+  );
+  assert.match(
+    boundaryTests,
+    /platformRuntimeAndLinkageFailuresAreUnknownAfterEntry/u,
+  );
+  assert.match(boundaryTests, /finalGateWinsRaceAgainstEarlierOpenSnapshot/u);
+  assert.match(
+    callbackTests,
+    /StaleSpoofedAndStructurallyMalformedIntentsDoNot/u,
+  );
+  assert.match(
+    callbackTests,
+    /multipartCallbacksAreIndependentAndDuplicateCallbackIsIdempotent/u,
+  );
+  assert.match(
+    callbackTests,
+    /callbackRoutingSurvivesDatabaseAndRouterRecreation/u,
+  );
+  assert.match(
+    platformRuntimeTests,
+    /exactSingleAndMultipartPlansChooseOnlyTheirMatchingRuntimeCall/u,
+  );
+  assert.match(
+    platformRuntimeTests,
+    /invalidCardinalityNeverProducesARuntimeSubmission/u,
+  );
 });
 
 test('dangerous telephony permissions remain restricted-release only', () => {
@@ -189,8 +275,10 @@ test('the APK verifier keeps unsigned inspection dev-only and restricted artifac
   assert.match(verifier, /APK Sig Block 42/u);
   assert.match(verifier, /--restricted-evidence/u);
   assert.match(verifier, /--play-delivered-evidence/u);
+  assert.match(verifier, /--evidence-root/u);
   assert.match(verifier, /signature scheme v2 or v3/u);
   assert.match(aabVerifier, /--play-evidence/u);
+  assert.match(aabVerifier, /--evidence-root/u);
   assert.match(aabVerifier, /play-aab/u);
   assert.match(aabVerifier, /exactly one signer/u);
   assert.match(aabVerifier, /inspect-android-aab-manifest\.mjs/u);

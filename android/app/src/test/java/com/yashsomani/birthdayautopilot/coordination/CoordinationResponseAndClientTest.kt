@@ -14,6 +14,19 @@ import org.junit.Test
 
 class CoordinationResponseAndClientTest {
   @Test
+  fun `temporary iPhone composer fence preserves an unclaimed birthday for retry`() {
+    assertTrue(
+      CoordinationServerReason.IOS_COMPOSER_RESERVED
+        .preservesUnclaimedBirthdayForRetry(),
+    )
+    assertTrue(CoordinationServerReason.LEASE_EXPIRED.preservesUnclaimedBirthdayForRetry())
+    assertFalse(
+      CoordinationServerReason.OCCURRENCE_RESERVED
+        .preservesUnclaimedBirthdayForRetry(),
+    )
+  }
+
+  @Test
   fun `registration lease and mode responses are strict and request bound`() {
     val registration = registrationRequest()
     val active = CoordinationResponseParser.registration(
@@ -397,6 +410,17 @@ class CoordinationResponseAndClientTest {
         registrationRequest(),
       ) is RegistrationOutcome.Suppressed,
     )
+    assertTrue(
+      CoordinationResponseParser.registration(
+        mapOf("kind" to "SUPPRESSED", "reason" to "IOS_COMPOSER_RESERVED"),
+        registrationRequest(),
+      ) is RegistrationOutcome.Suppressed,
+    )
+    assertTrue(
+      CoordinationResponseParser.lease(
+        mapOf("kind" to "REFUSED", "reason" to "IOS_COMPOSER_RESERVED"),
+      ) is LeaseOutcome.Refused,
+    )
     assertNull(CoordinationResponseParser.lease(mapOf("kind" to "REFUSED", "reason" to "MISSING_CLAIM")))
     assertNull(
       CoordinationResponseParser.accountMode(
@@ -405,8 +429,20 @@ class CoordinationResponseAndClientTest {
       ),
     )
     assertTrue(
+      CoordinationResponseParser.accountMode(
+        mapOf("kind" to "REFUSED", "reason" to "IOS_COMPOSER_RESERVED"),
+        CoordinationRequestFactory.pauseForRepair(binding()),
+      ) is AccountModeOutcome.Refused,
+    )
+    assertTrue(
       CoordinationResponseParser.claim(
         mapOf("kind" to "REFUSED", "reason" to "OCCURRENCE_RESERVED"),
+        birthdayClaimRequest(),
+      ) is ClaimOutcome.Refused,
+    )
+    assertTrue(
+      CoordinationResponseParser.claim(
+        mapOf("kind" to "REFUSED", "reason" to "IOS_COMPOSER_RESERVED"),
         birthdayClaimRequest(),
       ) is ClaimOutcome.Refused,
     )
@@ -416,6 +452,12 @@ class CoordinationResponseAndClientTest {
         armRequest(),
       ),
     )
+    assertTrue(
+      CoordinationResponseParser.arm(
+        mapOf("kind" to "SUPPRESSED", "reason" to "IOS_COMPOSER_RESERVED"),
+        armRequest(),
+      ) is ArmDecisionOutcome.Suppressed,
+    )
     assertNull(
       CoordinationResponseParser.retry(
         mapOf("kind" to "REFUSED", "reason" to "MODE_BLOCKED"),
@@ -423,10 +465,29 @@ class CoordinationResponseAndClientTest {
       ),
     )
     assertTrue(
+      CoordinationResponseParser.retry(
+        mapOf("kind" to "REFUSED", "reason" to "IOS_COMPOSER_RESERVED"),
+        retryRequest(),
+      ) is RetryOutcome.Refused,
+    )
+    assertTrue(
       CoordinationResponseParser.testReport(
         mapOf("kind" to "REFUSED", "reason" to "ARMED_OUTCOME_REQUIRED"),
         testReportRequest(),
       ) is TestReportOutcome.Refused,
+    )
+    assertTrue(
+      CoordinationResponseParser.testReport(
+        mapOf("kind" to "SUPPRESSED", "reason" to "IOS_COMPOSER_RESERVED"),
+        testReportRequest(),
+      ) is TestReportOutcome.Suppressed,
+    )
+    assertTrue(
+      CoordinationResponseParser.senderTransfer(
+        mapOf("kind" to "REFUSED", "reason" to "IOS_COMPOSER_RESERVED"),
+        transferRequest(completing = false),
+        completing = false,
+      ) is SenderTransferOutcome.Refused,
     )
   }
 

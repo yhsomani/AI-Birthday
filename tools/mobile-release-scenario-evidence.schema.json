@@ -1,0 +1,476 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://birthday-autopilot.invalid/schemas/mobile-release-scenario-evidence-v2.json",
+  "title": "Birthday Autopilot physical, carrier, and accessibility scenario evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "evidenceKind",
+    "evidenceSetId",
+    "rows"
+  ],
+  "properties": {
+    "$schema": { "const": "./mobile-release-scenario-evidence.schema.json" },
+    "schemaVersion": { "const": 2 },
+    "evidenceKind": {
+      "enum": [
+        "android-physical",
+        "android-carrier",
+        "android-accessibility",
+        "ios-physical",
+        "ios-accessibility"
+      ]
+    },
+    "evidenceSetId": { "$ref": "#/$defs/evidenceSetId" },
+    "rows": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 32,
+      "items": { "$ref": "#/$defs/scenarioRow" }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+    },
+    "evidenceSetId": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]{6,62}[a-z0-9])$",
+      "minLength": 8,
+      "maxLength": 64
+    },
+    "observedText": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 120
+    },
+    "commonObservedProperties": {
+      "type": "object",
+      "properties": {
+        "physicalDevice": { "const": true },
+        "deviceIdSha256": { "$ref": "#/$defs/sha256" },
+        "installationSource": {
+          "enum": [
+            "google-play",
+            "managed-enterprise",
+            "controlled-direct",
+            "testflight",
+            "app-store",
+            "ad-hoc"
+          ]
+        },
+        "collector": { "$ref": "#/$defs/observedText" },
+        "collectorVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "protocolVersion": {
+          "type": "string",
+          "pattern": "^(?:android|ios)-(?:physical|carrier|accessibility)-v1$"
+        }
+      }
+    },
+    "androidPhysicalObserved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physicalDevice",
+        "deviceIdSha256",
+        "installationSource",
+        "collector",
+        "collectorVersion",
+        "protocolVersion",
+        "apiLevel",
+        "oem",
+        "simTopology",
+        "activeSubscriptionCount",
+        "selectedSubscriptionIdSha256",
+        "backgroundState",
+        "installerAllowlistObserved",
+        "duplicateSubmissionsObserved"
+      ],
+      "properties": {
+        "physicalDevice": { "const": true },
+        "deviceIdSha256": { "$ref": "#/$defs/sha256" },
+        "installationSource": {
+          "enum": ["google-play", "managed-enterprise", "controlled-direct"]
+        },
+        "collector": { "$ref": "#/$defs/observedText" },
+        "collectorVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "protocolVersion": { "const": "android-physical-v1" },
+        "apiLevel": { "type": "integer", "minimum": 29, "maximum": 37 },
+        "oem": { "$ref": "#/$defs/observedText" },
+        "simTopology": {
+          "enum": ["single-sim", "dual-sim", "esim", "dual-sim-esim"]
+        },
+        "activeSubscriptionCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "selectedSubscriptionIdSha256": { "$ref": "#/$defs/sha256" },
+        "backgroundState": {
+          "enum": [
+            "foreground",
+            "background",
+            "force-stopped-recovered",
+            "reboot-recovered"
+          ]
+        },
+        "installerAllowlistObserved": { "const": true },
+        "duplicateSubmissionsObserved": { "const": 0 }
+      }
+    },
+    "androidCarrierObserved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physicalDevice",
+        "deviceIdSha256",
+        "installationSource",
+        "collector",
+        "collectorVersion",
+        "protocolVersion",
+        "apiLevel",
+        "oem",
+        "simTopology",
+        "activeSubscriptionCount",
+        "selectedSubscriptionIdSha256",
+        "countryCode",
+        "carrierMccMnc",
+        "radioAccessTechnology",
+        "messageEncoding",
+        "submittedPartCount",
+        "sentResult",
+        "deliveryEvidence",
+        "carrierDeliveryClaimed"
+      ],
+      "properties": {
+        "physicalDevice": { "const": true },
+        "deviceIdSha256": { "$ref": "#/$defs/sha256" },
+        "installationSource": {
+          "enum": ["google-play", "managed-enterprise", "controlled-direct"]
+        },
+        "collector": { "$ref": "#/$defs/observedText" },
+        "collectorVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "protocolVersion": { "const": "android-carrier-v1" },
+        "apiLevel": { "type": "integer", "minimum": 29, "maximum": 37 },
+        "oem": { "$ref": "#/$defs/observedText" },
+        "simTopology": {
+          "enum": ["single-sim", "dual-sim", "esim", "dual-sim-esim"]
+        },
+        "activeSubscriptionCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "selectedSubscriptionIdSha256": { "$ref": "#/$defs/sha256" },
+        "countryCode": { "type": "string", "pattern": "^[A-Z]{2}$" },
+        "carrierMccMnc": { "type": "string", "pattern": "^[0-9]{5,6}$" },
+        "radioAccessTechnology": {
+          "enum": ["2g", "3g", "4g", "5g", "wifi-calling"]
+        },
+        "messageEncoding": { "enum": ["gsm-7", "ucs-2"] },
+        "submittedPartCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "sentResult": { "enum": ["accepted", "rejected", "unknown"] },
+        "deliveryEvidence": {
+          "enum": ["reported", "not-reported", "not-observable"]
+        },
+        "carrierDeliveryClaimed": { "const": false }
+      }
+    },
+    "androidAccessibilityObserved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physicalDevice",
+        "deviceIdSha256",
+        "installationSource",
+        "collector",
+        "collectorVersion",
+        "protocolVersion",
+        "apiLevel",
+        "oem",
+        "assistiveTechnology",
+        "assistiveTechnologyVersion",
+        "textScalePercent",
+        "reducedMotion",
+        "increasedContrast",
+        "layoutDirection",
+        "locale",
+        "humanReviewerIdSha256",
+        "checkpointsPassed",
+        "checkpointsTotal"
+      ],
+      "properties": {
+        "physicalDevice": { "const": true },
+        "deviceIdSha256": { "$ref": "#/$defs/sha256" },
+        "installationSource": {
+          "enum": ["google-play", "managed-enterprise", "controlled-direct"]
+        },
+        "collector": { "$ref": "#/$defs/observedText" },
+        "collectorVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "protocolVersion": { "const": "android-accessibility-v1" },
+        "apiLevel": { "type": "integer", "minimum": 29, "maximum": 37 },
+        "oem": { "$ref": "#/$defs/observedText" },
+        "assistiveTechnology": { "enum": ["talkback", "system-settings"] },
+        "assistiveTechnologyVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "textScalePercent": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 300
+        },
+        "reducedMotion": { "type": "boolean" },
+        "increasedContrast": { "type": "boolean" },
+        "layoutDirection": { "enum": ["ltr", "rtl"] },
+        "locale": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(?:-[A-Z][A-Za-z0-9]{1,7})?$"
+        },
+        "humanReviewerIdSha256": { "$ref": "#/$defs/sha256" },
+        "checkpointsPassed": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "checkpointsTotal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        }
+      }
+    },
+    "iosPhysicalObserved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physicalDevice",
+        "deviceIdSha256",
+        "installationSource",
+        "collector",
+        "collectorVersion",
+        "protocolVersion",
+        "deviceClass",
+        "simTopologiesCovered",
+        "canSendTextStatesCovered",
+        "notificationStatesCovered",
+        "applicationStatesCovered",
+        "composerOutcomesCovered",
+        "androidCoexistenceStatesCovered",
+        "backgroundSmsAttempted",
+        "carrierDeliveryClaimed",
+        "reservationHoldHours"
+      ],
+      "properties": {
+        "physicalDevice": { "const": true },
+        "deviceIdSha256": { "$ref": "#/$defs/sha256" },
+        "installationSource": { "enum": ["testflight", "app-store", "ad-hoc"] },
+        "collector": { "$ref": "#/$defs/observedText" },
+        "collectorVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "protocolVersion": { "const": "ios-physical-v1" },
+        "deviceClass": { "const": "iphone" },
+        "simTopologiesCovered": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["no-sim", "single-sim", "dual-sim", "esim"] }
+        },
+        "canSendTextStatesCovered": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "boolean" }
+        },
+        "notificationStatesCovered": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["authorized", "denied", "provisional", "not-determined"]
+          }
+        },
+        "applicationStatesCovered": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["foreground", "background", "terminated"] }
+        },
+        "composerOutcomesCovered": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["cancelled", "failed", "reported-sent", "unknown"]
+          }
+        },
+        "androidCoexistenceStatesCovered": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["no-live-android", "live-android-suppressed"]
+          }
+        },
+        "backgroundSmsAttempted": { "const": false },
+        "carrierDeliveryClaimed": { "const": false },
+        "reservationHoldHours": { "const": 72 }
+      }
+    },
+    "iosAccessibilityObserved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physicalDevice",
+        "deviceIdSha256",
+        "installationSource",
+        "collector",
+        "collectorVersion",
+        "protocolVersion",
+        "deviceClass",
+        "assistiveTechnology",
+        "assistiveTechnologyVersion",
+        "contentSizeCategory",
+        "reducedMotion",
+        "increasedContrast",
+        "layoutDirection",
+        "locale",
+        "humanReviewerIdSha256",
+        "checkpointsPassed",
+        "checkpointsTotal"
+      ],
+      "properties": {
+        "physicalDevice": { "const": true },
+        "deviceIdSha256": { "$ref": "#/$defs/sha256" },
+        "installationSource": { "enum": ["testflight", "app-store", "ad-hoc"] },
+        "collector": { "$ref": "#/$defs/observedText" },
+        "collectorVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "protocolVersion": { "const": "ios-accessibility-v1" },
+        "deviceClass": { "const": "iphone" },
+        "assistiveTechnology": { "enum": ["voiceover", "system-settings"] },
+        "assistiveTechnologyVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "contentSizeCategory": { "$ref": "#/$defs/observedText" },
+        "reducedMotion": { "type": "boolean" },
+        "increasedContrast": { "type": "boolean" },
+        "layoutDirection": { "enum": ["ltr", "rtl"] },
+        "locale": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(?:-[A-Z][A-Za-z0-9]{1,7})?$"
+        },
+        "humanReviewerIdSha256": { "$ref": "#/$defs/sha256" },
+        "checkpointsPassed": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "checkpointsTotal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        }
+      }
+    },
+    "scenarioRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenarioId",
+        "sourceRevision",
+        "artifactSha256",
+        "signingCertificateSha256",
+        "artifactVersion",
+        "platform",
+        "deviceModel",
+        "osVersion",
+        "observedAt",
+        "result",
+        "rawEvidenceReference",
+        "rawEvidenceSha256",
+        "rawEvidenceBytes",
+        "observed"
+      ],
+      "properties": {
+        "scenarioId": {
+          "type": "string",
+          "pattern": "^(?:android|ios)-[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "maxLength": 96
+        },
+        "sourceRevision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "signingCertificateSha256": { "$ref": "#/$defs/sha256" },
+        "artifactVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 96
+        },
+        "platform": { "enum": ["android", "ios"] },
+        "deviceModel": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "osVersion": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])T(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d{1,9})?Z$"
+        },
+        "result": { "const": "passed" },
+        "rawEvidenceReference": {
+          "type": "string",
+          "pattern": "^mobile-scenario-raw--[a-z0-9](?:[a-z0-9-]{6,62}[a-z0-9])--(?:android|ios)-(?:physical|carrier|accessibility)--(?:android|ios)-[a-z0-9]+(?:-[a-z0-9]+)*\\.json$",
+          "maxLength": 320
+        },
+        "rawEvidenceSha256": { "$ref": "#/$defs/sha256" },
+        "rawEvidenceBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 536870912
+        },
+        "observed": {
+          "oneOf": [
+            { "$ref": "#/$defs/androidPhysicalObserved" },
+            { "$ref": "#/$defs/androidCarrierObserved" },
+            { "$ref": "#/$defs/androidAccessibilityObserved" },
+            { "$ref": "#/$defs/iosPhysicalObserved" },
+            { "$ref": "#/$defs/iosAccessibilityObserved" }
+          ]
+        }
+      }
+    }
+  }
+}

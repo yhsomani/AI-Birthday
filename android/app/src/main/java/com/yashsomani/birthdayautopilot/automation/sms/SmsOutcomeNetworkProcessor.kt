@@ -218,7 +218,10 @@ internal class SmsOutcomeNetworkProcessor(
       armStartBlockerRevision = null,
       claimExpiresAtMillis = claim.claimExpiresAtMillis,
       maxPossibleSubmitNotAfterMillis = claim.maxPossibleSubmitNotAfterMillis,
-      unresolvedArmCutoffMillis = claim.maxPossibleSubmitNotAfterMillis,
+      unresolvedArmCutoffMillis = BirthdayRetryPermitPolicy.unresolvedArmCutoffMillis(
+        maxPossibleSubmitNotAfterMillis = claim.maxPossibleSubmitNotAfterMillis,
+        resolvedWindowEndMillis = occurrence.resolvedWindowEndMillis,
+      ),
       trustedServerNowMillis = claim.serverObservedAtMillis,
       requestStartElapsedMillis = elapsedRealtimeMillis,
       bootCount = bootCount,
@@ -372,6 +375,14 @@ internal class SmsOutcomeNetworkProcessor(
   private companion object {
     const val TEST_REPORT_SETTLED_PREFIX = "TEST_REPORT_SETTLED_"
   }
+}
+
+/** Birthday retry ambiguity may never outlive the immutable approved occurrence window. */
+internal object BirthdayRetryPermitPolicy {
+  fun unresolvedArmCutoffMillis(
+    maxPossibleSubmitNotAfterMillis: Long,
+    resolvedWindowEndMillis: Long,
+  ): Long = minOf(maxPossibleSubmitNotAfterMillis, resolvedWindowEndMillis)
 }
 
 internal object SmsRetryAuthorizationPolicy {

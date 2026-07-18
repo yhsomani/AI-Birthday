@@ -133,8 +133,15 @@
       ],
       "properties": {
         "applicationId": { "const": "com.yashsomani.birthdayautopilot" },
-        "versionCode": { "const": 1 },
-        "versionName": { "const": "1.0" },
+        "versionCode": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "versionName": {
+          "type": "string",
+          "pattern": "^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$"
+        },
         "artifactKind": { "const": "aab" },
         "artifactFileName": { "$ref": "#/$defs/nullableText" },
         "artifactSha256": { "$ref": "#/$defs/nullableSha256" },
@@ -155,8 +162,14 @@
       ],
       "properties": {
         "bundleId": { "const": "com.yashsomani.birthdayautopilot" },
-        "shortVersion": { "const": "1.0" },
-        "buildNumber": { "const": "1" },
+        "shortVersion": {
+          "type": "string",
+          "pattern": "^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$"
+        },
+        "buildNumber": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,17}$"
+        },
         "artifactKind": { "const": "ipa" },
         "artifactFileName": { "$ref": "#/$defs/nullableText" },
         "artifactSha256": { "$ref": "#/$defs/nullableSha256" },

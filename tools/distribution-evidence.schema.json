@@ -106,13 +106,25 @@
           "playUploadApproved": { "type": "boolean" },
           "policyApprovalReference": { "$ref": "#/$defs/reference" },
           "policyApprovalSha256": { "$ref": "#/$defs/sha256" },
-          "certifiedDeviceMatrixReference": { "$ref": "#/$defs/reference" },
+          "certifiedDeviceMatrixReference": {
+            "$ref": "#/$defs/reference",
+            "description": "Version-2 mobile-release-scenario-evidence JSON with evidenceKind android-physical; every row binds exact raw evidence bytes retained in the same evidence root."
+          },
           "certifiedDeviceMatrixSha256": { "$ref": "#/$defs/sha256" },
-          "carrierMatrixReference": { "$ref": "#/$defs/reference" },
+          "carrierMatrixReference": {
+            "$ref": "#/$defs/reference",
+            "description": "Version-2 mobile-release-scenario-evidence JSON with evidenceKind android-carrier; every row binds exact raw evidence bytes retained in the same evidence root."
+          },
           "carrierMatrixSha256": { "$ref": "#/$defs/sha256" },
-          "performanceEvidenceReference": { "$ref": "#/$defs/reference" },
+          "performanceEvidenceReference": {
+            "$ref": "#/$defs/reference",
+            "description": "Version-2 structured performance evidence executed by validate-performance-evidence.mjs; protocol and raw-result bytes are retained in the same evidence root."
+          },
           "performanceEvidenceSha256": { "$ref": "#/$defs/sha256" },
-          "accessibilityEvidenceReference": { "$ref": "#/$defs/reference" },
+          "accessibilityEvidenceReference": {
+            "$ref": "#/$defs/reference",
+            "description": "Version-2 mobile-release-scenario-evidence JSON with evidenceKind android-accessibility; every row binds exact raw evidence bytes retained in the same evidence root."
+          },
           "accessibilityEvidenceSha256": { "$ref": "#/$defs/sha256" },
           "supplyChainEvidenceReference": { "$ref": "#/$defs/reference" },
           "supplyChainEvidenceSha256": { "$ref": "#/$defs/sha256" },
@@ -126,7 +138,6 @@
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
-            "contains": { "const": "IN" },
             "items": { "type": "string", "pattern": "^[A-Z]{2}$" }
           }
         },
@@ -187,8 +198,8 @@
     "reference": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 256,
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{0,255}$"
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._/@()+-]{0,511}$"
     },
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
   }

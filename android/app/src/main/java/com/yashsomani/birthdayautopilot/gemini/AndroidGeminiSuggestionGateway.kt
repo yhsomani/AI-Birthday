@@ -52,9 +52,14 @@ internal class AndroidGeminiSuggestionGateway internal constructor(
   constructor(
     context: Context,
     exactAccountSessionMatches: () -> Boolean,
+    accountGeneration: () -> String?,
     operationalGate: GeminiOperationalGate = AndroidGeminiOperationalGate(context),
   ) : this(
-    client = AndroidFirebaseGeminiClient(context, exactAccountSessionMatches),
+    client = AndroidFirebaseGeminiClient(
+      context,
+      exactAccountSessionMatches,
+      accountGeneration,
+    ),
     rateGuard = GeminiUxRateGuard(AndroidGeminiRateStore(context)),
     operationalGate = operationalGate,
   )
@@ -79,7 +84,7 @@ internal class AndroidGeminiSuggestionGateway internal constructor(
       provenanceRegistry.clear()
       if (!client.isOnline()) return fallbackProjection("network-offline")
       if (!client.appCheckReady()) return fallbackProjection("coordination-unavailable")
-      if (!rateGuard.tryAcquire(wallClockMillis(), elapsedClockMillis())) {
+      if (!rateGuard.tryAcquire(accountSessionKey, wallClockMillis(), elapsedClockMillis())) {
         return fallbackProjection("policy-suspended")
       }
       var networkDropped = false
@@ -168,6 +173,7 @@ internal interface GeminiNativeClient {
 private class AndroidFirebaseGeminiClient(
   context: Context,
   private val exactAccountSessionMatches: () -> Boolean,
+  private val accountGeneration: () -> String?,
 ) : GeminiNativeClient {
   private val appContext = context.applicationContext
   private val network = AndroidNetworkAvailability(appContext)
@@ -181,9 +187,10 @@ private class AndroidFirebaseGeminiClient(
       it.providerId == GoogleAuthProvider.PROVIDER_ID
     }
     if (googleIdentities.size != 1 || googleIdentities.single().uid.isBlank()) return null
-    return GeminiCandidateProvenanceRegistry.digest(
-      "BirthdayAutopilot.GeminiAccountSession.v1",
-      user.uid,
+    val generation = runCatching(accountGeneration).getOrNull() ?: return null
+    return GeminiAccountScope.accountSessionKey(
+      firebaseUid = user.uid,
+      accountGeneration = generation,
     )
   }
 
@@ -262,12 +269,12 @@ internal data class GeminiSuggestionRequest(
 )
 
 internal object GeminiSuggestionPolicy {
-  const val PROMPT_POLICY_VERSION = "birthday-greeting-prompt-v1"
+  const val PROMPT_POLICY_VERSION = "birthday-greeting-prompt-v2"
   const val MODEL_IDENTIFIER = "vertex-ai/global/gemini-3.5-flash"
   const val VALIDATOR_VERSION = MessageTemplateValidator.VALIDATOR_VERSION
 
   const val SYSTEM_INSTRUCTION =
-    "Create generic personal birthday greeting templates only. Never include or request a " +
+    "Create clearly positive, generic personal birthday greeting templates only. Never include or request a " +
       "person's name, phone number, birthday, age, gender, relationship, religion, health, " +
       "private history, contact data, secret, URL, hashtag, marketing, promotion, invented " +
       "memory, sensitive attribute, hateful, sexual, self-harm, violent, or deceptive content. " +
@@ -371,47 +378,102 @@ internal object GeminiSuggestionPolicy {
   private const val MAX_CANDIDATE_UTF16_UNITS = 2_000
 }
 
-internal data class GeminiRateState(val epochDay: Long, val attempts: Int)
+internal data class GeminiRateState(
+  val scopeKey: String,
+  val epochDay: Long,
+  val attempts: Int,
+)
 
 internal interface GeminiRateStore {
-  fun read(): GeminiRateState?
+  /** Empty means first use; null means unreadable/corrupt and must fail closed. */
+  fun read(): List<GeminiRateState>?
 
-  fun write(value: GeminiRateState): Boolean
+  fun write(value: List<GeminiRateState>): Boolean
+
+  fun clearAll(): Boolean
 }
 
 private class AndroidGeminiRateStore(context: Context) : GeminiRateStore {
   private val preferences = context.applicationContext.getSharedPreferences(
-    "birthday_gemini_ux_guard_v1",
+    PREFERENCES_NAME,
+    Context.MODE_PRIVATE,
+  )
+  private val legacyPreferences = context.applicationContext.getSharedPreferences(
+    LEGACY_PREFERENCES_NAME,
     Context.MODE_PRIVATE,
   )
 
-  override fun read(): GeminiRateState? {
-    if (!preferences.contains(KEY_DAY) || !preferences.contains(KEY_ATTEMPTS)) return null
-    val day = preferences.getLong(KEY_DAY, Long.MIN_VALUE)
-    val attempts = preferences.getInt(KEY_ATTEMPTS, -1)
-    return if (day >= 0 && attempts >= 0) GeminiRateState(day, attempts) else null
+  override fun read(): List<GeminiRateState>? {
+    val stateExists = runCatching { preferences.contains(KEY_STATE) }.getOrElse { return null }
+    if (!stateExists) return emptyList()
+    val encoded = runCatching { preferences.getString(KEY_STATE, null) }.getOrNull() ?: return null
+    val values = runCatching { JSONArray(encoded) }.getOrNull() ?: return null
+    if (values.length() !in 0..MAXIMUM_GEMINI_RATE_SCOPES) return null
+    val output = ArrayList<GeminiRateState>(values.length())
+    val scopes = mutableSetOf<String>()
+    for (index in 0 until values.length()) {
+      val item = values.opt(index) as? JSONObject ?: return null
+      if (item.keyNames() != setOf("scopeKey", "epochDay", "attempts")) return null
+      val scopeKey = item.strictString("scopeKey")?.takeIf(SHA_256_HEX::matches) ?: return null
+      val epochDay = item.strictLong("epochDay")?.takeIf { it >= 0 } ?: return null
+      val attempts = item.strictInt("attempts")?.takeIf { it in 0..100 } ?: return null
+      if (!scopes.add(scopeKey)) return null
+      output += GeminiRateState(scopeKey, epochDay, attempts)
+    }
+    return output
   }
 
-  // The KTX edit helper returns Unit; this safety guard must observe the synchronous commit result.
+  // The KTX edit helper returns Unit; this UX guard observes the synchronous commit result.
   @SuppressLint("UseKtx")
-  override fun write(value: GeminiRateState): Boolean = preferences.edit()
-    .putLong(KEY_DAY, value.epochDay)
-    .putInt(KEY_ATTEMPTS, value.attempts)
-    .commit()
+  override fun write(value: List<GeminiRateState>): Boolean {
+    if (value.size > MAXIMUM_GEMINI_RATE_SCOPES) return false
+    val scopes = mutableSetOf<String>()
+    val encoded = JSONArray()
+    value.sortedWith(compareByDescending<GeminiRateState> { it.epochDay }.thenBy { it.scopeKey })
+      .forEach { state ->
+        if (
+          !SHA_256_HEX.matches(state.scopeKey) || !scopes.add(state.scopeKey) ||
+          state.epochDay < 0 || state.attempts !in 0..100
+        ) return false
+        encoded.put(
+          JSONObject()
+            .put("scopeKey", state.scopeKey)
+            .put("epochDay", state.epochDay)
+            .put("attempts", state.attempts),
+        )
+      }
+    return preferences.edit().putString(KEY_STATE, encoded.toString()).commit()
+  }
+
+  @SuppressLint("UseKtx")
+  override fun clearAll(): Boolean {
+    val currentCleared = runCatching {
+      preferences.edit().clear().commit() && preferences.all.isEmpty()
+    }.getOrDefault(false)
+    val legacyCleared = runCatching {
+      legacyPreferences.edit().clear().commit() && legacyPreferences.all.isEmpty()
+    }.getOrDefault(false)
+    return currentCleared && legacyCleared
+  }
 
   private companion object {
-    const val KEY_DAY = "utc_epoch_day"
-    const val KEY_ATTEMPTS = "attempts"
+    const val PREFERENCES_NAME = "birthday_gemini_ux_guard_v2"
+    const val LEGACY_PREFERENCES_NAME = "birthday_gemini_ux_guard_v1"
+    const val KEY_STATE = "scoped_daily_state"
+    val SHA_256_HEX = Regex("^[0-9a-f]{64}$")
   }
 }
 
-/** A bypassable local cost/UX guard; provider quotas remain the actual abuse boundary. */
+internal fun clearAndroidGeminiLocalRateState(context: Context): Boolean =
+  AndroidGeminiRateStore(context).clearAll()
+
+/** A bypassable local per-account cost/UX guard; provider quotas remain the abuse boundary. */
 internal class GeminiUxRateGuard(
   private val store: GeminiRateStore,
   private val dailyLimit: Int = 10,
   private val cooldownMillis: Long = 5_000,
 ) {
-  private var lastAcceptedElapsedMillis: Long? = null
+  private val lastAcceptedElapsedMillisByScope = linkedMapOf<String, Long>()
 
   init {
     require(dailyLimit in 1..100)
@@ -419,25 +481,55 @@ internal class GeminiUxRateGuard(
   }
 
   @Synchronized
-  fun tryAcquire(wallClockMillis: Long, elapsedClockMillis: Long): Boolean {
+  fun tryAcquire(
+    accountSessionKey: String,
+    wallClockMillis: Long,
+    elapsedClockMillis: Long,
+  ): Boolean {
     if (wallClockMillis < 0 || elapsedClockMillis < 0) return false
-    val previousElapsed = lastAcceptedElapsedMillis
-    if (
-      previousElapsed != null && elapsedClockMillis >= previousElapsed &&
-      elapsedClockMillis - previousElapsed < cooldownMillis
-    ) return false
+    val scopeKey = GeminiAccountScope.rateScopeKey(accountSessionKey) ?: return false
+    val previousElapsed = lastAcceptedElapsedMillisByScope[scopeKey]
+    if (previousElapsed != null) {
+      if (elapsedClockMillis < previousElapsed) return false
+      if (elapsedClockMillis - previousElapsed < cooldownMillis) return false
+    }
     val epochDay = Math.floorDiv(wallClockMillis, MILLIS_PER_DAY)
-    val current = store.read()?.takeIf { it.epochDay == epochDay }?.attempts ?: 0
-    if (current >= dailyLimit) return false
-    if (!store.write(GeminiRateState(epochDay, current + 1))) return false
-    lastAcceptedElapsedMillis = elapsedClockMillis
+    val stored = store.read() ?: return false
+    if (stored.size > MAXIMUM_GEMINI_RATE_SCOPES) return false
+    val current = stored.singleOrNull { it.scopeKey == scopeKey }
+    // A wall-clock rollback must not reset the current account's already-observed daily budget.
+    if (current != null && current.epochDay > epochDay) return false
+    val currentAttempts = current?.takeIf { it.epochDay == epochDay }?.attempts ?: 0
+    if (currentAttempts >= dailyLimit) return false
+
+    val retained = stored.asSequence()
+      .filter { it.scopeKey != scopeKey && it.epochDay <= epochDay }
+      .filter { epochDay - it.epochDay <= RATE_SCOPE_RETENTION_DAYS }
+      .sortedWith(compareByDescending<GeminiRateState> { it.epochDay }.thenBy { it.scopeKey })
+      .take(MAXIMUM_GEMINI_RATE_SCOPES - 1)
+      .toMutableList()
+    retained += GeminiRateState(scopeKey, epochDay, currentAttempts + 1)
+    if (!store.write(retained)) return false
+
+    lastAcceptedElapsedMillisByScope[scopeKey] = elapsedClockMillis
+    val retainedScopes = retained.mapTo(mutableSetOf()) { it.scopeKey }
+    lastAcceptedElapsedMillisByScope.keys.retainAll(retainedScopes)
     return true
+  }
+
+  @Synchronized
+  fun clearAll(): Boolean {
+    lastAcceptedElapsedMillisByScope.clear()
+    return store.clearAll()
   }
 
   private companion object {
     const val MILLIS_PER_DAY = 86_400_000L
+    const val RATE_SCOPE_RETENTION_DAYS = 32L
   }
 }
+
+internal const val MAXIMUM_GEMINI_RATE_SCOPES = 8
 
 private fun JSONObject.keyNames(): Set<String> {
   val output = linkedSetOf<String>()
@@ -454,4 +546,12 @@ private fun JSONObject.strictInt(key: String): Int? {
   val long = number.toLong()
   if (number.toDouble() != long.toDouble() || long !in Int.MIN_VALUE..Int.MAX_VALUE) return null
   return long.toInt()
+}
+
+private fun JSONObject.strictLong(key: String): Long? {
+  val number = opt(key) as? Number ?: return null
+  val double = number.toDouble()
+  val long = number.toLong()
+  if (!double.isFinite() || double != long.toDouble()) return null
+  return long
 }

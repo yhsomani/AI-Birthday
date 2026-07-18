@@ -328,7 +328,7 @@
     {
       "id": "A06",
       "platforms": ["android", "ios"],
-      "implementation": ["src/features/live/LiveActivityScreen.tsx"],
+      "implementation": ["src/features/live/LivePrivacyScreen.tsx"],
       "nearestContractFiles": ["src/app/LiveApp.test.tsx"]
     },
     {
@@ -381,7 +381,8 @@
       "platforms": ["android", "ios"],
       "implementation": [
         "src/features/live/LiveSettingsScreen.tsx",
-        "src/features/live/LiveAndroidDeviceControls.tsx"
+        "src/features/live/LiveAndroidDeviceControls.tsx",
+        "src/features/live/LivePrivacyScreen.tsx"
       ],
       "nearestContractFiles": [
         "src/app/LiveApp.test.tsx",

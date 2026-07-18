@@ -37,6 +37,7 @@ export const safeReasonMessageKeys: Record<SafeReasonCode, TranslationKey> = {
   'invalid-daily-cap': 'live.reason.invalidDailyCap',
   'invalid-segment-cap': 'live.reason.invalidSegmentCap',
   'invalid-window': 'live.reason.invalidWindow',
+  'ios-composer-reserved': 'live.reason.iosComposerReserved',
   'leap-policy-required': 'live.people.issue.leapPolicy',
   'low-power-standby-unsafe': 'live.reason.lowPowerStandbyUnsafe',
   'native-bridge-unavailable': 'live.reason.nativeBridgeUnavailable',

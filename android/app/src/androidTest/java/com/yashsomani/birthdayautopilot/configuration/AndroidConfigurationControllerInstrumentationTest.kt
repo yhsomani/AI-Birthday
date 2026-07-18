@@ -11,6 +11,7 @@ import com.yashsomani.birthdayautopilot.automation.state.BirthdayJobState
 import com.yashsomani.birthdayautopilot.coordination.DistributionChannel
 import com.yashsomani.birthdayautopilot.core.model.AccountMode
 import com.yashsomani.birthdayautopilot.gemini.AndroidGeminiSuggestionGateway
+import com.yashsomani.birthdayautopilot.gemini.GeminiAccountScope
 import com.yashsomani.birthdayautopilot.gemini.GeminiNativeClient
 import com.yashsomani.birthdayautopilot.gemini.GeminiRateState
 import com.yashsomani.birthdayautopilot.gemini.GeminiRateStore
@@ -584,7 +585,12 @@ class AndroidConfigurationControllerInstrumentationTest {
           runBlocking {
             database.peopleSyncDao().activeAccount()
               ?.takeIf { it.accountId == ACCOUNT_ID && sessionMatches }
-              ?.accountId
+              ?.let { account ->
+                GeminiAccountScope.accountSessionKey(
+                  firebaseUid = account.firebaseUid,
+                  accountGeneration = "callback-generation",
+                )
+              }
           }
         },
         rateGuard = GeminiUxRateGuard(MemoryGeminiRateStore(), cooldownMillis = 0),
@@ -914,12 +920,17 @@ class AndroidConfigurationControllerInstrumentationTest {
   )
 
   private class MemoryGeminiRateStore : GeminiRateStore {
-    private var value: GeminiRateState? = null
+    private var value: List<GeminiRateState> = emptyList()
 
-    override fun read(): GeminiRateState? = value
+    override fun read(): List<GeminiRateState> = value
 
-    override fun write(value: GeminiRateState): Boolean {
-      this.value = value
+    override fun write(value: List<GeminiRateState>): Boolean {
+      this.value = value.toList()
+      return true
+    }
+
+    override fun clearAll(): Boolean {
+      value = emptyList()
       return true
     }
   }

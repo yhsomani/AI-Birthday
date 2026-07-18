@@ -280,6 +280,67 @@ describe('sender-release decisions', () => {
       /email|phone|message|contact|token|providerSubject/iu,
     );
   });
+
+  it('replays immutable completion after sender state is gone and rejects a changed binding', () => {
+    const identity = deriveOperationIdentity(
+      'uid-release-completed-replay',
+      'SENDER_RELEASE',
+      RELEASE_REQUEST_ID,
+      [INSTALLATION_ID, '4', '3'],
+    );
+    const operation = {
+      schemaVersion: SCHEMA_VERSION,
+      operation: 'SENDER_RELEASE' as const,
+      stage: 'RELEASE_PURGING' as const,
+      requestKey: identity.requestKey,
+      requestFingerprint: identity.requestFingerprint,
+      accountKey: identity.accountKey,
+      androidStateExisted: true,
+      senderEpochAfter: 5,
+      resetGenerationAfter: 3,
+      nextSweepAtMs: NOW_MS,
+      sweepAttemptCount: 0,
+      createdAtMs: NOW_MS,
+      updatedAtMs: NOW_MS,
+    };
+    const receipt = makeCoordinationOperationReceipt(operation, NOW_MS + 1);
+    const binding = {
+      installationId: INSTALLATION_ID,
+      senderEpoch: 4,
+      resetGeneration: 3,
+    };
+    expect(
+      decideBeginSenderRelease(
+        null,
+        receipt,
+        null,
+        null,
+        null,
+        binding,
+        identity,
+        NOW_MS + 2,
+      ),
+    ).toEqual({ kind: 'COMPLETED', receipt });
+
+    const changed = deriveOperationIdentity(
+      'uid-release-completed-replay',
+      'SENDER_RELEASE',
+      RELEASE_REQUEST_ID,
+      [INSTALLATION_ID, '5', '3'],
+    );
+    expect(
+      decideBeginSenderRelease(
+        null,
+        receipt,
+        null,
+        null,
+        null,
+        { ...binding, senderEpoch: 5 },
+        changed,
+        NOW_MS + 2,
+      ),
+    ).toEqual({ kind: 'REFUSED', reason: 'REQUEST_MISMATCH' });
+  });
 });
 
 describe('strict destructive-operation persistence codecs', () => {

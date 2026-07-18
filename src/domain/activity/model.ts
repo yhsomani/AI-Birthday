@@ -31,12 +31,26 @@ export const ACTIVITY_KINDS = [
 
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 
+export const ACTIVITY_RECOVERY_ROUTES = [
+  'attention',
+  'automation',
+  'people',
+  'settings',
+] as const;
+
+export type ActivityRecoveryRoute = (typeof ACTIVITY_RECOVERY_ROUTES)[number];
+
+export type ActivityRecovery = Readonly<{
+  route: ActivityRecoveryRoute;
+}>;
+
 export type ActivityRecord = Readonly<{
   id: ActivityId;
   kind: ActivityKind;
   reason?: SafeReasonCode | undefined;
   occurredAt: UtcInstant;
-  actionable: boolean;
+  /** Present only while native state still exposes a concrete repair route. */
+  recovery?: ActivityRecovery | undefined;
 }>;
 
 export type ActivityQuery = Readonly<{

@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://birthday-autopilot.invalid/schemas/production-release-closure.schema.json",
+  "title": "Birthday Autopilot production release closure",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "product",
+    "status",
+    "source",
+    "validity",
+    "release",
+    "components",
+    "finalApproval"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "./production-release-closure.schema.json"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "product": {
+      "const": "birthday-autopilot-production-release-closure"
+    },
+    "status": {
+      "const": "approved"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "repository",
+        "clean",
+        "authorityPublicKeySpkiSha256"
+      ],
+      "properties": {
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "repository": {
+          "enum": [
+            "https://github.com/yhsomani/AI-Birthday.git",
+            "git@github.com:yhsomani/AI-Birthday.git"
+          ]
+        },
+        "clean": {
+          "const": true
+        },
+        "authorityPublicKeySpkiSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "validity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generatedAt", "validUntil"],
+      "properties": {
+        "generatedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "validUntil": {
+          "$ref": "#/$defs/instant"
+        }
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment", "firebase", "android", "ios", "hosting"],
+      "properties": {
+        "environment": {
+          "const": "production"
+        },
+        "firebase": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "projectId",
+            "projectNumber",
+            "androidAppId",
+            "iosAppId"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{4,28}[a-z0-9]$"
+            },
+            "projectNumber": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{5,19}$"
+            },
+            "androidAppId": {
+              "type": "string",
+              "pattern": "^1:[1-9][0-9]{5,19}:android:[0-9a-f]{8,64}$"
+            },
+            "iosAppId": {
+              "type": "string",
+              "pattern": "^1:[1-9][0-9]{5,19}:ios:[0-9a-f]{8,64}$"
+            }
+          }
+        },
+        "android": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applicationId",
+            "versionCode",
+            "versionName",
+            "artifactKind",
+            "artifactFileName",
+            "artifactSha256",
+            "artifactSigningCertificateSha256",
+            "installedSigningCertificateSha1",
+            "installedSigningCertificateSha256",
+            "deliveredBaseApkFileName",
+            "deliveredBaseApkSha256"
+          ],
+          "properties": {
+            "applicationId": {
+              "const": "com.yashsomani.birthdayautopilot"
+            },
+            "versionCode": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "versionName": {
+              "$ref": "#/$defs/version"
+            },
+            "artifactKind": {
+              "const": "aab"
+            },
+            "artifactFileName": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,251}\\.aab$"
+            },
+            "artifactSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "artifactSigningCertificateSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "installedSigningCertificateSha1": {
+              "$ref": "#/$defs/sha1"
+            },
+            "installedSigningCertificateSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "deliveredBaseApkFileName": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,251}\\.apk$"
+            },
+            "deliveredBaseApkSha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "ios": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bundleId",
+            "shortVersion",
+            "buildNumber",
+            "artifactFileName",
+            "artifactSha256",
+            "distributionCertificateSha256"
+          ],
+          "properties": {
+            "bundleId": {
+              "const": "com.yashsomani.birthdayautopilot"
+            },
+            "shortVersion": {
+              "$ref": "#/$defs/version"
+            },
+            "buildNumber": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,17}$"
+            },
+            "artifactFileName": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,251}\\.ipa$"
+            },
+            "artifactSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "distributionCertificateSha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "hosting": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "publicBaseUrl",
+            "releaseConfigSha256",
+            "deployedArtifactSha256"
+          ],
+          "properties": {
+            "publicBaseUrl": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://[^/?#]+/$"
+            },
+            "releaseConfigSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "deployedArtifactSha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "androidDistribution",
+        "androidPlayDelivery",
+        "iosRelease",
+        "cloud",
+        "store",
+        "hosting"
+      ],
+      "properties": {
+        "androidDistribution": {
+          "$ref": "#/$defs/component"
+        },
+        "androidPlayDelivery": {
+          "$ref": "#/$defs/component"
+        },
+        "iosRelease": {
+          "$ref": "#/$defs/component"
+        },
+        "cloud": {
+          "$ref": "#/$defs/component"
+        },
+        "store": {
+          "$ref": "#/$defs/component"
+        },
+        "hosting": {
+          "$ref": "#/$defs/component"
+        }
+      }
+    },
+    "finalApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "approvedAt", "validUntil"],
+      "properties": {
+        "decision": {
+          "const": "approved"
+        },
+        "approvedAt": {
+          "$ref": "#/$defs/instant"
+        },
+        "validUntil": {
+          "$ref": "#/$defs/instant"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha1": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "instant": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$"
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/@()+ -]{0,511}$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4194304
+        }
+      }
+    }
+  }
+}

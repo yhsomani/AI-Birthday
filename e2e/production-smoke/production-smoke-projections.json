@@ -22,7 +22,13 @@
         }
       ],
       "activity:list": {
-        "items": []
+        "items": [
+          {
+            "id": "smoke.activity.1",
+            "kind": "settings-changed",
+            "occurredAt": "2026-07-12T00:00:00.000Z"
+          }
+        ]
       },
       "automation:approval": {
         "kind": "missing"
@@ -167,7 +173,7 @@
         "localContactCount": 0,
         "enabledRecipientCount": 0,
         "approvalCount": 0,
-        "activityCount": 0,
+        "activityCount": 1,
         "templateCount": 0,
         "localStorageBytes": 0,
         "consentVersions": [],
@@ -353,7 +359,13 @@
         }
       ],
       "activity:list": {
-        "items": []
+        "items": [
+          {
+            "id": "smoke.activity.1",
+            "kind": "settings-changed",
+            "occurredAt": "2026-07-12T00:00:00.000Z"
+          }
+        ]
       },
       "automation:approval": {
         "kind": "missing"
@@ -477,7 +489,7 @@
         "localContactCount": 0,
         "enabledRecipientCount": 0,
         "approvalCount": 0,
-        "activityCount": 0,
+        "activityCount": 1,
         "templateCount": 0,
         "localStorageBytes": 0,
         "consentVersions": [],

@@ -24,6 +24,33 @@ internal data class GeminiCandidateProvenance(
 )
 
 /**
+ * Native-only, purpose-separated account keys. Raw Firebase UIDs and local account generations are
+ * accepted only at this boundary and are never returned to JavaScript or persisted by Gemini.
+ */
+internal object GeminiAccountScope {
+  fun accountSessionKey(firebaseUid: String, accountGeneration: String): String? {
+    if (
+      firebaseUid.isBlank() || firebaseUid.length > MAXIMUM_INPUT_CHARACTERS ||
+      accountGeneration.isBlank() || accountGeneration.length > MAXIMUM_INPUT_CHARACTERS
+    ) return null
+    return GeminiCandidateProvenanceRegistry.digest(
+      ACCOUNT_SESSION_DOMAIN,
+      firebaseUid + "\u0000" + accountGeneration,
+    )
+  }
+
+  fun rateScopeKey(accountSessionKey: String): String? {
+    if (!SHA_256_HEX.matches(accountSessionKey)) return null
+    return GeminiCandidateProvenanceRegistry.digest(RATE_SCOPE_DOMAIN, accountSessionKey)
+  }
+
+  private const val ACCOUNT_SESSION_DOMAIN = "BirthdayAutopilot.GeminiAccountSession.v1"
+  private const val RATE_SCOPE_DOMAIN = "BirthdayAutopilot.GeminiRateScope.v1"
+  private const val MAXIMUM_INPUT_CHARACTERS = 512
+  private val SHA_256_HEX = Regex("^[0-9a-f]{64}$")
+}
+
+/**
  * Bounded, process-memory-only provenance for the candidates currently visible in the authoring
  * UI. It stores a domain-separated exact-text digest, never the provider response or raw text.
  */

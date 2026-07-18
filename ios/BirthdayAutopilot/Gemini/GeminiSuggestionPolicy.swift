@@ -1,4 +1,5 @@
 import CoreFoundation
+import CryptoKit
 import Foundation
 
 struct IOSGeminiSuggestionRequest: Equatable {
@@ -120,8 +121,7 @@ enum IOSGeminiSuggestionPolicy {
       guard placeholderCount == 0 else { return false }
     }
     let withoutSupportedPlaceholder = text.replacingOccurrences(of: "{firstName}", with: "")
-    guard !withoutSupportedPlaceholder.contains("{"), !withoutSupportedPlaceholder.contains("}"),
-      languageMatches(withoutSupportedPlaceholder, language: request.language)
+    guard !withoutSupportedPlaceholder.contains("{"), !withoutSupportedPlaceholder.contains("}")
     else {
       return false
     }
@@ -171,4 +171,162 @@ enum IOSGeminiSuggestionPolicy {
     "ÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡" +
     "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà"
   private static let gsmExtension = "^{}\\[~]|€"
+}
+
+/// Purpose-separated native account keys. Raw provider identifiers are consumed only here and the
+/// resulting fixed-length digest remains inside the native Gemini boundary.
+enum IOSGeminiAccountScope {
+  static func accountSessionKey(firebaseUID: String, accountGeneration: String) -> String? {
+    guard !firebaseUID.isEmpty, firebaseUID.count <= maximumInputCharacters,
+      !accountGeneration.isEmpty, accountGeneration.count <= maximumInputCharacters
+    else { return nil }
+    return digest(
+      domain: accountSessionDomain,
+      value: "\(firebaseUID)\u{0}\(accountGeneration)"
+    )
+  }
+
+  static func rateScopeKey(accountSessionKey: String) -> String? {
+    guard accountSessionKey.count == 64,
+      accountSessionKey.unicodeScalars.allSatisfy({ scalar in
+        (48...57).contains(scalar.value) || (97...102).contains(scalar.value)
+      })
+    else { return nil }
+    return digest(domain: rateScopeDomain, value: accountSessionKey)
+  }
+
+  private static func digest(domain: String, value: String) -> String {
+    SHA256.hash(data: Data("\(domain)\u{0}\(value)".utf8))
+      .map { String(format: "%02x", $0) }
+      .joined()
+  }
+
+  private static let accountSessionDomain = "BirthdayAutopilot.GeminiAccountSession.v1"
+  private static let rateScopeDomain = "BirthdayAutopilot.GeminiRateScope.v1"
+  private static let maximumInputCharacters = 512
+}
+
+/// Bounded, content-free, per-account UX/cost state. Provider quota and App Check remain the abuse
+/// boundary; this local guard deliberately contains no UID, subject, prompt, response, or contact.
+@MainActor
+final class IOSGeminiUXRateGuard {
+  private struct StoredRecord: Codable, Equatable {
+    let scopeKey: String
+    let epochDay: Int64
+    let attempts: Int
+  }
+
+  private struct StoredSnapshot: Codable {
+    let schemaVersion: Int
+    let records: [StoredRecord]
+  }
+
+  private let defaults: UserDefaults
+  private let dailyLimit: Int
+  private let cooldownSeconds: TimeInterval
+  private var lastAcceptedUptimeByScope: [String: TimeInterval] = [:]
+
+  init(
+    defaults: UserDefaults = .standard,
+    dailyLimit: Int = 10,
+    cooldownSeconds: TimeInterval = 5
+  ) {
+    precondition((1...100).contains(dailyLimit))
+    precondition(cooldownSeconds >= 0 && cooldownSeconds <= 60)
+    self.defaults = defaults
+    self.dailyLimit = dailyLimit
+    self.cooldownSeconds = cooldownSeconds
+  }
+
+  func tryAcquire(
+    accountSessionKey: String,
+    wallTime: TimeInterval,
+    uptime: TimeInterval
+  ) -> Bool {
+    guard wallTime.isFinite, wallTime >= 0, uptime.isFinite, uptime >= 0,
+      let scopeKey = IOSGeminiAccountScope.rateScopeKey(
+        accountSessionKey: accountSessionKey
+      )
+    else { return false }
+    let dayValue = floor(wallTime / 86_400)
+    guard dayValue <= Double(Int64.max) else { return false }
+    let epochDay = Int64(dayValue)
+    if let previous = lastAcceptedUptimeByScope[scopeKey] {
+      if uptime < previous { return false }
+      if uptime - previous < cooldownSeconds { return false }
+    }
+    guard let stored = load() else { return false }
+    let current = stored.first { $0.scopeKey == scopeKey }
+    // A wall-clock rollback must not reset this account's already-observed daily budget.
+    if let current, current.epochDay > epochDay { return false }
+    let attempts = current?.epochDay == epochDay ? current?.attempts ?? 0 : 0
+    guard attempts < dailyLimit else { return false }
+
+    var retained = stored.filter {
+      $0.scopeKey != scopeKey && $0.epochDay <= epochDay
+        && epochDay - $0.epochDay <= Self.scopeRetentionDays
+    }.sorted {
+      $0.epochDay == $1.epochDay ? $0.scopeKey < $1.scopeKey : $0.epochDay > $1.epochDay
+    }
+    retained = Array(retained.prefix(Self.maximumRetainedScopes - 1))
+    retained.append(StoredRecord(
+      scopeKey: scopeKey,
+      epochDay: epochDay,
+      attempts: attempts + 1
+    ))
+    guard persist(retained) else { return false }
+
+    lastAcceptedUptimeByScope[scopeKey] = uptime
+    let retainedScopes = Set(retained.map(\.scopeKey))
+    lastAcceptedUptimeByScope = lastAcceptedUptimeByScope.filter {
+      retainedScopes.contains($0.key)
+    }
+    return true
+  }
+
+  @discardableResult
+  func clearAll() -> Bool {
+    lastAcceptedUptimeByScope = [:]
+    defaults.removeObject(forKey: Self.stateKey)
+    defaults.removeObject(forKey: Self.legacyDayKey)
+    defaults.removeObject(forKey: Self.legacyAttemptsKey)
+    return defaults.object(forKey: Self.stateKey) == nil
+      && defaults.object(forKey: Self.legacyDayKey) == nil
+      && defaults.object(forKey: Self.legacyAttemptsKey) == nil
+  }
+
+  func storedScopeCountForTesting() -> Int? { load()?.count }
+
+  private func load() -> [StoredRecord]? {
+    guard let object = defaults.object(forKey: Self.stateKey) else { return [] }
+    guard let data = object as? Data,
+      let snapshot = try? PropertyListDecoder().decode(StoredSnapshot.self, from: data),
+      snapshot.schemaVersion == 1,
+      snapshot.records.count <= Self.maximumRetainedScopes
+    else { return nil }
+    var scopes = Set<String>()
+    for record in snapshot.records {
+      guard IOSGeminiAccountScope.rateScopeKey(accountSessionKey: record.scopeKey) != nil,
+        scopes.insert(record.scopeKey).inserted,
+        record.epochDay >= 0, (0...100).contains(record.attempts)
+      else { return nil }
+    }
+    return snapshot.records
+  }
+
+  private func persist(_ records: [StoredRecord]) -> Bool {
+    guard records.count <= Self.maximumRetainedScopes else { return false }
+    let snapshot = StoredSnapshot(schemaVersion: 1, records: records)
+    let encoder = PropertyListEncoder()
+    encoder.outputFormat = .binary
+    guard let data = try? encoder.encode(snapshot) else { return false }
+    defaults.set(data, forKey: Self.stateKey)
+    return defaults.data(forKey: Self.stateKey) == data
+  }
+
+  static let maximumRetainedScopes = 8
+  private static let scopeRetentionDays: Int64 = 32
+  private static let stateKey = "birthday.gemini.ux-guard.scoped-state.v2"
+  private static let legacyDayKey = "birthday.gemini.ux-guard.utc-day.v1"
+  private static let legacyAttemptsKey = "birthday.gemini.ux-guard.attempts.v1"
 }

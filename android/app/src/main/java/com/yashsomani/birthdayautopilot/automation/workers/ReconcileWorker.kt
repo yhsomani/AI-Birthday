@@ -14,6 +14,22 @@ import com.yashsomani.birthdayautopilot.storage.database.ReconcileHeartbeatLease
 import com.yashsomani.birthdayautopilot.storage.database.ReconcileHeartbeatPolicy
 import com.yashsomani.birthdayautopilot.storage.database.ReconcileHeartbeatStatus
 
+internal object ReconcileSuccessorPolicy {
+  const val MIN_RETRY_DELAY_MILLIS = 30_000L
+
+  fun nextRunAtMillis(
+    result: com.yashsomani.birthdayautopilot.automation.orchestration.AutomationReconcileResult,
+    nowMillis: Long,
+  ): Long? {
+    if (result.nextWakeAtMillis == null && !result.retryRecommended) return null
+    if (!result.retryRecommended) return result.nextWakeAtMillis
+    val retryFloor = runCatching {
+      Math.addExact(nowMillis, MIN_RETRY_DELAY_MILLIS)
+    }.getOrDefault(Long.MAX_VALUE)
+    return maxOf(result.nextWakeAtMillis ?: Long.MIN_VALUE, retryFloor)
+  }
+}
+
 class ReconcileWorker(
   appContext: Context,
   workerParameters: WorkerParameters,
@@ -75,18 +91,14 @@ class ReconcileWorker(
           listOfNotNull(result.attentionSafeCode),
         ),
       )
-      if (result.nextWakeAtMillis != null || result.retryRecommended) {
+      ReconcileSuccessorPolicy.nextRunAtMillis(
+        result,
+        System.currentTimeMillis(),
+      )?.let { nextRunAtMillis ->
         AutomationScheduler.scheduleNetworkAttempt(
           applicationContext,
           result.operationKey,
-          if (result.retryRecommended) {
-            maxOf(
-              result.nextWakeAtMillis ?: Long.MIN_VALUE,
-              System.currentTimeMillis() + MIN_RETRY_DELAY_MILLIS,
-            )
-          } else {
-            result.nextWakeAtMillis
-          },
+          nextRunAtMillis,
         )
       }
       heartbeatStatus = if (result.retryRecommended) {
@@ -145,7 +157,6 @@ class ReconcileWorker(
   private companion object {
     const val SAFE_CODE = "safeCode"
     const val MAX_TRANSIENT_ATTEMPTS = 3
-    const val MIN_RETRY_DELAY_MILLIS = 30_000L
     val SEND_BLOCKING_LIFECYCLE_ACTIONS = setOf(
       "sender-transfer",
       "disconnect-contacts",

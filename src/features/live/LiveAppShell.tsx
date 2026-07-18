@@ -29,6 +29,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { AccountProjection } from '../../domain/account/model';
+import type { ActivityRecoveryRoute } from '../../domain/activity/model';
 import type { ActivityId, ContactId } from '../../domain/shared/brand';
 import type { PlatformCapability } from '../../domain/shared/platform';
 import { AppText } from '../../design-system/components/AppText';
@@ -113,17 +114,22 @@ function navigateToTab(
   navigation.navigate('Main', { screen: tab });
 }
 
-/**
- * Every non-detail live route historically sat above Home. Keeping that stack
- * shape preserves Android system-back behavior while allowing native iOS
- * swipe-to-go-back gestures to be handled by the native stack.
- */
+/** Keep the visible origin tab underneath a leaf so the native Back gesture,
+ * Android system Back, and the screen's visible Back action agree. */
+function navigateToLeafFromTab(
+  navigation: Pick<LiveRootNavigation, 'navigate'>,
+  tab: keyof LiveMainTabParamList,
+  leaf: LiveRootLeaf,
+) {
+  navigation.navigate('Main', { screen: tab });
+  navigation.navigate(leaf);
+}
+
 function navigateToLeafFromHome(
   navigation: Pick<LiveRootNavigation, 'navigate'>,
   leaf: LiveRootLeaf,
 ) {
-  navigation.navigate('Main', { screen: 'Home' });
-  navigation.navigate(leaf);
+  navigateToLeafFromTab(navigation, 'Home', leaf);
 }
 
 function navigateToPerson(
@@ -132,6 +138,25 @@ function navigateToPerson(
 ) {
   navigation.navigate('Main', { screen: 'People' });
   navigation.navigate('Person', { contactId });
+}
+
+function navigateToActivityRecovery(
+  navigation: Pick<LiveRootNavigation, 'navigate'>,
+  route: ActivityRecoveryRoute,
+) {
+  switch (route) {
+    case 'attention':
+      navigateToLeafFromHome(navigation, 'Attention');
+      return;
+    case 'automation':
+      navigateToLeafFromHome(navigation, 'Automation');
+      return;
+    case 'people':
+      navigateToTab(navigation, 'People');
+      return;
+    case 'settings':
+      navigateToTab(navigation, 'Settings');
+  }
 }
 
 function useRootNavigation(): LiveRootNavigation {
@@ -214,16 +239,24 @@ function LiveSettingsRoute() {
     <LiveRouteFrame announcement={t('tabs.settings')} routeKey="tab:settings">
       <LiveSettingsScreen
         capability={capability}
-        onOpenActivity={() => navigateToLeafFromHome(navigation, 'Activity')}
-        onOpenAttention={() => navigateToLeafFromHome(navigation, 'Attention')}
+        onOpenActivity={() =>
+          navigateToLeafFromTab(navigation, 'Settings', 'Activity')
+        }
+        onOpenAttention={() =>
+          navigateToLeafFromTab(navigation, 'Settings', 'Attention')
+        }
         onOpenAutomation={() =>
-          navigateToLeafFromHome(navigation, 'Automation')
+          navigateToLeafFromTab(navigation, 'Settings', 'Automation')
         }
         onOpenDiagnostics={() =>
-          navigateToLeafFromHome(navigation, 'Diagnostics')
+          navigateToLeafFromTab(navigation, 'Settings', 'Diagnostics')
         }
-        onOpenHelpLegal={() => navigateToLeafFromHome(navigation, 'HelpLegal')}
-        onOpenPrivacy={() => navigateToLeafFromHome(navigation, 'Privacy')}
+        onOpenHelpLegal={() =>
+          navigateToLeafFromTab(navigation, 'Settings', 'HelpLegal')
+        }
+        onOpenPrivacy={() =>
+          navigateToLeafFromTab(navigation, 'Settings', 'Privacy')
+        }
         port={port}
       />
     </LiveRouteFrame>
@@ -244,7 +277,7 @@ function LivePersonRoute({
       <LivePersonDetailScreen
         capability={capability}
         contactId={route.params.contactId}
-        onBack={() => navigateToTab(navigation, 'People')}
+        onBack={() => navigation.goBack()}
         port={port}
       />
     </LiveRouteFrame>
@@ -259,11 +292,11 @@ function LiveActivityRoute({
   return (
     <LiveRouteFrame announcement={t('live.activity.title')} routeKey="activity">
       <LiveActivityScreen
-        onBack={() => navigateToTab(navigation, 'Home')}
-        onOpenAttention={() => navigateToLeafFromHome(navigation, 'Attention')}
+        onBack={() => navigation.goBack()}
         onOpenDetail={record =>
           navigation.navigate('ActivityDetail', { activityId: record.id })
         }
+        onOpenRecovery={route => navigateToActivityRecovery(navigation, route)}
         port={port}
       />
     </LiveRouteFrame>
@@ -284,6 +317,9 @@ function LiveActivityDetailRoute({
       <LiveActivityDetailScreen
         activityId={route.params.activityId}
         onBack={() => navigation.goBack()}
+        onOpenRecovery={recoveryRoute =>
+          navigateToActivityRecovery(navigation, recoveryRoute)
+        }
         port={port}
       />
     </LiveRouteFrame>
@@ -301,7 +337,7 @@ function LiveAttentionRoute({
       routeKey="attention"
     >
       <LiveAttentionScreen
-        onBack={() => navigateToTab(navigation, 'Home')}
+        onBack={() => navigation.goBack()}
         onOpenAutomation={() =>
           navigateToLeafFromHome(navigation, 'Automation')
         }
@@ -327,7 +363,7 @@ function LiveAutomationRoute({
       <LiveAutomationScreen
         capability={capability}
         companionPort={companionPort}
-        onBack={() => navigateToTab(navigation, 'Home')}
+        onBack={() => navigation.goBack()}
         port={port}
       />
     </LiveRouteFrame>
@@ -344,10 +380,7 @@ function LiveDiagnosticsRoute({
       announcement={t('live.diagnostics.title')}
       routeKey="diagnostics"
     >
-      <LiveDiagnosticsScreen
-        onBack={() => navigateToTab(navigation, 'Settings')}
-        port={port}
-      />
+      <LiveDiagnosticsScreen onBack={() => navigation.goBack()} port={port} />
     </LiveRouteFrame>
   );
 }
@@ -360,7 +393,7 @@ function LiveHelpLegalRoute({
   return (
     <LiveRouteFrame announcement={t('live.help.title')} routeKey="help-legal">
       <LiveHelpLegalScreen
-        onBack={() => navigateToTab(navigation, 'Settings')}
+        onBack={() => navigation.goBack()}
         platform={capability.platform}
         port={port}
       />
@@ -375,10 +408,7 @@ function LiveMessageRoute({
   const { t } = useAppLocalization();
   return (
     <LiveRouteFrame announcement={t('live.message.title')} routeKey="message">
-      <LiveMessageScreen
-        onBack={() => navigateToTab(navigation, 'Home')}
-        port={port}
-      />
+      <LiveMessageScreen onBack={() => navigation.goBack()} port={port} />
     </LiveRouteFrame>
   );
 }
@@ -391,8 +421,10 @@ function LivePrivacyRoute({
   return (
     <LiveRouteFrame announcement={t('live.privacy.title')} routeKey="privacy">
       <LivePrivacyScreen
-        onBack={() => navigateToTab(navigation, 'Settings')}
-        onOpenHelpLegal={() => navigateToLeafFromHome(navigation, 'HelpLegal')}
+        onBack={() => navigation.goBack()}
+        onOpenHelpLegal={() =>
+          navigateToLeafFromTab(navigation, 'Settings', 'HelpLegal')
+        }
         platform={capability.platform}
         port={port}
       />

@@ -22,6 +22,7 @@ import {
   REQUIRED_APPROVAL_ROLES,
   REQUIRED_EVIDENCE_IDS,
   collectCloudEvidenceFiles,
+  createCloudReleaseVerificationReport,
   validateCloudReleaseEvidence,
   verifyCloudReleaseAuthority,
 } from './validate-cloud-release-evidence.mjs';
@@ -372,6 +373,13 @@ function validFixture() {
       firebaseConfigSha256: sourceDigests.firebaseJsonSha256,
       releaseConfigSha256: 'a'.repeat(64),
       deployedArtifactSha256: 'b'.repeat(64),
+      deploymentManifestSha256: 'c'.repeat(64),
+      deploymentProvenanceSha256: digest('hosting-release\n'),
+      deploymentConfigSha256: 'd'.repeat(64),
+      publicTreeSha256: 'e'.repeat(64),
+      providerOriginObservationSha256: 'f'.repeat(64),
+      firebaseWebConfigObservationSha256: 'a'.repeat(64),
+      currentLiveObservationSha256: digest('hosting-current-live\n'),
       recaptchaEnterpriseAppCheckRegistered: true,
       securityHeadersVerified: true,
       legalCopyApproved: true,
@@ -379,9 +387,138 @@ function validFixture() {
       deletionSagaTested: true,
       evidenceId: 'hosting-release',
     },
+    hostingReleaseControl: {
+      repository: 'yhsomani/AI-Birthday',
+      repositoryId: '24681012',
+      repositoryOwnerId: '1357911',
+      productionRef: 'refs/heads/main',
+      releaseSecurityProjectId: 'birthday-release-security',
+      releaseSecurityProjectNumber: '987654321098',
+      applicationIamAnalysisScope: 'organizations/555555555555',
+      releaseSecurityIamAnalysisScope: 'organizations/555555555555',
+      observer: {
+        serviceAccount:
+          'hosting-observer@birthday-prod-12345.iam.gserviceaccount.com',
+        userManagedKeyCount: 0,
+        wifProvider:
+          'projects/123456789012/locations/global/workloadIdentityPools/hosting-observer-pool/providers/github-main',
+        workflowPath: '.github/workflows/hosting-current-live-observation.yml',
+        protectedEnvironment: 'hosting-production-readonly-live',
+        subject:
+          'repo:yhsomani/AI-Birthday:environment:hosting-production-readonly-live',
+        attributeCondition:
+          "assertion.repository=='yhsomani/AI-Birthday' && assertion.repository_id=='24681012' && assertion.repository_owner_id=='1357911' && assertion.workflow_ref=='yhsomani/AI-Birthday/.github/workflows/hosting-current-live-observation.yml@refs/heads/main' && assertion.ref=='refs/heads/main' && assertion.sub=='repo:yhsomani/AI-Birthday:environment:hosting-production-readonly-live'",
+        attributeMapping: {
+          'google.subject': 'assertion.sub',
+          'attribute.repository': 'assertion.repository',
+          'attribute.repository_id': 'assertion.repository_id',
+          'attribute.repository_owner_id': 'assertion.repository_owner_id',
+          'attribute.workflow_ref': 'assertion.workflow_ref',
+          'attribute.ref': 'assertion.ref',
+        },
+        admissionBucketPermissions: [
+          'storage.buckets.get',
+          'storage.objects.create',
+          'storage.objects.get',
+        ],
+      },
+      admissionReader: {
+        serviceAccount:
+          'admission-reader@birthday-release-security.iam.gserviceaccount.com',
+        userManagedKeyCount: 0,
+        wifProvider:
+          'projects/987654321098/locations/global/workloadIdentityPools/admission-reader-pool/providers/github-main',
+        workflowPath: '.github/workflows/hosting-production-deploy.yml',
+        protectedEnvironment: 'hosting-production-admission',
+        subject:
+          'repo:yhsomani/AI-Birthday:environment:hosting-production-admission',
+        attributeCondition:
+          "assertion.repository=='yhsomani/AI-Birthday' && assertion.repository_id=='24681012' && assertion.repository_owner_id=='1357911' && assertion.workflow_ref=='yhsomani/AI-Birthday/.github/workflows/hosting-production-deploy.yml@refs/heads/main' && assertion.ref=='refs/heads/main' && assertion.sub=='repo:yhsomani/AI-Birthday:environment:hosting-production-admission'",
+        attributeMapping: {
+          'google.subject': 'assertion.sub',
+          'attribute.repository': 'assertion.repository',
+          'attribute.repository_id': 'assertion.repository_id',
+          'attribute.repository_owner_id': 'assertion.repository_owner_id',
+          'attribute.workflow_ref': 'assertion.workflow_ref',
+          'attribute.ref': 'assertion.ref',
+        },
+        admissionBucketPermissions: [
+          'storage.buckets.get',
+          'storage.objects.get',
+          'storage.objects.list',
+        ],
+      },
+      deployer: {
+        serviceAccount:
+          'hosting-deploy@birthday-prod-12345.iam.gserviceaccount.com',
+        userManagedKeyCount: 0,
+        wifProvider:
+          'projects/123456789012/locations/global/workloadIdentityPools/hosting-deploy-pool/providers/github-main',
+        workflowPath: '.github/workflows/hosting-production-deploy.yml',
+        protectedEnvironment: 'hosting-production-deploy',
+        subject:
+          'repo:yhsomani/AI-Birthday:environment:hosting-production-deploy',
+        attributeCondition:
+          "assertion.repository=='yhsomani/AI-Birthday' && assertion.repository_id=='24681012' && assertion.repository_owner_id=='1357911' && assertion.workflow_ref=='yhsomani/AI-Birthday/.github/workflows/hosting-production-deploy.yml@refs/heads/main' && assertion.ref=='refs/heads/main' && assertion.sub=='repo:yhsomani/AI-Birthday:environment:hosting-production-deploy'",
+        attributeMapping: {
+          'google.subject': 'assertion.sub',
+          'attribute.repository': 'assertion.repository',
+          'attribute.repository_id': 'assertion.repository_id',
+          'attribute.repository_owner_id': 'assertion.repository_owner_id',
+          'attribute.workflow_ref': 'assertion.workflow_ref',
+          'attribute.ref': 'assertion.ref',
+        },
+        admissionBucketPermissions: [],
+      },
+      identitiesDistinct: true,
+      admissionBucket: {
+        name: 'birthday-release-admission',
+        resourceName:
+          '//storage.googleapis.com/projects/_/buckets/birthday-release-admission',
+        metageneration: '7',
+        publicAccessPrevention: 'enforced',
+        uniformBucketLevelAccess: true,
+        versioningEnabled: false,
+        softDeleteRetentionSeconds: 0,
+        retentionSeconds: 900,
+        retentionLocked: true,
+        lifecycleDeleteAgeDays: 1,
+        lifecycleMatchesPrefix: 'hosting-production-change-freezes/',
+        releaseSecurityProjectBucketCount: 1,
+      },
+      applicationAndClientBucketAccessCount: 0,
+      hostingMutation: {
+        siteResourceName:
+          '//firebasehosting.googleapis.com/projects/123456789012/sites/birthday-autopilot-prod',
+        serviceAccount:
+          'hosting-deploy@birthday-prod-12345.iam.gserviceaccount.com',
+        workflowPath: '.github/workflows/hosting-production-deploy.yml',
+        mutationIdentityCount: 1,
+        mutationWorkflowCount: 1,
+        alternateMutationIdentityCount: 0,
+      },
+      auditLogging: {
+        service: 'storage.googleapis.com',
+        logTypes: ['ADMIN_READ', 'DATA_READ', 'DATA_WRITE'],
+        exemptedMembers: [],
+        sinkName:
+          'projects/birthday-release-security/sinks/admission-audit-sink',
+        sinkDestination:
+          'logging.googleapis.com/projects/birthday-release-security/locations/global/buckets/admission-audit',
+        sinkFilter:
+          'resource.type="gcs_bucket" AND resource.labels.bucket_name="birthday-release-admission"',
+        sinkDisabled: false,
+        sinkExclusions: [],
+        logBucketName:
+          'projects/birthday-release-security/locations/global/buckets/admission-audit',
+        logBucketLocation: 'global',
+        retentionDays: 30,
+      },
+      evidenceId: 'live-readonly-audit',
+    },
     prohibitedServices: {
       realtimeDatabaseEnabled: false,
-      cloudStorageEnabled: false,
+      applicationProjectCloudStorageEnabled: false,
       fcmEnabled: false,
       analyticsEnabled: false,
       adSdkEnabled: false,
@@ -442,9 +579,180 @@ function validFixture() {
       evidenceId: `approval-${role}`,
     })),
   };
+  const readonlyReference = document.evidenceReferences.find(
+    reference => reference.id === 'live-readonly-audit',
+  );
+  const reportIdentity = identity => ({
+    ...identity,
+    impersonationPrincipal: `principal://iam.googleapis.com/${
+      identity.wifProvider.split('/providers/')[0]
+    }/subject/${identity.subject}`,
+  });
+  const readonlyObservationReport = {
+    schemaVersion: 1,
+    product: 'birthday-autopilot-cloud-readonly-observation',
+    status: 'observed-not-approved',
+    sourceRevision: document.source.revision,
+    observedAt: readonlyReference.capturedAt,
+    mutationAuthorized: false,
+    project: {
+      projectId: document.project.projectId,
+      projectNumber: document.project.projectNumber,
+      androidAppId: document.project.androidAppId,
+      iosAppId: document.project.iosAppId,
+      webAppId: document.project.webAppId,
+      hostingSiteId: document.hosting.siteId,
+    },
+    identities: {
+      runtimeServiceAccount: document.functions.runtimeServiceAccount,
+      auditServiceAccount: document.iam.auditServiceAccount,
+    },
+    hostingReleaseControl: {
+      repositoryId: document.hostingReleaseControl.repositoryId,
+      repositoryOwnerId: document.hostingReleaseControl.repositoryOwnerId,
+      releaseSecurityProjectId:
+        document.hostingReleaseControl.releaseSecurityProjectId,
+      releaseSecurityProjectNumber:
+        document.hostingReleaseControl.releaseSecurityProjectNumber,
+      applicationIamAnalysisScope:
+        document.hostingReleaseControl.applicationIamAnalysisScope,
+      releaseSecurityIamAnalysisScope:
+        document.hostingReleaseControl.releaseSecurityIamAnalysisScope,
+      applicationResourceAssetCount: 0,
+      releaseSecurityResourceAssetCount: 0,
+      githubGovernance: {
+        organizationId: document.hostingReleaseControl.repositoryOwnerId,
+        repositoryId: document.hostingReleaseControl.repositoryId,
+        branch: 'main',
+        branchProtectionEnforced: true,
+        requiredStatusChecksStrict: true,
+        sourceCi: {
+          aggregateCheckName: 'Release admission for exact source SHA',
+          aggregateCheckRunId: '555555555',
+          requiredCheckAppId: '15368',
+          workflowPath: '.github/workflows/ci.yml',
+          workflowRunId: '777777777',
+          workflowRunAttempt: '1',
+          checkSuiteId: '666666666',
+          sourceRevision: document.source.revision,
+          conclusion: 'success',
+        },
+        environmentIds: {
+          'cloud-production-readonly-audit': '1001',
+          'hosting-production-readonly-live': '1002',
+          'hosting-production-build': '1003',
+          'hosting-production-admission': '1004',
+          'hosting-production-deploy': '1005',
+        },
+        reviewerIds: {
+          'cloud-production-readonly-audit': ['424242'],
+          'hosting-production-readonly-live': ['424242'],
+          'hosting-production-build': ['424242'],
+          'hosting-production-admission': ['424242'],
+          'hosting-production-deploy': ['424242'],
+        },
+        auditEventIds: {
+          'cloud-production-readonly-audit': 'event-1',
+          'hosting-production-readonly-live': 'event-2',
+          'hosting-production-build': 'event-3',
+          'hosting-production-admission': 'event-4',
+          'hosting-production-deploy': 'event-5',
+        },
+      },
+      identities: {
+        observer: reportIdentity(document.hostingReleaseControl.observer),
+        admissionReader: reportIdentity(
+          document.hostingReleaseControl.admissionReader,
+        ),
+        deployer: reportIdentity(document.hostingReleaseControl.deployer),
+      },
+      admissionBucket: document.hostingReleaseControl.admissionBucket,
+      bucketAccessPrincipalCount: 2,
+      applicationAndClientBucketAccessCount: 0,
+      applicationProjectCloudStorageEnabled: false,
+      hostingMutation: {
+        ...document.hostingReleaseControl.hostingMutation,
+        permissions: [
+          'firebasehosting.sites.create',
+          'firebasehosting.sites.delete',
+          'firebasehosting.sites.update',
+        ],
+      },
+      auditLogging: document.hostingReleaseControl.auditLogging,
+    },
+    workflow: {
+      repository: 'yhsomani/AI-Birthday',
+      runId: '123456789',
+      runAttempt: '1',
+      workflowRef:
+        'yhsomani/AI-Birthday/.github/workflows/cloud-readonly-evidence.yml@refs/heads/main',
+      runUrl: 'https://github.com/yhsomani/AI-Birthday/actions/runs/123456789',
+    },
+    observed: {
+      firebaseApps: [
+        {
+          platform: 'ANDROID',
+          appId: document.project.androidAppId,
+          resourceName: 'projects/123456789012/androidApps/abcdef1234567890',
+        },
+        {
+          platform: 'IOS',
+          appId: document.project.iosAppId,
+          resourceName: 'projects/123456789012/iosApps/abcdef1234567890',
+        },
+        {
+          platform: 'WEB',
+          appId: document.project.webAppId,
+          resourceName: 'projects/123456789012/webApps/abcdef1234567890',
+        },
+      ],
+      hostingSiteResourceName: `projects/${document.project.projectId}/sites/${document.hosting.siteId}`,
+      projectResourceName: `projects/${document.project.projectNumber}`,
+    },
+    evidenceManifest: {
+      path: 'evidence-manifest.json',
+      sha256: 'd'.repeat(64),
+      bytes: 321,
+    },
+    rawArchive: {
+      path: 'cloud-readonly-observation.tar',
+      sha256: 'e'.repeat(64),
+      bytes: 654,
+    },
+  };
+  const readonlyReportBytes = Buffer.from(
+    JSON.stringify(readonlyObservationReport),
+    'utf8',
+  );
+  evidenceFiles.delete(readonlyReference.path);
+  readonlyReference.path = 'cloud-readonly-observation-report.json';
+  readonlyReference.sha256 = digest(readonlyReportBytes);
+  evidenceFiles.set(readonlyReference.path, {
+    sha256: readonlyReference.sha256,
+    bytes: readonlyReportBytes.byteLength,
+  });
+  evidenceFiles.set(readonlyObservationReport.evidenceManifest.path, {
+    sha256: readonlyObservationReport.evidenceManifest.sha256,
+    bytes: readonlyObservationReport.evidenceManifest.bytes,
+  });
+  evidenceFiles.set(readonlyObservationReport.rawArchive.path, {
+    sha256: readonlyObservationReport.rawArchive.sha256,
+    bytes: readonlyObservationReport.rawArchive.bytes,
+  });
   return {
     document,
-    context: { nowMs: NOW, expectedSource: sourceDigests, evidenceFiles },
+    context: {
+      nowMs: NOW,
+      expectedSource: sourceDigests,
+      evidenceFiles,
+      readonlyObservationReport,
+      readonlyObservationReportSha256: readonlyReference.sha256,
+      readonlyObservationReportBytes: readonlyReportBytes.byteLength,
+      allowedCompanionEvidencePaths: new Set([
+        readonlyObservationReport.evidenceManifest.path,
+        readonlyObservationReport.rawArchive.path,
+      ]),
+    },
   };
 }
 
@@ -581,6 +889,88 @@ test('mixed Android distribution requires distinct Play and direct OAuth/App Che
   );
 });
 
+test('closure report projects exact mobile and web client trust coordinates', () => {
+  const { document, context } = validFixture();
+  const directOauth = document.identityAndApis.androidOauthClients[0];
+  document.identityAndApis.androidOauthClients.push({
+    ...directOauth,
+    channel: 'google-play',
+    clientId: '123456789012-play.apps.googleusercontent.com',
+    signingCertificateSha1: 'b'.repeat(40),
+  });
+  const directRegistration = document.appCheck.androidRegistrations[0];
+  directRegistration.distributionScope = 'mixed';
+  directRegistration.playRecognizedRequired = true;
+  directRegistration.deviceIntegrityRequired = false;
+  document.appCheck.androidRegistrations.push({
+    ...directRegistration,
+    channel: 'google-play',
+    signingCertificateSha256: 'd'.repeat(64),
+  });
+  assert.deepEqual(validateCloudReleaseEvidence(document, context), []);
+
+  const report = createCloudReleaseVerificationReport({
+    document,
+    expectedSource: sourceDigests,
+    evidenceBytes: Buffer.from('signed cloud evidence', 'utf8'),
+    authorityPublicKeySpkiSha256: 'e'.repeat(64),
+  });
+  assert.deepEqual(report.clientTrust, {
+    androidGooglePlay: {
+      appCheckSigningCertificateSha256: 'd'.repeat(64),
+      oauthAndroidClientId: '123456789012-play.apps.googleusercontent.com',
+      oauthSigningCertificateSha1: 'b'.repeat(40),
+      webOauthClientId: '123456789012-web.apps.googleusercontent.com',
+    },
+    ios: {
+      oauthClientId: '123456789012-ios.apps.googleusercontent.com',
+      reversedClientId: 'com.googleusercontent.apps.123456789012-ios',
+      teamId: 'ABCDEFGHIJ',
+    },
+    web: {
+      firebaseAppId: '1:123456789012:web:abcdef1234567890',
+      recaptchaEnterpriseSiteKeySha256: 'c'.repeat(64),
+    },
+  });
+  assert.equal(report.project.webAppId, document.project.webAppId);
+  assert.deepEqual(report.hosting, {
+    siteId: document.hosting.siteId,
+    deployedVersionId: document.hosting.deployedVersionId,
+    publicBaseUrl: document.hosting.publicBaseUrl,
+    releaseConfigSha256: document.hosting.releaseConfigSha256,
+    deployedArtifactSha256: document.hosting.deployedArtifactSha256,
+    deploymentManifestSha256: document.hosting.deploymentManifestSha256,
+    deploymentProvenanceSha256: document.hosting.deploymentProvenanceSha256,
+    deploymentConfigSha256: document.hosting.deploymentConfigSha256,
+    publicTreeSha256: document.hosting.publicTreeSha256,
+    providerOriginObservationSha256:
+      document.hosting.providerOriginObservationSha256,
+    firebaseWebConfigObservationSha256:
+      document.hosting.firebaseWebConfigObservationSha256,
+    currentLiveObservationSha256: document.hosting.currentLiveObservationSha256,
+    firebaseConfigSha256: document.hosting.firebaseConfigSha256,
+    hostingSourceTreeSha256: sourceDigests.hostingSourceTreeSha256,
+  });
+});
+
+test('Hosting provenance bytes are the exact hosting-release evidence object', () => {
+  const { document, context } = validFixture();
+  document.hosting.deploymentProvenanceSha256 = 'f'.repeat(64);
+  assert.match(
+    messages(document, context),
+    /provenance digest must equal the hosting-release evidence bytes/u,
+  );
+});
+
+test('current live Hosting bytes are the exact hosting-current-live evidence object', () => {
+  const { document, context } = validFixture();
+  document.hosting.currentLiveObservationSha256 = 'b'.repeat(64);
+  assert.match(
+    messages(document, context),
+    /current-live digest must equal the hosting-current-live evidence bytes/u,
+  );
+});
+
 test('Functions inventory, options, source revision, and logging policy are exact', () => {
   const { document, context } = validFixture();
   document.functions.callableNames.pop();
@@ -665,6 +1055,29 @@ test('Hosting evidence binds source, public HTTPS identity, deletion, and securi
   assert.match(error, /deletionSagaTested/u);
 });
 
+test('Hosting release control rejects shared identities, weaker WIF, bucket access, alternate writers, and incomplete audit logs', () => {
+  const { document, context } = validFixture();
+  document.hostingReleaseControl.admissionReader.serviceAccount =
+    document.hostingReleaseControl.observer.serviceAccount;
+  document.hostingReleaseControl.observer.attributeCondition =
+    "assertion.repository=='yhsomani/AI-Birthday'";
+  document.hostingReleaseControl.deployer.admissionBucketPermissions = [
+    'storage.objects.get',
+  ];
+  document.hostingReleaseControl.admissionBucket.retentionLocked = false;
+  document.hostingReleaseControl.applicationAndClientBucketAccessCount = 1;
+  document.hostingReleaseControl.hostingMutation.alternateMutationIdentityCount = 1;
+  document.hostingReleaseControl.auditLogging.logTypes = ['ADMIN_READ'];
+  const error = messages(document, context);
+  assert.match(error, /exact protected workflow\/ref\/environment/u);
+  assert.match(error, /least-privilege exact/u);
+  assert.match(error, /mutually distinct/u);
+  assert.match(error, /exact and immutable/u);
+  assert.match(error, /zero admission-bucket access/u);
+  assert.match(error, /exactly one deploy identity\/workflow/u);
+  assert.match(error, /audit sink\/retention contract/u);
+});
+
 test('prohibited Firebase products and any direct mobile Firestore path fail the release', () => {
   const { document, context } = validFixture();
   document.prohibitedServices.analyticsEnabled = true;
@@ -709,6 +1122,53 @@ test('every external evidence file must exist, match its digest, and outlive the
   assert.match(error, /was not collected/u);
   assert.match(error, /expires before/u);
   assert.match(error, /unreferenced file/u);
+});
+
+test('live read-only report rejects relabeled source, project, time, workflow, and companion bytes', () => {
+  const mutations = [
+    ({ context }) => {
+      context.readonlyObservationReport.sourceRevision = 'f'.repeat(40);
+    },
+    ({ context }) => {
+      context.readonlyObservationReport.project.projectId = 'other-prod-12345';
+    },
+    ({ context }) => {
+      context.readonlyObservationReport.observedAt = '2026-07-11T10:00:00Z';
+    },
+    ({ context }) => {
+      context.readonlyObservationReport.workflow.repository =
+        'attacker/AI-Birthday';
+    },
+    ({ context }) => {
+      context.readonlyObservationReport.workflow.workflowRef =
+        'yhsomani/AI-Birthday/.github/workflows/other.yml@refs/heads/main';
+    },
+    ({ context }) => {
+      context.readonlyObservationReport.observed.firebaseApps[0].resourceName =
+        'projects/999999999999/androidApps/abcdef1234567890';
+    },
+    ({ context }) => {
+      context.readonlyObservationReport.rawArchive.sha256 = 'f'.repeat(64);
+    },
+    ({ context }) => {
+      context.readonlyObservationReport.mutationAuthorized = true;
+    },
+  ];
+  for (const mutate of mutations) {
+    const fixture = validFixture();
+    mutate(fixture);
+    assert.match(
+      messages(fixture.document, fixture.context),
+      /live-readonly-audit/u,
+    );
+  }
+
+  const missing = validFixture();
+  delete missing.context.readonlyObservationReport;
+  assert.match(
+    messages(missing.document, missing.context),
+    /live-readonly-audit/u,
+  );
 });
 
 test('all seven approval roles require distinct people and matching expiring approval files', () => {
@@ -819,7 +1279,7 @@ test('cloud evidence CLI cannot replace trust, validation time, or source checko
   }
 });
 
-test('template and authority pin preserve the intentional external blocker', () => {
+test('template inventory is complete and the authority pin has one valid state', () => {
   const template = JSON.parse(
     readFileSync(
       path.join(ROOT, 'tools/cloud-release-evidence.template.json'),
@@ -836,7 +1296,14 @@ test('template and authority pin preserve the intentional external blocker', () 
     template.evidenceReferences.map(reference => reference.id).sort(),
     [...REQUIRED_EVIDENCE_IDS].sort(),
   );
-  assert.equal(pin.publicKeySpkiSha256, 'UNPROVISIONED');
+  assert.deepEqual(Object.keys(pin).sort(), [
+    'algorithm',
+    'publicKeySpkiSha256',
+    'schemaVersion',
+  ]);
+  assert.equal(pin.schemaVersion, 1);
+  assert.equal(pin.algorithm, 'Ed25519');
+  assert.match(pin.publicKeySpkiSha256, /^(?:UNPROVISIONED|[0-9a-f]{64})$/u);
 });
 
 test('schema and template keep exact top-level and section key inventories in sync', () => {

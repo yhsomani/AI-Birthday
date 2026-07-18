@@ -12,11 +12,10 @@ final class IOSGeminiSuggestionGateway {
   static let shared = IOSGeminiSuggestionGateway()
 
   private let identity: IOSGoogleIdentityCoordinator
-  private let defaults: UserDefaults
   private let operationalGate: IOSGeminiOperationalGate
   private let provenanceRegistry: IOSGeminiCandidateProvenanceRegistry
+  private let rateGuard: IOSGeminiUXRateGuard
   private var requestInFlight = false
-  private var lastAcceptedUptime: TimeInterval?
 
   init(
     identity: IOSGoogleIdentityCoordinator = .shared,
@@ -26,9 +25,9 @@ final class IOSGeminiSuggestionGateway {
       IOSGeminiCandidateProvenanceRegistry()
   ) {
     self.identity = identity
-    self.defaults = defaults
     self.operationalGate = operationalGate
     self.provenanceRegistry = provenanceRegistry
+    rateGuard = IOSGeminiUXRateGuard(defaults: defaults)
   }
 
   func configureOperationalGateAfterFirebaseLaunch() {
@@ -63,11 +62,18 @@ final class IOSGeminiSuggestionGateway {
       provenanceRegistry.clear()
       return fallback("coordination-unavailable")
     }
-    let accountSessionKey = Self.accountSessionKey(binding)
+    guard let accountSessionKey = Self.accountSessionKey(binding) else {
+      provenanceRegistry.clear()
+      return fallback("coordination-unavailable")
+    }
     provenanceRegistry.clear()
     let appCheckReady = await appCheckReadyWithinTimeout()
     guard appCheckReady else { return fallback("coordination-unavailable") }
-    guard rateGuardAllows() else { return fallback("policy-suspended") }
+    guard rateGuard.tryAcquire(
+      accountSessionKey: accountSessionKey,
+      wallTime: Date().timeIntervalSince1970,
+      uptime: ProcessInfo.processInfo.systemUptime
+    ) else { return fallback("policy-suspended") }
 
     do {
       let raw = try await generateProviderText(request: request)
@@ -106,12 +112,14 @@ final class IOSGeminiSuggestionGateway {
     provenanceRegistry.clear()
   }
 
-  func clearLocalDataForAccountDeletion() {
+  @discardableResult
+  func clearLocalDataForAccountWipe() -> Bool {
     provenanceRegistry.clear()
-    defaults.removeObject(forKey: Self.dayKey)
-    defaults.removeObject(forKey: Self.attemptsKey)
-    lastAcceptedUptime = nil
+    return rateGuard.clearAll()
   }
+
+  @discardableResult
+  func clearLocalDataForAccountDeletion() -> Bool { clearLocalDataForAccountWipe() }
 
   private func provenance(
     draft: IOSGeminiProvenanceDraft,
@@ -121,7 +129,10 @@ final class IOSGeminiSuggestionGateway {
       provenanceRegistry.clear()
       return nil
     }
-    let key = Self.accountSessionKey(binding)
+    guard let key = Self.accountSessionKey(binding) else {
+      provenanceRegistry.clear()
+      return nil
+    }
     return consume
       ? provenanceRegistry.consume(accountSessionKey: key, draft: draft)
       : provenanceRegistry.peek(accountSessionKey: key, draft: draft)
@@ -129,8 +140,8 @@ final class IOSGeminiSuggestionGateway {
 
   private static func accountSessionKey(
     _ binding: IOSNativeGoogleAccountBinding
-  ) -> String {
-    IOSGeminiCandidateProvenanceRegistry.accountSessionKey(
+  ) -> String? {
+    IOSGeminiAccountScope.accountSessionKey(
       firebaseUID: binding.firebaseUID,
       accountGeneration: binding.accountGeneration
     )
@@ -198,27 +209,6 @@ final class IOSGeminiSuggestionGateway {
     }
   }
 
-  /// Device-local cost/UX guard only. App Check, authenticated mode, provider quota and project
-  /// controls are the abuse boundary. Stored values contain no account or content identifiers.
-  private func rateGuardAllows() -> Bool {
-    let wall = Date().timeIntervalSince1970
-    let uptime = ProcessInfo.processInfo.systemUptime
-    guard wall >= 0, uptime >= 0 else { return false }
-    if let lastAcceptedUptime, uptime >= lastAcceptedUptime,
-      uptime - lastAcceptedUptime < Self.cooldownSeconds
-    {
-      return false
-    }
-    let day = Int64(floor(wall / 86_400))
-    let storedDay = Int64(defaults.object(forKey: Self.dayKey) as? Int ?? -1)
-    let attempts = storedDay == day ? defaults.integer(forKey: Self.attemptsKey) : 0
-    guard attempts >= 0, attempts < Self.dailyLimit else { return false }
-    defaults.set(day, forKey: Self.dayKey)
-    defaults.set(attempts + 1, forKey: Self.attemptsKey)
-    lastAcceptedUptime = uptime
-    return true
-  }
-
   private func fallback(_ reason: String) -> [String: Any] {
     ["kind": "fallback", "reason": reason]
   }
@@ -244,10 +234,6 @@ final class IOSGeminiSuggestionGateway {
   }
 
   private enum IOSGeminiGatewayError: Error { case emptyResponse }
-  private static let dailyLimit = 10
-  private static let cooldownSeconds: TimeInterval = 5
-  private static let dayKey = "birthday.gemini.ux-guard.utc-day.v1"
-  private static let attemptsKey = "birthday.gemini.ux-guard.attempts.v1"
 }
 
 private final class IOSGeminiContinuationGate: @unchecked Sendable {

@@ -23,6 +23,7 @@
     "observability",
     "costControls",
     "hosting",
+    "hostingReleaseControl",
     "prohibitedServices",
     "verification",
     "operations",
@@ -47,6 +48,9 @@
     "observability": { "$ref": "#/$defs/observability" },
     "costControls": { "$ref": "#/$defs/costControls" },
     "hosting": { "$ref": "#/$defs/hosting" },
+    "hostingReleaseControl": {
+      "$ref": "#/$defs/hostingReleaseControl"
+    },
     "prohibitedServices": { "$ref": "#/$defs/prohibitedServices" },
     "verification": { "$ref": "#/$defs/verification" },
     "operations": { "$ref": "#/$defs/operations" },
@@ -711,6 +715,13 @@
         "firebaseConfigSha256",
         "releaseConfigSha256",
         "deployedArtifactSha256",
+        "deploymentManifestSha256",
+        "deploymentProvenanceSha256",
+        "deploymentConfigSha256",
+        "publicTreeSha256",
+        "providerOriginObservationSha256",
+        "firebaseWebConfigObservationSha256",
+        "currentLiveObservationSha256",
         "recaptchaEnterpriseAppCheckRegistered",
         "securityHeadersVerified",
         "legalCopyApproved",
@@ -730,6 +741,19 @@
         "firebaseConfigSha256": { "$ref": "#/$defs/nullableDigest" },
         "releaseConfigSha256": { "$ref": "#/$defs/nullableDigest" },
         "deployedArtifactSha256": { "$ref": "#/$defs/nullableDigest" },
+        "deploymentManifestSha256": { "$ref": "#/$defs/nullableDigest" },
+        "deploymentProvenanceSha256": { "$ref": "#/$defs/nullableDigest" },
+        "deploymentConfigSha256": { "$ref": "#/$defs/nullableDigest" },
+        "publicTreeSha256": { "$ref": "#/$defs/nullableDigest" },
+        "providerOriginObservationSha256": {
+          "$ref": "#/$defs/nullableDigest"
+        },
+        "firebaseWebConfigObservationSha256": {
+          "$ref": "#/$defs/nullableDigest"
+        },
+        "currentLiveObservationSha256": {
+          "$ref": "#/$defs/nullableDigest"
+        },
         "recaptchaEnterpriseAppCheckRegistered": {
           "$ref": "#/$defs/nullableBoolean"
         },
@@ -740,12 +764,206 @@
         "evidenceId": { "const": "hosting-release" }
       }
     },
+    "hostingReleaseIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "serviceAccount",
+        "userManagedKeyCount",
+        "wifProvider",
+        "workflowPath",
+        "protectedEnvironment",
+        "subject",
+        "attributeCondition",
+        "attributeMapping",
+        "admissionBucketPermissions"
+      ],
+      "properties": {
+        "serviceAccount": { "$ref": "#/$defs/nullableText" },
+        "userManagedKeyCount": { "$ref": "#/$defs/nullableInteger" },
+        "wifProvider": { "$ref": "#/$defs/nullableText" },
+        "workflowPath": { "$ref": "#/$defs/nullableText" },
+        "protectedEnvironment": { "$ref": "#/$defs/nullableText" },
+        "subject": { "$ref": "#/$defs/nullableText" },
+        "attributeCondition": { "$ref": "#/$defs/nullableText" },
+        "attributeMapping": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "google.subject",
+            "attribute.repository",
+            "attribute.repository_id",
+            "attribute.repository_owner_id",
+            "attribute.workflow_ref",
+            "attribute.ref"
+          ],
+          "properties": {
+            "google.subject": { "const": "assertion.sub" },
+            "attribute.repository": { "const": "assertion.repository" },
+            "attribute.repository_id": {
+              "const": "assertion.repository_id"
+            },
+            "attribute.repository_owner_id": {
+              "const": "assertion.repository_owner_id"
+            },
+            "attribute.workflow_ref": { "const": "assertion.workflow_ref" },
+            "attribute.ref": { "const": "assertion.ref" }
+          }
+        },
+        "admissionBucketPermissions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "hostingReleaseControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "repositoryId",
+        "repositoryOwnerId",
+        "productionRef",
+        "releaseSecurityProjectId",
+        "releaseSecurityProjectNumber",
+        "applicationIamAnalysisScope",
+        "releaseSecurityIamAnalysisScope",
+        "observer",
+        "admissionReader",
+        "deployer",
+        "identitiesDistinct",
+        "admissionBucket",
+        "applicationAndClientBucketAccessCount",
+        "hostingMutation",
+        "auditLogging",
+        "evidenceId"
+      ],
+      "properties": {
+        "repository": { "const": "yhsomani/AI-Birthday" },
+        "repositoryId": { "$ref": "#/$defs/nullableText" },
+        "repositoryOwnerId": { "$ref": "#/$defs/nullableText" },
+        "productionRef": { "const": "refs/heads/main" },
+        "releaseSecurityProjectId": { "$ref": "#/$defs/nullableText" },
+        "releaseSecurityProjectNumber": { "$ref": "#/$defs/nullableText" },
+        "applicationIamAnalysisScope": { "$ref": "#/$defs/nullableText" },
+        "releaseSecurityIamAnalysisScope": {
+          "$ref": "#/$defs/nullableText"
+        },
+        "observer": { "$ref": "#/$defs/hostingReleaseIdentity" },
+        "admissionReader": { "$ref": "#/$defs/hostingReleaseIdentity" },
+        "deployer": { "$ref": "#/$defs/hostingReleaseIdentity" },
+        "identitiesDistinct": { "$ref": "#/$defs/nullableBoolean" },
+        "admissionBucket": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "resourceName",
+            "metageneration",
+            "publicAccessPrevention",
+            "uniformBucketLevelAccess",
+            "versioningEnabled",
+            "softDeleteRetentionSeconds",
+            "retentionSeconds",
+            "retentionLocked",
+            "lifecycleDeleteAgeDays",
+            "lifecycleMatchesPrefix",
+            "releaseSecurityProjectBucketCount"
+          ],
+          "properties": {
+            "name": { "$ref": "#/$defs/nullableText" },
+            "resourceName": { "$ref": "#/$defs/nullableText" },
+            "metageneration": { "$ref": "#/$defs/nullableText" },
+            "publicAccessPrevention": { "$ref": "#/$defs/nullableText" },
+            "uniformBucketLevelAccess": { "$ref": "#/$defs/nullableBoolean" },
+            "versioningEnabled": { "$ref": "#/$defs/nullableBoolean" },
+            "softDeleteRetentionSeconds": { "$ref": "#/$defs/nullableInteger" },
+            "retentionSeconds": { "$ref": "#/$defs/nullableInteger" },
+            "retentionLocked": { "$ref": "#/$defs/nullableBoolean" },
+            "lifecycleDeleteAgeDays": { "$ref": "#/$defs/nullableInteger" },
+            "lifecycleMatchesPrefix": { "$ref": "#/$defs/nullableText" },
+            "releaseSecurityProjectBucketCount": {
+              "$ref": "#/$defs/nullableInteger"
+            }
+          }
+        },
+        "applicationAndClientBucketAccessCount": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "hostingMutation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "siteResourceName",
+            "serviceAccount",
+            "workflowPath",
+            "mutationIdentityCount",
+            "mutationWorkflowCount",
+            "alternateMutationIdentityCount"
+          ],
+          "properties": {
+            "siteResourceName": { "$ref": "#/$defs/nullableText" },
+            "serviceAccount": { "$ref": "#/$defs/nullableText" },
+            "workflowPath": { "$ref": "#/$defs/nullableText" },
+            "mutationIdentityCount": { "$ref": "#/$defs/nullableInteger" },
+            "mutationWorkflowCount": { "$ref": "#/$defs/nullableInteger" },
+            "alternateMutationIdentityCount": {
+              "$ref": "#/$defs/nullableInteger"
+            }
+          }
+        },
+        "auditLogging": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "service",
+            "logTypes",
+            "exemptedMembers",
+            "sinkName",
+            "sinkDestination",
+            "sinkFilter",
+            "sinkDisabled",
+            "sinkExclusions",
+            "logBucketName",
+            "logBucketLocation",
+            "retentionDays"
+          ],
+          "properties": {
+            "service": { "const": "storage.googleapis.com" },
+            "logTypes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string" }
+            },
+            "exemptedMembers": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string" }
+            },
+            "sinkName": { "$ref": "#/$defs/nullableText" },
+            "sinkDestination": { "$ref": "#/$defs/nullableText" },
+            "sinkFilter": { "$ref": "#/$defs/nullableText" },
+            "sinkDisabled": { "$ref": "#/$defs/nullableBoolean" },
+            "sinkExclusions": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string" }
+            },
+            "logBucketName": { "$ref": "#/$defs/nullableText" },
+            "logBucketLocation": { "$ref": "#/$defs/nullableText" },
+            "retentionDays": { "$ref": "#/$defs/nullableInteger" }
+          }
+        },
+        "evidenceId": { "const": "live-readonly-audit" }
+      }
+    },
     "prohibitedServices": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "realtimeDatabaseEnabled",
-        "cloudStorageEnabled",
+        "applicationProjectCloudStorageEnabled",
         "fcmEnabled",
         "analyticsEnabled",
         "adSdkEnabled",
@@ -757,7 +975,9 @@
       ],
       "properties": {
         "realtimeDatabaseEnabled": { "$ref": "#/$defs/nullableBoolean" },
-        "cloudStorageEnabled": { "$ref": "#/$defs/nullableBoolean" },
+        "applicationProjectCloudStorageEnabled": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
         "fcmEnabled": { "$ref": "#/$defs/nullableBoolean" },
         "analyticsEnabled": { "$ref": "#/$defs/nullableBoolean" },
         "adSdkEnabled": { "$ref": "#/$defs/nullableBoolean" },

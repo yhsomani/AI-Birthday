@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, StyleSheet, View } from 'react-native';
 
 import type {
   AutomationProjection,
@@ -183,36 +183,47 @@ export function LiveHomeScreen({
   const [confirmPause, setConfirmPause] = useState(false);
   const [iosCompanionState, setIosCompanionState] =
     useState<IosCompanionHomeState>({ kind: 'loading' });
-  const homeRevision =
-    home.state.kind === 'ready'
-      ? home.state.result.envelope.revision
-      : undefined;
+  const iosCompanionRequestSequence = useRef(0);
+
+  const loadIosCompanionState = useCallback(async () => {
+    if (capability.platform !== 'ios') return;
+    const request = iosCompanionRequestSequence.current + 1;
+    iosCompanionRequestSequence.current = request;
+    setIosCompanionState({ kind: 'loading' });
+    try {
+      const [reminder, canOpenComposer] = await Promise.all([
+        companionPort.getReminderStatus(),
+        companionPort.canOpenComposer(),
+      ]);
+      if (iosCompanionRequestSequence.current !== request) return;
+      setIosCompanionState(
+        reminder.kind === 'ok'
+          ? { kind: 'ready', reminder: reminder.value, canOpenComposer }
+          : { kind: 'error' },
+      );
+    } catch {
+      if (iosCompanionRequestSequence.current === request) {
+        setIosCompanionState({ kind: 'error' });
+      }
+    }
+  }, [capability.platform, companionPort]);
 
   useEffect(() => {
-    if (capability.platform !== 'ios') {
-      return;
-    }
-    let active = true;
-    setIosCompanionState({ kind: 'loading' });
-    Promise.all([
-      companionPort.getReminderStatus(),
-      companionPort.canOpenComposer(),
-    ])
-      .then(([reminder, canOpenComposer]) => {
-        if (!active) return;
-        setIosCompanionState(
-          reminder.kind === 'ok'
-            ? { kind: 'ready', reminder: reminder.value, canOpenComposer }
-            : { kind: 'error' },
-        );
-      })
-      .catch(() => {
-        if (active) setIosCompanionState({ kind: 'error' });
-      });
+    loadIosCompanionState().catch(() => undefined);
     return () => {
-      active = false;
+      iosCompanionRequestSequence.current += 1;
     };
-  }, [capability.platform, companionPort, homeRevision]);
+  }, [loadIosCompanionState]);
+
+  useEffect(() => {
+    if (capability.platform !== 'ios') return undefined;
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        loadIosCompanionState().catch(() => undefined);
+      }
+    });
+    return () => subscription.remove();
+  }, [capability.platform, loadIosCompanionState]);
 
   useEffect(
     () =>
@@ -222,9 +233,10 @@ export function LiveHomeScreen({
           event.areas.includes('automation')
         ) {
           setTodayReview(undefined);
+          loadIosCompanionState().catch(() => undefined);
         }
       }),
-    [port],
+    [loadIosCompanionState, port],
   );
 
   const prepareToday = async () => {
@@ -347,7 +359,7 @@ export function LiveHomeScreen({
       return;
     }
     setConfirmPause(false);
-    await home.reload();
+    await Promise.all([home.reload(), loadIosCompanionState()]);
     setTodayMessage(t('live.home.pauseAccepted'));
     setTodayPending(false);
   };
@@ -826,12 +838,21 @@ export function LiveHomeScreen({
       ) : null}
       <Button
         label={
-          home.state.refreshing
+          home.state.refreshing ||
+          (capability.platform === 'ios' &&
+            iosCompanionState.kind === 'loading')
             ? t('live.common.refreshing')
             : t('live.home.refresh')
         }
-        disabled={home.state.refreshing}
-        onPress={() => home.reload()}
+        disabled={
+          home.state.refreshing ||
+          (capability.platform === 'ios' &&
+            iosCompanionState.kind === 'loading')
+        }
+        onPress={() => {
+          home.reload().catch(() => undefined);
+          loadIosCompanionState().catch(() => undefined);
+        }}
         variant="secondary"
         testID="live-home-refresh"
       />

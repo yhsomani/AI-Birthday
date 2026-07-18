@@ -14,6 +14,7 @@ import { AppText } from '../../design-system/components/AppText';
 import {
   Button,
   Card,
+  InlineReviewCard,
   KeyValue,
   ReadinessBanner,
   Screen,
@@ -49,6 +50,10 @@ import {
   nativePlatformMismatchProblem,
 } from './nativeProblem';
 import { useLiveProjection } from './useLiveProjection';
+import {
+  composerErrorCanRepairContacts,
+  composerErrorMessageKey,
+} from './composerErrorCopy';
 
 type AndroidReview =
   | Readonly<{
@@ -67,6 +72,38 @@ type IosActivationReviewState = Readonly<{
   review: Extract<ActivationReview, { platform: 'ios' }>;
   revision: import('../../domain/shared/brand').NativeRevision;
 }>;
+
+type IosActivationReview = IosActivationReviewState['review'];
+
+const iosReminderHorizonKeys: Record<
+  IosActivationReview['reminderHorizon'],
+  TranslationKey
+> = {
+  denied: 'live.companion.horizon.denied',
+  full: 'live.companion.horizon.full',
+  'not-built': 'live.companion.horizon.notBuilt',
+  partial: 'live.companion.horizon.partial',
+};
+
+const iosCoexistenceKeys: Record<
+  IosActivationReview['coexistence'],
+  TranslationKey
+> = {
+  clear: 'live.companion.coexistence.clear',
+  deleting: 'live.companion.coexistence.deleting',
+  managed: 'live.companion.coexistence.managed',
+  'stale-or-unknown': 'live.companion.coexistence.unverified',
+  unavailable: 'live.companion.coexistence.unavailable',
+};
+
+const iosActivationSnapshotComplete = (review: IosActivationReview): boolean =>
+  review.contactsReady &&
+  review.messageUiReady &&
+  review.protectedStorageReady &&
+  (review.reminderHorizon === 'full' ||
+    review.reminderHorizon === 'not-built') &&
+  review.coexistence === 'clear' &&
+  review.readiness.composer.kind === 'allowed';
 
 const androidStateKeys: Record<string, TranslationKey> = {
   'not-configured': 'live.automation.state.notConfigured',
@@ -115,13 +152,6 @@ const iosStateKeys: Record<string, TranslationKey> = {
   ready: 'live.companion.state.ready',
   'action-required': 'live.companion.state.actionRequired',
   paused: 'live.companion.state.paused',
-};
-
-const composerErrorKeys: Partial<Record<string, TranslationKey>> = {
-  COMPOSER_CONTACTS_FRESHNESS_UNAVAILABLE:
-    'live.companion.contactsFreshnessUnavailable',
-  COMPOSER_CONTACTS_RECONNECT_REQUIRED:
-    'live.companion.contactsReconnectRequired',
 };
 
 const isCurrentOrNewerRevision = (
@@ -353,7 +383,12 @@ function LiveAndroidAutomation({
 
   return (
     <Screen includeTopInset testID="live-automation-screen">
-      <Button label={t('live.common.back')} onPress={onBack} variant="ghost" />
+      <Button
+        label={t('live.common.back')}
+        onPress={onBack}
+        variant="ghost"
+        testID="live-automation-back"
+      />
       <AppText variant="title" accessibilityRole="header">
         {t('live.automation.title')}
       </AppText>
@@ -655,6 +690,8 @@ function LiveIosCompanion({
     | 'contacts-repair'
   >();
   const [message, setMessage] = useState<string>();
+  const [pauseVerificationRequired, setPauseVerificationRequired] =
+    useState(false);
 
   const loadReminder = useCallback(async () => {
     setReminder({ kind: 'loading' });
@@ -773,6 +810,7 @@ function LiveIosCompanion({
     setPending(kind);
     setActionProblem(undefined);
     setMessage(undefined);
+    setPauseVerificationRequired(false);
     let result: Awaited<ReturnType<LiveAppPort['prepareActivation']>>;
     try {
       result =
@@ -799,7 +837,10 @@ function LiveIosCompanion({
   };
 
   const confirmActivationReview = async () => {
-    if (!activationReview) {
+    if (
+      !activationReview ||
+      !iosActivationSnapshotComplete(activationReview.review)
+    ) {
       return;
     }
     setPending(activationReview.kind);
@@ -845,6 +886,7 @@ function LiveIosCompanion({
     }
     setPending('pause');
     setActionProblem(undefined);
+    setPauseVerificationRequired(false);
     let result: Awaited<ReturnType<LiveAppPort['pauseAll']>>;
     try {
       result = await port.pauseAll({
@@ -854,12 +896,15 @@ function LiveIosCompanion({
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
     if (result.kind === 'error') {
+      await Promise.all([home.reload(), loadReminder()]);
+      setPauseVerificationRequired(true);
       await failAutomation(result.problem);
       return;
     }
     await home.reload();
     await loadReminder();
     setConfirmPause(false);
+    setPauseVerificationRequired(false);
     setMessage(t('live.companion.pauseAccepted'));
     setPending(undefined);
   };
@@ -997,8 +1042,11 @@ function LiveIosCompanion({
       )[composerOutcome]
     : undefined;
   const composerErrorKey = composerError
-    ? composerErrorKeys[composerError]
+    ? composerErrorMessageKey(composerError)
     : undefined;
+  const composerContactRepairable = composerError
+    ? composerErrorCanRepairContacts(composerError)
+    : false;
   const iosAutomation =
     home.state.kind === 'ready' &&
     home.state.result.envelope.value.automation.platform === 'ios'
@@ -1027,12 +1075,25 @@ function LiveIosCompanion({
 
   return (
     <Screen includeTopInset testID="live-automation-screen">
-      <Button label={t('live.common.back')} onPress={onBack} variant="ghost" />
+      <Button
+        label={t('live.common.back')}
+        onPress={onBack}
+        variant="ghost"
+        testID="live-automation-back"
+      />
       <AppText variant="title" accessibilityRole="header">
         {t('live.automation.title')}
       </AppText>
       <AppText color="muted">{t('live.automation.iosBody')}</AppText>
       <LiveActionFeedback problem={actionProblem} message={message} />
+      {pauseVerificationRequired ? (
+        <ReadinessBanner
+          title={t('live.companion.pauseVerificationTitle')}
+          detail={t('live.companion.pauseVerificationBody')}
+          tone="critical"
+          testID="live-ios-pause-verification-required"
+        />
+      ) : null}
 
       {home.state.kind === 'loading' ? (
         <LiveLoading label={t('live.automation.loading')} />
@@ -1132,40 +1193,134 @@ function LiveIosCompanion({
             />
           ) : null}
           {activationReview ? (
-            <Card>
-              <AppText variant="heading">
-                {t(
-                  activationReview.kind === 'activate'
-                    ? 'live.companion.activationReview'
-                    : 'live.companion.resumeReview',
-                )}
-              </AppText>
+            <InlineReviewCard
+              reviewKey={activationReview.review.handle}
+              testID="live-ios-activation-review"
+              title={t(
+                activationReview.kind === 'activate'
+                  ? 'live.companion.activationReview'
+                  : 'live.companion.resumeReview',
+              )}
+            >
               <KeyValue
                 label={t('live.companion.reminderRecipients')}
                 value={String(activationReview.review.reminderRecipientCount)}
               />
+              <KeyValue
+                label={t('live.companion.plannedReminderCount')}
+                value={String(activationReview.review.plannedReminderCount)}
+              />
+              <KeyValue
+                label={t('live.home.window')}
+                value={activationReview.review.reminderWindowLabel}
+              />
+              <StatusRow
+                title={t('live.companion.horizonTitle')}
+                detail={t(
+                  iosReminderHorizonKeys[
+                    activationReview.review.reminderHorizon
+                  ],
+                )}
+                tone={
+                  activationReview.review.reminderHorizon === 'full'
+                    ? 'positive'
+                    : 'warning'
+                }
+              />
+              <StatusRow
+                title={t('live.companion.contactsSnapshot')}
+                detail={t(
+                  activationReview.review.contactsReady
+                    ? 'live.common.allowed'
+                    : 'live.common.unavailable',
+                )}
+                tone={
+                  activationReview.review.contactsReady
+                    ? 'positive'
+                    : 'critical'
+                }
+              />
+              <StatusRow
+                title={t('live.home.messageUiCapability')}
+                detail={t(
+                  activationReview.review.messageUiReady
+                    ? 'live.home.messageUiAvailable'
+                    : 'live.home.messageUiUnavailable',
+                )}
+                tone={
+                  activationReview.review.messageUiReady
+                    ? 'positive'
+                    : 'critical'
+                }
+              />
+              <StatusRow
+                title={t('live.companion.protectedStorage')}
+                detail={t(
+                  activationReview.review.protectedStorageReady
+                    ? 'live.common.allowed'
+                    : 'live.common.unavailable',
+                )}
+                tone={
+                  activationReview.review.protectedStorageReady
+                    ? 'positive'
+                    : 'critical'
+                }
+              />
+              <StatusRow
+                title={t('live.companion.coexistenceTitle')}
+                detail={t(
+                  iosCoexistenceKeys[activationReview.review.coexistence],
+                )}
+                tone={
+                  activationReview.review.coexistence === 'clear'
+                    ? 'positive'
+                    : 'critical'
+                }
+              />
+              {activationReview.review.readiness.composer.kind === 'blocked'
+                ? activationReview.review.readiness.composer.issues.map(
+                    issue => (
+                      <StatusRow
+                        key={issue.id}
+                        title={t(safeReasonMessageKey(issue.code))}
+                        tone={
+                          issue.severity === 'blocking' ? 'critical' : 'warning'
+                        }
+                      />
+                    ),
+                  )
+                : null}
               <ReadinessBanner
                 title={t('live.common.iosEdition')}
                 detail={t('live.companion.activationDisclosure')}
                 tone="info"
               />
-              <Button
-                label={t(
-                  activationReview.kind === 'activate'
-                    ? 'live.companion.activate'
-                    : 'live.companion.resume',
-                )}
-                disabled={pending !== undefined}
-                onPress={confirmActivationReview}
-                testID="live-ios-confirm-activation"
-              />
+              {iosActivationSnapshotComplete(activationReview.review) ? (
+                <Button
+                  label={t(
+                    activationReview.kind === 'activate'
+                      ? 'live.companion.activate'
+                      : 'live.companion.resume',
+                  )}
+                  disabled={pending !== undefined}
+                  onPress={confirmActivationReview}
+                  testID="live-ios-confirm-activation"
+                />
+              ) : (
+                <ReadinessBanner
+                  title={t('live.companion.activationSnapshotUnavailable')}
+                  detail={t('live.companion.activationSnapshotUnavailableBody')}
+                  tone="critical"
+                  testID="live-ios-activation-snapshot-blocked"
+                />
+              )}
               <Button
                 label={t('live.common.cancel')}
                 disabled={pending !== undefined}
                 onPress={() => setActivationReview(undefined)}
                 variant="secondary"
               />
-            </Card>
+            </InlineReviewCard>
           ) : null}
           {confirmPause ? (
             <Card>
@@ -1323,8 +1478,11 @@ function LiveIosCompanion({
         </Card>
       ) : null}
       {review ? (
-        <Card>
-          <AppText variant="heading">{t('live.companion.reviewTitle')}</AppText>
+        <InlineReviewCard
+          reviewKey={`${review.proposalId}:${review.revision}`}
+          testID="live-ios-composer-review"
+          title={t('live.companion.reviewTitle')}
+        >
           <KeyValue
             label={t('live.companion.destination')}
             value={review.maskedDestination}
@@ -1334,7 +1492,7 @@ function LiveIosCompanion({
             title={t('live.common.iosEdition')}
             detail={t('live.companion.editableWarning')}
             testID="live-composer-final-disclosure"
-            tone="info"
+            tone="warning"
           />
           <Button
             label={t('live.companion.openComposer')}
@@ -1347,13 +1505,13 @@ function LiveIosCompanion({
             onPress={() => setReview(undefined)}
             variant="secondary"
           />
-        </Card>
+        </InlineReviewCard>
       ) : null}
       {composerError ? (
         <Card>
           <StatusRow title={t('live.companion.error')} tone="critical" />
           {composerErrorKey ? <AppText>{t(composerErrorKey)}</AppText> : null}
-          {composerErrorKey ? (
+          {composerContactRepairable ? (
             <Button
               label={
                 pending === 'contacts-repair'
@@ -1377,8 +1535,9 @@ function LiveIosCompanion({
       {outcomeKey ? (
         <ReadinessBanner
           title={t(outcomeKey)}
-          detail={t('live.companion.editableWarning')}
-          tone="info"
+          detail={t('live.companion.postComposerSafety')}
+          testID="live-composer-post-safety"
+          tone="warning"
         />
       ) : null}
     </Screen>

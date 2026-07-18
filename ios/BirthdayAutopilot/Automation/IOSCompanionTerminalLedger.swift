@@ -103,6 +103,28 @@ struct IOSCompanionTerminalLedger: Codable, Equatable {
     check(digest: digest, civilDate: civilDate) != .clear
   }
 
+  func hasLegacyDateWideFence(civilDate: String) -> Bool {
+    guard Self.validCivilDate(civilDate),
+      let bucketIndex = bucketIndex(for: civilDate, requireExact: true)
+    else { return false }
+    return buckets[bucketIndex].legacySuppressAll
+  }
+
+  /// Contact clearing intentionally destroys the local IDs needed to
+  /// recompute exact digests. Promote existing buckets before that boundary so
+  /// a later re-import with new local IDs cannot reopen a duplicate window.
+  mutating func promoteAllToLegacyDateWideFences(recordedAt: Date) throws {
+    guard let timestamp = Self.canonicalTimestamp(recordedAt) else {
+      throw LedgerError.timestampInvalid
+    }
+    for index in buckets.indices {
+      buckets[index].legacySuppressAll = true
+      if timestamp > buckets[index].latestCommittedAt {
+        buckets[index].latestCommittedAt = timestamp
+      }
+    }
+  }
+
   /// Called by the durable OpenCommitted transaction before MessageUI is
   /// presented. A duplicate is refused rather than treated as idempotent.
   mutating func recordCommitted(

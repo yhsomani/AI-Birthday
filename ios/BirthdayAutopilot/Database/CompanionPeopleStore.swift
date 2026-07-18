@@ -105,6 +105,20 @@ struct IOSPeoplePrivateContact: Equatable {
   let birthdays: [IOSPeoplePrivateBirthday]
 }
 
+/// Exact durable People generation plus its native-only material. The sync
+/// generation advances before network work or privacy mutation, so binding it
+/// into a composer proposal detects both committed and in-flight replacement.
+struct IOSPeoplePrivateSnapshot: Equatable {
+  let binding: IOSNativeGoogleAccountBinding?
+  let generation: String
+  let contacts: [IOSPeoplePrivateContact]
+}
+
+struct IOSPeopleComposerMaterialLease: Equatable {
+  let token: String
+  let snapshotGeneration: String
+}
+
 private struct IOSStoredPhone: Codable, Equatable {
   let localId: String
   let rawValue: String
@@ -215,6 +229,14 @@ final class CompanionPeopleStore {
   private static let authenticatedContext = Data(
     "birthday-autopilot.people-store.v1".utf8
   )
+  private static let composerLeaseNanoseconds: UInt64 = 60 * 1_000_000_000
+
+  private struct ActiveComposerMaterialLease {
+    let token: String
+    let snapshotGeneration: String
+    let expiresAtUptimeNanoseconds: UInt64
+    let retainedUntilRelease: Bool
+  }
 
   private let queue = DispatchQueue(
     label: "com.yashsomani.birthdayautopilot.people-store",
@@ -229,6 +251,10 @@ final class CompanionPeopleStore {
     storageResetDetected: false
   )
   private var syncInProgress: IOSPeopleCompletedMode?
+  // Accessed only on `queue`. This short lease spans the protected-store CAS
+  // and MessageUI presentation transition; process death releases it by
+  // construction and the uptime deadline prevents an in-process orphan.
+  private var activeComposerMaterialLease: ActiveComposerMaterialLease?
   private let fileManager: FileManager
 
   private init(fileManager: FileManager = .default) {
@@ -311,6 +337,159 @@ final class CompanionPeopleStore {
     }
   }
 
+  func privateSnapshot() -> IOSPeoplePrivateSnapshot? {
+    queue.sync {
+      do {
+        var snapshot = try loadOrCreate().snapshot
+        let generation: String
+        if IOSPeopleSyncFencePolicy.isValidGeneration(snapshot.sync.generation),
+          let existing = snapshot.sync.generation
+        {
+          generation = existing
+        } else {
+          generation = IOSPeopleSyncFencePolicy.freshGeneration()
+          snapshot.sync.generation = generation
+          try persist(snapshot)
+          refreshCache(snapshot: snapshot, storageResetDetected: false)
+        }
+        return IOSPeoplePrivateSnapshot(
+          binding: snapshot.binding,
+          generation: generation,
+          contacts: snapshot.contacts.map(Self.privateContact)
+        )
+      } catch {
+        return nil
+      }
+    }
+  }
+
+  /// Acquires an exact material lease only if the durable generation and
+  /// selected E.164 material still match the reviewed proposal. While held,
+  /// every People mutation capable of changing that material fails closed.
+  func acquireComposerMaterialLease(
+    expectedBinding: IOSNativeGoogleAccountBinding,
+    expectedSnapshotGeneration: String,
+    contactId: String,
+    expectedMaterialRevision: UInt64,
+    selectedPhoneId: String,
+    expectedRecipient: String,
+    completion: @escaping (IOSPeopleComposerMaterialLease?) -> Void
+  ) {
+    queue.async {
+      do {
+        self.removeExpiredComposerMaterialLease()
+        guard self.activeComposerMaterialLease == nil,
+          IOSPeopleSyncFencePolicy.isValidGeneration(expectedSnapshotGeneration),
+          let snapshot = try self.readExistingSnapshotWithoutRepair(),
+          snapshot.binding == expectedBinding,
+          snapshot.sync.generation == expectedSnapshotGeneration,
+          let stored = snapshot.contacts.first(where: { $0.localId == contactId })
+        else {
+          DispatchQueue.main.async { completion(nil) }
+          return
+        }
+        let contact = Self.privateContact(stored)
+        guard !contact.deleted,
+          contact.materialRevision == expectedMaterialRevision,
+          contact.phones.first(where: {
+            $0.localId == selectedPhoneId
+          })?.e164 == expectedRecipient
+        else {
+          DispatchQueue.main.async { completion(nil) }
+          return
+        }
+        let expiration = DispatchTime.now().uptimeNanoseconds.addingReportingOverflow(
+          Self.composerLeaseNanoseconds
+        )
+        guard !expiration.overflow else {
+          DispatchQueue.main.async { completion(nil) }
+          return
+        }
+        let lease = IOSPeopleComposerMaterialLease(
+          token: UUID().uuidString.lowercased(),
+          snapshotGeneration: expectedSnapshotGeneration
+        )
+        self.activeComposerMaterialLease = ActiveComposerMaterialLease(
+          token: lease.token,
+          snapshotGeneration: lease.snapshotGeneration,
+          expiresAtUptimeNanoseconds: expiration.partialValue,
+          retainedUntilRelease: false
+        )
+        DispatchQueue.main.async { completion(lease) }
+      } catch {
+        DispatchQueue.main.async { completion(nil) }
+      }
+    }
+  }
+
+  /// Revalidates the durable material behind an active composer lease and
+  /// retains its mutation fence until explicit release. A cached lease value
+  /// is never sufficient:
+  /// the lease may have expired while reservation/protected-store work was in
+  /// flight, allowing a later People mutation to replace the reviewed material.
+  /// Retention also closes the main-queue callback delay: once validation
+  /// succeeds, expiry cannot silently reopen People mutations before MessageUI
+  /// is actually presented. Process death clears this in-memory fence, while
+  /// every failure/background/presentation path explicitly releases it.
+  func validateAndRetainComposerMaterialLease(
+    _ lease: IOSPeopleComposerMaterialLease,
+    expectedBinding: IOSNativeGoogleAccountBinding,
+    expectedSnapshotGeneration: String,
+    contactId: String,
+    expectedMaterialRevision: UInt64,
+    selectedPhoneId: String,
+    expectedRecipient: String,
+    completion: @escaping (Bool) -> Void
+  ) {
+    queue.async {
+      do {
+        self.removeExpiredComposerMaterialLease()
+        guard expectedSnapshotGeneration == lease.snapshotGeneration,
+          IOSPeopleSyncFencePolicy.isValidGeneration(expectedSnapshotGeneration),
+          let activeLease = self.activeComposerMaterialLease,
+          activeLease.token == lease.token,
+          activeLease.snapshotGeneration == lease.snapshotGeneration,
+          let snapshot = try self.readExistingSnapshotWithoutRepair(),
+          snapshot.binding == expectedBinding,
+          snapshot.sync.generation == expectedSnapshotGeneration,
+          let stored = snapshot.contacts.first(where: { $0.localId == contactId })
+        else {
+          DispatchQueue.main.async { completion(false) }
+          return
+        }
+        let contact = Self.privateContact(stored)
+        guard !contact.deleted,
+          contact.materialRevision == expectedMaterialRevision,
+          contact.phones.first(where: {
+            $0.localId == selectedPhoneId
+          })?.e164 == expectedRecipient
+        else {
+          self.activeComposerMaterialLease = nil
+          DispatchQueue.main.async { completion(false) }
+          return
+        }
+        self.activeComposerMaterialLease = ActiveComposerMaterialLease(
+          token: lease.token,
+          snapshotGeneration: lease.snapshotGeneration,
+          expiresAtUptimeNanoseconds: activeLease.expiresAtUptimeNanoseconds,
+          retainedUntilRelease: true
+        )
+        DispatchQueue.main.async { completion(true) }
+      } catch {
+        DispatchQueue.main.async { completion(false) }
+      }
+    }
+  }
+
+  func releaseComposerMaterialLease(_ lease: IOSPeopleComposerMaterialLease) {
+    queue.async {
+      guard self.activeComposerMaterialLease?.token == lease.token,
+        self.activeComposerMaterialLease?.snapshotGeneration == lease.snapshotGeneration
+      else { return }
+      self.activeComposerMaterialLease = nil
+    }
+  }
+
   func attach(
     _ binding: IOSNativeGoogleAccountBinding,
     retainedCompanionSetupExists: Bool,
@@ -318,6 +497,10 @@ final class CompanionPeopleStore {
   ) {
     queue.async {
       do {
+        guard self.peopleMaterialMutationAllowed() else {
+          DispatchQueue.main.async { completion(.storageFailure) }
+          return
+        }
         var snapshot = try self.loadOrCreate().snapshot
         if let existing = snapshot.binding {
           guard existing.hasSameOwner(as: binding) else {
@@ -355,6 +538,10 @@ final class CompanionPeopleStore {
   ) {
     queue.async {
       do {
+        guard self.peopleMaterialMutationAllowed() else {
+          DispatchQueue.main.async { completion(nil) }
+          return
+        }
         guard var snapshot = try self.readExistingSnapshotWithoutRepair() else {
           throw IOSPeopleStoreError.storageUnavailable
         }
@@ -396,6 +583,10 @@ final class CompanionPeopleStore {
   func invalidateOutstandingSync(completion: @escaping (Bool) -> Void) {
     queue.async {
       do {
+        guard self.peopleMaterialMutationAllowed() else {
+          DispatchQueue.main.async { completion(false) }
+          return
+        }
         var snapshot = try self.loadOrCreate().snapshot
         snapshot.sync.generation = IOSPeopleSyncFencePolicy.freshGeneration()
         try self.persist(snapshot)
@@ -422,6 +613,9 @@ final class CompanionPeopleStore {
   ) {
     queue.async {
       do {
+        guard self.peopleMaterialMutationAllowed() else {
+          throw IOSPeopleStoreError.storageUnavailable
+        }
         guard IOSPeopleValuePolicy.token(nextSyncToken) == nextSyncToken else {
           throw IOSPeopleStoreError.storageUnavailable
         }
@@ -540,6 +734,13 @@ final class CompanionPeopleStore {
     completion: ((Bool) -> Void)? = nil
   ) {
     queue.async {
+      guard self.peopleMaterialMutationAllowed() else {
+        self.cacheLock.lock()
+        self.syncInProgress = nil
+        self.cacheLock.unlock()
+        DispatchQueue.main.async { completion?(false) }
+        return
+      }
       guard var snapshot = try? self.readExistingSnapshotWithoutRepair() else {
         DispatchQueue.main.async { completion?(false) }
         return
@@ -603,6 +804,10 @@ final class CompanionPeopleStore {
   ) {
     queue.async {
       do {
+        guard self.peopleMaterialMutationAllowed() else {
+          DispatchQueue.main.async { completion(false) }
+          return
+        }
         var snapshot = try self.loadOrCreate().snapshot
         guard snapshot.binding == expectedBinding else {
           DispatchQueue.main.async { completion(false) }
@@ -618,8 +823,8 @@ final class CompanionPeopleStore {
           lastFailureReason: nil
         )
         try self.persist(snapshot)
-        let verified = try self.readExistingSnapshotWithoutRepair()
-        guard verified.binding == expectedBinding,
+        guard let verified = try self.readExistingSnapshotWithoutRepair(),
+          verified.binding == expectedBinding,
           verified.contacts.isEmpty,
           verified.sync.nextSyncToken == nil,
           verified.sync.parameterFingerprint == nil,
@@ -638,6 +843,10 @@ final class CompanionPeopleStore {
   func wipe(completion: @escaping (Bool) -> Void) {
     queue.async {
       do {
+        guard self.peopleMaterialMutationAllowed() else {
+          DispatchQueue.main.async { completion(false) }
+          return
+        }
         let url = try self.storeFileURL()
         if self.fileManager.fileExists(atPath: url.path) {
           try self.fileManager.removeItem(at: url)
@@ -645,8 +854,8 @@ final class CompanionPeopleStore {
         try self.deleteKey(allowMissing: true)
         let snapshot = IOSCompanionPeopleSnapshot.empty
         try self.persist(snapshot)
-        let verified = try self.readExistingSnapshotWithoutRepair()
-        guard verified.binding == nil, verified.contacts.isEmpty,
+        guard let verified = try self.readExistingSnapshotWithoutRepair(),
+          verified.binding == nil, verified.contacts.isEmpty,
           verified.sync.nextSyncToken == nil,
           verified.sync.parameterFingerprint == nil,
           verified.sync.lastSuccessAt == nil,
@@ -666,6 +875,10 @@ final class CompanionPeopleStore {
   func destroyAfterRemoteAccountDeletion(completion: @escaping (Bool) -> Void) {
     queue.async {
       do {
+        guard self.peopleMaterialMutationAllowed() else {
+          DispatchQueue.main.async { completion(false) }
+          return
+        }
         let url = try self.storeFileURL()
         if self.fileManager.fileExists(atPath: url.path) {
           try self.fileManager.removeItem(at: url)
@@ -688,6 +901,19 @@ final class CompanionPeopleStore {
         DispatchQueue.main.async { completion(false) }
       }
     }
+  }
+
+  private func removeExpiredComposerMaterialLease() {
+    guard let lease = activeComposerMaterialLease,
+      !lease.retainedUntilRelease,
+      DispatchTime.now().uptimeNanoseconds >= lease.expiresAtUptimeNanoseconds
+    else { return }
+    activeComposerMaterialLease = nil
+  }
+
+  private func peopleMaterialMutationAllowed() -> Bool {
+    removeExpiredComposerMaterialLease()
+    return activeComposerMaterialLease == nil
   }
 
   private func refreshCache(

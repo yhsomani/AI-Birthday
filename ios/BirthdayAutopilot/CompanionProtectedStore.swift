@@ -2,20 +2,6 @@ import CryptoKit
 import Foundation
 import Security
 
-enum CompanionComposerOutcome: String, Codable, Hashable {
-  case openCommitted = "open-committed"
-  case presented
-  case cancelled
-  case failed
-  case outcomeUnknown = "outcome-unknown"
-  case reportedSent = "reported-sent"
-
-  var preventsRepeat: Bool {
-    self == .openCommitted || self == .presented || self == .outcomeUnknown
-      || self == .reportedSent
-  }
-}
-
 enum CompanionProposalState: String, Codable, Equatable {
   case ready
   case openCommitted = "open-committed"
@@ -38,6 +24,8 @@ struct CompanionComposerRecord: Codable {
   let proposalId: String
   let occurrenceId: String
   let occurrenceCivilDate: String
+  /// Full HMAC digest only; contains no recoverable contact identifier.
+  var occurrenceDigest: Data?
   let openedAt: Date
   var outcome: CompanionComposerOutcome
   var resolvedAt: Date?
@@ -49,6 +37,15 @@ struct CompanionApprovedProposal: Codable {
   let accountGeneration: String
   let occurrenceId: String
   let occurrenceCivilDate: String
+  let occurrenceDigest: Data?
+  let configurationGeneration: UInt64?
+  // Optional only for fail-closed adoption of an in-flight schema-v3 review
+  // written before People generation binding was introduced.
+  let peopleSnapshotGeneration: String?
+  let contactOrdinal: Int?
+  let contactId: String?
+  let contactMaterialRevision: UInt64?
+  let selectedPhoneId: String?
   let recipient: String
   let body: String
   var state: CompanionProposalState
@@ -105,7 +102,7 @@ struct IOSCompanionNativeRoute: Equatable {
   }
 }
 
-private struct IOSCompanionPendingNativeRoute: Codable {
+struct IOSCompanionPendingNativeRoute: Codable {
   let routeId: String
   let createdAt: Date
 }
@@ -150,7 +147,7 @@ struct CompanionPresentationCommit {
 /// projections. The bridge methods below must explicitly project only the
 /// fields permitted by their TypeScript schemas.
 struct CompanionProjectionStatus {
-  enum Coexistence {
+  enum Coexistence: Equatable {
     case clear
     case deleting
     case managed
@@ -179,6 +176,9 @@ struct CompanionProjectionStatus {
   let proposals: [CompanionApprovedProposal]
   let composerRecords: [CompanionComposerRecord]
   let reminderPlans: [CompanionReminderPlan]
+  let occurrenceNamespace: Data
+  let planningIndex: IOSCompanionPlanningIndex?
+  let terminalLedger: IOSCompanionTerminalLedger
 }
 
 extension Notification.Name {
@@ -249,10 +249,10 @@ enum CompanionStoreError: Error {
   }
 }
 
-private struct CompanionProtectedSnapshot: Codable {
-  static let currentSchemaVersion = 2
+struct CompanionProtectedSnapshot: Codable {
+  static let currentSchemaVersion = 3
 
-  let schemaVersion: Int
+  var schemaVersion: Int
   var resetSafety: CompanionResetSafety
   var control: CompanionControlState?
   var proposals: [CompanionApprovedProposal]
@@ -271,14 +271,23 @@ private struct CompanionProtectedSnapshot: Codable {
   // Optional so schema-v2 files written before the BirthdayNative bridge remain
   // readable. A missing value is revision zero for that protected generation.
   var projectionRevision: UInt64?
+  // Optional at decode time so schema-v2 can be adopted atomically. Schema-v3
+  // validation requires all safety fields except the replaceable plan index.
+  var occurrenceNamespace: Data?
+  var planningIndex: IOSCompanionPlanningIndex?
+  var terminalLedger: IOSCompanionTerminalLedger?
 
-  static func reset(on civilDate: String) -> CompanionProtectedSnapshot {
+  static func reset(
+    generation: String,
+    blockedCivilDates: [String],
+    overflowed: Bool
+  ) -> CompanionProtectedSnapshot {
     CompanionProtectedSnapshot(
       schemaVersion: currentSchemaVersion,
       resetSafety: CompanionResetSafety(
-        generation: UUID().uuidString.lowercased(),
-        blockedCivilDates: [civilDate],
-        overflowed: false,
+        generation: generation,
+        blockedCivilDates: blockedCivilDates,
+        overflowed: overflowed,
         verifiedCivilDate: nil
       ),
       control: nil,
@@ -290,29 +299,25 @@ private struct CompanionProtectedSnapshot: Codable {
       reminderHorizon: nil,
       pendingNativeRoute: nil,
       workflow: nil,
-      projectionRevision: 0
+      projectionRevision: 0,
+      occurrenceNamespace: IOSCompanionOccurrenceIdentity.makeNamespace(),
+      planningIndex: nil,
+      terminalLedger: IOSCompanionTerminalLedger()
     )
   }
 
-  static var initialInstall: CompanionProtectedSnapshot {
-    CompanionProtectedSnapshot(
-      schemaVersion: currentSchemaVersion,
-      resetSafety: CompanionResetSafety(
-        generation: UUID().uuidString.lowercased(),
-        blockedCivilDates: [],
-        overflowed: false,
-        verifiedCivilDate: nil
-      ),
-      control: nil,
-      proposals: [],
-      composerRecords: [],
-      reminderPlans: [],
-      notificationIdentities: [],
-      attentionNotificationDays: [:],
-      reminderHorizon: nil,
-      pendingNativeRoute: nil,
-      workflow: nil,
-      projectionRevision: 0
+  static func initialInstall(
+    generation: String,
+    civilDate: String
+  ) -> CompanionProtectedSnapshot {
+    // A truly new installation is indistinguishable from independent loss of
+    // both encrypted state and its device-only key. Start fenced on today's
+    // civil date; authenticated server time releases it through the same path
+    // as every other reset.
+    reset(
+      generation: generation,
+      blockedCivilDates: [civilDate],
+      overflowed: false
     )
   }
 }
@@ -330,10 +335,10 @@ private enum CompanionKeychainError: Error {
 final class CompanionProtectedStore {
   static let shared = CompanionProtectedStore()
 
-  private static let maximumFileBytes = 4 * 1_024 * 1_024
-  private static let maximumComposerRecords = 1_024
-  private static let maximumProposals = 1_024
-  private static let maximumReminderPlans = 500
+  private static let maximumFileBytes = 16 * 1_024 * 1_024
+  private static let maximumComposerRecords = 256
+  private static let maximumProposals = 1
+  private static let maximumReminderPlans = IOSCompanionPlanningIndex.planningDayCount
   private static let maximumWorkflowContacts = IOSPeopleCapacityPolicy.maximumPeople
   private static let maximumWorkflowReviews = 32
   private static let maximumWorkflowActivity = 2_048
@@ -359,7 +364,9 @@ final class CompanionProtectedStore {
   private let fileManager: FileManager
   private let calendar: Calendar
 
-  private init(
+  /// Internal only so the hosted native test target can exercise migrations on
+  /// an isolated instance. Production wiring continues to use `shared`.
+  init(
     fileManager: FileManager = .default,
     calendar: Calendar = {
       var value = Calendar(identifier: .gregorian)
@@ -420,7 +427,9 @@ final class CompanionProtectedStore {
             revision: String(snapshot.projectionRevision ?? 0),
             retainedSetupExists: snapshot.control != nil || !snapshot.proposals.isEmpty
               || !snapshot.composerRecords.isEmpty || !snapshot.reminderPlans.isEmpty
-              || snapshot.reminderHorizon != nil || snapshot.workflow != nil,
+              || snapshot.reminderHorizon != nil || snapshot.workflow != nil
+              || snapshot.planningIndex != nil
+              || (snapshot.terminalLedger?.entryCount ?? 0) > 0,
             approvedProposalCount: snapshot.proposals.count,
             composerRecordCount: snapshot.composerRecords.count,
             localStorageBytes: Int(fileSize),
@@ -434,7 +443,10 @@ final class CompanionProtectedStore {
             workflow: snapshot.workflow,
             proposals: snapshot.proposals,
             composerRecords: snapshot.composerRecords,
-            reminderPlans: snapshot.reminderPlans
+            reminderPlans: snapshot.reminderPlans,
+            occurrenceNamespace: try Self.requiredOccurrenceNamespace(snapshot),
+            planningIndex: snapshot.planningIndex,
+            terminalLedger: try Self.requiredTerminalLedger(snapshot)
           )
         )
       } catch let error as CompanionStoreError {
@@ -467,12 +479,7 @@ final class CompanionProtectedStore {
       let result: Result<Void, CompanionStoreError> = self.transaction { snapshot in
         snapshot.control = nil
         snapshot.workflow?.reviews.removeAll()
-        for index in snapshot.proposals.indices {
-          snapshot.proposals[index].reviewNonceDigest = nil
-          snapshot.proposals[index].reviewNonceExpiresAt = nil
-          snapshot.proposals[index].reviewSessionGeneration = nil
-          snapshot.proposals[index].reviewSceneIdentifier = nil
-        }
+        snapshot.proposals.removeAll()
       }
       self.complete(result, completion: completion)
     }
@@ -488,12 +495,7 @@ final class CompanionProtectedStore {
         let snapshot = try self.loadSnapshot()
         verified = snapshot.control == nil
           && (snapshot.workflow?.reviews.isEmpty ?? true)
-          && snapshot.proposals.allSatisfy { proposal in
-            proposal.reviewNonceDigest == nil
-              && proposal.reviewNonceExpiresAt == nil
-              && proposal.reviewSessionGeneration == nil
-              && proposal.reviewSceneIdentifier == nil
-          }
+          && snapshot.proposals.isEmpty
       } catch {
         verified = false
       }
@@ -543,7 +545,10 @@ final class CompanionProtectedStore {
             workflow: snapshot.workflow,
             proposals: snapshot.proposals,
             composerRecords: snapshot.composerRecords,
-            reminderPlans: snapshot.reminderPlans
+            reminderPlans: snapshot.reminderPlans,
+            occurrenceNamespace: try Self.requiredOccurrenceNamespace(snapshot),
+            planningIndex: snapshot.planningIndex,
+            terminalLedger: try Self.requiredTerminalLedger(snapshot)
           )
         )
       } catch let error as CompanionStoreError {
@@ -584,10 +589,14 @@ final class CompanionProtectedStore {
         }
         Self.pruneWorkflowMetadata(&workflow, now: now)
         let value = try body(&workflow, String(currentRevision + 1))
+        // The compact planner stores UInt16 ordinals. This bytewise ordering is
+        // therefore part of the authenticated contact-table contract.
+        workflow.contacts.sort { $0.contactId < $1.contactId }
         guard Self.validateWorkflow(workflow) else {
           throw CompanionStoreError.invalidWorkflowState
         }
         snapshot.workflow = workflow
+        try Self.invalidateStalePlanArtifacts(in: &snapshot)
         return value
       }
       DispatchQueue.main.async { completion(result) }
@@ -595,10 +604,9 @@ final class CompanionProtectedStore {
   }
 
   /// Completes Clear activity in one protected-store transaction. Retryable
-  /// cancelled/failed proposals remain available for a new explicit review,
-  /// while their display-only records are removed. Reported-sent/unknown
-  /// operations retain only the opaque repeat-safety marker; their recipient
-  /// and message proposal is removed immediately rather than waiting 30 days.
+  /// resolved activity detail is removed independently of the terminal ledger.
+  /// Cancelled/failed occurrences remain lazily retryable; reported-sent and
+  /// unknown occurrences remain suppressed by their content-free digest only.
   func completeClearActivity(
     operationId: String,
     binding: IOSNativeGoogleAccountBinding,
@@ -624,17 +632,16 @@ final class CompanionProtectedStore {
 
           workflow.activity.removeAll()
 
-          let terminalProposalIds = Set(
-            snapshot.composerRecords.compactMap { record -> String? in
-              record.outcome == .reportedSent || record.outcome == .outcomeUnknown
-                ? record.proposalId : nil
+          let resolvedOperationIds = Set(
+            snapshot.composerRecords.compactMap { record in
+              record.resolvedAt == nil ? nil : record.operationId
             }
           )
           snapshot.proposals.removeAll {
-            terminalProposalIds.contains($0.proposalId)
+            $0.operationId.map(resolvedOperationIds.contains) ?? false
           }
           snapshot.composerRecords.removeAll {
-            $0.outcome == .cancelled || $0.outcome == .failed
+            resolvedOperationIds.contains($0.operationId)
           }
           workflow.activityClearedAt = snapshot.composerRecords.isEmpty ? nil : now
 
@@ -688,6 +695,15 @@ final class CompanionProtectedStore {
             )
           else { throw CompanionStoreError.invalidWorkflowState }
 
+          guard var ledger = snapshot.terminalLedger else {
+            throw CompanionStoreError.storageUnavailable
+          }
+          do {
+            try ledger.promoteAllToLegacyDateWideFences(recordedAt: now)
+          } catch {
+            throw CompanionStoreError.storageUnavailable
+          }
+          snapshot.terminalLedger = ledger
           workflow.configurationGeneration += 1
           workflow.contacts.removeAll()
           workflow.blockedDestinations = []
@@ -699,6 +715,7 @@ final class CompanionProtectedStore {
           workflow.privacyOperations[operationIndex].updatedAt = now
           let updatedOperation = workflow.privacyOperations[operationIndex]
           snapshot.proposals.removeAll()
+          snapshot.planningIndex = nil
           Self.applyReminderPlans([], to: &snapshot)
           snapshot.reminderHorizon = nil
           snapshot.pendingNativeRoute = nil
@@ -811,30 +828,25 @@ final class CompanionProtectedStore {
     }
   }
 
-  /// Replaces derived occurrence/proposal/reminder state only if the source
-  /// configuration generation is still current. This prevents a slow planner
-  /// from resurrecting reminders after a later pause or privacy action.
+  /// Replaces the content-minimized 400-day ordinal index and its one-per-date
+  /// reminder plans only if the source configuration is still current.
   func replaceWorkflowPlan(
     binding: IOSNativeGoogleAccountBinding,
     expectedConfigurationGeneration: UInt64,
-    occurrences: [CompanionWorkflowOccurrence],
-    proposals: [CompanionApprovedProposal],
+    planningIndex: IOSCompanionPlanningIndex?,
     plans: [CompanionReminderPlan],
     now: Date = Date(),
     completion: @escaping (Result<Void, CompanionStoreError>) -> Void
   ) {
     queue.async {
-      guard occurrences.count <= Self.maximumReminderPlans,
-        proposals.count <= Self.maximumProposals,
-        plans.count <= Self.maximumReminderPlans,
-        Set(occurrences.map(\.occurrenceId)).count == occurrences.count,
-        Set(occurrences.map(\.proposalId)).count == occurrences.count,
-        Set(proposals.map(\.proposalId)).count == proposals.count,
-        Set(proposals.map(\.occurrenceId)).count == proposals.count,
+      guard plans.count <= Self.maximumReminderPlans,
         Set(plans.map(\.occurrenceId)).count == plans.count,
-        Set(occurrences.map(\.occurrenceId)) == Set(proposals.map(\.occurrenceId)),
-        Set(occurrences.map(\.occurrenceId)) == Set(plans.map(\.occurrenceId)),
-        proposals.allSatisfy({ Self.validateProposal($0, binding: binding) })
+        Set(plans.map(\.civilDate)).count == plans.count,
+        plans.allSatisfy({ plan in
+          Self.isBoundedOpaqueIdentifier(plan.occurrenceId)
+            && Self.resetReleaseThreshold(for: plan.civilDate) != nil
+            && (0...23).contains(plan.hour) && (0...59).contains(plan.minute)
+        })
       else {
         DispatchQueue.main.async { completion(.failure(.invalidWorkflowState)) }
         return
@@ -847,51 +859,43 @@ final class CompanionProtectedStore {
         else {
           throw CompanionStoreError.staleMaterial
         }
-
-        let preventingOccurrenceIds = Set(
-          snapshot.composerRecords.filter { $0.outcome.preventsRepeat }.map(\.occurrenceId)
-        )
-        let safeOccurrences = occurrences.filter {
-          !preventingOccurrenceIds.contains($0.occurrenceId)
-        }
-        let safeOccurrenceIds = Set(safeOccurrences.map(\.occurrenceId))
-        let safeProposals = proposals.filter { safeOccurrenceIds.contains($0.occurrenceId) }
-        let safePlans = plans.filter { safeOccurrenceIds.contains($0.occurrenceId) }
-        let desiredProposalIds = Set(safeProposals.map(\.proposalId))
-
-        let retained = snapshot.proposals.filter { proposal in
-          if desiredProposalIds.contains(proposal.proposalId) { return false }
-          switch proposal.state {
-          case .ready, .cancelled, .failed:
-            return preventingOccurrenceIds.contains(proposal.occurrenceId)
-          case .openCommitted, .presented, .outcomeUnknown, .reportedSent:
-            return true
-          }
-        }
-        guard retained.count + safeProposals.count <= Self.maximumProposals,
-          Set(retained.map(\.proposalId)).isDisjoint(with: desiredProposalIds)
-        else {
-          throw CompanionStoreError.ledgerCapacityReached
+        workflow.contacts.sort { $0.contactId < $1.contactId }
+        guard let namespace = snapshot.occurrenceNamespace,
+          let digest = IOSCompanionOccurrenceIdentity.contactTableDigest(
+            namespace: namespace,
+            canonicalContactIdentifiers: workflow.contacts.map(\.contactId)
+          )
+        else { throw CompanionStoreError.storageUnavailable }
+        if let planningIndex {
+          guard planningIndex.configurationGeneration == expectedConfigurationGeneration,
+            planningIndex.contactTableDigest == digest,
+            planningIndex.contactCount == workflow.contacts.count,
+            planningIndex.timeZoneIdentifier == TimeZone.autoupdatingCurrent.identifier,
+            Self.plans(plans, exactlyCover: planningIndex)
+          else { throw CompanionStoreError.staleMaterial }
+        } else {
+          guard plans.isEmpty else { throw CompanionStoreError.invalidWorkflowState }
         }
 
-        let previouslyPlanned = Set(workflow.occurrences.map(\.occurrenceId))
-        for occurrence in safeOccurrences
-        where !previouslyPlanned.contains(occurrence.occurrenceId) {
+        if planningIndex != snapshot.planningIndex {
           workflow.activity.append(
             CompanionWorkflowActivity(
               id: UUID().uuidString.lowercased(),
               kind: "reminder-scheduled",
               reason: nil,
-              occurredAt: now,
-              actionable: false
+              occurredAt: now
             )
           )
         }
-        workflow.occurrences = safeOccurrences
+        workflow.occurrences.removeAll()
         Self.pruneWorkflowMetadata(&workflow, now: now)
         snapshot.workflow = workflow
-        snapshot.proposals = retained + safeProposals
-        Self.applyReminderPlans(safePlans, to: &snapshot)
+        snapshot.planningIndex = planningIndex
+        // A rebuilt binding invalidates every short-lived review cache. Open
+        // operations remain independently represented by composerRecords and
+        // the terminal ledger.
+        snapshot.proposals.removeAll()
+        Self.applyReminderPlans(plans, to: &snapshot)
       }
       DispatchQueue.main.async { completion(result) }
     }
@@ -910,9 +914,12 @@ final class CompanionProtectedStore {
           workflow.account.matches(binding),
           workflow.configurationGeneration == expectedConfigurationGeneration,
           workflow.desired == .remindersOn,
-          !snapshot.reminderPlans.isEmpty,
+          snapshot.planningIndex?.configurationGeneration
+            == expectedConfigurationGeneration,
           snapshot.reminderHorizon?.state == .full,
-          !(snapshot.reminderHorizon?.observedRequestIds.isEmpty ?? true)
+          snapshot.reminderPlans.isEmpty
+            ? (snapshot.reminderHorizon?.observedRequestIds.isEmpty == true)
+            : !(snapshot.reminderHorizon?.observedRequestIds.isEmpty ?? true)
         else {
           throw CompanionStoreError.staleMaterial
         }
@@ -954,56 +961,6 @@ final class CompanionProtectedStore {
         result = .failure(.storageUnavailable)
       }
       DispatchQueue.main.async { completion(result) }
-    }
-  }
-
-  /// Called only after native approval persistence. Message presentation accepts
-  /// a proposal ID/revision/nonce and never a JavaScript-supplied payload.
-  func storeApprovedProposal(
-    _ proposal: CompanionApprovedProposal,
-    completion: ((Result<Void, CompanionStoreError>) -> Void)? = nil
-  ) {
-    queue.async {
-      let result: Result<Void, CompanionStoreError> = self.transaction { snapshot in
-        guard proposal.state == .ready,
-          proposal.reviewNonceDigest == nil,
-          proposal.reviewNonceExpiresAt == nil,
-          proposal.reviewSessionGeneration == nil,
-          proposal.reviewSceneIdentifier == nil,
-          proposal.operationId == nil,
-          Self.isBoundedOpaqueIdentifier(proposal.proposalId),
-          Self.isBoundedOpaqueIdentifier(proposal.accountGeneration),
-          Self.isBoundedOpaqueIdentifier(proposal.occurrenceId),
-          proposal.revision.range(of: "^(0|[1-9][0-9]{0,18})$", options: .regularExpression)
-            != nil,
-          Self.resetReleaseThreshold(for: proposal.occurrenceCivilDate) != nil,
-          proposal.recipient.range(
-            of: "^\\+[1-9][0-9]{7,14}$",
-            options: .regularExpression
-          ) != nil,
-          Self.isSafeMessageBody(proposal.body)
-        else {
-          throw CompanionStoreError.proposalMissing
-        }
-        guard
-          !snapshot.composerRecords.contains(where: {
-            $0.occurrenceId == proposal.occurrenceId && $0.outcome.preventsRepeat
-          })
-        else {
-          throw CompanionStoreError.repeatSuppressed
-        }
-        if let index = snapshot.proposals.firstIndex(where: {
-          $0.proposalId == proposal.proposalId
-        }) {
-          snapshot.proposals[index] = proposal
-        } else {
-          guard snapshot.proposals.count < Self.maximumProposals else {
-            throw CompanionStoreError.ledgerCapacityReached
-          }
-          snapshot.proposals.append(proposal)
-        }
-      }
-      self.complete(result, completion: completion)
     }
   }
 
@@ -1100,7 +1057,7 @@ final class CompanionProtectedStore {
   }
 
   func prepareComposerReview(
-    proposalId: String,
+    material: IOSCompanionLazyProposalMaterial,
     expectedRevision: String,
     sessionGeneration: String,
     sceneIdentifier: String,
@@ -1114,27 +1071,82 @@ final class CompanionProtectedStore {
         do {
           self.resolveDanglingComposerOperations(in: &snapshot, at: now)
           try self.observeAndCheckResetSafety(in: &snapshot, now: now)
-          guard
-            let index = snapshot.proposals.firstIndex(where: {
-              $0.proposalId == proposalId
-            })
-          else {
-            throw CompanionStoreError.proposalMissing
-          }
           guard String(snapshot.projectionRevision ?? 0) == expectedRevision else {
             throw CompanionStoreError.staleRevision
           }
+          guard let workflow = snapshot.workflow,
+            workflow.desired == .remindersOn,
+            workflow.account.accountGeneration == material.accountGeneration,
+            workflow.configurationGeneration == material.configurationGeneration,
+            IOSPeopleSyncFencePolicy.isValidGeneration(
+              material.peopleSnapshotGeneration
+            ),
+            let namespace = snapshot.occurrenceNamespace,
+            let index = snapshot.planningIndex,
+            index.configurationGeneration == material.configurationGeneration,
+            index.timeZoneIdentifier == TimeZone.autoupdatingCurrent.identifier,
+            index.contactCount == workflow.contacts.count,
+            index.contactTableDigest == IOSCompanionOccurrenceIdentity.contactTableDigest(
+              namespace: namespace,
+              canonicalContactIdentifiers: workflow.contacts.map(\.contactId)
+            ),
+            material.contactOrdinal >= 0,
+            material.contactOrdinal < workflow.contacts.count,
+            workflow.contacts[material.contactOrdinal].contactId == material.contactId,
+            workflow.contacts[material.contactOrdinal].enrollment == .enabled,
+            workflow.contacts[material.contactOrdinal].materialRevision
+              == material.contactMaterialRevision,
+            workflow.contacts[material.contactOrdinal].selectedPhoneId
+              == material.selectedPhoneId,
+            workflow.contacts[material.contactOrdinal].approvalHash != nil,
+            workflow.contacts[material.contactOrdinal].approvalInvalidationReasons.isEmpty,
+            material.recipient.range(
+              of: "^\\+[1-9][0-9]{7,14}$",
+              options: .regularExpression
+            ) != nil,
+            Self.isSafeMessageBody(material.body),
+            let coordinates = IOSCompanionOccurrenceIdentity.verifyProposalHandle(
+              material.proposalId,
+              namespace: namespace,
+              accountGeneration: material.accountGeneration,
+              configurationGeneration: material.configurationGeneration,
+              baseCivilDate: index.baseCivilDate,
+              timeZoneIdentifier: index.timeZoneIdentifier,
+              contactTableDigest: index.contactTableDigest,
+              contactCount: index.contactCount,
+              occurrenceId: material.occurrenceId
+            ),
+            coordinates.contactOrdinal == material.contactOrdinal,
+            Self.civilDate(
+              baseCivilDate: index.baseCivilDate,
+              dayOffset: coordinates.dayOffset,
+              timeZoneIdentifier: index.timeZoneIdentifier
+            ) == material.occurrenceCivilDate,
+            try index.ordinals(dayOffset: coordinates.dayOffset).contains(
+              UInt16(material.contactOrdinal)
+            ),
+            IOSCompanionOccurrenceIdentity.occurrenceDigest(
+              namespace: namespace,
+              accountGeneration: material.accountGeneration,
+              contactIdentifier: material.contactId,
+              civilDate: material.occurrenceCivilDate
+            ) == material.occurrenceDigest,
+            IOSCompanionOccurrenceIdentity.occurrenceId(
+              namespace: namespace,
+              accountGeneration: material.accountGeneration,
+              contactIdentifier: material.contactId,
+              civilDate: material.occurrenceCivilDate
+            ) == material.occurrenceId,
+            snapshot.terminalLedger?.check(
+              digest: material.occurrenceDigest,
+              civilDate: material.occurrenceCivilDate
+            ) == .clear
+          else { throw CompanionStoreError.staleMaterial }
           try self.checkControl(
             snapshot.control,
-            proposalAccountGeneration: snapshot.proposals[index].accountGeneration,
+            proposalAccountGeneration: material.accountGeneration,
             now: now
           )
-          let state = snapshot.proposals[index].state
-          guard state == .ready || state == .cancelled || state == .failed else {
-            throw state == .reportedSent || state == .outcomeUnknown
-              ? CompanionStoreError.repeatSuppressed
-              : CompanionStoreError.operationOutOfOrder
-          }
           guard
             !snapshot.composerRecords.contains(where: {
               $0.outcome == .openCommitted || $0.outcome == .presented
@@ -1144,8 +1156,7 @@ final class CompanionProtectedStore {
           }
           guard
             !snapshot.composerRecords.contains(where: {
-              $0.occurrenceId == snapshot.proposals[index].occurrenceId
-                && $0.outcome.preventsRepeat
+              $0.occurrenceDigest == material.occurrenceDigest && $0.outcome.preventsRepeat
             })
           else {
             throw CompanionStoreError.repeatSuppressed
@@ -1154,19 +1165,34 @@ final class CompanionProtectedStore {
           let nonce = try Self.randomNonce()
           let digest = Data(SHA256.hash(data: Data(nonce.utf8)))
           let expiresAt = now.addingTimeInterval(Self.reviewLifetime)
-          snapshot.proposals[index].state = .ready
-          snapshot.proposals[index].revision = expectedRevision
-          snapshot.proposals[index].reviewNonceDigest = digest
-          snapshot.proposals[index].reviewNonceExpiresAt = expiresAt
-          snapshot.proposals[index].reviewSessionGeneration = sessionGeneration
-          snapshot.proposals[index].reviewSceneIdentifier = sceneIdentifier
-          snapshot.proposals[index].operationId = nil
+          snapshot.proposals = [CompanionApprovedProposal(
+            proposalId: material.proposalId,
+            revision: expectedRevision,
+            accountGeneration: material.accountGeneration,
+            occurrenceId: material.occurrenceId,
+            occurrenceCivilDate: material.occurrenceCivilDate,
+            occurrenceDigest: material.occurrenceDigest,
+            configurationGeneration: material.configurationGeneration,
+            peopleSnapshotGeneration: material.peopleSnapshotGeneration,
+            contactOrdinal: material.contactOrdinal,
+            contactId: material.contactId,
+            contactMaterialRevision: material.contactMaterialRevision,
+            selectedPhoneId: material.selectedPhoneId,
+            recipient: material.recipient,
+            body: material.body,
+            state: .ready,
+            reviewNonceDigest: digest,
+            reviewNonceExpiresAt: expiresAt,
+            reviewSessionGeneration: sessionGeneration,
+            reviewSceneIdentifier: sceneIdentifier,
+            operationId: nil
+          )]
           try self.persist(snapshot)
           result = .success(CompanionReviewProjection(
-            proposalId: proposalId,
+            proposalId: material.proposalId,
             revision: expectedRevision,
-            recipient: snapshot.proposals[index].recipient,
-            body: snapshot.proposals[index].body,
+            recipient: material.recipient,
+            body: material.body,
             actionNonce: nonce,
             expiresAt: expiresAt
           ))
@@ -1218,6 +1244,7 @@ final class CompanionProtectedStore {
   func commitComposerOpen(
     proposalId: String,
     expectedRevision: String,
+    expectedPeopleSnapshotGeneration: String,
     actionNonce: String,
     sessionGeneration: String,
     sceneIdentifier: String,
@@ -1229,7 +1256,7 @@ final class CompanionProtectedStore {
         self.transaction(persistMutationOnFailure: true) { snapshot in
           self.resolveDanglingComposerOperations(in: &snapshot, at: now)
           try self.observeAndCheckResetSafety(in: &snapshot, now: now)
-          guard
+          guard String(snapshot.projectionRevision ?? 0) == expectedRevision,
             let index = snapshot.proposals.firstIndex(where: {
               $0.proposalId == proposalId
             })
@@ -1237,9 +1264,46 @@ final class CompanionProtectedStore {
             throw CompanionStoreError.proposalMissing
           }
           let proposal = snapshot.proposals[index]
-          guard proposal.revision == expectedRevision else {
+          guard proposal.revision == expectedRevision,
+            proposal.peopleSnapshotGeneration == expectedPeopleSnapshotGeneration,
+            IOSPeopleSyncFencePolicy.isValidGeneration(
+              expectedPeopleSnapshotGeneration
+            )
+          else {
             throw CompanionStoreError.staleRevision
           }
+          guard let occurrenceDigest = proposal.occurrenceDigest,
+            occurrenceDigest.count == IOSCompanionTerminalLedger.digestByteCount,
+            let workflow = snapshot.workflow,
+            workflow.desired == .remindersOn,
+            workflow.account.accountGeneration == proposal.accountGeneration,
+            workflow.configurationGeneration == proposal.configurationGeneration,
+            let contactOrdinal = proposal.contactOrdinal,
+            contactOrdinal >= 0, contactOrdinal < workflow.contacts.count,
+            workflow.contacts[contactOrdinal].contactId == proposal.contactId,
+            workflow.contacts[contactOrdinal].materialRevision
+              == proposal.contactMaterialRevision,
+            workflow.contacts[contactOrdinal].selectedPhoneId == proposal.selectedPhoneId,
+            workflow.contacts[contactOrdinal].enrollment == .enabled,
+            workflow.contacts[contactOrdinal].approvalHash != nil,
+            workflow.contacts[contactOrdinal].approvalInvalidationReasons.isEmpty,
+            let planningIndex = snapshot.planningIndex,
+            planningIndex.configurationGeneration == workflow.configurationGeneration,
+            planningIndex.timeZoneIdentifier == TimeZone.autoupdatingCurrent.identifier,
+            let namespace = snapshot.occurrenceNamespace,
+            planningIndex.contactTableDigest
+              == IOSCompanionOccurrenceIdentity.contactTableDigest(
+                namespace: namespace,
+                canonicalContactIdentifiers: workflow.contacts.map(\.contactId)
+              ),
+            let proposalContactId = proposal.contactId,
+            IOSCompanionOccurrenceIdentity.occurrenceDigest(
+              namespace: namespace,
+              accountGeneration: proposal.accountGeneration,
+              contactIdentifier: proposalContactId,
+              civilDate: proposal.occurrenceCivilDate
+            ) == occurrenceDigest
+          else { throw CompanionStoreError.staleMaterial }
           try self.checkControl(
             snapshot.control,
             proposalAccountGeneration: proposal.accountGeneration,
@@ -1266,17 +1330,46 @@ final class CompanionProtectedStore {
           else {
             throw CompanionStoreError.operationOutOfOrder
           }
-          guard
-            !snapshot.composerRecords.contains(where: {
-              $0.occurrenceId == proposal.occurrenceId && $0.outcome.preventsRepeat
-            })
-          else {
-            throw CompanionStoreError.repeatSuppressed
-          }
+          guard snapshot.terminalLedger?.check(
+            digest: occurrenceDigest,
+            civilDate: proposal.occurrenceCivilDate
+          ) == .clear else { throw CompanionStoreError.repeatSuppressed }
 
           Self.pruneComposerRecords(in: &snapshot, now: now)
+          while snapshot.composerRecords.count >= Self.maximumComposerRecords,
+            let oldestResolved = snapshot.composerRecords.indices
+              .filter({ snapshot.composerRecords[$0].resolvedAt != nil })
+              .min(by: {
+                (snapshot.composerRecords[$0].resolvedAt ?? .distantFuture)
+                  < (snapshot.composerRecords[$1].resolvedAt ?? .distantFuture)
+              })
+          {
+            snapshot.composerRecords.remove(at: oldestResolved)
+          }
           guard snapshot.composerRecords.count < Self.maximumComposerRecords else {
             throw CompanionStoreError.ledgerCapacityReached
+          }
+
+          do {
+            guard var ledger = snapshot.terminalLedger else {
+              throw CompanionStoreError.storageUnavailable
+            }
+            try ledger.recordCommitted(
+              digest: occurrenceDigest,
+              civilDate: proposal.occurrenceCivilDate,
+              committedAt: now
+            )
+            snapshot.terminalLedger = ledger
+          } catch IOSCompanionTerminalLedger.LedgerError.capacityReached {
+            throw CompanionStoreError.ledgerCapacityReached
+          } catch IOSCompanionTerminalLedger.LedgerError.duplicateMarker {
+            throw CompanionStoreError.repeatSuppressed
+          } catch IOSCompanionTerminalLedger.LedgerError.legacyFenceActive {
+            throw CompanionStoreError.repeatSuppressed
+          } catch let error as CompanionStoreError {
+            throw error
+          } catch {
+            throw CompanionStoreError.storageUnavailable
           }
 
           let operationId = UUID().uuidString.lowercased()
@@ -1292,6 +1385,7 @@ final class CompanionProtectedStore {
               proposalId: proposal.proposalId,
               occurrenceId: proposal.occurrenceId,
               occurrenceCivilDate: proposal.occurrenceCivilDate,
+              occurrenceDigest: occurrenceDigest,
               openedAt: now,
               outcome: .openCommitted,
               resolvedAt: nil
@@ -1362,6 +1456,18 @@ final class CompanionProtectedStore {
         return
       }
       let result: Result<Void, CompanionStoreError> = self.transaction { snapshot in
+        if plans.isEmpty {
+          snapshot.planningIndex = nil
+          snapshot.proposals.removeAll()
+          snapshot.pendingNativeRoute = nil
+        } else {
+          // Plans are derived native state. The legacy bridge may request an
+          // idempotent reconciliation but cannot author destinations/dates.
+          guard plans == snapshot.reminderPlans,
+            let index = snapshot.planningIndex,
+            Self.plans(plans, exactlyCover: index)
+          else { throw CompanionStoreError.staleMaterial }
+        }
         let desiredDates = Set(plans.map(\.civilDate))
         var identities = Dictionary(
           uniqueKeysWithValues: snapshot.notificationIdentities.map {
@@ -1434,25 +1540,13 @@ final class CompanionProtectedStore {
           else { throw CompanionStoreError.invalidReview }
 
           let identity = snapshot.notificationIdentities[identityIndex]
-          let plannedOccurrenceIds = Set(
-            snapshot.reminderPlans.filter { $0.civilDate == identity.civilDate }
-              .map(\.occurrenceId)
-          )
-          let reviewableOccurrenceIds = Set(
-            workflow.occurrences.filter {
+          guard let index = snapshot.planningIndex,
+            index.configurationGeneration == workflow.configurationGeneration,
+            snapshot.reminderPlans.contains(where: {
               $0.civilDate == identity.civilDate
-                && [.reminderPlanned, .composerReady].contains($0.phase)
-            }.map(\.occurrenceId)
-          )
-          let readyProposalOccurrenceIds = Set(
-            snapshot.proposals.filter {
-              $0.accountGeneration == workflow.account.accountGeneration
-                && $0.occurrenceCivilDate == identity.civilDate
-                && $0.state == .ready
-            }.map(\.occurrenceId)
-          )
-          guard !plannedOccurrenceIds.intersection(reviewableOccurrenceIds)
-            .intersection(readyProposalOccurrenceIds).isEmpty
+            }),
+            let dayOffset = Self.dayOffset(civilDate: identity.civilDate, in: index),
+            !(try index.ordinals(dayOffset: dayOffset)).isEmpty
           else { throw CompanionStoreError.proposalMissing }
 
           let route = IOSCompanionNativeRoute(routeId: UUID().uuidString.lowercased())
@@ -1500,14 +1594,9 @@ final class CompanionProtectedStore {
           guard age >= -Self.maximumFutureClockSkew, age <= 48 * 60 * 60,
             let workflow = snapshot.workflow,
             workflow.desired == .remindersOn,
-            snapshot.proposals.contains(where: { proposal in
-              proposal.accountGeneration == workflow.account.accountGeneration
-                && proposal.state == .ready
-                && workflow.occurrences.contains(where: { occurrence in
-                  occurrence.occurrenceId == proposal.occurrenceId
-                    && [.reminderPlanned, .composerReady].contains(occurrence.phase)
-                })
-            })
+            let index = snapshot.planningIndex,
+            index.configurationGeneration == workflow.configurationGeneration,
+            index.recordCount > 0
           else { return nil }
           return IOSCompanionNativeRoute(routeId: pending.routeId)
         }
@@ -1570,16 +1659,7 @@ final class CompanionProtectedStore {
       let result: Result<Void, CompanionStoreError>
       do {
         let fileURL = try self.storeFileURL()
-        if self.fileManager.fileExists(atPath: fileURL.path) {
-          try self.fileManager.removeItem(at: fileURL)
-        }
-        try self.deleteKeychainKey(allowMissing: true)
-        _ = try self.createKeychainKey()
-        try self.persist(
-          CompanionProtectedSnapshot.reset(
-            on: Self.civilDate(for: Date(), calendar: self.calendar)
-          )
-        )
+        _ = try self.resetStore(at: fileURL, now: Date())
         self.publishProjectionChange(revision: "0")
         result = .success(())
       } catch {
@@ -1634,17 +1714,44 @@ final class CompanionProtectedStore {
         guard
           let recordIndex = snapshot.composerRecords.lastIndex(where: {
             $0.operationId == operationId
-          }), expected.contains(snapshot.composerRecords[recordIndex].outcome),
-          let proposalIndex = snapshot.proposals.firstIndex(where: {
-            $0.proposalId == snapshot.composerRecords[recordIndex].proposalId
-              && $0.operationId == operationId
-          })
+          }), expected.contains(snapshot.composerRecords[recordIndex].outcome)
         else {
           throw CompanionStoreError.operationOutOfOrder
         }
+        let record = snapshot.composerRecords[recordIndex]
+        if let proposalIndex = snapshot.proposals.firstIndex(where: {
+          $0.proposalId == record.proposalId && $0.operationId == operationId
+        }) {
+          snapshot.proposals[proposalIndex].state = proposalState
+        }
+        if let resolvedAt {
+          guard let digest = record.occurrenceDigest,
+            var ledger = snapshot.terminalLedger
+          else { throw CompanionStoreError.storageUnavailable }
+          let terminalResolution: IOSCompanionTerminalResolution
+          switch outcome {
+          case .cancelled: terminalResolution = .cancelled
+          case .failed: terminalResolution = .failed
+          case .outcomeUnknown: terminalResolution = .outcomeUnknown
+          case .reportedSent: terminalResolution = .reportedSent
+          case .openCommitted, .presented:
+            throw CompanionStoreError.operationOutOfOrder
+          }
+          do {
+            try ledger.resolve(
+              digest: digest,
+              civilDate: record.occurrenceCivilDate,
+              outcome: terminalResolution,
+              resolvedAt: resolvedAt
+            )
+          } catch {
+            throw CompanionStoreError.storageUnavailable
+          }
+          snapshot.terminalLedger = ledger
+          snapshot.proposals.removeAll { $0.operationId == operationId }
+        }
         snapshot.composerRecords[recordIndex].outcome = outcome
         snapshot.composerRecords[recordIndex].resolvedAt = resolvedAt
-        snapshot.proposals[proposalIndex].state = proposalState
       }
       self.complete(result, completion: completion)
     }
@@ -1668,6 +1775,40 @@ final class CompanionProtectedStore {
     snapshot.notificationIdentities = identities.map {
       CompanionNotificationIdentity(civilDate: $0.key, requestId: $0.value)
     }.sorted { $0.civilDate < $1.civilDate }
+  }
+
+  /// Keeps every workflow CAS independently reloadable. A plan rebuild runs
+  /// after most configuration mutations, but the process may be terminated
+  /// after this protected write and before that rebuild starts. Plan-bound
+  /// material therefore cannot survive a generation/table/proposal mismatch.
+  /// Content-free composer history and the terminal replay ledger are owned by
+  /// separate safety lifecycles and are intentionally preserved.
+  private static func invalidateStalePlanArtifacts(
+    in snapshot: inout CompanionProtectedSnapshot
+  ) throws {
+    guard let workflow = snapshot.workflow,
+      let namespace = snapshot.occurrenceNamespace,
+      let contactTableDigest = IOSCompanionOccurrenceIdentity.contactTableDigest(
+        namespace: namespace,
+        canonicalContactIdentifiers: workflow.contacts.map(\.contactId)
+      )
+    else { throw CompanionStoreError.storageUnavailable }
+
+    let planBindingIsCurrent = snapshot.planningIndex.map { index in
+      index.configurationGeneration == workflow.configurationGeneration
+        && index.contactTableDigest == contactTableDigest
+        && index.contactCount == workflow.contacts.count
+    } ?? true
+    let proposalsAreCurrent = snapshot.proposals.allSatisfy {
+      validateStoredProposal($0, snapshot: snapshot)
+    }
+    guard !planBindingIsCurrent || !proposalsAreCurrent else { return }
+
+    snapshot.proposals.removeAll()
+    snapshot.planningIndex = nil
+    applyReminderPlans([], to: &snapshot)
+    snapshot.reminderHorizon = nil
+    snapshot.pendingNativeRoute = nil
   }
 
   private static func pruneWorkflowMetadata(
@@ -1705,27 +1846,94 @@ final class CompanionProtectedStore {
     }
   }
 
-  private static func validateProposal(
+  private static func validateStoredProposal(
     _ proposal: CompanionApprovedProposal,
-    binding: IOSNativeGoogleAccountBinding
+    snapshot: CompanionProtectedSnapshot
   ) -> Bool {
-    proposal.state == .ready && proposal.reviewNonceDigest == nil
-      && proposal.reviewNonceExpiresAt == nil
-      && proposal.reviewSessionGeneration == nil
-      && proposal.reviewSceneIdentifier == nil && proposal.operationId == nil
-      && isBoundedOpaqueIdentifier(proposal.proposalId)
-      && proposal.accountGeneration == binding.accountGeneration
-      && isBoundedOpaqueIdentifier(proposal.occurrenceId)
-      && proposal.revision.range(
+    guard isBoundedOpaqueIdentifier(proposal.proposalId),
+      isBoundedOpaqueIdentifier(proposal.accountGeneration),
+      isBoundedOpaqueIdentifier(proposal.occurrenceId),
+      proposal.revision.range(
         of: "^(0|[1-9][0-9]{0,18})$",
         options: .regularExpression
-      ) != nil
-      && resetReleaseThreshold(for: proposal.occurrenceCivilDate) != nil
-      && proposal.recipient.range(
+      ) != nil,
+      resetReleaseThreshold(for: proposal.occurrenceCivilDate) != nil,
+      proposal.recipient.range(
         of: "^\\+[1-9][0-9]{7,14}$",
         options: .regularExpression
-      ) != nil
-      && isSafeMessageBody(proposal.body)
+      ) != nil,
+      isSafeMessageBody(proposal.body),
+      let digest = proposal.occurrenceDigest,
+      digest.count == IOSCompanionTerminalLedger.digestByteCount,
+      let generation = proposal.configurationGeneration,
+      let peopleSnapshotGeneration = proposal.peopleSnapshotGeneration,
+      IOSPeopleSyncFencePolicy.isValidGeneration(peopleSnapshotGeneration),
+      let ordinal = proposal.contactOrdinal,
+      let contactId = proposal.contactId,
+      let materialRevision = proposal.contactMaterialRevision,
+      let phoneId = proposal.selectedPhoneId,
+      let namespace = snapshot.occurrenceNamespace,
+      let index = snapshot.planningIndex,
+      let workflow = snapshot.workflow,
+      workflow.account.accountGeneration == proposal.accountGeneration,
+      workflow.configurationGeneration == generation,
+      index.configurationGeneration == generation,
+      ordinal >= 0, ordinal < workflow.contacts.count,
+      workflow.contacts[ordinal].contactId == contactId,
+      workflow.contacts[ordinal].materialRevision == materialRevision,
+      workflow.contacts[ordinal].selectedPhoneId == phoneId,
+      workflow.contacts[ordinal].enrollment == .enabled,
+      workflow.contacts[ordinal].approvalHash != nil,
+      workflow.contacts[ordinal].approvalInvalidationReasons.isEmpty,
+      let coordinates = IOSCompanionOccurrenceIdentity.verifyProposalHandle(
+        proposal.proposalId,
+        namespace: namespace,
+        accountGeneration: proposal.accountGeneration,
+        configurationGeneration: generation,
+        baseCivilDate: index.baseCivilDate,
+        timeZoneIdentifier: index.timeZoneIdentifier,
+        contactTableDigest: index.contactTableDigest,
+        contactCount: index.contactCount,
+        occurrenceId: proposal.occurrenceId
+      ),
+      coordinates.contactOrdinal == ordinal,
+      civilDate(
+        baseCivilDate: index.baseCivilDate,
+        dayOffset: coordinates.dayOffset,
+        timeZoneIdentifier: index.timeZoneIdentifier
+      ) == proposal.occurrenceCivilDate,
+      (try? index.ordinals(dayOffset: coordinates.dayOffset).contains(UInt16(ordinal))) == true,
+      IOSCompanionOccurrenceIdentity.occurrenceDigest(
+        namespace: namespace,
+        accountGeneration: proposal.accountGeneration,
+        contactIdentifier: contactId,
+        civilDate: proposal.occurrenceCivilDate
+      ) == digest
+    else { return false }
+
+    switch proposal.state {
+    case .ready:
+      return proposal.operationId == nil
+        && proposal.reviewNonceDigest?.count == 32
+        && proposal.reviewNonceExpiresAt != nil
+        && proposal.reviewSessionGeneration.map(isBoundedOpaqueIdentifier) == true
+        && proposal.reviewSceneIdentifier.map(isBoundedOpaqueIdentifier) == true
+        && snapshot.terminalLedger?.check(
+          digest: digest,
+          civilDate: proposal.occurrenceCivilDate
+        ) == .clear
+    case .openCommitted, .presented:
+      return proposal.operationId.map(isBoundedOpaqueIdentifier) == true
+        && proposal.reviewNonceDigest == nil && proposal.reviewNonceExpiresAt == nil
+        && proposal.reviewSessionGeneration == nil
+        && proposal.reviewSceneIdentifier == nil
+        && snapshot.terminalLedger?.check(
+          digest: digest,
+          civilDate: proposal.occurrenceCivilDate
+        ) == .blocked
+    case .cancelled, .failed, .outcomeUnknown, .reportedSent:
+      return false
+    }
   }
 
   private static func isSafeMessageBody(_ value: String) -> Bool {
@@ -1767,7 +1975,7 @@ final class CompanionProtectedStore {
     else { return false }
     guard workflow.contacts.count <= maximumWorkflowContacts,
       workflow.reviews.count <= maximumWorkflowReviews,
-      workflow.occurrences.count <= maximumReminderPlans,
+      workflow.occurrences.isEmpty,
       workflow.activity.count <= maximumWorkflowActivity,
       workflow.privacyOperations.count <= maximumWorkflowOperations,
       workflow.account.accountGeneration.range(of: uuid, options: .regularExpression) != nil,
@@ -1778,24 +1986,21 @@ final class CompanionProtectedStore {
         maximumBytes: 256
       ),
       Set(workflow.contacts.map(\.contactId)).count == workflow.contacts.count,
+      workflow.contacts.map(\.contactId) == workflow.contacts.map(\.contactId).sorted(),
       Set(workflow.reviews.map(\.handle)).count == workflow.reviews.count,
-      Set(workflow.occurrences.map(\.occurrenceId)).count == workflow.occurrences.count,
-      Set(workflow.occurrences.map(\.proposalId)).count == workflow.occurrences.count,
-      Set(workflow.occurrences.map { "\($0.contactId)|\($0.civilDate)" }).count
-        == workflow.occurrences.count,
       Set(workflow.activity.map(\.id)).count == workflow.activity.count,
       Set(workflow.privacyOperations.map(\.id)).count
         == workflow.privacyOperations.count
     else { return false }
 
     guard workflow.contacts.allSatisfy({ contact in
-      contact.contactId.range(of: opaque, options: .regularExpression) != nil
+      contact.contactId.range(of: uuid, options: .regularExpression) != nil
         && contact.approvalInvalidationReasons.count <= 16
         && (contact.selectedPhoneId?.range(
-          of: opaque, options: .regularExpression
+          of: uuid, options: .regularExpression
         ) != nil || contact.selectedPhoneId == nil)
         && (contact.selectedBirthdayId?.range(
-          of: opaque, options: .regularExpression
+          of: uuid, options: .regularExpression
         ) != nil || contact.selectedBirthdayId == nil)
         && (contact.approvalHash?.range(of: hash, options: .regularExpression) != nil
           || contact.approvalHash == nil)
@@ -1818,13 +2023,6 @@ final class CompanionProtectedStore {
             && policy.primaryStart.count <= 12 && policy.primaryEnd.count <= 12
             && policy.graceEnd?.count ?? 0 <= 12
         } ?? true)
-    }), workflow.occurrences.allSatisfy({ occurrence in
-      occurrence.occurrenceId.range(of: opaque, options: .regularExpression) != nil
-        && occurrence.proposalId.range(
-          of: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
-          options: .regularExpression
-        ) != nil
-        && resetReleaseThreshold(for: occurrence.civilDate) != nil
     }), workflow.activity.allSatisfy({ activity in
       activity.id.range(of: opaque, options: .regularExpression) != nil
         && allowedActivity.contains(activity.kind)
@@ -1877,6 +2075,84 @@ final class CompanionProtectedStore {
       } ?? false)
     }
     return provenance.modelIdentifier == nil && provenance.promptPolicyVersion == nil
+  }
+
+  private static func requiredOccurrenceNamespace(
+    _ snapshot: CompanionProtectedSnapshot
+  ) throws -> Data {
+    guard let namespace = snapshot.occurrenceNamespace,
+      namespace.count == IOSCompanionOccurrenceIdentity.namespaceByteCount
+    else { throw CompanionStoreError.storageUnavailable }
+    return namespace
+  }
+
+  private static func requiredTerminalLedger(
+    _ snapshot: CompanionProtectedSnapshot
+  ) throws -> IOSCompanionTerminalLedger {
+    guard let ledger = snapshot.terminalLedger else {
+      throw CompanionStoreError.storageUnavailable
+    }
+    return ledger
+  }
+
+  private static func plans(
+    _ plans: [CompanionReminderPlan],
+    exactlyCover index: IOSCompanionPlanningIndex
+  ) -> Bool {
+    var expectedDates: Set<String> = []
+    for dayOffset in 0..<IOSCompanionPlanningIndex.planningDayCount {
+      guard let ordinals = try? index.ordinals(dayOffset: dayOffset) else {
+        return false
+      }
+      guard !ordinals.isEmpty else { continue }
+      guard let civilDate = civilDate(
+        baseCivilDate: index.baseCivilDate,
+        dayOffset: dayOffset,
+        timeZoneIdentifier: index.timeZoneIdentifier
+      ) else { return false }
+      expectedDates.insert(civilDate)
+    }
+    return expectedDates == Set(plans.map(\.civilDate))
+  }
+
+  private static func civilDate(
+    baseCivilDate: String,
+    dayOffset: Int,
+    timeZoneIdentifier: String
+  ) -> String? {
+    guard (0..<IOSCompanionPlanningIndex.planningDayCount).contains(dayOffset),
+      let timeZone = TimeZone(identifier: timeZoneIdentifier)
+    else { return nil }
+    let parts = baseCivilDate.split(separator: "-", omittingEmptySubsequences: false)
+    guard parts.count == 3, let year = Int(parts[0]), let month = Int(parts[1]),
+      let day = Int(parts[2])
+    else { return nil }
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = timeZone
+    guard let base = calendar.date(
+      from: DateComponents(year: year, month: month, day: day, hour: 12)
+    ), let value = calendar.date(byAdding: .day, value: dayOffset, to: base)
+    else { return nil }
+    let result = calendar.dateComponents([.year, .month, .day], from: value)
+    guard let resultYear = result.year, let resultMonth = result.month,
+      let resultDay = result.day
+    else { return nil }
+    return String(format: "%04d-%02d-%02d", resultYear, resultMonth, resultDay)
+  }
+
+  private static func dayOffset(
+    civilDate: String,
+    in index: IOSCompanionPlanningIndex
+  ) -> Int? {
+    for offset in 0..<IOSCompanionPlanningIndex.planningDayCount
+    where Self.civilDate(
+      baseCivilDate: index.baseCivilDate,
+      dayOffset: offset,
+      timeZoneIdentifier: index.timeZoneIdentifier
+    ) == civilDate {
+      return offset
+    }
+    return nil
   }
 
   private func checkControl(
@@ -1934,18 +2210,38 @@ final class CompanionProtectedStore {
     in snapshot: inout CompanionProtectedSnapshot,
     at now: Date
   ) {
+    var resolvedOperationIds: Set<String> = []
     for recordIndex in snapshot.composerRecords.indices
     where snapshot.composerRecords[recordIndex].outcome == .openCommitted
       || snapshot.composerRecords[recordIndex].outcome == .presented
     {
       let operationId = snapshot.composerRecords[recordIndex].operationId
+      if let digest = snapshot.composerRecords[recordIndex].occurrenceDigest,
+        var ledger = snapshot.terminalLedger
+      {
+        do {
+          try ledger.resolve(
+            digest: digest,
+            civilDate: snapshot.composerRecords[recordIndex].occurrenceCivilDate,
+            outcome: .outcomeUnknown,
+            resolvedAt: now
+          )
+        } catch {
+          // A damaged/missing legacy marker is replaced by a conservative
+          // date-wide fence; recovery must never create a duplicate window.
+          try? ledger.installLegacyDateWideFence(
+            civilDate: snapshot.composerRecords[recordIndex].occurrenceCivilDate,
+            recordedAt: now
+          )
+        }
+        snapshot.terminalLedger = ledger
+      }
       snapshot.composerRecords[recordIndex].outcome = .outcomeUnknown
       snapshot.composerRecords[recordIndex].resolvedAt = now
-      if let proposalIndex = snapshot.proposals.firstIndex(where: {
-        $0.operationId == operationId
-      }) {
-        snapshot.proposals[proposalIndex].state = .outcomeUnknown
-      }
+      resolvedOperationIds.insert(operationId)
+    }
+    snapshot.proposals.removeAll {
+      $0.operationId.map(resolvedOperationIds.contains) ?? false
     }
   }
 
@@ -2012,12 +2308,28 @@ final class CompanionProtectedStore {
     let activityClearedAtBefore = snapshot.workflow?.activityClearedAt
     let privacyIDsBefore = snapshot.workflow?.privacyOperations.map(\.id) ?? []
     let attentionClaimsBefore = snapshot.attentionNotificationDays ?? [:]
+    let terminalLedgerBefore = snapshot.terminalLedger
 
     if var workflow = snapshot.workflow {
       pruneWorkflowMetadata(&workflow, now: now)
       snapshot.workflow = workflow
     }
+    snapshot.proposals.removeAll { proposal in
+      guard proposal.state == .ready,
+        let expiresAt = proposal.reviewNonceExpiresAt
+      else { return false }
+      let remaining = expiresAt.timeIntervalSince(now)
+      return !remaining.isFinite || remaining < 0
+        || remaining > Self.reviewLifetime + Self.maximumFutureClockSkew
+    }
     pruneComposerRecords(in: &snapshot, now: now)
+    if var ledger = snapshot.terminalLedger {
+      _ = ledger.pruneReleased(
+        now: now,
+        trustedServerTime: snapshot.control?.trustedServerTime
+      )
+      snapshot.terminalLedger = ledger
+    }
     if var workflow = snapshot.workflow, let cutoff = workflow.activityClearedAt,
       !snapshot.composerRecords.contains(where: { $0.openedAt <= cutoff })
     {
@@ -2041,6 +2353,7 @@ final class CompanionProtectedStore {
       || activityClearedAtBefore != snapshot.workflow?.activityClearedAt
       || privacyIDsBefore != (snapshot.workflow?.privacyOperations.map(\.id) ?? [])
       || attentionClaimsBefore != (snapshot.attentionNotificationDays ?? [:])
+      || terminalLedgerBefore != snapshot.terminalLedger
   }
 
   private func loadSnapshotApplyingRetention(
@@ -2120,9 +2433,193 @@ final class CompanionProtectedStore {
     }
   }
 
+  private func migrateSchemaV2(
+    _ snapshot: inout CompanionProtectedSnapshot,
+    now: Date
+  ) throws {
+    // Bound legacy input before doing any adoption work. These were the v2
+    // writer limits and keep migration deterministic under hostile state.
+    guard snapshot.proposals.count <= 1_024,
+      snapshot.composerRecords.count <= 1_024,
+      snapshot.reminderPlans.count <= 500,
+      snapshot.notificationIdentities.count <= 500,
+      (snapshot.workflow?.contacts.count ?? 0) <= Self.maximumWorkflowContacts,
+      (snapshot.workflow?.occurrences.count ?? 0) <= 500
+    else { throw CompanionStoreError.storageUnavailable }
+
+    let namespace = IOSCompanionOccurrenceIdentity.makeNamespace()
+    var ledger = IOSCompanionTerminalLedger()
+    var occurrenceById: [String: CompanionWorkflowOccurrence] = [:]
+    if var workflow = snapshot.workflow {
+      workflow.contacts.sort { $0.contactId < $1.contactId }
+      for occurrence in workflow.occurrences
+      where occurrenceById[occurrence.occurrenceId] == nil {
+        occurrenceById[occurrence.occurrenceId] = occurrence
+      }
+      workflow.occurrences.removeAll()
+      workflow.reviews.removeAll()
+      snapshot.workflow = workflow
+    }
+
+    for index in snapshot.composerRecords.indices {
+      if snapshot.composerRecords[index].outcome == .openCommitted
+        || snapshot.composerRecords[index].outcome == .presented
+      {
+        snapshot.composerRecords[index].outcome = .outcomeUnknown
+        snapshot.composerRecords[index].resolvedAt = now
+      }
+      guard snapshot.composerRecords[index].outcome.preventsRepeat else {
+        snapshot.composerRecords[index].occurrenceDigest = nil
+        continue
+      }
+      let record = snapshot.composerRecords[index]
+      let occurrence = occurrenceById[record.occurrenceId]
+      let accountGeneration = snapshot.workflow?.account.accountGeneration
+      if let contactId = occurrence?.contactId, let accountGeneration,
+        occurrence?.civilDate == record.occurrenceCivilDate,
+        let digest = IOSCompanionOccurrenceIdentity.occurrenceDigest(
+          namespace: namespace,
+          accountGeneration: accountGeneration,
+          contactIdentifier: contactId,
+          civilDate: record.occurrenceCivilDate
+        )
+      {
+        snapshot.composerRecords[index].occurrenceDigest = digest
+        if ledger.check(digest: digest, civilDate: record.occurrenceCivilDate) == .clear {
+          try ledger.recordCommitted(
+            digest: digest,
+            civilDate: record.occurrenceCivilDate,
+            committedAt: record.openedAt
+          )
+          if record.outcome == .reportedSent || record.outcome == .outcomeUnknown {
+            try ledger.resolve(
+              digest: digest,
+              civilDate: record.occurrenceCivilDate,
+              outcome: record.outcome == .reportedSent ? .reportedSent : .outcomeUnknown,
+              resolvedAt: record.resolvedAt ?? record.openedAt
+            )
+          }
+        }
+      } else {
+        snapshot.composerRecords[index].occurrenceDigest = nil
+        try ledger.installLegacyDateWideFence(
+          civilDate: record.occurrenceCivilDate,
+          recordedAt: record.resolvedAt ?? record.openedAt
+        )
+      }
+    }
+
+    snapshot.composerRecords.sort { $0.openedAt < $1.openedAt }
+    if snapshot.composerRecords.count > Self.maximumComposerRecords {
+      snapshot.composerRecords = Array(
+        snapshot.composerRecords.suffix(Self.maximumComposerRecords)
+      )
+    }
+    snapshot.schemaVersion = CompanionProtectedSnapshot.currentSchemaVersion
+    snapshot.occurrenceNamespace = namespace
+    snapshot.planningIndex = nil
+    snapshot.terminalLedger = ledger
+    snapshot.proposals.removeAll()
+    Self.applyReminderPlans([], to: &snapshot)
+    snapshot.reminderHorizon = nil
+    snapshot.pendingNativeRoute = nil
+  }
+
+  #if DEBUG
+    /// Hosted XCTest seam for the real migration routine. It performs no file
+    /// or Keychain I/O and is absent from Release builds.
+    func migrateSchemaV2ForNativeTests(
+      _ snapshot: inout CompanionProtectedSnapshot,
+      now: Date
+    ) throws {
+      try migrateSchemaV2(&snapshot, now: now)
+    }
+  #endif
+
+  private static func validateCapacitySafetyState(
+    _ snapshot: CompanionProtectedSnapshot
+  ) -> Bool {
+    guard snapshot.schemaVersion == CompanionProtectedSnapshot.currentSchemaVersion,
+      let namespace = snapshot.occurrenceNamespace,
+      namespace.count == IOSCompanionOccurrenceIdentity.namespaceByteCount,
+      let ledger = snapshot.terminalLedger,
+      ledger.entryCount <= IOSCompanionTerminalLedger.maximumEntryCount
+    else { return false }
+
+    if let index = snapshot.planningIndex {
+      guard let workflow = snapshot.workflow,
+        let digest = IOSCompanionOccurrenceIdentity.contactTableDigest(
+          namespace: namespace,
+          canonicalContactIdentifiers: workflow.contacts.map(\.contactId)
+        ),
+        index.configurationGeneration == workflow.configurationGeneration,
+        index.contactTableDigest == digest,
+        index.contactCount == workflow.contacts.count,
+        plans(snapshot.reminderPlans, exactlyCover: index)
+      else { return false }
+    } else if !snapshot.reminderPlans.isEmpty
+      || !snapshot.notificationIdentities.isEmpty
+    {
+      return false
+    }
+
+    return snapshot.composerRecords.allSatisfy { record in
+      guard isBoundedOpaqueIdentifier(record.operationId),
+        isBoundedOpaqueIdentifier(record.proposalId),
+        isBoundedOpaqueIdentifier(record.occurrenceId),
+        resetReleaseThreshold(for: record.occurrenceCivilDate) != nil,
+        record.openedAt.timeIntervalSince1970.isFinite,
+        record.openedAt.timeIntervalSince1970 >= 0
+      else { return false }
+      if let digest = record.occurrenceDigest,
+        digest.count != IOSCompanionTerminalLedger.digestByteCount
+      {
+        return false
+      }
+      if record.outcome.preventsRepeat {
+        if let digest = record.occurrenceDigest {
+          return ledger.check(
+            digest: digest,
+            civilDate: record.occurrenceCivilDate
+          ) == .blocked
+        }
+        return ledger.hasLegacyDateWideFence(civilDate: record.occurrenceCivilDate)
+      }
+      return true
+    }
+  }
+
   private func loadSnapshot() throws -> CompanionProtectedSnapshot {
     let fileURL = try storeFileURL()
+    let recoveryStore = IOSCompanionWipeRecoveryStore.shared
+    if recoveryStore.hasPendingOrUnreadableJournal() {
+      guard let journal = recoveryStore.observeResetCivilDate(
+        Self.civilDate(for: Date(), calendar: calendar)
+      ) else {
+        // An unreadable independent marker is authoritative. Treating it as
+        // absent could recreate an unfenced store after a crash or tampering.
+        throw CompanionStoreError.storageUnavailable
+      }
+      if journal.companionResetRequired {
+        if !journal.companionResetInstalled
+          || !persistedResetSnapshotMatches(journal)
+        {
+          return try installResetSnapshot(at: fileURL, journal: journal)
+        }
+        if journal.kind == .protectedStoreReset,
+          !recoveryStore.clearIfComplete(markerId: journal.markerId)
+        {
+          throw CompanionStoreError.storageUnavailable
+        }
+      }
+    }
     guard fileManager.fileExists(atPath: fileURL.path) else {
+      guard IOSProtectedStoreLoadPolicy.action(
+        fileExists: false,
+        keyState: .notChecked
+      ) == .installFencedReset else {
+        throw CompanionStoreError.storageUnavailable
+      }
       return try initializeMissingStore(at: fileURL)
     }
 
@@ -2130,34 +2627,67 @@ final class CompanionProtectedStore {
     do {
       key = try readKeychainKey()
     } catch CompanionKeychainError.notFound {
-      return try resetStore(at: fileURL)
+      guard IOSProtectedStoreLoadPolicy.action(
+        fileExists: true,
+        keyState: .missing
+      ) == .installFencedReset else {
+        throw CompanionStoreError.storageUnavailable
+      }
+      return try resetStore(at: fileURL, now: Date())
     } catch {
+      guard IOSProtectedStoreLoadPolicy.action(
+        fileExists: true,
+        keyState: .unavailable
+      ) == .refuseAccess else {
+        throw CompanionStoreError.storageUnavailable
+      }
       throw CompanionStoreError.storageUnavailable
     }
 
     do {
       let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
       if let fileSize = attributes[.size] as? NSNumber,
-        fileSize.intValue > Self.maximumFileBytes
+        fileSize.uint64Value > UInt64(Self.maximumFileBytes)
       {
-        return try resetStore(at: fileURL)
+        throw CompanionStoreError.storageUnavailable
       }
 
       var sealedData = try Data(contentsOf: fileURL, options: [.mappedIfSafe])
       defer { sealedData.resetBytes(in: 0..<sealedData.count) }
-      let sealedBox = try AES.GCM.SealedBox(combined: sealedData)
-      var plaintext = try AES.GCM.open(
-        sealedBox,
+      var plaintext = try IOSProtectedStoreEnvelope.open(
+        sealedData,
         using: key,
-        authenticating: Self.authenticatedContext
+        authenticatedContext: Self.authenticatedContext,
+        maximumBytes: Self.maximumFileBytes
       )
       defer { plaintext.resetBytes(in: 0..<plaintext.count) }
 
-      let decoder = JSONDecoder()
-      decoder.dateDecodingStrategy = .millisecondsSince1970
-      var snapshot = try decoder.decode(CompanionProtectedSnapshot.self, from: plaintext)
-      guard snapshot.schemaVersion == CompanionProtectedSnapshot.currentSchemaVersion else {
+      var snapshot = try IOSProtectedStoreEnvelope.decode(
+        CompanionProtectedSnapshot.self,
+        from: plaintext
+      )
+      var migratedSchema = false
+      switch IOSProtectedStoreSchemaPolicy.action(
+        storedVersion: snapshot.schemaVersion,
+        currentVersion: CompanionProtectedSnapshot.currentSchemaVersion
+      ) {
+      case .migrateV2:
+        try migrateSchemaV2(&snapshot, now: Date())
+        migratedSchema = true
+      case .reject:
         throw CompanionStoreError.unsupportedSchema
+      case .accept:
+        break
+      }
+      var recoveredLegacyPeopleGenerationProposal = false
+      if snapshot.proposals.contains(where: {
+        $0.peopleSnapshotGeneration == nil
+      }) {
+        // Reviews live for only 45 seconds and are never presentation authority
+        // without their nonce. Dropping a pre-generation review is the only
+        // safe forward adoption; terminal/composer evidence remains untouched.
+        snapshot.proposals.removeAll()
+        recoveredLegacyPeopleGenerationProposal = true
       }
       var recoveredPersistedDraft = false
       if var workflow = snapshot.workflow {
@@ -2180,12 +2710,13 @@ final class CompanionProtectedStore {
         case .revalidatedDraft, .clearedInvalidDraft:
           snapshot.workflow = workflow
           snapshot.proposals.removeAll()
+          snapshot.planningIndex = nil
           Self.applyReminderPlans([], to: &snapshot)
           snapshot.reminderHorizon = nil
           snapshot.pendingNativeRoute = nil
           recoveredPersistedDraft = true
         case .unrecoverable:
-          return try resetStore(at: fileURL)
+          throw CompanionStoreError.storageUnavailable
         }
       }
       guard snapshot.composerRecords.count <= Self.maximumComposerRecords,
@@ -2193,31 +2724,23 @@ final class CompanionProtectedStore {
         snapshot.reminderPlans.count <= Self.maximumReminderPlans,
         snapshot.notificationIdentities.count <= Self.maximumReminderPlans,
         snapshot.resetSafety.blockedCivilDates.count <= Self.maximumResetDates,
-        snapshot.attentionNotificationDays.map { claims in
+        snapshot.attentionNotificationDays.map({ claims in
           claims.count <= IOSCompanionAttentionKind.allCases.count
             && claims.allSatisfy { key, civilDate in
               IOSCompanionAttentionKind(rawValue: key) != nil
                 && Self.resetReleaseThreshold(for: civilDate) != nil
             }
-        } ?? true,
-        snapshot.pendingNativeRoute.map { route in
+        }) ?? true,
+        snapshot.pendingNativeRoute.map({ route in
           Self.isBoundedOpaqueIdentifier(route.routeId)
             && route.createdAt.timeIntervalSince1970.isFinite
             && route.createdAt.timeIntervalSince1970 >= 0
-        } ?? true,
+        }) ?? true,
         (snapshot.projectionRevision ?? 0) <= Self.maximumProjectionRevision,
         Set(snapshot.proposals.map(\.proposalId)).count == snapshot.proposals.count,
-        snapshot.proposals.allSatisfy { proposal in
-          Self.isBoundedOpaqueIdentifier(proposal.proposalId)
-            && Self.isBoundedOpaqueIdentifier(proposal.accountGeneration)
-            && Self.isBoundedOpaqueIdentifier(proposal.occurrenceId)
-            && Self.resetReleaseThreshold(for: proposal.occurrenceCivilDate) != nil
-            && proposal.recipient.range(
-              of: "^\\+[1-9][0-9]{7,14}$",
-              options: .regularExpression
-            ) != nil
-            && Self.isSafeMessageBody(proposal.body)
-        },
+        snapshot.proposals.allSatisfy({ proposal in
+          Self.validateStoredProposal(proposal, snapshot: snapshot)
+        }),
         Set(snapshot.composerRecords.map(\.operationId)).count
           == snapshot.composerRecords.count,
         Set(snapshot.notificationIdentities.map(\.civilDate)).count
@@ -2226,19 +2749,24 @@ final class CompanionProtectedStore {
           == snapshot.notificationIdentities.count,
         Set(snapshot.reminderPlans.map(\.occurrenceId)).count
           == snapshot.reminderPlans.count,
+        Set(snapshot.reminderPlans.map(\.civilDate)).count
+          == snapshot.reminderPlans.count,
         Set(snapshot.reminderPlans.map(\.civilDate))
           == Set(snapshot.notificationIdentities.map(\.civilDate)),
         Set(snapshot.resetSafety.blockedCivilDates).count
           == snapshot.resetSafety.blockedCivilDates.count,
-        snapshot.resetSafety.verifiedCivilDate.map { verified in
+        snapshot.resetSafety.verifiedCivilDate.map({ verified in
           Self.resetReleaseThreshold(for: verified) != nil
             && snapshot.resetSafety.blockedCivilDates.contains(verified)
-        } ?? true,
-        snapshot.workflow.map(Self.validateWorkflow) ?? true
+        }) ?? true,
+        snapshot.workflow.map(Self.validateWorkflow) ?? true,
+        Self.validateCapacitySafetyState(snapshot)
       else {
-        return try resetStore(at: fileURL)
+        throw CompanionStoreError.storageUnavailable
       }
-      if recoveredPersistedDraft {
+      if migratedSchema || recoveredPersistedDraft
+        || recoveredLegacyPeopleGenerationProposal
+      {
         try bumpProjectionRevision(in: &snapshot)
         try persist(snapshot)
         publishProjectionChange(
@@ -2246,58 +2774,112 @@ final class CompanionProtectedStore {
         )
       }
       return snapshot
-    } catch CompanionStoreError.unsupportedSchema {
-      throw CompanionStoreError.unsupportedSchema
+    } catch let error as CompanionStoreError {
+      throw error
     } catch let cocoaError as CocoaError
       where cocoaError.code == .fileReadNoPermission
     {
       throw CompanionStoreError.storageUnavailable
     } catch {
-      return try resetStore(at: fileURL)
+      // Authenticated-but-invalid state is retained for diagnosis and recovery.
+      // Silent deletion would discard repeat-safety evidence and open a send gap.
+      throw CompanionStoreError.storageUnavailable
     }
   }
 
-  private func resetStore(at fileURL: URL) throws -> CompanionProtectedSnapshot {
+  private func resetStore(
+    at fileURL: URL,
+    now: Date
+  ) throws -> CompanionProtectedSnapshot {
+    let recoveryStore = IOSCompanionWipeRecoveryStore.shared
+    guard let journal = recoveryStore.armCompanionReset(
+      civilDate: Self.civilDate(for: now, calendar: calendar),
+      now: now
+    ) else {
+      throw CompanionStoreError.storageUnavailable
+    }
+    return try installResetSnapshot(at: fileURL, journal: journal)
+  }
+
+  private func installResetSnapshot(
+    at fileURL: URL,
+    journal: IOSCompanionWipeRecoveryJournal
+  ) throws -> CompanionProtectedSnapshot {
     if fileManager.fileExists(atPath: fileURL.path) {
       try fileManager.removeItem(at: fileURL)
     }
     try deleteKeychainKey(allowMissing: true)
     _ = try createKeychainKey()
     let snapshot = CompanionProtectedSnapshot.reset(
-      on: Self.civilDate(for: Date(), calendar: calendar)
+      generation: journal.resetSafetyGeneration,
+      blockedCivilDates: journal.resetCivilDates,
+      overflowed: journal.resetOverflowed
     )
     try persist(snapshot)
+    guard persistedResetSnapshotMatches(journal),
+      IOSCompanionWipeRecoveryStore.shared.markCompanionResetInstalled(
+        markerId: journal.markerId
+      )
+    else { throw CompanionStoreError.storageUnavailable }
+    if journal.kind == .protectedStoreReset,
+      !IOSCompanionWipeRecoveryStore.shared.clearIfComplete(
+        markerId: journal.markerId
+      )
+    {
+      throw CompanionStoreError.storageUnavailable
+    }
     return snapshot
   }
 
   private func initializeMissingStore(
     at fileURL: URL
   ) throws -> CompanionProtectedSnapshot {
-    let retainedKeyExists: Bool
+    // Missing-file/key combinations and a true first install intentionally use
+    // the same date-aware fenced bootstrap. There is no safe observable signal
+    // that can distinguish them after an interrupted external deletion.
+    return try resetStore(at: fileURL, now: Date())
+  }
+
+  /// Verifies the independently journaled reset generation by decrypting the
+  /// atomic replacement from disk. A successful write alone is not sufficient
+  /// to retire the only crash fence.
+  private func persistedResetSnapshotMatches(
+    _ journal: IOSCompanionWipeRecoveryJournal
+  ) -> Bool {
     do {
-      _ = try readKeychainKey()
-      retainedKeyExists = true
-    } catch CompanionKeychainError.notFound {
-      retainedKeyExists = false
+      let fileURL = try storeFileURL()
+      guard fileManager.fileExists(atPath: fileURL.path) else { return false }
+      let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
+      guard let size = attributes[.size] as? NSNumber,
+        size.uint64Value <= UInt64(Self.maximumFileBytes)
+      else { return false }
+      let key = try readKeychainKey()
+      var sealedData = try Data(contentsOf: fileURL, options: [.mappedIfSafe])
+      defer { sealedData.resetBytes(in: 0..<sealedData.count) }
+      var plaintext = try IOSProtectedStoreEnvelope.open(
+        sealedData,
+        using: key,
+        authenticatedContext: Self.authenticatedContext,
+        maximumBytes: Self.maximumFileBytes
+      )
+      defer { plaintext.resetBytes(in: 0..<plaintext.count) }
+      let snapshot = try IOSProtectedStoreEnvelope.decode(
+        CompanionProtectedSnapshot.self,
+        from: plaintext
+      )
+      return snapshot.schemaVersion == CompanionProtectedSnapshot.currentSchemaVersion
+        && snapshot.resetSafety.generation == journal.resetSafetyGeneration
+        && snapshot.resetSafety.blockedCivilDates == journal.resetCivilDates
+        && snapshot.resetSafety.overflowed == journal.resetOverflowed
+        && snapshot.resetSafety.verifiedCivilDate == nil
+        && snapshot.resetSafety.requiresRelease
     } catch {
-      throw CompanionStoreError.storageUnavailable
+      return false
     }
-    if retainedKeyExists {
-      // A device-only key without its protected file indicates reinstall or an
-      // incomplete external deletion. Install a reset fence before rebuilding.
-      return try resetStore(at: fileURL)
-    }
-    _ = try createKeychainKey()
-    let snapshot = CompanionProtectedSnapshot.initialInstall
-    try persist(snapshot)
-    return snapshot
   }
 
   private func persist(_ snapshot: CompanionProtectedSnapshot) throws {
-    let encoder = JSONEncoder()
-    encoder.dateEncodingStrategy = .millisecondsSince1970
-    encoder.outputFormatting = [.sortedKeys]
-    var plaintext = try encoder.encode(snapshot)
+    var plaintext = try IOSProtectedStoreEnvelope.encode(snapshot)
     defer { plaintext.resetBytes(in: 0..<plaintext.count) }
 
     let key: SymmetricKey
@@ -2309,18 +2891,13 @@ final class CompanionProtectedStore {
       throw CompanionStoreError.storageUnavailable
     }
 
-    let sealedBox = try AES.GCM.seal(
+    var combined = try IOSProtectedStoreEnvelope.seal(
       plaintext,
       using: key,
-      authenticating: Self.authenticatedContext
+      authenticatedContext: Self.authenticatedContext,
+      maximumBytes: Self.maximumFileBytes
     )
-    guard var combined = sealedBox.combined else {
-      throw CompanionStoreError.storageUnavailable
-    }
     defer { combined.resetBytes(in: 0..<combined.count) }
-    guard combined.count <= Self.maximumFileBytes else {
-      throw CompanionStoreError.storageUnavailable
-    }
 
     let fileURL = try storeFileURL()
     try combined.write(to: fileURL, options: [.atomic, .completeFileProtection])

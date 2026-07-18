@@ -15,6 +15,14 @@ on:
         description: Exact production Google Cloud project number
         required: true
         type: string
+      release_security_project_id:
+        description: Exact separate release-security Google Cloud project ID
+        required: true
+        type: string
+      release_security_project_number:
+        description: Exact separate release-security Google Cloud project number
+        required: true
+        type: string
       billing_account_id:
         description: Exact billing account ID attached to the production project
         required: true
@@ -77,6 +85,8 @@ jobs:
       CLOUDSDK_CORE_DISABLE_PROMPTS: '1'
       PROJECT_ID: ${{ inputs.project_id }}
       PROJECT_NUMBER: ${{ inputs.project_number }}
+      RELEASE_SECURITY_PROJECT_ID: ${{ inputs.release_security_project_id }}
+      RELEASE_SECURITY_PROJECT_NUMBER: ${{ inputs.release_security_project_number }}
       BILLING_ACCOUNT_ID: ${{ inputs.billing_account_id }}
       ANDROID_APP_ID: ${{ inputs.firebase_android_app_id }}
       IOS_APP_ID: ${{ inputs.firebase_ios_app_id }}
@@ -89,12 +99,25 @@ jobs:
       EXPECTED_SOURCE_REVISION: ${{ inputs.source_revision }}
       CLOUD_AUDIT_WIF_PROVIDER: ${{ vars.CLOUD_AUDIT_WIF_PROVIDER }}
       CLOUD_AUDIT_SERVICE_ACCOUNT: ${{ vars.CLOUD_AUDIT_SERVICE_ACCOUNT }}
+      HOSTING_ADMISSION_BUCKET: ${{ vars.HOSTING_ADMISSION_BUCKET }}
+      HOSTING_AUDIT_WIF_PROVIDER: ${{ vars.HOSTING_AUDIT_WIF_PROVIDER }}
+      HOSTING_AUDIT_SERVICE_ACCOUNT: ${{ vars.HOSTING_AUDIT_SERVICE_ACCOUNT }}
+      HOSTING_ADMISSION_READER_WIF_PROVIDER: ${{ vars.HOSTING_ADMISSION_READER_WIF_PROVIDER }}
+      HOSTING_ADMISSION_READER_SERVICE_ACCOUNT: ${{ vars.HOSTING_ADMISSION_READER_SERVICE_ACCOUNT }}
+      HOSTING_DEPLOY_WIF_PROVIDER: ${{ vars.HOSTING_DEPLOY_WIF_PROVIDER }}
+      HOSTING_DEPLOY_SERVICE_ACCOUNT: ${{ vars.HOSTING_DEPLOY_SERVICE_ACCOUNT }}
+      RELEASE_SECURITY_LOG_SINK: ${{ vars.RELEASE_SECURITY_LOG_SINK }}
+      RELEASE_SECURITY_LOG_BUCKET: ${{ vars.RELEASE_SECURITY_LOG_BUCKET }}
+      RELEASE_SECURITY_LOGGING_LOCATION: ${{ vars.RELEASE_SECURITY_LOGGING_LOCATION }}
+      REPOSITORY_ID: ${{ github.repository_id }}
+      REPOSITORY_OWNER_ID: ${{ github.repository_owner_id }}
 
     steps:
       - name: Check out the workflow-selected source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ inputs.source_revision }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Validate every explicit coordinate before authentication
@@ -102,10 +125,18 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$EXPECTED_SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$GITHUB_WORKFLOW_REF" = 'yhsomani/AI-Birthday/.github/workflows/cloud-readonly-evidence.yml@refs/heads/main'
           test "$(git rev-parse --verify HEAD)" = "$EXPECTED_SOURCE_REVISION"
+          [[ "$(git rev-parse --verify refs/remotes/origin/main)" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
           [[ "$PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]
           [[ "$PROJECT_NUMBER" =~ ^[1-9][0-9]{5,19}$ ]]
+          [[ "$RELEASE_SECURITY_PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]
+          [[ "$RELEASE_SECURITY_PROJECT_NUMBER" =~ ^[1-9][0-9]{5,19}$ ]]
+          test "$RELEASE_SECURITY_PROJECT_ID" != "$PROJECT_ID"
+          test "$RELEASE_SECURITY_PROJECT_NUMBER" != "$PROJECT_NUMBER"
           [[ "$BILLING_ACCOUNT_ID" =~ ^[0-9A-F]{6}-[0-9A-F]{6}-[0-9A-F]{6}$ ]]
           [[ "$ANDROID_APP_ID" =~ ^1:${PROJECT_NUMBER}:android:[0-9a-f]{8,64}$ ]]
           [[ "$IOS_APP_ID" =~ ^1:${PROJECT_NUMBER}:ios:[0-9a-f]{8,64}$ ]]
@@ -116,6 +147,106 @@ jobs:
           [[ "$CLOUD_AUDIT_SERVICE_ACCOUNT" =~ ^[a-z][a-z0-9-]{2,62}@${PROJECT_ID}\.iam\.gserviceaccount\.com$ ]]
           [[ "$CLOUD_AUDIT_WIF_PROVIDER" =~ ^projects/[1-9][0-9]{5,19}/locations/global/workloadIdentityPools/[a-z0-9-]{4,32}/providers/[a-z0-9-]{4,32}$ ]]
           test "$RUNTIME_SERVICE_ACCOUNT" != "$CLOUD_AUDIT_SERVICE_ACCOUNT"
+          [[ "$HOSTING_ADMISSION_BUCKET" =~ ^[a-z0-9][a-z0-9-]{4,61}[a-z0-9]$ ]]
+          [[ "$HOSTING_AUDIT_WIF_PROVIDER" =~ ^projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/[a-z0-9-]{4,32}/providers/[a-z0-9-]{4,32}$ ]]
+          [[ "$HOSTING_AUDIT_SERVICE_ACCOUNT" =~ ^[a-z][a-z0-9-]{2,62}@${PROJECT_ID}\.iam\.gserviceaccount\.com$ ]]
+          [[ "$HOSTING_ADMISSION_READER_WIF_PROVIDER" =~ ^projects/${RELEASE_SECURITY_PROJECT_NUMBER}/locations/global/workloadIdentityPools/[a-z0-9-]{4,32}/providers/[a-z0-9-]{4,32}$ ]]
+          [[ "$HOSTING_ADMISSION_READER_SERVICE_ACCOUNT" =~ ^[a-z][a-z0-9-]{2,62}@${RELEASE_SECURITY_PROJECT_ID}\.iam\.gserviceaccount\.com$ ]]
+          [[ "$HOSTING_DEPLOY_WIF_PROVIDER" =~ ^projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/[a-z0-9-]{4,32}/providers/[a-z0-9-]{4,32}$ ]]
+          [[ "$HOSTING_DEPLOY_SERVICE_ACCOUNT" =~ ^[a-z][a-z0-9-]{2,62}@${PROJECT_ID}\.iam\.gserviceaccount\.com$ ]]
+          test "$(printf '%s\n' "$RUNTIME_SERVICE_ACCOUNT" "$CLOUD_AUDIT_SERVICE_ACCOUNT" "$HOSTING_AUDIT_SERVICE_ACCOUNT" "$HOSTING_ADMISSION_READER_SERVICE_ACCOUNT" "$HOSTING_DEPLOY_SERVICE_ACCOUNT" | sort -u | wc -l | tr -d ' ')" = 5
+          test "$(printf '%s\n' "$HOSTING_AUDIT_WIF_PROVIDER" "$HOSTING_ADMISSION_READER_WIF_PROVIDER" "$HOSTING_DEPLOY_WIF_PROVIDER" | sort -u | wc -l | tr -d ' ')" = 3
+          test "$(printf '%s\n' "$HOSTING_AUDIT_WIF_PROVIDER" "$HOSTING_ADMISSION_READER_WIF_PROVIDER" "$HOSTING_DEPLOY_WIF_PROVIDER" | sed 's#/providers/.*##' | sort -u | wc -l | tr -d ' ')" = 3
+          [[ "$RELEASE_SECURITY_LOG_SINK" =~ ^[A-Za-z][A-Za-z0-9._-]{0,99}$ ]]
+          [[ "$RELEASE_SECURITY_LOG_BUCKET" =~ ^[A-Za-z0-9._-]{1,100}$ ]]
+          [[ "$RELEASE_SECURITY_LOGGING_LOCATION" =~ ^(global|eu|us|[a-z]+-[a-z]+[0-9])$ ]]
+          [[ "$REPOSITORY_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$REPOSITORY_OWNER_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+
+      - name: Mint a short-lived read-only GitHub governance token
+        id: github-governance-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.GITHUB_GOVERNANCE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.GITHUB_GOVERNANCE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: AI-Birthday
+          permission-actions: read
+          permission-administration: read
+          permission-checks: read
+          permission-organization-administration: read
+
+      - name: Collect protected GitHub repository and environment governance
+        id: github-governance
+        shell: bash
+        env:
+          GITHUB_GOVERNANCE_AUDIT_TOKEN: ${{ steps.github-governance-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$GITHUB_GOVERNANCE_AUDIT_TOKEN"
+          output="$GITHUB_WORKSPACE/release-evidence/cloud-production-readonly/raw"
+          mkdir -p "$output"
+          github_get() {
+            local url="$1"
+            local destination="$2"
+            {
+              printf '%s\n' 'fail' 'silent' 'show-error' 'proto = "=https"' 'tlsv1.2' 'request = "GET"'
+              printf 'header = "Authorization: Bearer %s"\n' "$GITHUB_GOVERNANCE_AUDIT_TOKEN"
+              printf '%s\n' 'header = "Accept: application/vnd.github+json"' 'header = "X-GitHub-Api-Version: 2026-03-10"'
+              printf 'url = "%s"\n' "$url"
+            } | curl --config - > "$destination"
+          }
+          github_get "https://api.github.com/repos/$GITHUB_REPOSITORY" "$output/github-repository.json"
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg id "$REPOSITORY_ID" --arg owner "$REPOSITORY_OWNER_ID" \
+            '.full_name == $repo and (.id | tostring) == $id and .owner.type == "Organization" and (.owner.id | tostring) == $owner' \
+            "$output/github-repository.json" > /dev/null
+          github_get "https://api.github.com/repos/$GITHUB_REPOSITORY/branches/main/protection" "$output/github-main-branch-protection.json"
+          github_get "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$EXPECTED_SOURCE_REVISION/check-runs?filter=latest&per_page=100" \
+            "$output/github-release-source-check-runs.json"
+          github_get "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&head_sha=$EXPECTED_SOURCE_REVISION&status=success&per_page=100" \
+            "$output/github-release-source-ci-runs.json"
+          jq -e --arg source "$EXPECTED_SOURCE_REVISION" '
+            .total_count == 1 and
+            (.workflow_runs | type == "array" and length == 1) and
+            .workflow_runs[0].head_sha == $source and
+            .workflow_runs[0].head_branch == "main" and
+            .workflow_runs[0].event == "push" and
+            .workflow_runs[0].status == "completed" and
+            .workflow_runs[0].conclusion == "success"
+          ' "$output/github-release-source-ci-runs.json" > /dev/null
+          ci_check_suite_id="$(jq -er '.workflow_runs[0].check_suite_id | tostring' "$output/github-release-source-ci-runs.json")"
+          jq -e --arg source "$EXPECTED_SOURCE_REVISION" --arg suite "$ci_check_suite_id" '
+            . as $response |
+            ($response.total_count | type == "number" and . < 100) and
+            ($response.check_runs | type == "array" and length == $response.total_count) and
+            ([
+              $response.check_runs[] |
+              select(
+                .name == "Release admission for exact source SHA" and
+                .head_sha == $source and
+                .status == "completed" and
+                .conclusion == "success" and
+                (.check_suite.id | tostring) == $suite and
+                .app.slug == "github-actions"
+              )
+            ] | length == 1)
+          ' "$output/github-release-source-check-runs.json" > /dev/null
+          for environment in cloud-production-readonly-audit hosting-production-readonly-live hosting-production-build hosting-production-admission hosting-production-deploy; do
+            encoded_environment="$(jq -nr --arg value "$environment" '$value | @uri')"
+            github_get "https://api.github.com/repos/$GITHUB_REPOSITORY/environments/$encoded_environment" \
+              "$output/github-environment-${environment}.json"
+            github_get "https://api.github.com/repos/$GITHUB_REPOSITORY/environments/$encoded_environment/deployment-branch-policies?per_page=100" \
+              "$output/github-environment-${environment}-branch-policies.json"
+          done
+          audit="$output/github-environment-audit-log.json"
+          phrase="$(jq -nr --arg value "action:environment.update_protection_rule repo:$GITHUB_REPOSITORY" '$value | @uri')"
+          github_get "https://api.github.com/orgs/$GITHUB_REPOSITORY_OWNER/audit-log?phrase=$phrase&include=all&per_page=100" "$audit"
+          jq -e 'type == "array" and length < 100' "$audit" > /dev/null
+          governance_digest="$(find "$output" -maxdepth 1 -type f -name 'github-*.json' -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)"
+          [[ "$governance_digest" =~ ^[0-9a-f]{64}$ ]]
+          printf 'digest=%s\n' "$governance_digest" >> "$GITHUB_OUTPUT"
+          unset GITHUB_GOVERNANCE_AUDIT_TOKEN
 
       - name: Set up the repository Node.js line
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -164,6 +295,53 @@ jobs:
           output="$GITHUB_WORKSPACE/release-evidence/cloud-production-readonly/raw"
           mkdir -p "$output"
 
+          gcloud projects get-ancestors "$PROJECT_ID" --format=json > "$output/application-project-ancestors.json"
+          gcloud projects get-ancestors "$RELEASE_SECURITY_PROJECT_ID" --format=json > "$output/release-security-project-ancestors.json"
+          analysis_scope() {
+            local ancestors="$1"
+            local project_id="$2"
+            local project_number="$3"
+            jq -e --arg project "$project_number" \
+              'map(select(.type == "project" and (.id | tostring) == $project)) | length == 1' \
+              "$ancestors" > /dev/null
+            local organization_count folder_count
+            organization_count="$(jq '[.[] | select(.type == "organization")] | length' "$ancestors")"
+            folder_count="$(jq '[.[] | select(.type == "folder")] | length' "$ancestors")"
+            test "$organization_count" -le 1
+            if [[ "$organization_count" = 1 ]]; then
+              jq -er '[.[] | select(.type == "organization")][0].id | tostring | select(test("^[1-9][0-9]{5,19}$")) | "organizations/" + .' "$ancestors"
+            else
+              test "$folder_count" = 0
+              printf 'projects/%s\n' "$project_id"
+            fi
+          }
+          application_analysis_scope="$(analysis_scope "$output/application-project-ancestors.json" "$PROJECT_ID" "$PROJECT_NUMBER")"
+          release_security_analysis_scope="$(analysis_scope "$output/release-security-project-ancestors.json" "$RELEASE_SECURITY_PROJECT_ID" "$RELEASE_SECURITY_PROJECT_NUMBER")"
+          ancestor_policies="$output/release-security-ancestor-iam-policies.json"
+          printf '[]\n' > "$ancestor_policies"
+          while IFS= read -r ancestor; do
+            ancestor_type="$(jq -er '.type' <<< "$ancestor")"
+            ancestor_id="$(jq -er '.id | tostring' <<< "$ancestor")"
+            [[ "$ancestor_id" =~ ^[1-9][0-9]{5,19}$ ]]
+            policy="$output/.ancestor-policy-${ancestor_type}-${ancestor_id}.json"
+            case "$ancestor_type" in
+              folder)
+                gcloud resource-manager folders get-iam-policy "$ancestor_id" --format=json > "$policy"
+                ;;
+              organization)
+                gcloud organizations get-iam-policy "$ancestor_id" --format=json > "$policy"
+                ;;
+              *) exit 1 ;;
+            esac
+            updated="$output/.ancestor-policies-updated.json"
+            jq --arg type "$ancestor_type" --arg id "$ancestor_id" \
+              --slurpfile policy "$policy" \
+              '. + [{type:$type,id:$id,policy:$policy[0]}]' \
+              "$ancestor_policies" > "$updated"
+            mv "$updated" "$ancestor_policies"
+            rm -f "$policy"
+          done < <(jq -c '.[] | select(.type != "project")' "$output/release-security-project-ancestors.json")
+
           jq -n \
             --arg sourceRevision "$EXPECTED_SOURCE_REVISION" \
             --arg projectId "$PROJECT_ID" \
@@ -175,14 +353,35 @@ jobs:
             --arg auditServiceAccount "$CLOUD_AUDIT_SERVICE_ACCOUNT" \
             --arg hostingSiteId "$HOSTING_SITE_ID" \
             --arg loggingLocation "$LOGGING_LOCATION" \
+            --arg releaseSecurityProjectId "$RELEASE_SECURITY_PROJECT_ID" \
+            --arg releaseSecurityProjectNumber "$RELEASE_SECURITY_PROJECT_NUMBER" \
+            --arg applicationIamAnalysisScope "$application_analysis_scope" \
+            --arg releaseSecurityIamAnalysisScope "$release_security_analysis_scope" \
+            --arg admissionBucketName "$HOSTING_ADMISSION_BUCKET" \
+            --arg hostingObserverServiceAccount "$HOSTING_AUDIT_SERVICE_ACCOUNT" \
+            --arg hostingObserverWifProvider "$HOSTING_AUDIT_WIF_PROVIDER" \
+            --arg admissionReaderServiceAccount "$HOSTING_ADMISSION_READER_SERVICE_ACCOUNT" \
+            --arg admissionReaderWifProvider "$HOSTING_ADMISSION_READER_WIF_PROVIDER" \
+            --arg hostingDeployServiceAccount "$HOSTING_DEPLOY_SERVICE_ACCOUNT" \
+            --arg hostingDeployWifProvider "$HOSTING_DEPLOY_WIF_PROVIDER" \
+            --arg releaseSecurityLogSinkName "$RELEASE_SECURITY_LOG_SINK" \
+            --arg releaseSecurityLogBucketName "$RELEASE_SECURITY_LOG_BUCKET" \
+            --arg releaseSecurityLoggingLocation "$RELEASE_SECURITY_LOGGING_LOCATION" \
             --arg retainedProjectAssignment "$RETAINED_PROJECT_ASSIGNMENT" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg repositoryId "$REPOSITORY_ID" \
+            --arg repositoryOwnerId "$REPOSITORY_OWNER_ID" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg workflowRef "$GITHUB_WORKFLOW_REF" \
             --arg workflowRun "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             --arg observedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{schemaVersion:1,sourceRevision:$sourceRevision,projectId:$projectId,projectNumber:$projectNumber,androidAppId:$androidAppId,iosAppId:$iosAppId,webAppId:$webAppId,runtimeServiceAccount:$runtimeServiceAccount,auditServiceAccount:$auditServiceAccount,hostingSiteId:$hostingSiteId,loggingLocation:$loggingLocation,retainedProjectAssignment:$retainedProjectAssignment,workflowRun:$workflowRun,observedAt:$observedAt,mutationAuthorized:false}' \
+            '{schemaVersion:1,sourceRevision:$sourceRevision,projectId:$projectId,projectNumber:$projectNumber,androidAppId:$androidAppId,iosAppId:$iosAppId,webAppId:$webAppId,runtimeServiceAccount:$runtimeServiceAccount,auditServiceAccount:$auditServiceAccount,hostingSiteId:$hostingSiteId,loggingLocation:$loggingLocation,releaseSecurityProjectId:$releaseSecurityProjectId,releaseSecurityProjectNumber:$releaseSecurityProjectNumber,applicationIamAnalysisScope:$applicationIamAnalysisScope,releaseSecurityIamAnalysisScope:$releaseSecurityIamAnalysisScope,admissionBucketName:$admissionBucketName,hostingObserverServiceAccount:$hostingObserverServiceAccount,hostingObserverWifProvider:$hostingObserverWifProvider,admissionReaderServiceAccount:$admissionReaderServiceAccount,admissionReaderWifProvider:$admissionReaderWifProvider,hostingDeployServiceAccount:$hostingDeployServiceAccount,hostingDeployWifProvider:$hostingDeployWifProvider,releaseSecurityLogSinkName:$releaseSecurityLogSinkName,releaseSecurityLogBucketName:$releaseSecurityLogBucketName,releaseSecurityLoggingLocation:$releaseSecurityLoggingLocation,retainedProjectAssignment:$retainedProjectAssignment,repository:$repository,repositoryId:$repositoryId,repositoryOwnerId:$repositoryOwnerId,runId:$runId,runAttempt:$runAttempt,workflowRef:$workflowRef,workflowRun:$workflowRun,observedAt:$observedAt,mutationAuthorized:false}' \
             > "$output/workflow-context.json"
 
           gcloud version --format=json > "$output/gcloud-version.json"
           gcloud projects describe "$PROJECT_ID" --project="$PROJECT_ID" --format=json > "$output/project.json"
+          gcloud projects describe "$RELEASE_SECURITY_PROJECT_ID" --project="$PROJECT_ID" --format=json > "$output/release-security-project.json"
           gcloud billing projects describe "$PROJECT_ID" --format=json > "$output/project-billing.json"
           gcloud beta billing budgets list --billing-account="$BILLING_ACCOUNT_ID" --format=json > "$output/budgets.json"
           gcloud services list --enabled --project="$PROJECT_ID" --format=json > "$output/enabled-services.json"
@@ -203,13 +402,109 @@ jobs:
           gcloud iam service-accounts keys list --iam-account="$RUNTIME_SERVICE_ACCOUNT" --managed-by=user --project="$PROJECT_ID" --format=json > "$output/runtime-user-managed-keys.json"
           gcloud iam service-accounts describe "$CLOUD_AUDIT_SERVICE_ACCOUNT" --project="$PROJECT_ID" --format=json > "$output/audit-service-account.json"
           gcloud iam service-accounts keys list --iam-account="$CLOUD_AUDIT_SERVICE_ACCOUNT" --managed-by=user --project="$PROJECT_ID" --format=json > "$output/audit-user-managed-keys.json"
+          gcloud iam service-accounts describe "$HOSTING_AUDIT_SERVICE_ACCOUNT" --project="$PROJECT_ID" --format=json > "$output/hosting-observer-service-account.json"
+          gcloud iam service-accounts keys list --iam-account="$HOSTING_AUDIT_SERVICE_ACCOUNT" --managed-by=user --project="$PROJECT_ID" --format=json > "$output/hosting-observer-user-managed-keys.json"
+          gcloud iam service-accounts get-iam-policy "$HOSTING_AUDIT_SERVICE_ACCOUNT" --project="$PROJECT_ID" --format=json > "$output/hosting-observer-service-account-iam.json"
+          gcloud iam service-accounts describe "$HOSTING_ADMISSION_READER_SERVICE_ACCOUNT" --project="$RELEASE_SECURITY_PROJECT_ID" --format=json > "$output/admission-reader-service-account.json"
+          gcloud iam service-accounts keys list --iam-account="$HOSTING_ADMISSION_READER_SERVICE_ACCOUNT" --managed-by=user --project="$RELEASE_SECURITY_PROJECT_ID" --format=json > "$output/admission-reader-user-managed-keys.json"
+          gcloud iam service-accounts get-iam-policy "$HOSTING_ADMISSION_READER_SERVICE_ACCOUNT" --project="$RELEASE_SECURITY_PROJECT_ID" --format=json > "$output/admission-reader-service-account-iam.json"
+          gcloud iam service-accounts describe "$HOSTING_DEPLOY_SERVICE_ACCOUNT" --project="$PROJECT_ID" --format=json > "$output/hosting-deploy-service-account.json"
+          gcloud iam service-accounts keys list --iam-account="$HOSTING_DEPLOY_SERVICE_ACCOUNT" --managed-by=user --project="$PROJECT_ID" --format=json > "$output/hosting-deploy-user-managed-keys.json"
+          gcloud iam service-accounts get-iam-policy "$HOSTING_DEPLOY_SERVICE_ACCOUNT" --project="$PROJECT_ID" --format=json > "$output/hosting-deploy-service-account-iam.json"
           gcloud projects get-iam-policy "$PROJECT_ID" --flatten='bindings[].members' --filter="bindings.members:serviceAccount:$RUNTIME_SERVICE_ACCOUNT" --format=json > "$output/runtime-project-iam.json"
           gcloud projects get-iam-policy "$PROJECT_ID" --flatten='bindings[].members' --filter="bindings.members:serviceAccount:$CLOUD_AUDIT_SERVICE_ACCOUNT" --format=json > "$output/audit-project-iam.json"
+          gcloud projects get-iam-policy "$PROJECT_ID" --format=json > "$output/application-project-iam.json"
+          gcloud projects get-iam-policy "$RELEASE_SECURITY_PROJECT_ID" --format=json > "$output/release-security-project-iam.json"
+
+          describe_provider() {
+            local resource="$1"
+            local project="$2"
+            local prefix="$3"
+            local pool provider
+            pool="$(cut -d/ -f6 <<< "$resource")"
+            provider="$(cut -d/ -f8 <<< "$resource")"
+            gcloud iam workload-identity-pools describe "$pool" \
+              --location=global --project="$project" --format=json \
+              > "$output/${prefix}-wif-pool.json"
+            gcloud iam workload-identity-pools providers list \
+              --location=global --workload-identity-pool="$pool" \
+              --project="$project" --format=json \
+              > "$output/${prefix}-wif-providers.json"
+            gcloud iam workload-identity-pools providers describe "$provider" \
+              --location=global --workload-identity-pool="$pool" \
+              --project="$project" --format=json \
+              > "$output/${prefix}-wif-provider.json"
+          }
+          describe_provider "$HOSTING_AUDIT_WIF_PROVIDER" "$PROJECT_ID" 'hosting-observer'
+          describe_provider "$HOSTING_ADMISSION_READER_WIF_PROVIDER" "$RELEASE_SECURITY_PROJECT_ID" 'admission-reader'
+          describe_provider "$HOSTING_DEPLOY_WIF_PROVIDER" "$PROJECT_ID" 'hosting-deploy'
+
+          asset_analysis() {
+            local scope="$1"
+            local resource="$2"
+            local permissions="$3"
+            local destination="$4"
+            local scope_kind="${scope%%/*}"
+            local scope_id="${scope#*/}"
+            local scope_args=()
+            case "$scope_kind" in
+              organizations) scope_args=(--organization="$scope_id") ;;
+              projects) scope_args=(--project="$scope_id") ;;
+              *) return 1 ;;
+            esac
+            local response="${destination}.response"
+            local permission_args=()
+            if [[ -n "$permissions" ]]; then
+              permission_args=(--permissions="$permissions")
+            fi
+            gcloud asset analyze-iam-policy \
+              "${scope_args[@]}" \
+              --full-resource-name="$resource" \
+              "${permission_args[@]}" \
+              --expand-groups --expand-roles --show-response --format=json \
+              > "$response"
+            jq -n --arg scope "$scope" --slurpfile response "$response" \
+              '{scope:$scope,response:$response[0]}' > "$destination"
+            rm -f "$response"
+          }
+          token_permissions='iam.serviceAccounts.getAccessToken,iam.serviceAccounts.getOpenIdToken,iam.serviceAccounts.implicitDelegation,iam.serviceAccounts.signBlob,iam.serviceAccounts.signJwt,iam.serviceAccounts.actAs'
+          asset_analysis "$application_analysis_scope" "//iam.googleapis.com/projects/$PROJECT_ID/serviceAccounts/$HOSTING_AUDIT_SERVICE_ACCOUNT" "$token_permissions" "$output/hosting-observer-impersonation-access-analysis.json"
+          asset_analysis "$release_security_analysis_scope" "//iam.googleapis.com/projects/$RELEASE_SECURITY_PROJECT_ID/serviceAccounts/$HOSTING_ADMISSION_READER_SERVICE_ACCOUNT" "$token_permissions" "$output/admission-reader-impersonation-access-analysis.json"
+          asset_analysis "$application_analysis_scope" "//iam.googleapis.com/projects/$PROJECT_ID/serviceAccounts/$HOSTING_DEPLOY_SERVICE_ACCOUNT" "$token_permissions" "$output/hosting-deploy-impersonation-access-analysis.json"
+          gcloud resource-manager org-policies describe \
+            iam.disableCrossProjectServiceAccountUsage \
+            --project="$PROJECT_ID" --effective --format=json \
+            > "$output/application-cross-project-sa-org-policy.json"
+          gcloud resource-manager org-policies describe \
+            iam.disableCrossProjectServiceAccountUsage \
+            --project="$RELEASE_SECURITY_PROJECT_ID" --effective --format=json \
+            > "$output/release-security-cross-project-sa-org-policy.json"
+          gcloud asset list --project="$PROJECT_ID" --content-type=resource \
+            --format=json > "$output/application-resource-assets.json"
+          gcloud asset list --project="$RELEASE_SECURITY_PROJECT_ID" \
+            --content-type=resource --format=json \
+            > "$output/release-security-resource-assets.json"
+
+          gcloud storage buckets list --project="$PROJECT_ID" --format=json > "$output/application-project-buckets.json"
+          gcloud storage buckets list --project="$RELEASE_SECURITY_PROJECT_ID" --format=json > "$output/release-security-buckets.json"
+          gcloud storage buckets describe "gs://$HOSTING_ADMISSION_BUCKET" --project="$RELEASE_SECURITY_PROJECT_ID" --format=json > "$output/admission-bucket.json"
+          gcloud storage buckets get-iam-policy "gs://$HOSTING_ADMISSION_BUCKET" --project="$RELEASE_SECURITY_PROJECT_ID" --format=json > "$output/admission-bucket-iam.json"
+
+          asset_analysis "$release_security_analysis_scope" \
+            "//storage.googleapis.com/projects/_/buckets/$HOSTING_ADMISSION_BUCKET" \
+            '' "$output/admission-bucket-access-analysis.json"
+          hosting_mutation_permissions='firebasehosting.sites.create,firebasehosting.sites.delete,firebasehosting.sites.update'
+          asset_analysis "$application_analysis_scope" \
+            "//cloudresourcemanager.googleapis.com/projects/$PROJECT_NUMBER" \
+            "$hosting_mutation_permissions" \
+            "$output/hosting-mutation-access-analysis.json"
 
           gcloud logging exclusions list --project="$PROJECT_ID" --format=json > "$output/logging-exclusions.json"
           gcloud logging sinks list --project="$PROJECT_ID" --format=json > "$output/logging-sinks.json"
           gcloud logging buckets describe _Default --location="$LOGGING_LOCATION" --project="$PROJECT_ID" --format=json > "$output/logging-default-bucket.json"
           gcloud logging buckets describe _Required --location="$LOGGING_LOCATION" --project="$PROJECT_ID" --format=json > "$output/logging-required-bucket.json"
+          gcloud logging sinks list --project="$RELEASE_SECURITY_PROJECT_ID" --format=json > "$output/release-security-logging-sinks.json"
+          gcloud logging buckets describe "$RELEASE_SECURITY_LOG_BUCKET" --location="$RELEASE_SECURITY_LOGGING_LOCATION" --project="$RELEASE_SECURITY_PROJECT_ID" --format=json > "$output/release-security-log-bucket.json"
 
           backend/functions/node_modules/.bin/firebase apps:list --project "$PROJECT_ID" --json --non-interactive > "$output/firebase-apps.json"
           backend/functions/node_modules/.bin/firebase hosting:sites:list --project "$PROJECT_ID" --json --non-interactive > "$output/firebase-hosting-sites.json"
@@ -240,6 +535,9 @@ jobs:
             "https://firebaseappcheck.googleapis.com/v1/projects/$PROJECT_NUMBER/apps/$WEB_APP_ID/recaptchaEnterpriseConfig" \
             "$output/web-app-check.json"
           curl_readonly \
+            "https://firebase.googleapis.com/v1beta1/projects/$PROJECT_ID" \
+            "$output/firebase-project.json"
+          curl_readonly \
             "https://firebaseremoteconfig.googleapis.com/v1/projects/$PROJECT_ID/remoteConfig" \
             "$output/remote-config.json"
           unset access_token
@@ -250,11 +548,19 @@ jobs:
           test "$(jq 'length' "$output/firestore-backups.json")" = 0
           test "$(jq 'length' "$output/runtime-user-managed-keys.json")" = 0
           test "$(jq 'length' "$output/audit-user-managed-keys.json")" = 0
+          test "$(jq 'length' "$output/hosting-observer-user-managed-keys.json")" = 0
+          test "$(jq 'length' "$output/admission-reader-user-managed-keys.json")" = 0
+          test "$(jq 'length' "$output/hosting-deploy-user-managed-keys.json")" = 0
 
       - name: Create immutable observation manifest
         shell: bash
+        env:
+          EXPECTED_GITHUB_GOVERNANCE_DIGEST: ${{ steps.github-governance.outputs.digest }}
         run: |
           set -euo pipefail
+          output="$GITHUB_WORKSPACE/release-evidence/cloud-production-readonly/raw"
+          governance_digest="$(find "$output" -maxdepth 1 -type f -name 'github-*.json' -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)"
+          test "$governance_digest" = "$EXPECTED_GITHUB_GOVERNANCE_DIGEST"
           node tools/create-evidence-manifest.mjs \
             --base "$GITHUB_WORKSPACE" \
             --label cloud-production-readonly \
@@ -273,6 +579,11 @@ jobs:
           sha256sum \
             release-evidence/cloud-production-readonly/cloud-readonly-observation.tar \
             > release-evidence/cloud-production-readonly/cloud-readonly-observation.tar.sha256
+          node tools/create-cloud-readonly-observation-report.mjs \
+            --raw-root release-evidence/cloud-production-readonly/raw \
+            --manifest release-evidence/cloud-production-readonly/evidence-manifest.json \
+            --archive release-evidence/cloud-production-readonly/cloud-readonly-observation.tar \
+            --output release-evidence/cloud-production-readonly/cloud-readonly-observation-report.json
           git diff --exit-code
 
       - name: Upload protected read-only observations

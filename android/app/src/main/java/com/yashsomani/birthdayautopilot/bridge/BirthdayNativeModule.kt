@@ -550,18 +550,29 @@ class BirthdayNativeModule(
         resetSafetyClear = durable.resetSafetyClear,
       ),
     )
+    val iosComposerReserved = runBlocking {
+      appGraph.automationOrchestrationDao.activeAccount()?.let { account ->
+        appGraph.automationOrchestrationDao.coordinationState(account.accountId)?.lastSafeCode
+      }
+    } == "IOS_COMPOSER_RESERVED"
+    fun withComposerReservation(blockers: List<String>): List<String> =
+      if (iosComposerReserved) blockers + "IOS_COMPOSER_RESERVED" else blockers
     val permanentPermissionIssue = snapshot.permanentPermissionDenial.readinessWireCode()
     return JSONObject()
       .put("platform", "android")
       .put(
         "test",
-        gatePayload("test", decision.testBlockers.map { it.name }, permanentPermissionIssue),
+        gatePayload(
+          "test",
+          withComposerReservation(decision.testBlockers.map { it.name }),
+          permanentPermissionIssue,
+        ),
       )
       .put(
         "activation",
         gatePayload(
           "activation",
-          decision.activationBlockers.map { it.name },
+          withComposerReservation(decision.activationBlockers.map { it.name }),
           permanentPermissionIssue,
         ),
       )
@@ -569,7 +580,7 @@ class BirthdayNativeModule(
         "birthday",
         gatePayload(
           "birthday",
-          decision.birthdayBlockers.map { it.name },
+          withComposerReservation(decision.birthdayBlockers.map { it.name }),
           permanentPermissionIssue,
         ),
       )
@@ -797,7 +808,9 @@ class BirthdayNativeModule(
     request: JSONObject,
     snapshot: AndroidReadinessSnapshot,
   ): Any? = when (request.optString("kind")) {
-    "list" -> runBlocking { lifecycleController.activityPayload(request) }
+    "list" -> runBlocking { lifecycleController.activityPayload(request) }?.also {
+      attachActivityRecoveries(it, snapshot)
+    }
     "issues" -> if (request.keyNames() == setOf("kind")) {
       activityIssuesPayload(snapshot)
     } else {
@@ -806,7 +819,9 @@ class BirthdayNativeModule(
     else -> null
   }
 
-  private fun activityIssuesPayload(snapshot: AndroidReadinessSnapshot): JSONArray {
+  private fun activityIssueBlocksByCode(
+    snapshot: AndroidReadinessSnapshot,
+  ): LinkedHashMap<String, LinkedHashSet<String>> {
     val readiness = readinessPayload(snapshot)
     val blocksByCode = linkedMapOf<String, LinkedHashSet<String>>()
     listOf("test", "activation", "birthday").forEach { gate ->
@@ -818,6 +833,39 @@ class BirthdayNativeModule(
         blocksByCode.getOrPut(code) { linkedSetOf() }.add(gate)
       }
     }
+    return blocksByCode
+  }
+
+  /**
+   * Activity is historical, while recovery is a live capability. Project a
+   * route only when the current native snapshot still exposes that repair.
+   */
+  private fun attachActivityRecoveries(
+    page: JSONObject,
+    snapshot: AndroidReadinessSnapshot,
+  ) {
+    val issueCodes = activityIssueBlocksByCode(snapshot).keys
+    val automation = automationPayload(snapshot)
+    val effective = automation.optString("effective")
+    val items = page.optJSONArray("items") ?: return
+    for (index in 0 until items.length()) {
+      val item = items.optJSONObject(index) ?: continue
+      val kind = item.optString("kind")
+      val reason = item.optString("reason").takeIf { it.isNotBlank() }
+      val route = AndroidActivityRecoveryPolicy.route(
+        kind = kind,
+        reason = reason,
+        currentIssueCodes = issueCodes,
+        automationEffective = effective,
+      )
+      route?.let {
+        item.put("recovery", JSONObject().put("route", it))
+      }
+    }
+  }
+
+  private fun activityIssuesPayload(snapshot: AndroidReadinessSnapshot): JSONArray {
+    val blocksByCode = activityIssueBlocksByCode(snapshot)
     val revision = currentRevision().toLongOrNull() ?: 0L
     return JSONArray().apply {
       blocksByCode.forEach { (code, blocks) ->
@@ -2615,6 +2663,8 @@ class BirthdayNativeModule(
       "coordination-unavailable"
     com.yashsomani.birthdayautopilot.coordination.CoordinationServerReason.DELETION_SUPPRESSED ->
       "firebase-account-deleting"
+    com.yashsomani.birthdayautopilot.coordination.CoordinationServerReason.IOS_COMPOSER_RESERVED ->
+      "ios-composer-reserved"
     com.yashsomani.birthdayautopilot.coordination.CoordinationServerReason.MODE_BLOCKED ->
       "policy-suspended"
     else -> "coordination-unavailable"
@@ -3396,6 +3446,7 @@ class BirthdayNativeModule(
       "RESET_SAFETY_BLOCKED" to "reset-safety-blocked",
       "STORAGE_UNAVAILABLE" to "internal-contract-invalid",
       "IOS_USER_CONFIRMATION_REQUIRED" to "platform-composer-only",
+      "IOS_COMPOSER_RESERVED" to "ios-composer-reserved",
       "UPDATE_REQUIRED" to "platform-unsupported",
     )
     val SAFE_REASON_CODES = READINESS_WIRE_CODES.values.toSet() + setOf(

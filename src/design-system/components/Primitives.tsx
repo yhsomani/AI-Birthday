@@ -1,5 +1,17 @@
-import React, { PropsWithChildren, ReactNode } from 'react';
+import React, {
+  PropsWithChildren,
+  ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import {
+  AccessibilityInfo,
+  LayoutChangeEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleProp,
@@ -7,6 +19,7 @@ import {
   Switch,
   View,
   ViewStyle,
+  findNodeHandle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -24,6 +37,14 @@ type ScreenProps = PropsWithChildren<{
   contentStyle?: StyleProp<ViewStyle>;
 }>;
 
+type ScreenScrollController = Readonly<{
+  scrollToReview: (y: number) => void;
+}>;
+
+const ScreenScrollContext = createContext<ScreenScrollController | undefined>(
+  undefined,
+);
+
 export function Screen({
   children,
   testID,
@@ -32,6 +53,18 @@ export function Screen({
   contentStyle,
 }: ScreenProps) {
   const { colors } = useAppTheme();
+  const scrollView = useRef<ScrollView>(null);
+  const scrollController = useMemo<ScreenScrollController>(
+    () => ({
+      scrollToReview: y => {
+        scrollView.current?.scrollTo({
+          animated: false,
+          y: Math.max(0, y - spacing.md),
+        });
+      },
+    }),
+    [],
+  );
   return (
     <SafeAreaView
       edges={[
@@ -43,13 +76,16 @@ export function Screen({
       style={[styles.screen, { backgroundColor: colors.background }]}
       testID={testID}
     >
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[styles.screenContent, contentStyle]}
-      >
-        {children}
-      </ScrollView>
+      <ScreenScrollContext.Provider value={scrollController}>
+        <ScrollView
+          ref={scrollView}
+          keyboardShouldPersistTaps="handled"
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={[styles.screenContent, contentStyle]}
+        >
+          {children}
+        </ScrollView>
+      </ScreenScrollContext.Provider>
     </SafeAreaView>
   );
 }
@@ -78,6 +114,113 @@ export function Card({
       ]}
     >
       {children}
+    </View>
+  );
+}
+
+/**
+ * Reveals a newly materialized inline review and moves assistive focus to its
+ * visible heading. The opaque review key only fences duplicate layout events;
+ * it is never exposed through accessibility or test identifiers.
+ */
+export function InlineReviewCard({
+  children,
+  reviewKey,
+  testID,
+  title,
+}: PropsWithChildren<{
+  reviewKey: string;
+  testID: string;
+  title: string;
+}>) {
+  const scrollController = useContext(ScreenScrollContext);
+  const focusTarget = useRef<View>(null);
+  const lastLayoutY = useRef<number | undefined>(undefined);
+  const handledReviewKey = useRef<string | undefined>(undefined);
+  const requestGeneration = useRef(0);
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      requestGeneration.current += 1;
+      if (focusTimer.current !== undefined) {
+        clearTimeout(focusTimer.current);
+      }
+    };
+  }, []);
+
+  const revealReview = useCallback(
+    (y: number) => {
+      if (handledReviewKey.current === reviewKey) return;
+      handledReviewKey.current = reviewKey;
+      const generation = requestGeneration.current + 1;
+      requestGeneration.current = generation;
+      scrollController?.scrollToReview(y);
+
+      AccessibilityInfo.isScreenReaderEnabled()
+        .then(enabled => {
+          if (
+            !enabled ||
+            !mounted.current ||
+            requestGeneration.current !== generation
+          ) {
+            return;
+          }
+          focusTimer.current = setTimeout(() => {
+            if (!mounted.current || requestGeneration.current !== generation) {
+              return;
+            }
+            const handle = findNodeHandle(focusTarget.current);
+            if (handle !== null) {
+              AccessibilityInfo.setAccessibilityFocus(handle);
+            }
+            if (Platform.OS === 'ios') {
+              AccessibilityInfo.announceForAccessibilityWithOptions(title, {
+                queue: true,
+              });
+            } else if (handle === null) {
+              AccessibilityInfo.announceForAccessibility(title);
+            }
+          }, 0);
+        })
+        .catch(() => undefined);
+    },
+    [reviewKey, scrollController, title],
+  );
+
+  useEffect(() => {
+    if (lastLayoutY.current !== undefined) {
+      revealReview(lastLayoutY.current);
+    }
+  }, [revealReview, reviewKey]);
+
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      lastLayoutY.current = event.nativeEvent.layout.y;
+      revealReview(event.nativeEvent.layout.y);
+    },
+    [revealReview],
+  );
+
+  return (
+    <View onLayout={onLayout} testID={testID}>
+      <Card>
+        <View
+          accessible
+          accessibilityLabel={title}
+          accessibilityRole="header"
+          ref={focusTarget}
+          testID={`${testID}-focus`}
+        >
+          <AppText variant="heading">{title}</AppText>
+        </View>
+        {children}
+      </Card>
     </View>
   );
 }
@@ -322,6 +465,7 @@ export function ChoiceChip({
   const { colors, isHighContrast } = useAppTheme();
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       onPress={onPress}
@@ -336,13 +480,39 @@ export function ChoiceChip({
         },
       ]}
     >
+      {selected ? (
+        <View testID={testID ? `${testID}-selected-indicator` : undefined}>
+          <Icon name="check" color={colors.onAccent} size={18} />
+        </View>
+      ) : null}
       <AppText
         variant="caption"
-        style={{ color: selected ? colors.onAccent : colors.text }}
+        style={[
+          styles.choiceText,
+          { color: selected ? colors.onAccent : colors.text },
+        ]}
       >
         {label}
       </AppText>
     </Pressable>
+  );
+}
+
+export function SingleChoiceGroup({
+  children,
+  label,
+  testID,
+}: PropsWithChildren<{ label: string; testID?: string }>) {
+  return (
+    <View
+      accessible={false}
+      accessibilityLabel={label}
+      accessibilityRole="radiogroup"
+      style={styles.choiceGroup}
+      testID={testID}
+    >
+      {children}
+    </View>
   );
 }
 
@@ -636,8 +806,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
     justifyContent: 'center',
   },
+  choiceGroup: { gap: spacing.sm },
+  choiceText: { flexShrink: 1, textAlign: 'center' },
   search: {
     minHeight: minimumTargetSize,
     borderWidth: 1,

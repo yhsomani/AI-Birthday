@@ -185,12 +185,15 @@ test('notification taps consume only an opaque protected request and route to re
     /request\.content\.userInfo\["requestId"\] as\? String/u,
   );
   assert.match(router, /request\.content\.userInfo\.count == 1/u);
-  assert.match(router, /consumeReminderRouteRequest\(requestId\)/u);
+  assert.match(
+    router,
+    /store\.consumeReminderRouteRequest\(requestId, now: Date\(\)\)/u,
+  );
   assert.match(store, /snapshot\.notificationIdentities\[identityIndex\]/u);
   assert.match(store, /requestId: UUID\(\)\.uuidString\.lowercased\(\)/u);
   assert.match(
     store,
-    /!plannedOccurrenceIds\.intersection\(reviewableOccurrenceIds\)/u,
+    /let index = snapshot\.planningIndex[\s\S]*?Self\.dayOffset\(civilDate: identity\.civilDate, in: index\)[\s\S]*?index\.ordinals\(dayOffset: dayOffset\)/u,
   );
   assert.match(router, /"kind": "available"/u);
   assert.match(store, /"kind": "automation-review"/u);

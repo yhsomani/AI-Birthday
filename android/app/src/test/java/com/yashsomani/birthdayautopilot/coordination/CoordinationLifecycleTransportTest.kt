@@ -441,6 +441,7 @@ class CoordinationLifecycleTransportTest {
       "RESET_SUPPRESSED",
       "CONTINUITY_UNAVAILABLE",
       "GENERATION_EXHAUSTED",
+      "IOS_COMPOSER_RESERVED",
     )
   }
 }

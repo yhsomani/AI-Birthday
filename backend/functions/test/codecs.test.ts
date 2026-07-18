@@ -14,6 +14,7 @@ import {
   decodeDestinationGuard,
   decodeGlobalControl,
   decodeInstallation,
+  decodeIOSComposerReservation,
   decodeOccurrenceKey,
   decodeOutcome,
   decodePresence,
@@ -106,6 +107,16 @@ describe('strict Firestore persistence codecs', () => {
       { ...operation, stage: 'RESET_PURGING', drainUntilMs: undefined },
       NOW_MS + 60_001,
     );
+    const iosComposerReservation = {
+      schemaVersion: SCHEMA_VERSION,
+      reservationKey: 'e'.repeat(64),
+      phase: 'COMMITTED',
+      ledgerGeneration: 'ledger-generation-1',
+      createdAtMs: NOW_MS,
+      updatedAtMs: NOW_MS + 1,
+      expiresAtMs: NOW_MS + 72 * 60 * 60_000,
+      cleanupAtMs: NOW_MS + 72 * 60 * 60_000,
+    } as const;
 
     expect(decodeGlobalControl(globalControl())).toEqual(globalControl());
     expect(decodeAccountFence(fence())).toEqual(fence());
@@ -179,6 +190,21 @@ describe('strict Firestore persistence codecs', () => {
       }),
     ).toBeNull();
     expect(decodePresence(presence)).toEqual(presence);
+    expect(
+      decodeIOSComposerReservation(encodeDocument(iosComposerReservation)),
+    ).toEqual(iosComposerReservation);
+    expect(
+      decodeIOSComposerReservation({
+        ...iosComposerReservation,
+        destination: '+919999999999',
+      }),
+    ).toBeNull();
+    expect(
+      decodeIOSComposerReservation({
+        ...iosComposerReservation,
+        expiresAtMs: NOW_MS,
+      }),
+    ).toBeNull();
     expect(decodeCoordinationOperation(operation)).toEqual(operation);
     expect(decodeCoordinationOperationReceipt(encodeDocument(receipt))).toEqual(
       receipt,

@@ -94,6 +94,39 @@ private data class RuntimeSafetyAction(
   val serverPauseRequired: Boolean,
 )
 
+private data class RegistrationResolution(
+  val binding: InstallationBindingEntity?,
+  val refusalReason: CoordinationServerReason? = null,
+)
+
+private data class LeaseResolution(
+  val available: Boolean,
+  val refusalReason: CoordinationServerReason? = null,
+)
+
+private data class BirthdayClaimResolution(
+  val permit: CoordinationPermitEntity?,
+  val refusalReason: CoordinationServerReason? = null,
+)
+
+/**
+ * A live iOS review can legitimately fence Android for 72 hours. Recheck at a bounded one-hour
+ * cadence instead of turning the ordinary 30-second network retry floor into thousands of calls.
+ * Foreground and explicit state-change work may still refresh immediately.
+ */
+internal object IOSComposerReservationRecheckPolicy {
+  const val SAFE_CODE = "IOS_COMPOSER_RESERVED"
+  const val RECHECK_DELAY_MILLIS = 60L * 60L * 1_000L
+
+  fun result(nowMillis: Long): AutomationReconcileResult = AutomationReconcileResult(
+    safeCode = SAFE_CODE,
+    retryRecommended = false,
+    nextWakeAtMillis = runCatching {
+      Math.addExact(nowMillis, RECHECK_DELAY_MILLIS)
+    }.getOrDefault(Long.MAX_VALUE),
+  )
+}
+
 /**
  * Native-only durable automation coordinator. Every network wait occurs outside SubmissionGate;
  * every Arm request is committed once before dispatch and is subsequently status-query-only.
@@ -128,7 +161,7 @@ internal class AndroidAutomationOrchestrator(
       ensureRegisteredBinding(
         allowCachedOnUnavailable = false,
         acceptAuthoritativeStandby = true,
-      )
+      ).binding
     }
 
   suspend fun applyCompletedSenderTransfer(
@@ -171,9 +204,14 @@ internal class AndroidAutomationOrchestrator(
         result(action.safeCode, false)
       }
     }
-    val binding = ensureRegisteredBinding()
-      ?: return@withLock result("SENDER_REGISTRATION_UNAVAILABLE", true)
-    if (!ensureLease(binding, CoordinationPurpose.TEST)) {
+    val registration = ensureRegisteredBinding()
+    val binding = registration.binding
+      ?: return@withLock registrationFailureResult(registration)
+    val lease = ensureLease(binding, CoordinationPurpose.TEST)
+    if (!lease.available) {
+      if (lease.refusalReason == CoordinationServerReason.IOS_COMPOSER_RESERVED) {
+        return@withLock iosComposerReservationResult()
+      }
       return@withLock result("TEST_LEASE_UNAVAILABLE", true)
     }
     val test = dao.testJob(testJobId)
@@ -221,7 +259,8 @@ internal class AndroidAutomationOrchestrator(
         result(runtimeSafetyAction.safeCode, false)
       }
     }
-    val binding = ensureRegisteredBinding()
+    val registration = ensureRegisteredBinding()
+    val binding = registration.binding
     auditWallClock(account.accountId)
     val trustedNow = TrustedTimeEstimator.estimate(
       dao.clockTrust(account.accountId),
@@ -242,7 +281,7 @@ internal class AndroidAutomationOrchestrator(
 
     val recoverable = dao.recoverablePermits(1).firstOrNull()
     if (recoverable != null) {
-      if (binding == null) return withAttention(result("SENDER_REGISTRATION_UNAVAILABLE", true))
+      if (binding == null) return withAttention(registrationFailureResult(registration))
       val spacingWake = trustedNow?.let { armSpacingWake(account.accountId, it) }
       if (
         recoverable.state == CoordinationPermitState.CLOUD_CLAIMED &&
@@ -252,7 +291,10 @@ internal class AndroidAutomationOrchestrator(
           result("ARM_SPACING_ACTIVE", false, spacingWake, recoverable.permitId),
         )
       }
-      ensureLease(binding, recoverable.purpose.toCoordinationPurpose())
+      val lease = ensureLease(binding, recoverable.purpose.toCoordinationPurpose())
+      if (lease.refusalReason == CoordinationServerReason.IOS_COMPOSER_RESERVED) {
+        return withAttention(iosComposerReservationResult())
+      }
       return withAttention(advancePermit(recoverable, null))
     }
 
@@ -263,7 +305,7 @@ internal class AndroidAutomationOrchestrator(
     }
 
     if (trustedNow == null) return withAttention(result("CLOCK_TRUST_UNAVAILABLE", true))
-    if (binding == null) return withAttention(result("SENDER_REGISTRATION_UNAVAILABLE", true))
+    if (binding == null) return withAttention(registrationFailureResult(registration))
     if (binding.accountMode != AccountMode.AUTOMATION_ACTIVE) {
       val code = when (binding.accountMode) {
         AccountMode.TRANSFER_PENDING -> "SENDER_TRANSFER_PENDING"
@@ -273,7 +315,11 @@ internal class AndroidAutomationOrchestrator(
       }
       return withAttention(result(code, false, nextWake(trustedNow)))
     }
-    if (!ensureLease(binding, CoordinationPurpose.BIRTHDAY)) {
+    val lease = ensureLease(binding, CoordinationPurpose.BIRTHDAY)
+    if (!lease.available) {
+      if (lease.refusalReason == CoordinationServerReason.IOS_COMPOSER_RESERVED) {
+        return withAttention(iosComposerReservationResult())
+      }
       return withAttention(result("BIRTHDAY_LEASE_UNAVAILABLE", true, nextWake(trustedNow)))
     }
     armSpacingWake(account.accountId, trustedNow)?.let { wake ->
@@ -281,7 +327,11 @@ internal class AndroidAutomationOrchestrator(
     }
     val due = dao.nextDueBirthday(trustedNow)
       ?: return withAttention(result("RECONCILE_IDLE", false, nextWake(trustedNow)))
-    val permit = claimBirthday(binding, due, trustedNow)
+    val claim = claimBirthday(binding, due, trustedNow)
+    if (claim.refusalReason == CoordinationServerReason.IOS_COMPOSER_RESERVED) {
+      return withAttention(iosComposerReservationResult())
+    }
+    val permit = claim.permit
       ?: return withAttention(result("BIRTHDAY_CLAIM_PENDING", true))
     return withAttention(advancePermit(permit, null))
   }
@@ -463,10 +513,10 @@ internal class AndroidAutomationOrchestrator(
   private suspend fun ensureRegisteredBinding(
     allowCachedOnUnavailable: Boolean = true,
     acceptAuthoritativeStandby: Boolean = false,
-  ): InstallationBindingEntity? {
-    val account = dao.activeAccount() ?: return null
-    if (!identitySessionMatches(account.accountId)) return null
-    val identity = installationIdentityStore.getOrCreate() ?: return null
+  ): RegistrationResolution {
+    val account = dao.activeAccount() ?: return RegistrationResolution(null)
+    if (!identitySessionMatches(account.accountId)) return RegistrationResolution(null)
+    val identity = installationIdentityStore.getOrCreate() ?: return RegistrationResolution(null)
     val now = timeSource.wallMillis()
     val candidate = InstallationBindingEntity(
       installationId = identity.installationId,
@@ -488,9 +538,11 @@ internal class AndroidAutomationOrchestrator(
       updatedAtMillis = now,
     )
     val local = submissionGate.withExclusiveBoundary { dao.ensureLocalInstallation(candidate) }
-      ?: return null
+      ?: return RegistrationResolution(null)
     if (!networkValidated()) {
-      return local.takeIf(::isRegisteredLocalBinding).takeIf { allowCachedOnUnavailable }
+      return RegistrationResolution(
+        local.takeIf(::isRegisteredLocalBinding).takeIf { allowCachedOnUnavailable },
+      )
     }
 
     val registration = coordination.register(
@@ -505,17 +557,26 @@ internal class AndroidAutomationOrchestrator(
     return when (registration) {
       is OrchestrationCall.Unavailable -> {
         dao.recordSafeCode(account.accountId, registration.safeCode, now)
-        local.takeIf(::isRegisteredLocalBinding).takeIf { allowCachedOnUnavailable }
+        RegistrationResolution(
+          local.takeIf(::isRegisteredLocalBinding).takeIf { allowCachedOnUnavailable },
+        )
       }
       is OrchestrationCall.Authoritative -> when (val outcome = registration.value) {
         is RegistrationOutcome.Suppressed -> {
-          dao.recordSafeCode(account.accountId, "REGISTRATION_${outcome.reason.name}", now)
-          null
-        }
-        is RegistrationOutcome.Registered -> applyRegistration(account.accountId, local, outcome)
-          ?.takeIf { row ->
-            acceptAuthoritativeStandby || isRegisteredLocalBinding(row)
+          val safeCode = if (outcome.reason == CoordinationServerReason.IOS_COMPOSER_RESERVED) {
+            IOSComposerReservationRecheckPolicy.SAFE_CODE
+          } else {
+            "REGISTRATION_${outcome.reason.name}"
           }
+          dao.recordRegistrationSafeCode(account.accountId, safeCode, now)
+          RegistrationResolution(null, outcome.reason)
+        }
+        is RegistrationOutcome.Registered -> RegistrationResolution(
+          applyRegistration(account.accountId, local, outcome)
+            ?.takeIf { row ->
+              acceptAuthoritativeStandby || isRegisteredLocalBinding(row)
+            },
+        )
       }
     }
   }
@@ -721,49 +782,59 @@ internal class AndroidAutomationOrchestrator(
   private suspend fun ensureLease(
     binding: InstallationBindingEntity,
     purpose: CoordinationPurpose,
-  ): Boolean {
-    val epoch = binding.senderEpoch ?: return false
-    if (binding.state != InstallationRecordState.ACTIVE) return false
-    val account = dao.activeAccount() ?: return false
+  ): LeaseResolution {
+    val epoch = binding.senderEpoch ?: return LeaseResolution(false)
+    if (binding.state != InstallationRecordState.ACTIVE) return LeaseResolution(false)
+    val account = dao.activeAccount() ?: return LeaseResolution(false)
     val trust = dao.clockTrust(account.accountId)
     val trustedNow = TrustedTimeEstimator.estimate(
       trust,
       timeSource.elapsedRealtimeMillis(),
       timeSource.bootCount(),
-    ) ?: return false
-    val coordinationState = dao.coordinationState(account.accountId) ?: return false
+    ) ?: return LeaseResolution(false)
+    val coordinationState = dao.coordinationState(account.accountId)
+      ?: return LeaseResolution(false)
     val leaseUntil = minOf(
       binding.ownerLeaseUntilMillis ?: Long.MIN_VALUE,
       coordinationState.ownerLeaseUntilMillis ?: Long.MIN_VALUE,
     )
     val leaseRemaining = subtractExactOrNull(leaseUntil, trustedNow) ?: Long.MIN_VALUE
-    if (leaseRemaining > LEASE_RENEW_MARGIN_MILLIS) return true
-    if (!leasePreflightReady(binding, purpose) || !networkValidated()) return false
+    if (leaseRemaining > LEASE_RENEW_MARGIN_MILLIS) return LeaseResolution(true)
+    if (!leasePreflightReady(binding, purpose) || !networkValidated()) {
+      return LeaseResolution(false)
+    }
     val spec = bindingSpec(binding)
     return when (val call = coordination.renewLease(spec, purpose)) {
       is OrchestrationCall.Unavailable -> {
         dao.recordSafeCode(account.accountId, call.safeCode, timeSource.wallMillis())
-        false
+        LeaseResolution(false)
       }
       is OrchestrationCall.Authoritative -> when (val outcome = call.value) {
         is LeaseOutcome.Refused -> {
+          val safeCode = if (outcome.reason == CoordinationServerReason.IOS_COMPOSER_RESERVED) {
+            IOSComposerReservationRecheckPolicy.SAFE_CODE
+          } else {
+            "LEASE_${outcome.reason.name}"
+          }
           dao.recordSafeCode(
             account.accountId,
-            "LEASE_${outcome.reason.name}",
+            safeCode,
             timeSource.wallMillis(),
           )
-          false
+          LeaseResolution(false, outcome.reason)
         }
-        is LeaseOutcome.Renewed -> submissionGate.withExclusiveBoundary {
-          dao.persistRenewedLease(
-            account.accountId,
-            binding.installationId,
-            epoch,
-            outcome.leaseUntilMillis,
-            trustedNow,
-            timeSource.wallMillis(),
-          )
-        }
+        is LeaseOutcome.Renewed -> LeaseResolution(
+          submissionGate.withExclusiveBoundary {
+            dao.persistRenewedLease(
+              account.accountId,
+              binding.installationId,
+              epoch,
+              outcome.leaseUntilMillis,
+              trustedNow,
+              timeSource.wallMillis(),
+            )
+          },
+        )
       }
     }
   }
@@ -984,24 +1055,26 @@ internal class AndroidAutomationOrchestrator(
     binding: InstallationBindingEntity,
     due: BirthdayOccurrenceRecordEntity,
     trustedNowMillis: Long,
-  ): CoordinationPermitEntity? {
+  ): BirthdayClaimResolution {
     if (due.state == BirthdayJobState.SCHEDULED) {
       val claimed = submissionGate.withExclusiveBoundary {
         ledger.claimBirthdayOccurrence(due.occurrenceId, due.revision, trustedNowMillis)
       }
-      if (!claimed) return null
+      if (!claimed) return BirthdayClaimResolution(null)
     } else if (due.state != BirthdayJobState.CLAIMED) {
-      return null
+      return BirthdayClaimResolution(null)
     }
-    val claimed = ledger.getBirthdayOccurrence(due.occurrenceId) ?: return null
-    val material = dao.claimMaterial(due.occurrenceId) ?: return null
+    val claimed = ledger.getBirthdayOccurrence(due.occurrenceId)
+      ?: return BirthdayClaimResolution(null)
+    val material = dao.claimMaterial(due.occurrenceId)
+      ?: return BirthdayClaimResolution(null)
     val requestId = AutomationOpaqueIds.uuid(
       "BirthdayClaimRequest.v1",
       due.accountId,
       due.occurrenceId,
     )
     val startElapsed = timeSource.elapsedRealtimeMillis()
-    val boot = timeSource.bootCount() ?: return null
+    val boot = timeSource.bootCount() ?: return BirthdayClaimResolution(null)
     val call = coordination.claimBirthday(
       BirthdayClaimSpec(
         binding = bindingSpec(binding),
@@ -1027,11 +1100,11 @@ internal class AndroidAutomationOrchestrator(
     return when (call) {
       is OrchestrationCall.Unavailable -> {
         dao.recordSafeCode(due.accountId, call.safeCode, timeSource.wallMillis())
-        null
+        BirthdayClaimResolution(null)
       }
       is OrchestrationCall.Authoritative -> when (val outcome = call.value) {
         is ClaimOutcome.Refused -> {
-          if (!outcome.reason.isTransientClaimRefusal()) {
+          if (!outcome.reason.preservesUnclaimedBirthdayForRetry()) {
             submissionGate.withExclusiveBoundary {
               dao.terminalizeUnclaimedBirthday(
                 due.occurrenceId,
@@ -1041,7 +1114,14 @@ internal class AndroidAutomationOrchestrator(
               )
             }
           }
-          null
+          if (outcome.reason == CoordinationServerReason.IOS_COMPOSER_RESERVED) {
+            dao.recordSafeCode(
+              due.accountId,
+              IOSComposerReservationRecheckPolicy.SAFE_CODE,
+              timeSource.wallMillis(),
+            )
+          }
+          BirthdayClaimResolution(null, outcome.reason)
         }
         is ClaimOutcome.Accepted -> {
           val cloud = outcome.claim
@@ -1051,7 +1131,7 @@ internal class AndroidAutomationOrchestrator(
             cloud.ownerInstallationId != binding.installationId ||
             cloud.ownerEpoch != binding.senderEpoch ||
             cloud.resetGeneration != binding.resetGeneration
-          ) return null
+          ) return BirthdayClaimResolution(null)
           val now = timeSource.wallMillis()
           val permit = CoordinationPermitEntity(
             permitId = AutomationOpaqueIds.prefixed(
@@ -1098,7 +1178,9 @@ internal class AndroidAutomationOrchestrator(
             observeServerTime(due.accountId, cloud.serverObservedAtMillis)
             ledger.recordCloudClaim(permit)
           }
-          if (stored) ledger.getCoordinationPermit(permit.permitId) else null
+          BirthdayClaimResolution(
+            if (stored) ledger.getCoordinationPermit(permit.permitId) else null,
+          )
         }
       }
     }
@@ -1676,6 +1758,19 @@ internal class AndroidAutomationOrchestrator(
     operationKey: String? = null,
   ) = AutomationReconcileResult(safeCode, retry, nextWakeAtMillis, operationKey)
 
+  private fun registrationFailureResult(
+    resolution: RegistrationResolution,
+  ): AutomationReconcileResult = if (
+    resolution.refusalReason == CoordinationServerReason.IOS_COMPOSER_RESERVED
+  ) {
+    iosComposerReservationResult()
+  } else {
+    result("SENDER_REGISTRATION_UNAVAILABLE", true)
+  }
+
+  private fun iosComposerReservationResult(): AutomationReconcileResult =
+    IOSComposerReservationRecheckPolicy.result(timeSource.wallMillis())
+
   private fun OperationPurpose.toCoordinationPurpose(): CoordinationPurpose = when (this) {
     OperationPurpose.BIRTHDAY -> CoordinationPurpose.BIRTHDAY
     OperationPurpose.TEST -> CoordinationPurpose.TEST
@@ -1713,6 +1808,7 @@ internal class AndroidAutomationOrchestrator(
     CoordinationServerReason.BIRTHDAY_RESET_FENCE,
     -> "RESET_SUPPRESSED"
     CoordinationServerReason.DELETION_SUPPRESSED -> "DELETION_SUPPRESSED"
+    CoordinationServerReason.IOS_COMPOSER_RESERVED -> "IOS_COMPOSER_RESERVED"
     CoordinationServerReason.BUDGET_EXCEEDED -> "BUDGET_BLOCKED"
     CoordinationServerReason.OCCURRENCE_RESERVED,
     CoordinationServerReason.DESTINATION_RESERVED,
@@ -1720,11 +1816,6 @@ internal class AndroidAutomationOrchestrator(
     -> "GUARD_BLOCKED"
     else -> "POLICY_BLOCKED"
   }
-
-  private fun CoordinationServerReason.isTransientClaimRefusal(): Boolean = this in setOf(
-    CoordinationServerReason.LEASE_EXPIRED,
-    CoordinationServerReason.TOO_EARLY,
-  )
 
   private fun safeAdd(left: Long, right: Long): Long? = try {
     Math.addExact(left, right)

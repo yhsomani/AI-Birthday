@@ -14,6 +14,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  history-secrets:
+    name: Complete Git history contains no credentials
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out every branch and tag with complete history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up the exact mobile Node.js line
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Pin and verify npm
+        run: |
+          npm install --global npm@11.6.0
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.6.0"
+          test "$(git rev-parse --is-shallow-repository)" = "false"
+
+      - name: Reject credentials and forbidden config paths in every Git ref
+        run: npm run security:history
+
   backend-node22:
     name: Backend on deployed Node 22 runtime
     runs-on: ubuntu-latest
@@ -163,9 +190,9 @@ jobs:
             android/app/build/outputs/androidTest-results/
 
   android-device-e2e:
-    name: Android API 29 isolated UI E2E
+    name: Android API 29 isolated UI E2E and production-path smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Check out source
@@ -205,7 +232,7 @@ jobs:
           echo "MOBILE_E2E_TOOL_DIR=$RUNNER_TEMP/maestro-cli" >> "$GITHUB_ENV"
           tools/install-maestro.sh "$RUNNER_TEMP/maestro-cli" >/dev/null
 
-      - name: Exercise the isolated fixture on API 29
+      - name: Exercise the isolated fixture and production entry on API 29
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 29
@@ -215,7 +242,7 @@ jobs:
           disable-animations: true
           script: |
             set -euo pipefail
-            mkdir -p "$RUNNER_TEMP/mobile-e2e/android"
+            mkdir -p "$RUNNER_TEMP/mobile-e2e/android" "$RUNNER_TEMP/production-smoke/android"
             npm start -- --reset-cache > "$RUNNER_TEMP/mobile-e2e/android/metro.log" 2>&1 &
             METRO_PID=$!
             trap 'kill "$METRO_PID" 2>/dev/null || true' EXIT
@@ -227,29 +254,45 @@ jobs:
               sleep 1
             done
             curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'
+            npm run smoke:fixture:verify | tee "$RUNNER_TEMP/production-smoke/android/fixture-validation.log"
             cd android
             ./gradlew \
               :app:assembleE2eDebug \
               :app:lintE2eDebug \
+              :app:compileSmokeDebugKotlin \
+              :app:assembleSmokeDebug \
+              :app:lintSmokeDebug \
+              :app:processSmokeDebugMainManifest \
               :app:processProdReleaseManifest \
               -PreactNativeArchitectures=x86_64 \
               --no-configuration-cache
             cd ..
-            if [ -d android/app/build/generated/res/google-services/e2e ] && \
-              [ -n "$(find android/app/build/generated/res/google-services/e2e -type f -print -quit)" ]; then
-              echo 'Google Services generated resources leaked into e2eDebug.' >&2
-              exit 1
-            fi
+            for fixture_variant in e2e smoke; do
+              generated_services="android/app/build/generated/res/google-services/$fixture_variant"
+              if [ -d "$generated_services" ] && \
+                [ -n "$(find "$generated_services" -type f -print -quit)" ]; then
+                echo "Google Services generated resources leaked into $fixture_variant." >&2
+                exit 1
+              fi
+            done
             npm run e2e:manifest:verify
+            npm run smoke:manifest:verify
             adb install -r android/app/build/outputs/apk/e2e/debug/app-e2e-debug.apk
             adb reverse tcp:8081 tcp:8081
             E2E_REPORT_ROOT="$RUNNER_TEMP/mobile-e2e/android/smoke" npm run e2e:android
-            adb shell settings put system font_scale 1.3
+            adb shell settings put system font_scale 2.0
             adb shell am force-stop com.yashsomani.birthdayautopilot.e2e
             E2E_REPORT_ROOT="$RUNNER_TEMP/mobile-e2e/android/large-text" npm run e2e:android:large-text
-            adb shell settings put system font_scale 1.0
             test -s "$RUNNER_TEMP/mobile-e2e/android/smoke/report.xml"
             test -s "$RUNNER_TEMP/mobile-e2e/android/large-text/report.xml"
+            adb install -r android/app/build/outputs/apk/smoke/debug/app-smoke-debug.apk
+            adb reverse tcp:8081 tcp:8081
+            PRODUCTION_SMOKE_REPORT_ROOT="$RUNNER_TEMP/production-smoke/android/large-text" npm run smoke:android
+            test -s "$RUNNER_TEMP/production-smoke/android/large-text/report.xml"
+            adb shell settings put system font_scale 1.0
+            adb shell am force-stop com.yashsomani.birthdayautopilot.smoke
+            PRODUCTION_SMOKE_REPORT_ROOT="$RUNNER_TEMP/production-smoke/android/default" npm run smoke:android
+            test -s "$RUNNER_TEMP/production-smoke/android/default/report.xml"
 
       - name: Retain Android device E2E evidence
         if: always()
@@ -263,6 +306,20 @@ jobs:
             android/app/build/outputs/apk/e2e/debug/app-e2e-debug.apk
             android/app/build/intermediates/merged_manifests/e2eDebug/
             android/app/build/intermediates/merged_manifests/prodRelease/
+
+      - name: Retain Android production-path smoke evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: android-api29-production-path-smoke
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/production-smoke/android/
+            ${{ runner.temp }}/mobile-e2e/android/metro.log
+            android/app/build/outputs/apk/smoke/debug/app-smoke-debug.apk
+            android/app/build/intermediates/merged_manifests/smokeDebug/
+            e2e/production-smoke/production-smoke-projections.json
 
   quality-and-android:
     name: Quality and Android dev artifact
@@ -538,15 +595,20 @@ jobs:
             ios/BirthdayAutopilot/Info.plist \
             ios/BirthdayAutopilot/Info-Debug.plist \
             ios/BirthdayAutopilot/Info-E2E.plist \
+            ios/BirthdayAutopilot/Info-Smoke.plist \
             ios/BirthdayAutopilot/PrivacyInfo.xcprivacy \
             ios/BirthdayAutopilot/BirthdayAutopilot-Debug.entitlements \
             ios/BirthdayAutopilot/BirthdayAutopilot.entitlements \
             ios/BirthdayAutopilot/BirthdayAutopilot-E2E.entitlements \
+            ios/BirthdayAutopilot/BirthdayAutopilot-Smoke.entitlements \
             ios/BirthdayAutopilot.xcodeproj/project.pbxproj
-          xmllint --noout ios/BirthdayAutopilot.xcodeproj/xcshareddata/xcschemes/BirthdayAutopilotE2E.xcscheme
+          xmllint --noout \
+            ios/BirthdayAutopilot.xcodeproj/xcshareddata/xcschemes/BirthdayAutopilotE2E.xcscheme \
+            ios/BirthdayAutopilot.xcodeproj/xcshareddata/xcschemes/BirthdayAutopilotProductionSmoke.xcscheme
           xcodebuild -workspace ios/BirthdayAutopilot.xcworkspace -list
           ruby -c ios/Podfile
           sh -n ios/scripts/copy-google-config.sh
+          sh -n ios/scripts/copy-production-smoke-fixture.sh
           sh -n ios/scripts/bundle-react-native.sh
 
       - name: Run the standalone People parser contract
@@ -583,6 +645,14 @@ jobs:
             tests/ios/CompanionPersistedDraftRecoveryTests.swift \
             -o "$RUNNER_TEMP/CompanionPersistedDraftRecoveryTests"
           "$RUNNER_TEMP/CompanionPersistedDraftRecoveryTests"
+
+      - name: Run standalone iOS protected-store and composer boundary contracts
+        run: |
+          xcrun swiftc \
+            ios/BirthdayAutopilot/Automation/IOSNativeBoundaryPolicies.swift \
+            tests/ios/IOSNativeBoundaryPolicyTests.swift \
+            -o "$RUNNER_TEMP/IOSNativeBoundaryPolicyTests"
+          "$RUNNER_TEMP/IOSNativeBoundaryPolicyTests"
 
       - name: Run hosted iOS native unit tests
         run: |
@@ -641,7 +711,7 @@ jobs:
           BIRTHDAY_IOS_SIMULATOR_COMPILE_SMOKE=YES
           build
 
-      - name: Exercise the isolated fixture on an iOS simulator
+      - name: Exercise the isolated fixture and production entry on an iOS simulator
         run: |
           set -euo pipefail
           export BIRTHDAY_IOS_SIMULATOR_RUNTIME="$(xcrun --sdk iphonesimulator --show-sdk-version)"
@@ -707,6 +777,35 @@ jobs:
           E2E_REPORT_ROOT="$RUNNER_TEMP/mobile-e2e/ios/large-text" npm run e2e:ios:large-text
           test -s "$RUNNER_TEMP/mobile-e2e/ios/smoke/report.xml"
           test -s "$RUNNER_TEMP/mobile-e2e/ios/large-text/report.xml"
+          mkdir -p "$RUNNER_TEMP/production-smoke/ios"
+          npm run smoke:fixture:verify | tee "$RUNNER_TEMP/production-smoke/ios/fixture-validation.log"
+          xcodebuild \
+            -workspace ios/BirthdayAutopilot.xcworkspace \
+            -scheme BirthdayAutopilotProductionSmoke \
+            -configuration Smoke \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/BirthdayAutopilotSmokeDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+          SMOKE_APP="$RUNNER_TEMP/BirthdayAutopilotSmokeDerivedData/Build/Products/Smoke-iphonesimulator/BirthdayAutopilot.app"
+          test -d "$SMOKE_APP"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$SMOKE_APP/Info.plist")" = 'com.yashsomani.birthdayautopilot.smoke'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :BirthdayProductionPathSmoke' "$SMOKE_APP/Info.plist")" = 'true'
+          test ! -e "$SMOKE_APP/GoogleService-Info.plist"
+          test -s "$SMOKE_APP/main.jsbundle"
+          cmp e2e/production-smoke/production-smoke-projections.json "$SMOKE_APP/production-smoke-projections.json"
+          tar -C "$(dirname "$SMOKE_APP")" \
+            -czf "$RUNNER_TEMP/BirthdayAutopilot-Smoke-simulator.app.tar.gz" \
+            "$(basename "$SMOKE_APP")"
+          xcrun simctl uninstall "$SIMULATOR_UDID" com.yashsomani.birthdayautopilot.smoke 2>/dev/null || true
+          xcrun simctl install "$SIMULATOR_UDID" "$SMOKE_APP"
+          PRODUCTION_SMOKE_REPORT_ROOT="$RUNNER_TEMP/production-smoke/ios/large-text" npm run smoke:ios
+          test -s "$RUNNER_TEMP/production-smoke/ios/large-text/report.xml"
+          xcrun simctl ui "$SIMULATOR_UDID" content_size medium
+          xcrun simctl terminate "$SIMULATOR_UDID" com.yashsomani.birthdayautopilot.smoke 2>/dev/null || true
+          PRODUCTION_SMOKE_REPORT_ROOT="$RUNNER_TEMP/production-smoke/ios/default" npm run smoke:ios
+          test -s "$RUNNER_TEMP/production-smoke/ios/default/report.xml"
 
       - name: Preserve iOS app-bundle structure in archives
         run: |
@@ -816,3 +915,40 @@ jobs:
           path: |
             ${{ runner.temp }}/BirthdayAutopilot-E2E-simulator.app.tar.gz
             ${{ runner.temp }}/mobile-e2e/ios/
+
+      - name: Retain iOS production-path smoke evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ios-production-path-smoke
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/BirthdayAutopilot-Smoke-simulator.app.tar.gz
+            ${{ runner.temp }}/production-smoke/ios/
+            ${{ runner.temp }}/mobile-e2e/ios/metro.log
+            e2e/production-smoke/production-smoke-projections.json
+
+  release-admission:
+    name: Release admission for exact source SHA
+    if: ${{ always() }}
+    needs:
+      - history-secrets
+      - backend-node22
+      - android-instrumentation
+      - android-device-e2e
+      - quality-and-android
+      - ios-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+
+    steps:
+      - name: Require every CI dependency to succeed
+        env:
+          REQUIRED_JOB_RESULTS: ${{ toJSON(needs) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(jq 'length' <<< "$REQUIRED_JOB_RESULTS")" = 6
+          jq -e 'all(.[]; .result == "success")' <<< "$REQUIRED_JOB_RESULTS" > /dev/null

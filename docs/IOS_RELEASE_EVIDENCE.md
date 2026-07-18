@@ -15,6 +15,10 @@ named owners approve every applicable item below for the exact archived build.
   line, observe the final edited recipient/body, guarantee SMS/MMS/iMessage routing, or prove carrier
   acceptance or delivery.
 - A live or unresolved Android sender state suppresses every iOS composer proposal account-wide.
+- Opening Messages first commits a content-free, account-global server reservation that pauses every
+  Android sender mutation for up to 72 hours. Cancel, Failed, reported Sent, Unknown, process death,
+  sign-out, revoke, or local wipe does not release that committed hold; Android birthdays may be
+  missed during it.
 - Google identity, read-only People authorization, Firebase credentials, provider responses,
   protected proposals, and private diagnostics remain outside React Native JavaScript and logs.
 
@@ -51,8 +55,9 @@ Release owners must retain dated, immutable evidence for all of the following:
 2. Firebase Auth Google sign-in, the exact iOS OAuth client and URL scheme, People API
    `contacts.readonly`, and the single-account binding work on a signed build.
 3. The approved production App Check provider succeeds on every supported device class; debug
-   providers are absent. Firebase AI Logic and the read-only companion-status callable enforce App
-   Check and supported replay protection.
+   providers are absent. Firebase AI Logic, the read-only companion-status callable, and all three
+   composer-reservation callables enforce App Check and supported replay protection with consumed
+   limited-use tokens.
 4. Vertex-backed Firebase AI Logic uses the reviewed stable model/location, receives no contact PII,
    has an operational kill switch, quota and spending controls, and AI monitoring remains Off unless
    the separately approved logging exclusion is proven first.
@@ -92,6 +97,55 @@ Re-enabling requires a new review; a console screenshot alone is not authorizati
 Console screenshots alone are insufficient. Evidence must include a signed-build probe whose
 bundle, certificate, App Check verdict, project, and request time can be correlated without logging
 tokens, prompts, contact data, message text, or phone numbers.
+
+### Account-global composer-reservation safety gate
+
+The status callable is advisory preflight. Release evidence must prove that the authoritative
+cross-platform fence is one top-level `iosComposerReservations/{uid}` document and that the iOS
+client can access it only through authenticated `acquireIOSComposerReservation`,
+`commitIOSComposerReservation`, and `releaseIOSComposerReservation` callables. The persisted fields
+must remain limited to schema version, a domain-separated SHA-256 owner-capability key,
+`PREPARED`/`COMMITTED` phase, reviewed ledger generation, and logical/cleanup timestamps. The random
+capability UUID, raw account identifiers, contact/date/destination/phone/recipient/message/prompt,
+proposal material, and MessageUI outcome must be absent from Firestore, logs, diagnostics, and
+React Native.
+
+Retain native tests and physical-device traces for the exact order:
+
+1. Current foreground review revalidates the exact account, proposal, trusted People snapshot
+   generation, one-use nonce, scene, reset safety, terminal marker, and content-free coexistence
+   result.
+2. Native iOS acquires and holds an exact short People-material lease, then acquires `PREPARED` with
+   the protected, backup-excluded exact-account capability.
+3. After a final recheck, iOS durably marks that local capability sticky before it calls commit. An
+   ambiguous commit response fails closed and never presents MessageUI or permits early release.
+4. Only an exact `COMMITTED` response permits protected `ComposerOpenCommitted` CAS, a final exact
+   People-lease validation, and MessageUI presentation. The lease is released only after confirmed
+   presentation.
+5. The client dismisses to Unknown when the app resigns active and at least five minutes before
+   server expiry using monotonic elapsed time with the complete acquire/commit round trips removed.
+
+Each successful exact-owner acquisition must produce a server-authoritative logical deadline of
+server time plus 72 hours; commit itself must not extend that response deadline. Delayed Firestore
+TTL cleanup is never authority. Only an exact never-sticky `PREPARED` capability may release early,
+and only after an exact `RELEASED` response. `COMMITTED`, ambiguous-sticky, Cancel, Failed, reported
+Sent, Unknown, process death, sign-out, revoke, and local wipe remain fenced until logical expiry.
+The same exact owner may revalidate/reuse its capability; another capability is refused. Because
+wipe/corruption can lose the UUID on the same phone, user/support copy must say **another iPhone or
+an earlier protected review**, never assert that the holder is a different device.
+
+Every Android registration, lease, mode, claim, Arm/status seal, report, retry, transfer, and new or
+in-progress destructive reset/release transaction must read the same reservation document and
+refuse while live. Exact unexpired completed reset/release receipts remain replayable as immutable
+privacy proof. Account deletion alone transactionally dominates and removes a live reservation.
+The signed evidence must include real concurrent acquire-versus-first-registration and
+acquire-versus-every-mutation tests, both serial outcomes, deletion races, logical-expiry behavior,
+and production Firestore contention—not only pure/unit tests or emulator screenshots.
+
+The final pre-Review message banner, Privacy inventory, public Privacy Notice, Terms, and support
+copy must all disclose that opening Messages commits an account-wide hold, can pause Android for up
+to 72 hours even after Cancel/Failed/Unknown, and may cause Android birthdays to be missed. A build
+that implies Cancel releases the hold fails release.
 
 ## Automated candidate checks
 
@@ -136,14 +190,29 @@ deliberately separate operations:
    production-release approval.
 2. After independent review, the release authority records the observed values in
    [`tools/ios-release-evidence.template.json`](../tools/ios-release-evidence.template.json), hashes
-   every supporting evidence file, replaces every false/sentinel value, and signs the final JSON's
-   exact bytes with the Ed25519 key whose public SPKI digest is committed in
+   every supporting evidence file, and publishes the 14 primary files plus every raw scenario and
+   performance-support file those primary JSON documents bind as assets on an access-controlled
+   release in the separately administered evidence repository. It then replaces
+   every false/sentinel value and signs the final JSON's exact bytes with the Ed25519 key whose
+   public SPKI digest is committed in
    [`tools/distribution-authority-pin.json`](../tools/distribution-authority-pin.json). The private
    authority key remains outside GitHub and the signing environment.
-3. `verify-authority-approved-artifacts` downloads the exact candidate run and a separately retained
-   `ios-release-supporting-evidence` artifact. It runs only in the protected
+3. `verify-authority-approved-artifacts` downloads the exact candidate run and the named private
+   evidence-repository release through a read-only protected token. It runs only in the protected
    `ios-production-release` environment. It is the sole operation that can emit the
    `ios-production-release-evidence` package.
+
+Configure `IOS_SUPPORTING_EVIDENCE_REPOSITORY` as the exact private `owner/repository` coordinate
+and `IOS_SUPPORTING_EVIDENCE_READ_TOKEN` as a least-privilege, read-only secret in the protected
+release environment. Supply the dedicated evidence-release tag through the workflow input and
+protect that repository against tag or asset replacement. GitHub tags and release assets are
+mutable locators, not trust anchors: any replacement still fails unless the complete exact inventory
+matches the authority-signed bindings. Asset names must be the 14 normalized primary paths plus every
+scenario `rawEvidenceReference` and both performance support paths; because GitHub release assets are
+flat, use unique flat names for all of them. Missing, extra, linked, hard-linked, renamed,
+size-mismatched, or digest-mismatched assets fail verification. A release tag or asset label is never
+approval by itself: the signed document binds the exact support bytes, source revision, and inspected
+candidate archive/IPA digests.
 
 The verifier rejects an unprovisioned/mismatched authority key, dirty or different Git revision,
 expired approval/profile, missing referenced bytes, or any mismatch in:
@@ -190,9 +259,19 @@ npm run ios:release:verify -- \
 The script uses Apple's `/usr/bin/codesign`, `/usr/bin/security`, `/usr/bin/plutil`,
 `/usr/bin/ditto`, `/usr/bin/unzip`, and `/usr/bin/lipo`. It verifies both signatures and profiles;
 it does not trust filenames, a self-authored JSON file, an unsigned simulator app, or a workflow
-label. Supporting-evidence references are normalized in-root regular files, never URLs or symlinks,
-and their exact SHA-256 bytes must match the signed document. Approval is valid for at most 90 days
-and may not outlive either provisioning profile.
+label. `--evidence-root` is mandatory. Its exact inventory is the 14 normalized primary files plus
+every scenario raw file and the performance protocol/raw-results files derived from those primary
+JSON documents; no other file or directory is accepted. The physical-device and accessibility
+references are version-2 `tools/mobile-release-scenario-evidence.schema.json` documents, not prose
+or a boolean assertion. Their unique required rows bind the source, IPA digest, exported certificate,
+marketing/build version, physical iPhone/OS, observation time, scenario ID, passing result, exact raw
+file path/digest/length, physical-device identity hash, installation source, collector/protocol, SIM,
+composer, notification/application, Android-coexistence, no-background-SMS, carrier-claim, or
+accessibility settings and human-review checkpoints as applicable. Observations older than 30 days,
+future-dated rows, placeholders, duplicate/missing scenarios, missing raw bytes, or cross-artifact
+rows fail. The iOS physical inventory includes the required no-SIM, single/dual-SIM/eSIM composer and
+no-carrier-delivery-claim scenarios. Approval is valid for at most 90 days and may not outlive either
+provisioning profile.
 
 The schema is machine-readable at
 [`tools/ios-release-evidence.schema.json`](../tools/ios-release-evidence.schema.json). The checked-in
@@ -222,6 +301,13 @@ For every device/OS row, retain repeatable results for:
   repeat suppression, and no automatic reopening;
 - Android coexistence: no binding, live binding, unresolved occurrence, status unavailable, Android
   transfer/deletion, and proof that suppression is account-global;
+- composer reservation: exact-owner reuse, different/lost capability refusal, acquire and commit
+  ambiguity, local-sticky-before-server-commit crash, PREPARED-only exact release, zero release after
+  Cancel/Failed/Sent/Unknown, 72-hour logical expiry despite delayed TTL, monotonic five-minute-early
+  and background dismissal, and first-registration/every-Android-mutation/deletion races;
+- sign-out/revoke/local-wipe/account-deletion recovery: verified reservation-journal absence before
+  cleanup markers retire, no server-release claim after local wipe, same-phone lost-capability copy,
+  Android remaining paused through the live logical window, and completed privacy-receipt replay;
 - offline/App Check/Auth/AI failures and deterministic non-AI templates remaining usable;
 - diagnostics and support export proving private contact, phone, birthday, message, prompt,
   credential and provider-response data is absent.
@@ -232,7 +318,9 @@ as carrier delivery or assert which sender line or transport was used.
 ## Performance and accessibility evidence
 
 Use the exact signed candidate and named reference iPhone. Bind raw traces and the candidate SHA to
-the signed performance evidence described in `docs/PERFORMANCE_RELEASE_EVIDENCE.md`. At minimum,
+the signed performance evidence described in `docs/PERFORMANCE_RELEASE_EVIDENCE.md`. The archive/IPA
+gate parses that JSON and executes `tools/validate-performance-evidence.mjs`; a digest and approval
+boolean without passing samples cannot authorize the artifact. At minimum,
 prove the shared cold/warm/search/normalization budgets plus:
 
 - no-change reminder reconciliation at or below 2 seconds CPU time;

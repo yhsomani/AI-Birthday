@@ -52,6 +52,22 @@ const stepActionKey = (step: SetupStep): TranslationKey | undefined => {
   }
 };
 
+const progressiveStepNumber = (step: SetupStep): 1 | 2 | 3 | 4 => {
+  switch (step) {
+    case 'compatibility':
+      return 1;
+    case 'google-account':
+    case 'contacts-disclosure':
+    case 'sync-summary':
+      return 2;
+    case 'recipient-selection':
+    case 'message-and-policy':
+      return 3;
+    default:
+      return 4;
+  }
+};
+
 const cleanupKeys: Record<
   Extract<AccountProjection, { kind: 'cleanup-pending' }>['operation'],
   TranslationKey
@@ -418,6 +434,7 @@ export function LiveSetupScreen({
     <Screen includeTopInset testID="live-setup-screen">
       <RouteAccessibilityFocus
         announcement={t('live.setup.currentStep', {
+          number: progressiveStepNumber(projection.step),
           step: t(stepKeys[projection.step]),
         })}
         routeKey={`setup:${projection.step}`}
@@ -437,6 +454,7 @@ export function LiveSetupScreen({
 
       <ReadinessBanner
         title={t('live.setup.currentStep', {
+          number: progressiveStepNumber(projection.step),
           step: t(stepKeys[projection.step]),
         })}
         detail={

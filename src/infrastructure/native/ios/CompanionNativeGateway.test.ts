@@ -152,33 +152,11 @@ describe('CompanionNativeGateway', () => {
     expect(present).not.toHaveBeenCalled();
   });
 
-  it('validates reminder results and bounds duplicate plans', async () => {
-    const replacePlans = jest.fn().mockResolvedValue(validReminderState);
+  it('validates reminder results from the read-only bridge surface', async () => {
     const gateway = new CompanionNativeGateway(null, {
-      cancelAppOwned: jest.fn().mockResolvedValue({ kind: 'ok' }),
       getStatus: jest.fn().mockResolvedValue(validReminderState),
-      replacePlans,
       requestAuthorization: jest.fn().mockResolvedValue(validReminderState),
-      wipeCompanionData: jest.fn().mockResolvedValue({ kind: 'ok' }),
     });
-
-    await expect(
-      gateway.replaceReminderPlans([
-        {
-          civilDate: '2026-08-01',
-          hour: 9,
-          minute: 0,
-          occurrenceId: 'same-occurrence',
-        },
-        {
-          civilDate: '2026-08-02',
-          hour: 9,
-          minute: 0,
-          occurrenceId: 'same-occurrence',
-        },
-      ]),
-    ).resolves.toEqual({ code: 'REMINDER_INPUT_INVALID', kind: 'error' });
-    expect(replacePlans).not.toHaveBeenCalled();
 
     await expect(gateway.getReminderStatus()).resolves.toEqual({
       kind: 'ok',
@@ -192,12 +170,9 @@ describe('CompanionNativeGateway', () => {
       .mockResolvedValueOnce({ kind: 'ok' })
       .mockResolvedValueOnce({ kind: 'ok', privateValue: 'leak' });
     const gateway = new CompanionNativeGateway(null, {
-      cancelAppOwned: jest.fn().mockResolvedValue({ kind: 'ok' }),
       getStatus: jest.fn().mockResolvedValue(validReminderState),
       openNotificationSettings,
-      replacePlans: jest.fn().mockResolvedValue(validReminderState),
       requestAuthorization: jest.fn().mockResolvedValue(validReminderState),
-      wipeCompanionData: jest.fn().mockResolvedValue({ kind: 'ok' }),
     });
 
     await expect(gateway.openNotificationSettings()).resolves.toEqual({

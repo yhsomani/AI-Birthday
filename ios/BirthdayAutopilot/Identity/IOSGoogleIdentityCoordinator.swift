@@ -124,6 +124,12 @@ final class IOSGoogleIdentityCoordinator {
           self.transition(.unavailable)
           return
         }
+        if IOSCompanionWipeRecoveryStore.shared.hasPendingOrUnreadableJournal() {
+          self.clearPendingOpenURL()
+          self.transition(.reconnectRequired)
+          IOSCompanionWipeRecoveryCoordinator.shared.resumeIfNeeded()
+          return
+        }
         if self.accountDeletionStateBlocksOrdinaryIdentity() {
           self.clearPendingOpenURL()
           let localDataErased = IOSAccountDeletionReceiptStore.shared.current()?
@@ -292,7 +298,13 @@ final class IOSGoogleIdentityCoordinator {
       return
     }
 
-    IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountDeletion()
+    guard IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountDeletion()
+    else {
+      releaseIdentityOperation(.deletionRecovery)
+      transition(.unavailable)
+      completion(.failed(.internalFailure))
+      return
+    }
     transition(.connecting)
     Task { @MainActor in
       defer { self.releaseIdentityOperation(.deletionRecovery) }
@@ -431,12 +443,20 @@ final class IOSGoogleIdentityCoordinator {
         self.transition(.signedOut(retainedSetup: false))
         completion(.submitted)
       } catch let failure as IOSGoogleIdentityFailure {
-        _ = self.signOutDeletionRecoverySession()
+        guard self.signOutDeletionRecoverySession() else {
+          self.transition(.unavailable)
+          completion(.failed(.internalFailure))
+          return
+        }
         self.transition(.signedOut(retainedSetup: false))
         completion(.failed(failure))
       } catch {
         let failure = Self.mapGoogleError(error)
-        _ = self.signOutDeletionRecoverySession()
+        guard self.signOutDeletionRecoverySession() else {
+          self.transition(.unavailable)
+          completion(.failed(.internalFailure))
+          return
+        }
         self.transition(.signedOut(retainedSetup: false))
         completion(.failed(failure))
       }
@@ -619,8 +639,13 @@ final class IOSGoogleIdentityCoordinator {
       || Auth.auth().currentUser == nil
     let sdkSessionsAbsent = firebaseSessionAbsent
       && GIDSignIn.sharedInstance.currentUser == nil
+    let reservationJournalDestroyed = retainData
+      || IOSComposerReservationJournal.shared.destroyAll()
+    let geminiDataCleared = retainData
+      || IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountWipe()
     guard firebaseSignOutSucceeded, sdkSessionsAbsent,
-      peopleCleanupSucceeded, companionSessionInvalidated
+      peopleCleanupSucceeded, companionSessionInvalidated,
+      reservationJournalDestroyed, geminiDataCleared
     else {
       enterIdentitySafetyInterlock()
       return false
@@ -667,8 +692,9 @@ final class IOSGoogleIdentityCoordinator {
       || Auth.auth().currentUser == nil
     let sdkSessionsAbsent = firebaseSessionAbsent
       && GIDSignIn.sharedInstance.currentUser == nil
+    let reservationJournalDestroyed = IOSComposerReservationJournal.shared.destroyAll()
     guard firebaseSignOutSucceeded, sdkSessionsAbsent,
-      companionSessionInvalidated
+      companionSessionInvalidated, reservationJournalDestroyed
     else {
       enterIdentitySafetyInterlock()
       return false
@@ -684,7 +710,8 @@ final class IOSGoogleIdentityCoordinator {
   func completeAccountDeletionLocalShutdown() async -> Bool {
     guard configuration != nil else { return false }
     guard await invalidatePeopleSyncFence() else { return false }
-    IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountDeletion()
+    guard IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountDeletion()
+    else { return false }
     do {
       try Auth.auth().signOut()
     } catch {
@@ -700,7 +727,8 @@ final class IOSGoogleIdentityCoordinator {
       }
     }
     guard destroyed, Auth.auth().currentUser == nil,
-      GIDSignIn.sharedInstance.currentUser == nil
+      GIDSignIn.sharedInstance.currentUser == nil,
+      IOSComposerReservationJournal.shared.destroyAll()
     else { return false }
     transition(.signedOut(retainedSetup: false))
     return true
@@ -744,8 +772,223 @@ final class IOSGoogleIdentityCoordinator {
       transition(.reconnectRequired)
       return false
     }
+    guard IOSComposerReservationJournal.shared.destroyAll() else {
+      transition(.reconnectRequired)
+      return false
+    }
+    guard IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountWipe() else {
+      transition(.reconnectRequired)
+      return false
+    }
     companionStore.markExternalProjectionChanged()
     return true
+  }
+
+  /// Cold-launch continuation for a journaled sign-out wipe. Every extant
+  /// People or SDK identity must match the journal's equality-only digests;
+  /// mismatched newly signed-in state is never signed out or erased.
+  func resumeJournaledSignOutWipe(
+    _ journal: IOSCompanionWipeRecoveryJournal
+  ) async -> Bool {
+    guard journal.kind == .signOutWipe, configuration != nil,
+      FirebaseApp.app() != nil
+    else { return false }
+    let recoveryStore = IOSCompanionWipeRecoveryStore.shared
+    if let stored = peopleStore.currentBinding(),
+      !recoveryStore.matches(binding: stored, journal: journal)
+    {
+      enterIdentitySafetyInterlock()
+      return false
+    }
+    if let firebase = Auth.auth().currentUser {
+      guard let provider = firebase.providerData.first(where: {
+        $0.providerID == "google.com"
+      }), recoveryStore.matchesProviderIdentity(
+        firebaseUID: firebase.uid,
+        googleSubject: provider.uid,
+        journal: journal
+      ) else {
+        enterIdentitySafetyInterlock()
+        return false
+      }
+    }
+    if let google = GIDSignIn.sharedInstance.currentUser,
+      !recoveryStore.matchesGoogleSubject(google.userID, journal: journal)
+    {
+      enterIdentitySafetyInterlock()
+      return false
+    }
+
+    IOSGeminiSuggestionGateway.shared.clearProvenance()
+    let firebaseSignedOut: Bool
+    do {
+      try Auth.auth().signOut()
+      firebaseSignedOut = true
+    } catch {
+      firebaseSignedOut = false
+    }
+    GIDSignIn.sharedInstance.signOut()
+    let peopleWiped = await withCheckedContinuation { continuation in
+      peopleStore.wipe { continuation.resume(returning: $0) }
+    }
+    let companionInvalidated = await invalidateCompanionAccountSession()
+    let reservationJournalDestroyed = IOSComposerReservationJournal.shared.destroyAll()
+    guard firebaseSignedOut, peopleWiped, companionInvalidated,
+      reservationJournalDestroyed,
+      Auth.auth().currentUser == nil,
+      GIDSignIn.sharedInstance.currentUser == nil
+    else {
+      enterIdentitySafetyInterlock()
+      return false
+    }
+    guard IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountWipe() else {
+      enterIdentitySafetyInterlock()
+      return false
+    }
+    identitySafetyInterlock = false
+    transition(.signedOut(retainedSetup: false))
+    return true
+  }
+
+  /// Cold-launch continuation for wipe-local-data. The official SDK session is
+  /// restored only for the equality-bound journal account; the resulting empty
+  /// People binding reuses the app-minted generation retained by the journal.
+  func resumeJournaledLocalDataWipe(
+    _ journal: IOSCompanionWipeRecoveryJournal
+  ) async -> Bool {
+    guard journal.kind == .wipeLocalData,
+      let binding = await recoverBindingForJournaledLocalWipe(journal),
+      IOSCompanionWipeRecoveryStore.shared.matches(
+        binding: binding, journal: journal
+      ), Self.hasExactLiveProviderSession(binding)
+    else { return false }
+    guard await invalidatePeopleSyncFence() else {
+      enterIdentitySafetyInterlock()
+      return false
+    }
+    IOSGeminiSuggestionGateway.shared.clearProvenance()
+    let peopleWiped = await withCheckedContinuation { continuation in
+      peopleStore.wipe { continuation.resume(returning: $0) }
+    }
+    guard peopleWiped, Self.hasExactLiveProviderSession(binding) else {
+      enterIdentitySafetyInterlock()
+      return false
+    }
+    let attached = await withCheckedContinuation { continuation in
+      peopleStore.attach(binding, retainedCompanionSetupExists: false) {
+        continuation.resume(returning: $0)
+      }
+    }
+    guard case .attached = attached else {
+      enterIdentitySafetyInterlock()
+      return false
+    }
+    let workflowBound = await withCheckedContinuation { continuation in
+      companionStore.bindWorkflowAccount(binding) { result in
+        continuation.resume(returning: (try? result.get()) != nil)
+      }
+    }
+    guard workflowBound else {
+      enterIdentitySafetyInterlock()
+      return false
+    }
+    guard IOSComposerReservationJournal.shared.destroyAll() else {
+      enterIdentitySafetyInterlock()
+      return false
+    }
+    guard IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountWipe() else {
+      enterIdentitySafetyInterlock()
+      return false
+    }
+    identitySafetyInterlock = false
+    transition(.connected(displayEmail: binding.displayEmail))
+    companionStore.markExternalProjectionChanged()
+    return true
+  }
+
+  private func recoverBindingForJournaledLocalWipe(
+    _ journal: IOSCompanionWipeRecoveryJournal
+  ) async -> IOSNativeGoogleAccountBinding? {
+    guard configuration != nil, googleIdentityAppCheckReady,
+      FirebaseApp.app() != nil,
+      let accountGeneration = journal.accountGeneration
+    else { return nil }
+    let recoveryStore = IOSCompanionWipeRecoveryStore.shared
+    if let stored = peopleStore.currentBinding(),
+      !recoveryStore.matches(binding: stored, journal: journal)
+    {
+      enterIdentitySafetyInterlock()
+      return nil
+    }
+    if let firebase = Auth.auth().currentUser {
+      guard let provider = firebase.providerData.first(where: {
+        $0.providerID == "google.com"
+      }), recoveryStore.matchesProviderIdentity(
+        firebaseUID: firebase.uid,
+        googleSubject: provider.uid,
+        journal: journal
+      ) else {
+        enterIdentitySafetyInterlock()
+        return nil
+      }
+    }
+    if let google = GIDSignIn.sharedInstance.currentUser,
+      !recoveryStore.matchesGoogleSubject(google.userID, journal: journal)
+    {
+      enterIdentitySafetyInterlock()
+      return nil
+    }
+
+    guard await firebaseAppCheckGate() else { return nil }
+    let restored: GIDGoogleUser
+    do {
+      restored = try await GIDSignIn.sharedInstance.restorePreviousSignIn()
+    } catch {
+      return nil
+    }
+    guard recoveryStore.matchesGoogleSubject(restored.userID, journal: journal)
+    else {
+      enterIdentitySafetyInterlock()
+      return nil
+    }
+    do {
+      let user = try await restored.refreshTokensIfNeeded()
+      guard let subject = IOSPeopleValuePolicy.googleSubject(user.userID),
+        recoveryStore.matchesGoogleSubject(subject, journal: journal),
+        let email = IOSPeopleValuePolicy.safeEmail(user.profile?.email),
+        let idToken = user.idToken?.tokenString,
+        let accessToken = IOSEphemeralGoogleAccessToken(user.accessToken.tokenString),
+        Self.allowedJournaledWipeRecoveryScopes(user.grantedScopes)
+      else { return nil }
+      defer { accessToken.clear() }
+      let credential = accessToken.use { token in
+        GoogleAuthProvider.credential(withIDToken: idToken, accessToken: token)
+      }
+      let result = try await Auth.auth().signIn(with: credential)
+      guard !result.user.isAnonymous,
+        let provider = result.user.providerData.first(where: {
+          $0.providerID == "google.com"
+        }), provider.uid == subject,
+        recoveryStore.matchesProviderIdentity(
+          firebaseUID: result.user.uid,
+          googleSubject: subject,
+          journal: journal
+        )
+      else {
+        try? Auth.auth().signOut()
+        enterIdentitySafetyInterlock()
+        return nil
+      }
+      return IOSNativeGoogleAccountBinding(
+        googleSubject: subject,
+        firebaseUID: result.user.uid,
+        displayEmail: email,
+        displayName: IOSPeopleValuePolicy.safeDisplayName(user.profile?.name),
+        accountGeneration: accountGeneration
+      )
+    } catch {
+      return nil
+    }
   }
 
   private func restorePreviousSession() async {
@@ -972,6 +1215,7 @@ final class IOSGoogleIdentityCoordinator {
   private func accountDeletionStateBlocksOrdinaryIdentity() -> Bool {
     IOSAccountDeletionReceiptStore.shared.hasPendingOrUnreadableReceipt()
       || IOSAccountDeletionRecoveryStore.shared.hasPendingOrUnreadableJournal()
+      || IOSCompanionWipeRecoveryStore.shared.hasPendingOrUnreadableJournal()
   }
 
   /// A completed receipt may coexist briefly with its exact recovery journal
@@ -981,6 +1225,8 @@ final class IOSGoogleIdentityCoordinator {
   /// unreadable deletion state blocks even account selection.
   private func canBeginOrdinaryGoogleSelection() -> Bool {
     guard !identitySafetyInterlock else { return false }
+    guard !IOSCompanionWipeRecoveryStore.shared.hasPendingOrUnreadableJournal()
+    else { return false }
     let receiptStore = IOSAccountDeletionReceiptStore.shared
     guard !receiptStore.hasPendingOrUnreadableReceipt() else { return false }
     guard IOSAccountDeletionRecoveryStore.shared.hasPendingOrUnreadableJournal() else {
@@ -990,7 +1236,8 @@ final class IOSGoogleIdentityCoordinator {
   }
 
   private func signOutDeletionRecoverySession() -> Bool {
-    IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountDeletion()
+    guard IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountDeletion()
+    else { return false }
     guard FirebaseApp.app() != nil else {
       GIDSignIn.sharedInstance.signOut()
       return false
@@ -1077,6 +1324,16 @@ final class IOSGoogleIdentityCoordinator {
       birthdayContactsReadOnlyScope,
     ])
     return scopes.isSubset(of: allowed)
+  }
+
+  private static func allowedJournaledWipeRecoveryScopes(
+    _ raw: [String]?
+  ) -> Bool {
+    let scopes = Set(
+      (raw ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+    )
+    return allowedIdentityScopes(raw)
+      && scopes.contains(birthdayContactsReadOnlyScope)
   }
 
   private static func mapGoogleError(_ error: Error) -> IOSGoogleIdentityFailure {

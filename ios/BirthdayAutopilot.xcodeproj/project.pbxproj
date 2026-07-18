@@ -44,6 +44,12 @@
 		D1A000022F00000100000002 /* IOSCompanionWorkflowEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000122F00000100000012 /* IOSCompanionWorkflowEngine.swift */; };
 		D1A000032F00000100000003 /* IOSCompanionStatusClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000132F00000100000013 /* IOSCompanionStatusClient.swift */; };
 		D1A000042F00000100000004 /* IOSCompanionMessagePlaceholderPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000142F00000100000014 /* IOSCompanionMessagePlaceholderPolicy.swift */; };
+		D1A000052F00000100000005 /* IOSCompanionPlanningIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000152F00000100000015 /* IOSCompanionPlanningIndex.swift */; };
+		D1A000062F00000100000006 /* IOSCompanionOccurrenceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000162F00000100000016 /* IOSCompanionOccurrenceIdentity.swift */; };
+		D1A000072F00000100000007 /* IOSCompanionTerminalLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000172F00000100000017 /* IOSCompanionTerminalLedger.swift */; };
+		D1A000082F00000100000008 /* IOSComposerReservationClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000182F00000100000018 /* IOSComposerReservationClient.swift */; };
+		D1A000092F00000100000009 /* IOSComposerReservationJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000192F00000100000019 /* IOSComposerReservationJournal.swift */; };
+		D1A0000A2F0000010000000A /* IOSComposerReservationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A0001A2F0000010000001A /* IOSComposerReservationPolicy.swift */; };
 		E1A000012F00000100000001 /* GeminiSuggestionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A000112F00000100000011 /* GeminiSuggestionPolicy.swift */; };
 		E1A000022F00000100000002 /* IOSGeminiSuggestionGateway.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A000122F00000100000012 /* IOSGeminiSuggestionGateway.swift */; };
 		E1A000032F00000100000003 /* GeminiCandidateProvenanceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A000132F00000100000013 /* GeminiCandidateProvenanceRegistry.swift */; };
@@ -56,6 +62,9 @@
 		F1A000052F00000100000005 /* IOSContactDerivedResetClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000152F00000100000015 /* IOSContactDerivedResetClient.swift */; };
 		F1A000062F00000100000006 /* IOSAccountDeletionReceiptClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000162F00000100000016 /* IOSAccountDeletionReceiptClient.swift */; };
 		F1A000072F00000100000007 /* IOSAccountDeletionRecoveryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000172F00000100000017 /* IOSAccountDeletionRecoveryStore.swift */; };
+		F1A000082F00000100000008 /* IOSCompanionWipeRecoveryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000182F00000100000018 /* IOSCompanionWipeRecoveryStore.swift */; };
+		G1A000012F40000100000001 /* IOSNativeBoundaryPolicies.swift in Sources */ = {isa = PBXBuildFile; fileRef = G1A000032F40000100000003 /* IOSNativeBoundaryPolicies.swift */; };
+		G1A000022F40000100000002 /* IOSNativeComponentBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = G1A000042F40000100000004 /* IOSNativeComponentBoundaryTests.swift */; };
 		SMK000012F30000100000001 /* BirthdayNativeSmokeModuleBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = SMK000022F30000100000002 /* BirthdayNativeSmokeModuleBridge.mm */; };
 /* End PBXBuildFile section */
 
@@ -114,6 +123,12 @@
 		D1A000122F00000100000012 /* IOSCompanionWorkflowEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionWorkflowEngine.swift; path = BirthdayAutopilot/Automation/IOSCompanionWorkflowEngine.swift; sourceTree = "<group>"; };
 		D1A000132F00000100000013 /* IOSCompanionStatusClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionStatusClient.swift; path = BirthdayAutopilot/Automation/IOSCompanionStatusClient.swift; sourceTree = "<group>"; };
 		D1A000142F00000100000014 /* IOSCompanionMessagePlaceholderPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionMessagePlaceholderPolicy.swift; path = BirthdayAutopilot/Automation/IOSCompanionMessagePlaceholderPolicy.swift; sourceTree = "<group>"; };
+		D1A000152F00000100000015 /* IOSCompanionPlanningIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionPlanningIndex.swift; path = BirthdayAutopilot/Automation/IOSCompanionPlanningIndex.swift; sourceTree = "<group>"; };
+		D1A000162F00000100000016 /* IOSCompanionOccurrenceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionOccurrenceIdentity.swift; path = BirthdayAutopilot/Automation/IOSCompanionOccurrenceIdentity.swift; sourceTree = "<group>"; };
+		D1A000172F00000100000017 /* IOSCompanionTerminalLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionTerminalLedger.swift; path = BirthdayAutopilot/Automation/IOSCompanionTerminalLedger.swift; sourceTree = "<group>"; };
+		D1A000182F00000100000018 /* IOSComposerReservationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSComposerReservationClient.swift; path = BirthdayAutopilot/Automation/IOSComposerReservationClient.swift; sourceTree = "<group>"; };
+		D1A000192F00000100000019 /* IOSComposerReservationJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSComposerReservationJournal.swift; path = BirthdayAutopilot/Automation/IOSComposerReservationJournal.swift; sourceTree = "<group>"; };
+		D1A0001A2F0000010000001A /* IOSComposerReservationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSComposerReservationPolicy.swift; path = BirthdayAutopilot/Automation/IOSComposerReservationPolicy.swift; sourceTree = "<group>"; };
 		E1A000112F00000100000011 /* GeminiSuggestionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GeminiSuggestionPolicy.swift; path = BirthdayAutopilot/Gemini/GeminiSuggestionPolicy.swift; sourceTree = "<group>"; };
 		E1A000122F00000100000012 /* IOSGeminiSuggestionGateway.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSGeminiSuggestionGateway.swift; path = BirthdayAutopilot/Gemini/IOSGeminiSuggestionGateway.swift; sourceTree = "<group>"; };
 		E1A000132F00000100000013 /* GeminiCandidateProvenanceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GeminiCandidateProvenanceRegistry.swift; path = BirthdayAutopilot/Gemini/GeminiCandidateProvenanceRegistry.swift; sourceTree = "<group>"; };
@@ -127,6 +142,9 @@
 		F1A000152F00000100000015 /* IOSContactDerivedResetClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSContactDerivedResetClient.swift; path = BirthdayAutopilot/Automation/IOSContactDerivedResetClient.swift; sourceTree = "<group>"; };
 		F1A000162F00000100000016 /* IOSAccountDeletionReceiptClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSAccountDeletionReceiptClient.swift; path = BirthdayAutopilot/Automation/IOSAccountDeletionReceiptClient.swift; sourceTree = "<group>"; };
 		F1A000172F00000100000017 /* IOSAccountDeletionRecoveryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSAccountDeletionRecoveryStore.swift; path = BirthdayAutopilot/Privacy/IOSAccountDeletionRecoveryStore.swift; sourceTree = "<group>"; };
+		F1A000182F00000100000018 /* IOSCompanionWipeRecoveryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionWipeRecoveryStore.swift; path = BirthdayAutopilot/Privacy/IOSCompanionWipeRecoveryStore.swift; sourceTree = "<group>"; };
+		G1A000032F40000100000003 /* IOSNativeBoundaryPolicies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSNativeBoundaryPolicies.swift; path = BirthdayAutopilot/Automation/IOSNativeBoundaryPolicies.swift; sourceTree = "<group>"; };
+		G1A000042F40000100000004 /* IOSNativeComponentBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSNativeComponentBoundaryTests.swift; path = BirthdayAutopilotTests/IOSNativeComponentBoundaryTests.swift; sourceTree = "<group>"; };
 		E2E000012F20000100000001 /* Info-E2E.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Info-E2E.plist"; path = "BirthdayAutopilot/Info-E2E.plist"; sourceTree = "<group>"; };
 		E2E000022F20000100000002 /* BirthdayAutopilot-Debug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = "BirthdayAutopilot-Debug.entitlements"; path = "BirthdayAutopilot/BirthdayAutopilot-Debug.entitlements"; sourceTree = "<group>"; };
 		E2E000032F20000100000003 /* BirthdayAutopilot-E2E.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = "BirthdayAutopilot-E2E.entitlements"; path = "BirthdayAutopilot/BirthdayAutopilot-E2E.entitlements"; sourceTree = "<group>"; };
@@ -188,6 +206,13 @@
 				D1A000122F00000100000012 /* IOSCompanionWorkflowEngine.swift */,
 				D1A000132F00000100000013 /* IOSCompanionStatusClient.swift */,
 				D1A000142F00000100000014 /* IOSCompanionMessagePlaceholderPolicy.swift */,
+				D1A000152F00000100000015 /* IOSCompanionPlanningIndex.swift */,
+				D1A000162F00000100000016 /* IOSCompanionOccurrenceIdentity.swift */,
+				D1A000172F00000100000017 /* IOSCompanionTerminalLedger.swift */,
+				D1A000182F00000100000018 /* IOSComposerReservationClient.swift */,
+				D1A000192F00000100000019 /* IOSComposerReservationJournal.swift */,
+				D1A0001A2F0000010000001A /* IOSComposerReservationPolicy.swift */,
+				G1A000032F40000100000003 /* IOSNativeBoundaryPolicies.swift */,
 				E1A000112F00000100000011 /* GeminiSuggestionPolicy.swift */,
 				E1A000122F00000100000012 /* IOSGeminiSuggestionGateway.swift */,
 				E1A000132F00000100000013 /* GeminiCandidateProvenanceRegistry.swift */,
@@ -200,6 +225,7 @@
 				F1A000152F00000100000015 /* IOSContactDerivedResetClient.swift */,
 				F1A000162F00000100000016 /* IOSAccountDeletionReceiptClient.swift */,
 				F1A000172F00000100000017 /* IOSAccountDeletionRecoveryStore.swift */,
+				F1A000182F00000100000018 /* IOSCompanionWipeRecoveryStore.swift */,
 				C1A000192F00000100000019 /* BirthdayAutopilot.entitlements */,
 				E2E000022F20000100000002 /* BirthdayAutopilot-Debug.entitlements */,
 				E2E000032F20000100000003 /* BirthdayAutopilot-E2E.entitlements */,
@@ -262,6 +288,7 @@
 				B2A000022F10000100000002 /* IOSPeopleBackgroundRefreshPolicyTests.swift */,
 				B2A000042F10000100000004 /* IOSPhoneNumberNormalizerTests.swift */,
 				B2A000062F10000100000006 /* IOSCompanionRetentionPolicyTests.swift */,
+				G1A000042F40000100000004 /* IOSNativeComponentBoundaryTests.swift */,
 			);
 			name = BirthdayAutopilotTests;
 			sourceTree = "<group>";
@@ -517,6 +544,13 @@
 				D1A000022F00000100000002 /* IOSCompanionWorkflowEngine.swift in Sources */,
 				D1A000032F00000100000003 /* IOSCompanionStatusClient.swift in Sources */,
 				D1A000042F00000100000004 /* IOSCompanionMessagePlaceholderPolicy.swift in Sources */,
+				D1A000052F00000100000005 /* IOSCompanionPlanningIndex.swift in Sources */,
+				D1A000062F00000100000006 /* IOSCompanionOccurrenceIdentity.swift in Sources */,
+				D1A000072F00000100000007 /* IOSCompanionTerminalLedger.swift in Sources */,
+				D1A000082F00000100000008 /* IOSComposerReservationClient.swift in Sources */,
+				D1A000092F00000100000009 /* IOSComposerReservationJournal.swift in Sources */,
+				D1A0000A2F0000010000000A /* IOSComposerReservationPolicy.swift in Sources */,
+				G1A000012F40000100000001 /* IOSNativeBoundaryPolicies.swift in Sources */,
 				E1A000012F00000100000001 /* GeminiSuggestionPolicy.swift in Sources */,
 				E1A000022F00000100000002 /* IOSGeminiSuggestionGateway.swift in Sources */,
 				E1A000032F00000100000003 /* GeminiCandidateProvenanceRegistry.swift in Sources */,
@@ -529,6 +563,7 @@
 				F1A000052F00000100000005 /* IOSContactDerivedResetClient.swift in Sources */,
 				F1A000062F00000100000006 /* IOSAccountDeletionReceiptClient.swift in Sources */,
 				F1A000072F00000100000007 /* IOSAccountDeletionRecoveryStore.swift in Sources */,
+				F1A000082F00000100000008 /* IOSCompanionWipeRecoveryStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -540,6 +575,7 @@
 				B2A000012F10000100000001 /* IOSPeopleBackgroundRefreshPolicyTests.swift in Sources */,
 				B2A000032F10000100000003 /* IOSPhoneNumberNormalizerTests.swift in Sources */,
 				B2A000052F10000100000005 /* IOSCompanionRetentionPolicyTests.swift in Sources */,
+				G1A000022F40000100000002 /* IOSNativeComponentBoundaryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

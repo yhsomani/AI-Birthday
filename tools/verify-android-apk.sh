@@ -35,8 +35,8 @@ assert_truly_unsigned_apk() {
 }
 
 main() {
-if [[ $# -ne 2 && $# -ne 3 && $# -ne 7 && $# -ne 8 ]]; then
-  echo "usage: $0 <apk> <expected-package> [--unsigned-dev-release | --restricted-evidence <json> <raw-signature> <authority-public-key> <lab|prod> | --play-delivered-evidence <json> <raw-signature> <authority-public-key> <lab|prod> <physical-device-serial>]" >&2
+if [[ $# -ne 2 && $# -ne 3 && $# -ne 8 && $# -ne 13 ]]; then
+  echo "usage: $0 <apk> <expected-package> [--unsigned-dev-release | --restricted-evidence <json> <raw-signature> <authority-public-key> <supporting-evidence-root> <lab|prod> | --play-delivered-evidence <json> <raw-signature> <authority-public-key> <supporting-evidence-root> <lab|prod> <physical-device-serial> --report <output-json> --installed-apk-output-root <new-directory>]" >&2
   exit 64
 fi
 
@@ -45,35 +45,42 @@ expected_package=$2
 restricted_evidence=""
 restricted_evidence_signature=""
 distribution_authority_public_key=""
+restricted_evidence_root=""
 restricted_tier=""
 unsigned_dev_release=false
 play_delivered_apk=false
 physical_device_serial=""
+play_delivery_report=""
+installed_apk_output_root=""
 if [[ $# -eq 3 ]]; then
   if [[ $3 != "--unsigned-dev-release" ]]; then
     echo "FAIL unsigned artifact argument is invalid" >&2
     exit 64
   fi
   unsigned_dev_release=true
-elif [[ $# -eq 7 ]]; then
-  if [[ $3 != "--restricted-evidence" || ($7 != "lab" && $7 != "prod") ]]; then
+elif [[ $# -eq 8 ]]; then
+  if [[ $3 != "--restricted-evidence" || ($8 != "lab" && $8 != "prod") ]]; then
     echo "FAIL restricted evidence arguments are invalid" >&2
     exit 64
   fi
   restricted_evidence=$4
   restricted_evidence_signature=$5
   distribution_authority_public_key=$6
-  restricted_tier=$7
-elif [[ $# -eq 8 ]]; then
-  if [[ $3 != "--play-delivered-evidence" || ($7 != "lab" && $7 != "prod") || -z $8 ]]; then
+  restricted_evidence_root=$7
+  restricted_tier=$8
+elif [[ $# -eq 13 ]]; then
+  if [[ $3 != "--play-delivered-evidence" || ($8 != "lab" && $8 != "prod") || -z $9 || ${10} != "--report" || -z ${11} || ${12} != "--installed-apk-output-root" || -z ${13} ]]; then
     echo "FAIL Play-delivered evidence arguments are invalid" >&2
     exit 64
   fi
   restricted_evidence=$4
   restricted_evidence_signature=$5
   distribution_authority_public_key=$6
-  restricted_tier=$7
-  physical_device_serial=$8
+  restricted_evidence_root=$7
+  restricted_tier=$8
+  physical_device_serial=$9
+  play_delivery_report=${11}
+  installed_apk_output_root=${13}
   play_delivered_apk=true
 fi
 sdk_root=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}
@@ -197,6 +204,7 @@ if [[ "$has_restricted_sms" == true ]]; then
 fi
 
 signing_certificate=""
+signing_certificate_sha1=""
 if [[ "$unsigned_dev_release" == true ]]; then
   assert_truly_unsigned_apk "$apk" "$apksigner"
 else
@@ -214,6 +222,11 @@ else
     echo "FAIL APK contains more than one signer" >&2
     exit 1
   fi
+  signing_certificate_sha1=$(sed -n 's/^Signer #1 certificate SHA-1 digest: //p' <<<"$signature_report" | tr 'A-F' 'a-f')
+  if [[ "$play_delivered_apk" == true && ! "$signing_certificate_sha1" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "FAIL APK signing certificate SHA-1 digest is unavailable" >&2
+    exit 1
+  fi
 fi
 if [[ -n "$restricted_evidence" ]]; then
   if ! command -v node >/dev/null 2>&1; then
@@ -228,6 +241,7 @@ if [[ -n "$restricted_evidence" ]]; then
     --file "$restricted_evidence" \
     --signature "$restricted_evidence_signature" \
     --public-key "$distribution_authority_public_key" \
+    --evidence-root "$restricted_evidence_root" \
     --tier "$restricted_tier" \
     --package "$package_name" \
     --version-code "$version_code" \
@@ -351,6 +365,91 @@ done
 if (( load_segments == 0 )); then
   echo "FAIL no ELF LOAD segments found" >&2
   exit 1
+fi
+
+if [[ "$play_delivered_apk" == true ]]; then
+  if [[ -e "$installed_apk_output_root" || -L "$installed_apk_output_root" ]]; then
+    echo "FAIL installed APK output root must not already exist" >&2
+    exit 1
+  fi
+  mkdir -m 700 -- "$installed_apk_output_root"
+  inventory="$tmp_dir/installed-artifacts.ndjson"
+  : >"$inventory"
+  for index in "${!installed_paths[@]}"; do
+    installed_path=${installed_paths[$index]}
+    installed_copy=${apk_files_to_inspect[$index]}
+    file_name=$(basename "$installed_path")
+    retained_copy="$installed_apk_output_root/$file_name"
+    if [[ -e "$retained_copy" || -L "$retained_copy" ]]; then
+      echo "FAIL installed Play APK file names are not unique" >&2
+      exit 1
+    fi
+    cp -- "$installed_copy" "$retained_copy"
+    chmod 600 -- "$retained_copy"
+    role=split
+    [[ "$file_name" == base.apk ]] && role=base
+    installed_digest=$(shasum -a 256 "$retained_copy" | awk '{print $1}')
+    installed_bytes=$(wc -c <"$retained_copy" | tr -d '[:space:]')
+    node --input-type=module - \
+      "$role" "$installed_path" "$file_name" "$installed_bytes" \
+      "$installed_digest" "$signing_certificate_sha1" "$signing_certificate" \
+      >>"$inventory" <<'NODE'
+const [role, packagePath, fileName, bytes, digest, sha1, sha256] = process.argv.slice(2);
+process.stdout.write(`${JSON.stringify({
+  role,
+  packagePath,
+  fileName,
+  bytes: Number(bytes),
+  sha256: digest,
+  signingCertificateSha1: sha1,
+  signingCertificateSha256: sha256,
+})}\n`);
+NODE
+  done
+
+  observation="$tmp_dir/play-device-observation.json"
+  validation_file="$tmp_dir/validated-distribution-evidence.json"
+  printf '%s\n' "$validation_output" >"$validation_file"
+  node --input-type=module - \
+    "$inventory" "$validation_file" "$observation" "$physical_device_serial" "$device_api" \
+    "$installer_package" "$package_name" "$version_code" "$version_name" \
+    "$signing_certificate_sha1" "$signing_certificate" \
+    <<'NODE'
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+const [inventoryPath, validationPath, outputPath, serial, deviceApi, installer, applicationId,
+  versionCode, versionName, signingSha1, signingSha256] = process.argv.slice(2);
+const validation = JSON.parse(readFileSync(validationPath, 'utf8'));
+const installedArtifacts = readFileSync(inventoryPath, 'utf8')
+  .trim()
+  .split('\n')
+  .filter(Boolean)
+  .map(line => JSON.parse(line));
+writeFileSync(outputPath, `${JSON.stringify({
+  schemaVersion: 1,
+  observedAt: new Date().toISOString(),
+  physicalDevice: true,
+  deviceSerialSha256: createHash('sha256').update(serial, 'utf8').digest('hex'),
+  deviceApi: Number(deviceApi),
+  installerOfRecord: installer,
+  applicationId,
+  versionCode: Number(versionCode),
+  versionName,
+  uploadAabSha256: validation.approval.artifactAabSha256,
+  deliveredBaseApkSha256: validation.approval.artifactApkSha256,
+  installedSigningCertificateSha1: signingSha1,
+  installedSigningCertificateSha256: signingSha256,
+  installedArtifacts,
+})}\n`, { flag: 'wx', mode: 0o600 });
+NODE
+  node "$script_dir/create-play-delivered-verification-report.mjs" \
+    --evidence "$restricted_evidence" \
+    --signature "$restricted_evidence_signature" \
+    --public-key "$distribution_authority_public_key" \
+    --evidence-root "$restricted_evidence_root" \
+    --tier "$restricted_tier" \
+    --observation "$observation" \
+    --output "$play_delivery_report"
 fi
 
 signature_state="verified"

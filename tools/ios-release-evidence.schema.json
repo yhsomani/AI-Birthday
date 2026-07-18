@@ -195,9 +195,18 @@
         "dependencyAudit": { "$ref": "#/$defs/reference" },
         "firebaseReview": { "$ref": "#/$defs/reference" },
         "protectedStorageBackup": { "$ref": "#/$defs/reference" },
-        "physicalDeviceMatrix": { "$ref": "#/$defs/reference" },
-        "performance": { "$ref": "#/$defs/reference" },
-        "accessibility": { "$ref": "#/$defs/reference" },
+        "physicalDeviceMatrix": {
+          "$ref": "#/$defs/reference",
+          "description": "Version-2 mobile-release-scenario-evidence JSON with evidenceKind ios-physical, including physical carrier/composer truth scenarios and exact raw evidence retained in the same evidence root."
+        },
+        "performance": {
+          "$ref": "#/$defs/reference",
+          "description": "Version-2 structured performance evidence executed by validate-performance-evidence.mjs with its exact protocol and raw-result bytes retained in the same evidence root."
+        },
+        "accessibility": {
+          "$ref": "#/$defs/reference",
+          "description": "Version-2 mobile-release-scenario-evidence JSON with evidenceKind ios-accessibility and exact raw evidence retained in the same evidence root."
+        },
         "privacyReview": { "$ref": "#/$defs/reference" },
         "appStoreSubmission": { "$ref": "#/$defs/reference" },
         "loginServicesReview": { "$ref": "#/$defs/reference" },

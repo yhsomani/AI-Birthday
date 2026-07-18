@@ -8,29 +8,97 @@ extension Notification.Name {
   )
 }
 
+protocol IOSCompanionNativeRouteStore: AnyObject {
+  func takePendingNativeRoute(
+    now: Date,
+    completion: @escaping (
+      Result<IOSCompanionNativeRoute?, CompanionStoreError>
+    ) -> Void
+  )
+  func consumeReminderRouteRequest(
+    _ requestId: String,
+    now: Date,
+    completion: @escaping (
+      Result<IOSCompanionNativeRoute, CompanionStoreError>
+    ) -> Void
+  )
+}
+
+extension CompanionProtectedStore: IOSCompanionNativeRouteStore {}
+
+protocol IOSCompanionRoutePrivacyGate {
+  var routeConsumptionIsBlocked: Bool { get }
+}
+
+struct IOSSystemCompanionRoutePrivacyGate: IOSCompanionRoutePrivacyGate {
+  var routeConsumptionIsBlocked: Bool {
+    IOSAccountDeletionReceiptStore.shared.hasPendingOrUnreadableReceipt()
+      || IOSAccountDeletionRecoveryStore.shared.hasPendingOrUnreadableJournal()
+      || IOSCompanionWipeRecoveryStore.shared.hasPendingOrUnreadableJournal()
+  }
+}
+
+protocol IOSCompanionProtectedDataStatus {
+  var isProtectedDataAvailable: Bool { get }
+}
+
+struct IOSSystemCompanionProtectedDataStatus: IOSCompanionProtectedDataStatus {
+  var isProtectedDataAvailable: Bool {
+    UIApplication.shared.isProtectedDataAvailable
+  }
+}
+
 /// Owns local-notification presentation and tap routing. Notification payloads
 /// contain one opaque request UUID only. The UUID is atomically consumed inside
 /// CompanionProtectedStore and never crosses the React Native boundary.
 final class IOSCompanionNotificationRouter: NSObject, UNUserNotificationCenterDelegate {
-  static let shared = IOSCompanionNotificationRouter()
+  static let shared = IOSCompanionNotificationRouter(
+    store: CompanionProtectedStore.shared,
+    privacyGate: IOSSystemCompanionRoutePrivacyGate(),
+    protectedDataStatus: IOSSystemCompanionProtectedDataStatus(),
+    eventCenter: .default,
+    observesProtectedData: true
+  )
 
   private static let identifierPrefix = "birthday-autopilot.reminder.v1."
   private let lock = NSLock()
+  private let store: IOSCompanionNativeRouteStore
+  private let privacyGate: IOSCompanionRoutePrivacyGate
+  private let protectedDataStatus: IOSCompanionProtectedDataStatus
+  private let eventCenter: NotificationCenter
+  private let observesProtectedData: Bool
   private var deferredRequestId: String?
   private var pendingAttentionRouteId: String?
 
-  private override init() {
+  /// Internal dependency seam for hosted native tests. Production uses the
+  /// singleton above and still observes the real protected-data notification.
+  init(
+    store: IOSCompanionNativeRouteStore,
+    privacyGate: IOSCompanionRoutePrivacyGate,
+    protectedDataStatus: IOSCompanionProtectedDataStatus,
+    eventCenter: NotificationCenter,
+    observesProtectedData: Bool
+  ) {
+    self.store = store
+    self.privacyGate = privacyGate
+    self.protectedDataStatus = protectedDataStatus
+    self.eventCenter = eventCenter
+    self.observesProtectedData = observesProtectedData
     super.init()
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(retryDeferredRoute),
-      name: UIApplication.protectedDataDidBecomeAvailableNotification,
-      object: nil
-    )
+    if observesProtectedData {
+      eventCenter.addObserver(
+        self,
+        selector: #selector(retryDeferredRoute),
+        name: UIApplication.protectedDataDidBecomeAvailableNotification,
+        object: nil
+      )
+    }
   }
 
   deinit {
-    NotificationCenter.default.removeObserver(self)
+    if observesProtectedData {
+      eventCenter.removeObserver(self)
+    }
   }
 
   /// Atomically returns and consumes the durable safe navigation hint. The
@@ -51,7 +119,7 @@ final class IOSCompanionNotificationRouter: NSObject, UNUserNotificationCenterDe
       ]))
       return
     }
-    CompanionProtectedStore.shared.takePendingNativeRoute { result in
+    store.takePendingNativeRoute(now: Date()) { result in
       completion(result.map { route in
         route?.projection ?? ["kind": "none"]
       })
@@ -97,7 +165,7 @@ final class IOSCompanionNotificationRouter: NSObject, UNUserNotificationCenterDe
       center.removeDeliveredNotifications(
         withIdentifiers: [response.notification.request.identifier]
       )
-      NotificationCenter.default.post(
+      eventCenter.post(
         name: .companionNativeRouteAvailable,
         object: self,
         userInfo: ["kind": "available"]
@@ -119,7 +187,7 @@ final class IOSCompanionNotificationRouter: NSObject, UNUserNotificationCenterDe
     }
   }
 
-  @objc private func retryDeferredRoute() {
+  @objc func retryDeferredRoute() {
     lock.lock()
     let requestId = deferredRequestId
     deferredRequestId = nil
@@ -128,14 +196,12 @@ final class IOSCompanionNotificationRouter: NSObject, UNUserNotificationCenterDe
     consume(requestId: requestId, completion: {})
   }
 
-  private func consume(requestId: String, completion: @escaping () -> Void) {
-    guard !IOSAccountDeletionReceiptStore.shared.hasPendingOrUnreadableReceipt(),
-      !IOSAccountDeletionRecoveryStore.shared.hasPendingOrUnreadableJournal()
-    else {
+  func consume(requestId: String, completion: @escaping () -> Void) {
+    guard !privacyGate.routeConsumptionIsBlocked else {
       completion()
       return
     }
-    CompanionProtectedStore.shared.consumeReminderRouteRequest(requestId) {
+    store.consumeReminderRouteRequest(requestId, now: Date()) {
       [weak self] result in
       guard let self else {
         completion()
@@ -146,13 +212,13 @@ final class IOSCompanionNotificationRouter: NSObject, UNUserNotificationCenterDe
         self.lock.lock()
         self.deferredRequestId = nil
         self.lock.unlock()
-        NotificationCenter.default.post(
+        self.eventCenter.post(
           name: .companionNativeRouteAvailable,
           object: self,
           userInfo: ["kind": "available"]
         )
       case .failure(.storageUnavailable)
-        where !UIApplication.shared.isProtectedDataAvailable:
+        where !self.protectedDataStatus.isProtectedDataAvailable:
         self.lock.lock()
         self.deferredRequestId = requestId
         self.lock.unlock()
@@ -163,7 +229,7 @@ final class IOSCompanionNotificationRouter: NSObject, UNUserNotificationCenterDe
     }
   }
 
-  private static func opaqueRequestId(
+  static func opaqueRequestId(
     from request: UNNotificationRequest
   ) -> String? {
     guard request.identifier.hasPrefix(identifierPrefix),

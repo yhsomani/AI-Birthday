@@ -21,6 +21,8 @@ import { parseReleaseConfig } from '../backend/hosting/tools/release-config.mjs'
 const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SHA256 = /^[0-9a-f]{64}$/u;
 const REVISION = /^[0-9a-f]{40}$/u;
+const RELEASE_VERSION = /^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$/u;
+const IOS_BUILD_NUMBER = /^[1-9][0-9]{0,17}$/u;
 const SAFE_RELATIVE = /^[A-Za-z0-9][A-Za-z0-9 ._/@()+-]{0,511}$/u;
 const EMAIL =
   /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/iu;
@@ -28,6 +30,8 @@ const PLACEHOLDER =
   /(?:^|[\s_./-])(?:required|todo|tbd|placeholder|replace|example|unknown|unprovisioned)(?:$|[\s_./-])|[<>]/iu;
 const UTC_INSTANT =
   /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?Z$/u;
+const TAXONOMY_REVIEW_WINDOW_DAYS = 7;
+const TAXONOMY_REVIEW_WINDOW_MS = TAXONOMY_REVIEW_WINDOW_DAYS * 86_400_000;
 const REQUIRED_LOCALES = Object.freeze(['en-US', 'hi-IN']);
 const REQUIRED_ROLES = Object.freeze([
   'product',
@@ -449,6 +453,40 @@ const parseInstant = (value, label, errors) => {
   return epoch;
 };
 
+const validateTaxonomyReviewInstant = (value, label, errors, packageTimes) => {
+  const reviewedAt = parseInstant(value, label, errors);
+  if (
+    reviewedAt === null ||
+    packageTimes === null ||
+    packageTimes?.generatedAt === null ||
+    packageTimes?.validUntil === null
+  ) {
+    return;
+  }
+  const { generatedAt, validUntil, now } = packageTimes;
+  if (reviewedAt > generatedAt) {
+    errors.push(`${label} must not be later than package generatedAt`);
+  }
+  if (reviewedAt > now) {
+    errors.push(`${label} must not be later than validation time`);
+  }
+  if (generatedAt - reviewedAt > TAXONOMY_REVIEW_WINDOW_MS) {
+    errors.push(
+      `${label} must be no more than ${TAXONOMY_REVIEW_WINDOW_DAYS} days old at package generation`,
+    );
+  }
+  if (now - reviewedAt > TAXONOMY_REVIEW_WINDOW_MS) {
+    errors.push(
+      `${label} must be no more than ${TAXONOMY_REVIEW_WINDOW_DAYS} days old at validation time`,
+    );
+  }
+  if (validUntil - reviewedAt > TAXONOMY_REVIEW_WINDOW_MS) {
+    errors.push(
+      `${label} must remain current through package validUntil within ${TAXONOMY_REVIEW_WINDOW_DAYS} days`,
+    );
+  }
+};
+
 const requiredHttps = (value, label, errors) => {
   const text = requiredString(value, label, errors, 2048);
   if (text === null) return null;
@@ -833,9 +871,15 @@ const validateCoordinate = (document, errors, context, mode) => {
     'Android applicationId',
     errors,
   );
-  if (android.versionCode !== 1)
-    errors.push('Android versionCode must be exactly 1');
-  fixedString(android.versionName, '1.0', 'Android versionName', errors);
+  if (!Number.isSafeInteger(android.versionCode) || android.versionCode < 1) {
+    errors.push('Android versionCode must be a positive safe integer');
+  }
+  if (
+    typeof android.versionName !== 'string' ||
+    !RELEASE_VERSION.test(android.versionName)
+  ) {
+    errors.push('Android versionName is invalid');
+  }
   fixedString(android.artifactKind, 'aab', 'Android artifactKind', errors);
   fixedString(
     ios.bundleId,
@@ -843,8 +887,18 @@ const validateCoordinate = (document, errors, context, mode) => {
     'iOS bundleId',
     errors,
   );
-  fixedString(ios.shortVersion, '1.0', 'iOS shortVersion', errors);
-  fixedString(ios.buildNumber, '1', 'iOS buildNumber', errors);
+  if (
+    typeof ios.shortVersion !== 'string' ||
+    !RELEASE_VERSION.test(ios.shortVersion)
+  ) {
+    errors.push('iOS shortVersion is invalid');
+  }
+  if (
+    typeof ios.buildNumber !== 'string' ||
+    !IOS_BUILD_NUMBER.test(ios.buildNumber)
+  ) {
+    errors.push('iOS buildNumber is invalid');
+  }
   fixedString(ios.artifactKind, 'ipa', 'iOS artifactKind', errors);
   if (mode === 'template') return;
   requiredString(
@@ -854,6 +908,12 @@ const validateCoordinate = (document, errors, context, mode) => {
     255,
   );
   requiredString(ios.artifactFileName, 'iOS artifactFileName', errors, 255);
+  if (!String(android.artifactFileName).endsWith('.aab')) {
+    errors.push('Android artifactFileName must end in .aab');
+  }
+  if (!String(ios.artifactFileName).endsWith('.ipa')) {
+    errors.push('iOS artifactFileName must end in .ipa');
+  }
   requiredSha(
     android.signingCertificateSha256,
     'Android signing certificate',
@@ -1328,6 +1388,7 @@ const validateDataBundle = (
   errors,
   context,
   mode,
+  packageTimes,
 ) => {
   if (!exactKeys(bundle, DATA_BUNDLE_KEYS, label, errors)) return;
   if (!Array.isArray(bundle.answers)) {
@@ -1358,10 +1419,11 @@ const validateDataBundle = (
       `${label}.privacyPolicyConsistent`,
       errors,
     );
-    parseInstant(
+    validateTaxonomyReviewInstant(
       bundle.taxonomyReviewedAt,
       `${label}.taxonomyReviewedAt`,
       errors,
+      packageTimes,
     );
     verifyExternalFile(
       context.evidenceRoot,
@@ -1468,7 +1530,7 @@ const validateReviewAccess = (access, label, errors, context, mode) => {
   );
 };
 
-const validatePlay = (play, errors, context, mode) => {
+const validatePlay = (play, errors, context, mode, packageTimes) => {
   if (!exactKeys(play, PLAY_KEYS, 'play', errors)) return;
   validateDataBundle(
     play.dataSafety,
@@ -1477,6 +1539,7 @@ const validatePlay = (play, errors, context, mode) => {
     errors,
     context,
     mode,
+    packageTimes,
   );
   validateReviewAccess(
     play.reviewAccess,
@@ -1583,7 +1646,7 @@ const validatePlay = (play, errors, context, mode) => {
   }
 };
 
-const validateAppStore = (appStore, errors, context, mode) => {
+const validateAppStore = (appStore, errors, context, mode, packageTimes) => {
   if (!exactKeys(appStore, APP_STORE_KEYS, 'appStore', errors)) return;
   validateDataBundle(
     appStore.appPrivacy,
@@ -1592,6 +1655,7 @@ const validateAppStore = (appStore, errors, context, mode) => {
     errors,
     context,
     mode,
+    packageTimes,
   );
   validateReviewAccess(
     appStore.reviewAccess,
@@ -1951,6 +2015,7 @@ export function validateStoreSubmissionEvidence(
   { mode = 'template', now = Date.now(), ...context } = {},
 ) {
   const errors = [];
+  let packageTimes = null;
   if (!['template', 'submission', 'release'].includes(mode)) {
     return {
       errors: ['mode must be template, submission, or release'],
@@ -1998,6 +2063,7 @@ export function validateStoreSubmissionEvidence(
       errors,
     );
     const validUntil = parseInstant(document.validUntil, 'validUntil', errors);
+    packageTimes = { generatedAt, validUntil, now };
     if (
       generatedAt !== null &&
       validUntil !== null &&
@@ -2026,8 +2092,8 @@ export function validateStoreSubmissionEvidence(
   validatePublicIdentity(document.publicIdentity, errors, context, mode);
   validateLocalizations(document.localizations, errors, context, mode);
   validateAssets(document.assets, errors, context, mode, document);
-  validatePlay(document.play, errors, context, mode);
-  validateAppStore(document.appStore, errors, context, mode);
+  validatePlay(document.play, errors, context, mode, packageTimes);
+  validateAppStore(document.appStore, errors, context, mode, packageTimes);
   validateAccessibility(document.accessibility, errors, context, mode);
   validateEvidenceReferences(
     document.evidenceReferences,

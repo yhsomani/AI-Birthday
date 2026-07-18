@@ -81,15 +81,15 @@
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     "physicalDeviceMatrix": {
-      "path": "<path>",
+      "path": "<ios-physical-mobile-scenario-evidence-v2-json>",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     "performance": {
-      "path": "<path>",
+      "path": "<validated-ios-performance-evidence-v2-json>",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     "accessibility": {
-      "path": "<path>",
+      "path": "<ios-accessibility-mobile-scenario-evidence-v2-json>",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     "privacyReview": {

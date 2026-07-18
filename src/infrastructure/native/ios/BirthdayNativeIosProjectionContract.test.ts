@@ -119,18 +119,41 @@ describe('BirthdayNative iOS projection contract', () => {
             id: 'composer-operation-1',
             kind: 'composer-reported-sent',
             occurredAt: checkedAt,
-            actionable: false,
           },
           {
             id: 'composer-operation-2',
             kind: 'composer-outcome-unknown',
             reason: 'internal-contract-invalid',
             occurredAt: checkedAt,
-            actionable: true,
+            recovery: { route: 'attention' },
           },
         ],
       }),
     ).not.toThrow();
+    expect(() =>
+      activityPageSchema.parse({
+        items: [
+          {
+            id: 'stale-activity-contract',
+            kind: 'composer-failed',
+            occurredAt: checkedAt,
+            actionable: true,
+          },
+        ],
+      }),
+    ).toThrow();
+    expect(() =>
+      activityPageSchema.parse({
+        items: [
+          {
+            id: 'invalid-recovery-route',
+            kind: 'composer-failed',
+            occurredAt: checkedAt,
+            recovery: { route: 'composer' },
+          },
+        ],
+      }),
+    ).toThrow();
     expect(() =>
       testProjectionSchema.parse({
         platform: 'ios',

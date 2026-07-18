@@ -82,7 +82,9 @@ describe('coordination-operation security architecture', () => {
     expect(callable).toContain('requireSignedOutAppChecked');
     expect(callable).not.toContain('requireAuthenticated');
     expect(callable).not.toContain('requireRecentGoogleAuthentication');
-    expect(source).toContain("throw new HttpsError('failed-precondition', 'SIGNED_OUT_REQUIRED')");
+    expect(source).toContain(
+      "throw new HttpsError('failed-precondition', 'SIGNED_OUT_REQUIRED')",
+    );
     expect(source).toContain('consumeAppCheckToken: true');
   });
 

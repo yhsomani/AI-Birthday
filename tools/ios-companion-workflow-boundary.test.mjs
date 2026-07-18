@@ -43,6 +43,12 @@ const nativeTests = read(
 );
 const featureSchemas = read('src/infrastructure/native/featureSchemas.ts');
 const project = read('ios/BirthdayAutopilot.xcodeproj/project.pbxproj');
+const reminderBridge = read(
+  'ios/BirthdayAutopilot/CompanionReminderModuleBridge.m',
+);
+const companionGateway = read(
+  'src/infrastructure/native/ios/CompanionNativeGateway.ts',
+);
 const podfile = read('ios/Podfile');
 const identity = read(
   'ios/BirthdayAutopilot/Identity/IOSGoogleIdentityCoordinator.swift',
@@ -98,6 +104,89 @@ test('iOS composer is foreground-only, nonce-fenced and never programmatically s
   assert.doesNotMatch(openKeys, /recipient|body/u);
 });
 
+test('iOS composer binds and leases one exact durable People generation', () => {
+  assert.match(
+    peopleStore,
+    /struct IOSPeoplePrivateSnapshot[\s\S]*?let generation: String/u,
+  );
+  assert.match(
+    peopleStore,
+    /func privateSnapshot[\s\S]*?snapshot\.sync\.generation = generation[\s\S]*?try persist\(snapshot\)/u,
+  );
+  const lease =
+    peopleStore.match(
+      /func acquireComposerMaterialLease[\s\S]*?func releaseComposerMaterialLease/u,
+    )?.[0] ?? '';
+  assert.match(lease, /snapshot\.binding == expectedBinding/u);
+  assert.match(
+    lease,
+    /snapshot\.sync\.generation == expectedSnapshotGeneration/u,
+  );
+  assert.match(lease, /contact\.materialRevision == expectedMaterialRevision/u);
+  assert.match(
+    lease,
+    /\$0\.localId == selectedPhoneId[\s\S]*?\.e164 == expectedRecipient/u,
+  );
+  assert.match(lease, /DispatchTime\.now\(\)\.uptimeNanoseconds/u);
+  const leaseRevalidation =
+    peopleStore.match(
+      /func validateAndRetainComposerMaterialLease[\s\S]*?func releaseComposerMaterialLease/u,
+    )?.[0] ?? '';
+  assert.match(
+    leaseRevalidation,
+    /expectedSnapshotGeneration == lease\.snapshotGeneration/u,
+  );
+  assert.match(
+    leaseRevalidation,
+    /activeLease\.token == lease\.token[\s\S]*?activeLease\.snapshotGeneration == lease\.snapshotGeneration/u,
+  );
+  assert.match(
+    leaseRevalidation,
+    /self\.removeExpiredComposerMaterialLease\(\)/u,
+  );
+  assert.match(leaseRevalidation, /snapshot\.binding == expectedBinding/u);
+  assert.match(
+    leaseRevalidation,
+    /snapshot\.sync\.generation == expectedSnapshotGeneration/u,
+  );
+  assert.match(
+    leaseRevalidation,
+    /contact\.materialRevision == expectedMaterialRevision/u,
+  );
+  assert.match(
+    leaseRevalidation,
+    /\$0\.localId == selectedPhoneId[\s\S]*?\.e164 == expectedRecipient/u,
+  );
+  assert.match(
+    leaseRevalidation,
+    /expiresAtUptimeNanoseconds: activeLease\.expiresAtUptimeNanoseconds[\s\S]*?retainedUntilRelease: true/u,
+  );
+  assert.match(
+    peopleStore,
+    /private func removeExpiredComposerMaterialLease[\s\S]*?!lease\.retainedUntilRelease[\s\S]*?uptimeNanoseconds >= lease\.expiresAtUptimeNanoseconds/u,
+  );
+  assert.ok(
+    (peopleStore.match(/guard self\.peopleMaterialMutationAllowed\(\)/gu) ?? [])
+      .length >= 7,
+  );
+
+  assert.match(workflowModels, /let peopleSnapshotGeneration: String/u);
+  assert.match(workflow, /peopleStore\.privateSnapshot\(\)/u);
+  assert.match(
+    workflow,
+    /peopleSnapshotGeneration: peopleSnapshot\.generation/u,
+  );
+  assert.match(protectedStore, /let peopleSnapshotGeneration: String\?/u);
+  assert.match(
+    protectedStore,
+    /func commitComposerOpen[\s\S]*?expectedPeopleSnapshotGeneration: String[\s\S]*?String\(snapshot\.projectionRevision \?\? 0\) == expectedRevision[\s\S]*?proposal\.peopleSnapshotGeneration == expectedPeopleSnapshotGeneration/u,
+  );
+  assert.match(
+    protectedStore,
+    /recoveredLegacyPeopleGenerationProposal[\s\S]*?snapshot\.proposals\.removeAll\(\)/u,
+  );
+});
+
 test('protected workflow uses account binding, CAS, expiring reviews and rollback-on-rejection', () => {
   assert.match(protectedStore, /workflow\.account\.matches\(binding\)/u);
   assert.match(protectedStore, /expectedConfigurationGeneration/u);
@@ -117,6 +206,57 @@ test('protected workflow uses account binding, CAS, expiring reviews and rollbac
   );
   assert.match(protectedStore, /outcome\.preventsRepeat/u);
   assert.match(protectedStore, /wipeAndInstallResetSafety/u);
+});
+
+test('workflow CAS is crash-reload safe and lifecycle reconciliation removes stale reminders', () => {
+  const mutation =
+    protectedStore.match(
+      /func mutateWorkflow<Value>[\s\S]*?func completeClearActivity/u,
+    )?.[0] ?? '';
+  assert.match(
+    mutation,
+    /workflow\.contacts\.sort[\s\S]*?Self\.validateWorkflow\(workflow\)[\s\S]*?snapshot\.workflow = workflow[\s\S]*?try Self\.invalidateStalePlanArtifacts/u,
+  );
+
+  const invalidation =
+    protectedStore.match(
+      /private static func invalidateStalePlanArtifacts[\s\S]*?private static func pruneWorkflowMetadata/u,
+    )?.[0] ?? '';
+  assert.match(
+    invalidation,
+    /index\.configurationGeneration == workflow\.configurationGeneration/u,
+  );
+  assert.match(
+    invalidation,
+    /index\.contactTableDigest == contactTableDigest/u,
+  );
+  assert.match(
+    invalidation,
+    /index\.contactCount == workflow\.contacts\.count/u,
+  );
+  assert.match(
+    invalidation,
+    /validateStoredProposal\(\$0, snapshot: snapshot\)/u,
+  );
+  assert.match(invalidation, /snapshot\.proposals\.removeAll\(\)/u);
+  assert.match(invalidation, /snapshot\.planningIndex = nil/u);
+  assert.match(invalidation, /applyReminderPlans\(\[\], to: &snapshot\)/u);
+  assert.match(invalidation, /snapshot\.reminderHorizon = nil/u);
+  assert.match(invalidation, /snapshot\.pendingNativeRoute = nil/u);
+  assert.doesNotMatch(invalidation, /composerRecords\.(?:removeAll|remove)/u);
+  assert.doesNotMatch(invalidation, /terminalLedger\s*=/u);
+
+  // A launch after the atomic write either rebuilds a current plan or
+  // reconciles the now-empty desired set. Reconciliation discovers owned OS
+  // requests by prefix, so clearing protected request IDs cannot orphan them.
+  assert.match(
+    reminder,
+    /private func replenishPlanBeforeReconciliation[\s\S]*?reconcileReminderPlanForLifecycle/u,
+  );
+  assert.match(
+    reminder,
+    /removeStaleOwnedRequestsBeforeAdding[\s\S]*?ownedIdentifiers\.subtracting\(desiredIdentifiers\)[\s\S]*?removePending\(withIdentifiers:/u,
+  );
 });
 
 test('all live iOS feature areas are wired and privacy cancels reminders before destructive wipes', () => {
@@ -154,7 +294,7 @@ test('all live iOS feature areas are wired and privacy cancels reminders before 
   );
   assert.match(
     reminder,
-    /guard settings\.authorizationStatus != \.denied[\s\S]*?REMINDER_SETTINGS_REQUIRED/u,
+    /guard authorizationStatus != \.denied[\s\S]*?REMINDER_SETTINGS_REQUIRED/u,
   );
   assert.match(
     reminder,
@@ -201,7 +341,7 @@ test('all live iOS feature areas are wired and privacy cancels reminders before 
   assert.match(workflow, /for date in self\.occurrenceDates/u);
   assert.match(
     workflow,
-    /let now = Date\(\)[\s\S]*?calendar\.date\(byAdding: \.day, value: 6, to: now\) \?\? now/u,
+    /for offset in 0\.\.\.6[\s\S]*?calendar\.date\(byAdding: \.day, value: offset, to: now\)[\s\S]*?plannedOccurrenceCount/u,
   );
   assert.match(
     workflow,
@@ -211,7 +351,7 @@ test('all live iOS feature areas are wired and privacy cancels reminders before 
   assert.match(workflow, /Calendar\(identifier: \.gregorian\)/u);
 });
 
-test('iOS keeps every eligible same-day proposal beyond Android send caps', () => {
+test('iOS indexes every eligible occurrence and coalesces reminders by date', () => {
   const rebuild =
     workflow.match(
       /private func rebuildPlan[\s\S]*?\n\s*private func finishMutation/u,
@@ -231,7 +371,7 @@ test('iOS keeps every eligible same-day proposal beyond Android send caps', () =
 
   assert.match(
     rebuild,
-    /for candidate in candidates[\s\S]*?occurrences\.append[\s\S]*?proposals\.append[\s\S]*?plans\.append/u,
+    /for \(ordinal, configuration\) in workflow\.contacts\.enumerated\(\)[\s\S]*?ordinalsByDay\[offset\]\.append[\s\S]*?IOSCompanionPlanningIndex\([\s\S]*?for dayOffset in ordinalsByDay\.indices[\s\S]*?plans\.append/u,
   );
   assert.doesNotMatch(
     rebuild,
@@ -274,6 +414,10 @@ test('iOS keeps every eligible same-day proposal beyond Android send caps', () =
   );
   assert.match(reminder, /private static let maximumScheduledDateCount = 60/u);
   assert.match(
+    protectedStore,
+    /maximumReminderPlans = IOSCompanionPlanningIndex\.planningDayCount/u,
+  );
+  assert.match(
     reminder,
     /var earliestByCivilDate:[\s\S]*?for plan in schedule\.plans[\s\S]*?earliestByCivilDate\[plan\.civilDate\]/u,
   );
@@ -297,7 +441,6 @@ test('iOS recurrence has an executable twenty-year and exact 400-day acceptance 
     protectedStore,
     /calendar: Calendar = \{[\s\S]*?Calendar\(identifier: \.gregorian\)[\s\S]*?timeZone = \.autoupdatingCurrent/u,
   );
-  assert.match(reminder, /value: maximumPlanningDays - 1/u);
   assert.doesNotMatch(reminder, /Calendar\.autoupdatingCurrent/u);
   for (const testName of [
     'testCompanionRecurrencePlannerCoversTwentyYearsAndEveryLeapPolicy',
@@ -422,7 +565,7 @@ test('iOS uses one strict placeholder policy and narrowly repairs unsafe persist
   assert.match(workflow, /IOSCompanionMessagePlaceholderPolicy\.issue/u);
   assert.match(workflow, /IOSCompanionMessagePlaceholderPolicy\.isValid/u);
   assert.match(workflow, /IOSCompanionMessagePlaceholderPolicy\.render/u);
-  assert.match(composer, /IOSBirthdayMessageContentPolicy\.renderedBody/u);
+  assert.match(workflow, /IOSBirthdayMessageContentPolicy\.renderedBody/u);
   assert.match(
     composer,
     /IOSBirthdayMessageContentPolicy\.isSafeRenderedBody/u,
@@ -430,7 +573,7 @@ test('iOS uses one strict placeholder policy and narrowly repairs unsafe persist
   assert.match(protectedStore, /IOSCompanionPersistedDraftRecovery\.apply/u);
   assert.match(
     protectedStore,
-    /case \.revalidatedDraft, \.clearedInvalidDraft:[\s\S]*?snapshot\.proposals\.removeAll\(\)[\s\S]*?Self\.applyReminderPlans\(\[\], to: &snapshot\)/u,
+    /case \.revalidatedDraft, \.clearedInvalidDraft:[\s\S]*?snapshot\.proposals\.removeAll\(\)[\s\S]*?snapshot\.planningIndex = nil[\s\S]*?Self\.applyReminderPlans\(\[\], to: &snapshot\)/u,
   );
   assert.match(workflowModels, /workflow\.desired = \.paused/u);
   assert.match(workflowModels, /reasons\.insert\("template-changed"\)/u);
@@ -449,6 +592,9 @@ test('Xcode and CocoaPods include every native companion workflow dependency', (
     'IOSCompanionWorkflowModels.swift',
     'IOSCompanionWorkflowEngine.swift',
     'IOSCompanionStatusClient.swift',
+    'IOSCompanionPlanningIndex.swift',
+    'IOSCompanionOccurrenceIdentity.swift',
+    'IOSCompanionTerminalLedger.swift',
     'GeminiCandidateProvenanceRegistry.swift',
     'GeminiSuggestionPolicy.swift',
     'IOSGeminiSuggestionGateway.swift',
@@ -519,22 +665,24 @@ test('composer review refreshes People material before coexistence and nonce min
   assert.match(composer, /COMPOSER_CONTACTS_RECONNECT_REQUIRED/u);
   assert.match(composer, /COMPOSER_CONTACTS_FRESHNESS_UNAVAILABLE/u);
   assert.match(
-    composer,
-    /contact\.materialRevision == configuration\.materialRevision/u,
+    workflow,
+    /configuration\.materialRevision == contact\.materialRevision/u,
   );
   assert.match(
-    composer,
-    /contact\.phones\.first[\s\S]*?\.e164 == proposal\.recipient/u,
+    workflow,
+    /IOSCompanionApprovalDestinationBinding\.resolve[\s\S]*?destinationCounts\[destination\] == 1/u,
   );
-  assert.match(composer, /let selectedPhoneId: String/u);
-  assert.match(composer, /selectedPhoneId: phoneId/u);
+  assert.match(composer, /requireTrustedFreshness: true/u);
+  assert.match(composer, /finalMaterial == expectedMaterial/u);
+  assert.match(composer, /material: finalMaterial/u);
+  assert.match(protectedStore, /snapshot\.terminalLedger\?\.check/u);
 });
 
 test('privacy shutdown drains stale notification adds and verifies final absence', () => {
   assert.match(reminder, /registerNotificationAdd\(generation: generation\)/u);
   assert.match(
     reminder,
-    /!self\.isCurrentReconciliation\(generation\)[\s\S]*?removePendingNotificationRequests[\s\S]*?finishNotificationAdd/u,
+    /!self\.isCurrentReconciliation\(generation\)[\s\S]*?removePending\(withIdentifiers:[\s\S]*?finishNotificationAdd/u,
   );
   assert.match(
     reminder,
@@ -542,7 +690,7 @@ test('privacy shutdown drains stale notification adds and verifies final absence
   );
   assert.match(
     reminder,
-    /getPendingNotificationRequests[\s\S]*?getDeliveredNotifications[\s\S]*?completion\(!remaining\)/u,
+    /pendingRequests[\s\S]*?deliveredRequests[\s\S]*?completion\(!remaining\)/u,
   );
   assert.match(reminder, /REMINDER_CANCELLATION_UNVERIFIED/u);
 });
@@ -654,7 +802,11 @@ test('iOS app-owned detail is pruned at 30 days while terminal safety stays trus
   );
   assert.match(
     protectedStore,
-    /func completeClearActivity[\s\S]*?terminalProposalIds[\s\S]*?snapshot\.proposals\.removeAll[\s\S]*?snapshot\.composerRecords\.removeAll/u,
+    /func completeClearActivity[\s\S]*?resolvedOperationIds[\s\S]*?snapshot\.proposals\.removeAll[\s\S]*?snapshot\.composerRecords\.removeAll/u,
+  );
+  assert.match(
+    protectedStore,
+    /ledger\.pruneReleased[\s\S]*?trustedServerTime: snapshot\.control\?\.trustedServerTime/u,
   );
   assert.match(
     protectedStore,
@@ -830,4 +982,129 @@ test('production and native presentation languages both follow device settings',
     presentationFormatter,
     /locale: Locale = \.autoupdatingCurrent/u,
   );
+});
+
+test('destructive reminder maintenance is native-only and absent from React Native', () => {
+  for (const method of [
+    'replacePlans',
+    'cancelAppOwned',
+    'wipeCompanionData',
+  ]) {
+    assert.doesNotMatch(
+      reminderBridge,
+      new RegExp(`RCT_EXTERN_METHOD\\(${method}`, 'u'),
+    );
+    assert.doesNotMatch(companionGateway, new RegExp(`\\b${method}\\b`, 'u'));
+  }
+  assert.doesNotMatch(
+    companionGateway,
+    /replaceReminderPlans|cancelReminders/u,
+  );
+  assert.doesNotMatch(reminder, /func replacePlans\(|validatePlans\(/u);
+  assert.match(reminder, /func cancelAppOwnedNotifications\(/u);
+  assert.match(reminder, /func wipeCompanionData\(/u);
+});
+
+test('reminder reconciliation removes an old full horizon before adding a new full horizon', () => {
+  const reconciliation = reminder.slice(
+    reminder.indexOf('private func runReconciliation('),
+    reminder.indexOf('private func removeAllPendingAppOwnedRequests('),
+  );
+  const staleRemoval = reconciliation.indexOf(
+    'removeStaleOwnedRequestsBeforeAdding(',
+  );
+  const firstAdd = reconciliation.indexOf('self.center.add(request)');
+  const authoritative = reconciliation.lastIndexOf(
+    'pendingRequests { finalObserved',
+  );
+  const horizonCommit = reconciliation.indexOf(
+    'recordReminderHorizon(horizon)',
+    authoritative,
+  );
+  assert.ok(staleRemoval >= 0 && staleRemoval < firstAdd);
+  assert.ok(firstAdd < authoritative && authoritative < horizonCommit);
+  assert.match(
+    reconciliation,
+    /if !self\.isCurrentReconciliation\(generation\)[\s\S]*?removePending\(withIdentifiers:[\s\S]*?removeDelivered\(withIdentifiers:/u,
+  );
+
+  const staleHelper = reminder.slice(
+    reminder.indexOf('private func removeStaleOwnedRequestsBeforeAdding('),
+    reminder.indexOf('private func removeAllPendingAppOwnedRequests('),
+  );
+  assert.ok(
+    staleHelper.indexOf('pendingRequests') <
+      staleHelper.indexOf('removePending(withIdentifiers:'),
+  );
+  assert.match(staleHelper, /isCurrentReconciliation\(generation\)/u);
+  assert.match(staleHelper, /attemptsRemaining: Int = 3/u);
+
+  const capacity = 60;
+  const pending = new Set(
+    Array.from({ length: capacity }, (_, index) => `old-${index}`),
+  );
+  const desired = new Set(
+    Array.from({ length: capacity }, (_, index) => `new-${index}`),
+  );
+  for (const identifier of [...pending]) {
+    if (!desired.has(identifier)) pending.delete(identifier);
+  }
+  let failures = 0;
+  for (const identifier of desired) {
+    if (!pending.has(identifier) && pending.size >= capacity) {
+      failures += 1;
+    } else {
+      pending.add(identifier);
+    }
+  }
+  assert.equal(failures, 0);
+  assert.deepEqual(pending, desired);
+
+  // A late completion owned by a superseded generation is removed instead of
+  // consuming quota or entering the authoritative next-generation horizon.
+  pending.add('superseded-late-add');
+  pending.delete('superseded-late-add');
+  assert.deepEqual(pending, desired);
+});
+
+test('iOS activation review binds and revalidates the displayed runtime snapshot', () => {
+  const prepare = workflow.slice(
+    workflow.indexOf('private func prepareActivation('),
+    workflow.indexOf('private func confirmActivation('),
+  );
+  const confirm = workflow.slice(
+    workflow.indexOf('private func confirmActivation('),
+    workflow.indexOf('private func pauseAll('),
+  );
+  const hash = workflow.slice(
+    workflow.indexOf('private static func activationReviewHash('),
+    workflow.indexOf('private static func messageReviewHash('),
+  );
+
+  for (const field of [
+    'plannedReminderCount',
+    'reminderWindowLabel',
+    'reminderHorizon',
+    'coexistence',
+    'contactsReady',
+    'messageUiReady',
+    'protectedStorageReady',
+    'readiness',
+  ]) {
+    assert.match(prepare, new RegExp(`"${field}"`, 'u'));
+    assert.match(featureSchemas, new RegExp(`\\b${field}:`, 'u'));
+  }
+  assert.match(prepare, /activationReviewHash\(/u);
+  assert.match(confirm, /activationReviewHash\(/u);
+  assert.match(confirm, /activationReviewIsConfirmable/u);
+  assert.match(confirm, /review\.blockerHash == currentReviewHash/u);
+  assert.match(
+    hash,
+    /status\.reminderHorizonState == nil[\s\S]*status\.reminderHorizonState == \.full/u,
+  );
+  assert.match(hash, /status\.reminderPlans\.count/u);
+  assert.match(hash, /status\.reminderHorizonState\?\.rawValue/u);
+  assert.match(hash, /activationCoexistenceValue\(status\.coexistence\)/u);
+  assert.match(hash, /canonicalHash\(readinessParts\)/u);
+  assert.doesNotMatch(hash, /recipient|body|phone|messageDraft\.text/u);
 });

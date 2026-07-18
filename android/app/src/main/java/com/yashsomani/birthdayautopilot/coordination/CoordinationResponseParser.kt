@@ -1389,6 +1389,7 @@ internal object CoordinationResponseParser {
     CoordinationServerReason.MISSING_FENCE,
     CoordinationServerReason.MISSING_CLAIM,
     CoordinationServerReason.UNKNOWN_HISTORY,
+    CoordinationServerReason.IOS_COMPOSER_RESERVED,
   )
   private val REGISTRATION_REASONS = setOf(
     CoordinationServerReason.DELETION_SUPPRESSED,
@@ -1397,6 +1398,7 @@ internal object CoordinationResponseParser {
     CoordinationServerReason.BUILD_UNSUPPORTED,
     CoordinationServerReason.POLICY_UNSUPPORTED,
     CoordinationServerReason.CHANNEL_UNSUPPORTED,
+    CoordinationServerReason.IOS_COMPOSER_RESERVED,
   )
   private val LEASE_REASONS = setOf(
     CoordinationServerReason.DELETION_SUPPRESSED,
@@ -1408,6 +1410,7 @@ internal object CoordinationResponseParser {
     CoordinationServerReason.CHANNEL_UNSUPPORTED,
     CoordinationServerReason.BINDING_MISMATCH,
     CoordinationServerReason.MODE_BLOCKED,
+    CoordinationServerReason.IOS_COMPOSER_RESERVED,
   )
   private val MODE_REASONS = setOf(
     CoordinationServerReason.DELETION_SUPPRESSED,
@@ -1420,10 +1423,12 @@ internal object CoordinationResponseParser {
     CoordinationServerReason.CHANNEL_UNSUPPORTED,
     CoordinationServerReason.TEST_LEASE_OR_MODE_INVALID,
     CoordinationServerReason.BOUND_TEST_RECEIPT_REQUIRED,
+    CoordinationServerReason.IOS_COMPOSER_RESERVED,
   )
   private val PAUSE_MODE_REASONS = setOf(
     CoordinationServerReason.DELETION_SUPPRESSED,
     CoordinationServerReason.BINDING_MISMATCH,
+    CoordinationServerReason.IOS_COMPOSER_RESERVED,
   )
   private val CLAIM_REASONS = NO_WRITE_REASONS + SUPPRESSION_REASONS + setOf(
     CoordinationServerReason.OCCURRENCE_RESERVED,
@@ -1440,6 +1445,7 @@ internal object CoordinationResponseParser {
     CoordinationServerReason.NOT_ARMED_ATTEMPT_ONE,
     CoordinationServerReason.UNSUPPORTED_ZERO_ACCEPTANCE_PROOF,
     CoordinationServerReason.RETRY_REQUEST_MISMATCH,
+    CoordinationServerReason.IOS_COMPOSER_RESERVED,
   )
   private val TEST_REPORT_REFUSAL_REASONS = setOf(
     CoordinationServerReason.BINDING_MISMATCH,
@@ -1453,6 +1459,7 @@ internal object CoordinationResponseParser {
     CoordinationServerReason.TARGET_NOT_STANDBY,
     CoordinationServerReason.WRONG_MODE,
     CoordinationServerReason.DRAIN_NOT_COMPLETE,
+    CoordinationServerReason.IOS_COMPOSER_RESERVED,
   )
   private val COORDINATION_OPERATION_REFUSAL_REASONS = setOf(
     CoordinationServerReason.DELETION_SUPPRESSED,
@@ -1461,6 +1468,7 @@ internal object CoordinationResponseParser {
     CoordinationServerReason.RESET_SUPPRESSED,
     CoordinationServerReason.CONTINUITY_UNAVAILABLE,
     CoordinationServerReason.GENERATION_EXHAUSTED,
+    CoordinationServerReason.IOS_COMPOSER_RESERVED,
   )
   private val OPERATION_RESPONSE_FIELDS = setOf(
     "kind",

@@ -13,16 +13,6 @@ RCT_EXTERN_METHOD(requestAuthorization:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(openNotificationSettings:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(replacePlans:(NSArray *)plans
-                  resolver:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
-
-RCT_EXTERN_METHOD(cancelAppOwned:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
-
-RCT_EXTERN_METHOD(wipeCompanionData:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
-
 @end
 
 #endif  // !BIRTHDAY_E2E && !BIRTHDAY_SMOKE

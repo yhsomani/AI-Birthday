@@ -2,8 +2,8 @@
 set -euo pipefail
 
 main() {
-  if [[ $# -ne 7 || $3 != "--play-evidence" || ($7 != "lab" && $7 != "prod") ]]; then
-    echo "usage: $0 <aab> <expected-package> --play-evidence <json> <raw-signature> <authority-public-key> <lab|prod>" >&2
+  if [[ $# -ne 8 || $3 != "--play-evidence" || ($8 != "lab" && $8 != "prod") ]]; then
+    echo "usage: $0 <aab> <expected-package> --play-evidence <json> <raw-signature> <authority-public-key> <supporting-evidence-root> <lab|prod>" >&2
     exit 64
   fi
 
@@ -12,7 +12,8 @@ main() {
   local evidence=$4
   local evidence_signature=$5
   local authority_public_key=$6
-  local tier=$7
+  local evidence_root=$7
+  local tier=$8
   local sdk_root=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}
   local java_home=${JAVA_HOME:-}
   local script_dir
@@ -120,6 +121,25 @@ main() {
     exit 1
   fi
 
+  local firebase_summary firebase_project_id firebase_project_number firebase_app_id firebase_web_oauth_client extra_firebase_field
+  firebase_summary=$(ANDROID_HOME="$sdk_root" ANDROID_SDK_ROOT="$sdk_root" \
+    node "$script_dir/inspect-android-aab-firebase.mjs" \
+      --aab "$aab")
+  IFS=$'\t' read -r \
+    firebase_project_id \
+    firebase_project_number \
+    firebase_app_id \
+    firebase_web_oauth_client \
+    extra_firebase_field <<<"$firebase_summary"
+  if [[ -z "$firebase_project_id" ||
+    ! "$firebase_project_number" =~ ^[1-9][0-9]{5,19}$ ||
+    ! "$firebase_app_id" =~ ^1:${firebase_project_number}:android:[0-9a-f]{8,64}$ ||
+    ! "$firebase_web_oauth_client" =~ ^${firebase_project_number}-[a-z0-9-]+\.apps\.googleusercontent\.com$ ||
+    -n "$extra_firebase_field" ]]; then
+    echo "FAIL decoded AAB Firebase summary is malformed" >&2
+    exit 1
+  fi
+
   tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/birthday-aab.XXXXXX")
   trap 'rm -rf "$tmp_dir"' EXIT
   local native_entries=()
@@ -159,6 +179,7 @@ main() {
     --file "$evidence" \
     --signature "$evidence_signature" \
     --public-key "$authority_public_key" \
+    --evidence-root "$evidence_root" \
     --tier "$tier" \
     --package "$manifest_package" \
     --version-code "$version_code" \
@@ -167,6 +188,7 @@ main() {
     --artifact-signing-certificate "$signing_certificate" \
     --artifact-file "$aab"
 
+  echo "PASS Android Firebase project=$firebase_project_id number=$firebase_project_number app-id=$firebase_app_id web-oauth-client=$firebase_web_oauth_client"
   echo "PASS $manifest_package AAB version=$version_code min=$minimum_sdk target=$target_sdk upload-signature=verified arm64-libs=${#native_entries[@]} load-segments=$load_segments"
 }
 

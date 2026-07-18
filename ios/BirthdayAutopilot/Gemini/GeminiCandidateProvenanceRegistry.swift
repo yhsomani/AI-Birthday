@@ -127,13 +127,6 @@ final class IOSGeminiCandidateProvenanceRegistry {
     return result
   }
 
-  static func accountSessionKey(firebaseUID: String, accountGeneration: String) -> String {
-    digest(
-      domain: "BirthdayAutopilot.GeminiAccountSession.v1",
-      value: "\(firebaseUID)\u{0}\(accountGeneration)"
-    )
-  }
-
   private static func candidateDigest(_ value: String) -> String {
     digest(domain: "BirthdayAutopilot.GeminiCandidateExactText.v1", value: value)
   }

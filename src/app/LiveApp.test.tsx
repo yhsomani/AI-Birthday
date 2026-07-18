@@ -609,6 +609,62 @@ describe('production live projections', () => {
     ).toBeTruthy();
   });
 
+  it('refreshes iPhone reminder and composer status even when Home revision is unchanged', async () => {
+    const getReminderStatus = jest
+      .fn()
+      .mockResolvedValueOnce({
+        kind: 'ok' as const,
+        value: {
+          authorization: 'denied' as const,
+          failedCount: 0,
+          kind: 'ok' as const,
+          plannedDateCount: 1,
+          scheduledCount: 0,
+          truncated: false,
+        },
+      })
+      .mockResolvedValue({
+        kind: 'ok' as const,
+        value: {
+          authorization: 'authorized' as const,
+          failedCount: 0,
+          kind: 'ok' as const,
+          plannedDateCount: 1,
+          scheduledCount: 1,
+          truncated: false,
+        },
+      });
+    const canOpenComposer = jest
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValue(true);
+    const companionPort: LiveCompanionPort = {
+      canOpenComposer,
+      getReminderStatus,
+      openNotificationSettings: jest.fn(),
+      openUserConfirmedComposer: jest.fn(),
+      prepareComposerReview: jest.fn(),
+      requestReminderAuthorization: jest.fn(),
+    };
+    const getHome = jest.fn(async () => ok(iosHome, revision('7')));
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
+      getHome,
+    });
+
+    await renderLiveApp(port, companionPort);
+
+    expect(await screen.findByText('Not allowed')).toBeTruthy();
+    expect(screen.getByText('Unavailable on this device')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('live-home-refresh'));
+
+    expect(await screen.findByText('Allowed')).toBeTruthy();
+    expect(screen.getByText('Available for your review')).toBeTruthy();
+    expect(getReminderStatus).toHaveBeenCalledTimes(2);
+    expect(canOpenComposer).toHaveBeenCalledTimes(2);
+    expect(getHome).toHaveBeenCalledTimes(2);
+  });
+
   it('requests Android safety alerts once and routes later denial to phone settings', async () => {
     const getNotificationPermission = jest
       .fn()
@@ -934,6 +990,32 @@ describe('production live projections', () => {
     ).toContain('Enabled');
   });
 
+  it('rejects a single-person mutation response for a different contact', async () => {
+    const otherContactId = 'contact-live-other' as ContactId;
+    const getPerson = jest.fn(async () => ok(contactDetail(), revision('1')));
+    const pauseRecipient = jest.fn(async () =>
+      ok({
+        changedContactIds: [otherContactId],
+        invalidatedApprovalCount: 1,
+      }),
+    );
+    const { port } = createPort({ getPerson, pauseRecipient });
+
+    await renderLiveApp(port);
+    await fireEvent.press(await screen.findByTestId('live-tab-people'));
+    await fireEvent.press(
+      await screen.findByTestId('live-person-contact-live-1'),
+    );
+    await fireEvent.press(await screen.findByTestId('live-person-pause'));
+
+    expect(await screen.findByText(/NATIVE_CONTRACT_INVALID/u)).toBeTruthy();
+    expect(pauseRecipient).toHaveBeenCalledTimes(1);
+    expect(getPerson).toHaveBeenCalledTimes(2);
+    expect(
+      screen.getByTestId('live-person-enrollment').props.accessibilityLabel,
+    ).toContain('Enabled');
+  });
+
   it('requires confirmation to block and unblock only the selected native destination', async () => {
     const phoneId = 'phone-block-choice' as PhoneChoiceId;
     const base: ContactDetail = {
@@ -1008,7 +1090,9 @@ describe('production live projections', () => {
       await screen.findByTestId('live-person-block-destination'),
     );
     expect(blockRecipientDestination).not.toHaveBeenCalled();
-    expect(screen.getByText(/•••• 4321 will be blocked/u)).toBeTruthy();
+    expect(
+      screen.getByText(/\u2068•••• 4321\u2069 will be blocked/u),
+    ).toBeTruthy();
     await fireEvent.press(
       screen.getByTestId('live-person-confirm-destination-block'),
     );
@@ -1089,7 +1173,6 @@ describe('production live projections', () => {
               id: 'activity-1' as import('../domain/shared/brand').ActivityId,
               kind: 'delivered' as const,
               occurredAt: generatedAt,
-              actionable: false,
             },
           ],
         }),
@@ -1121,6 +1204,44 @@ describe('production live projections', () => {
     );
     expect(screen.queryByTestId('live-activity-screen')).toBeNull();
     backSpy.mockRestore();
+  });
+
+  it('explains iOS reported-Sent and final MessageUI visibility boundaries in activity detail', async () => {
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
+      getHome: jest.fn(async () => ok(iosHome)),
+      listActivity: jest.fn(async () =>
+        ok({
+          items: [
+            {
+              id: 'activity-ios-sent' as import('../domain/shared/brand').ActivityId,
+              kind: 'composer-reported-sent' as const,
+              occurredAt: generatedAt,
+            },
+          ],
+        }),
+      ),
+    });
+
+    await renderLiveApp(port);
+    await fireEvent.press(await screen.findByTestId('live-home-activity'));
+    await fireEvent.press(
+      await screen.findByTestId('live-activity-activity-ios-sent'),
+    );
+
+    expect(
+      await screen.findAllByText(
+        'Messages reported sent; delivery not confirmed',
+      ),
+    ).not.toHaveLength(0);
+    expect(
+      screen.getByTestId('live-activity-detail-ios-visibility').props
+        .accessibilityLabel,
+    ).toMatch(/cannot see the final edited recipient or text/u);
+    expect(
+      screen.getByTestId('live-activity-detail-disclosure').props
+        .accessibilityLabel,
+    ).toMatch(/will not offer a second in-app composer/u);
   });
 
   it('uses tab history for Android back and leaves Home to the operating system', async () => {
@@ -1285,6 +1406,9 @@ describe('production live projections', () => {
     await waitFor(() =>
       expect(screen.getByTestId('live-message-save')).toBeTruthy(),
     );
+    expect(
+      screen.getByText('\u2068Live Contact\u2069 · 1 part(s) · gsm-7'),
+    ).toBeTruthy();
     expect(saveMessage).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('live-message-save'));
 
@@ -1553,6 +1677,14 @@ describe('production live projections', () => {
       expect(screen.getByTestId('live-open-composer')).toBeTruthy(),
     );
     expect(
+      screen.getByTestId('live-ios-composer-review-focus').props
+        .accessibilityRole,
+    ).toBe('header');
+    expect(
+      screen.getByTestId('live-ios-composer-review-focus').props
+        .accessibilityLabel,
+    ).toBe('Ready to review message?');
+    expect(
       screen.getByTestId('live-composer-final-disclosure').props
         .accessibilityLabel,
     ).toMatch(/SMS or MMS carrier charges may apply/u);
@@ -1560,17 +1692,39 @@ describe('production live projections', () => {
       screen.getByTestId('live-composer-final-disclosure').props
         .accessibilityLabel,
     ).toMatch(/Messages and iOS control the available sender line/u);
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('live-composer-final-disclosure').props.style,
+      ).backgroundColor,
+    ).toBe('#FFF2D8');
     expect(openUserConfirmedComposer).not.toHaveBeenCalled();
     expect(screen.getByText('•••• 4321')).toBeTruthy();
     expect(screen.getByText('18 July 2026')).toBeTruthy();
+    expect(screen.getByText('Review message')).toBeTruthy();
     expect(screen.queryByText('2026-07-18')).toBeNull();
     expect(screen.queryByText('+919876543210')).toBeNull();
 
     await fireEvent.press(screen.getByTestId('live-open-composer'));
 
     await waitFor(() =>
-      expect(screen.getByText(/carrier delivery are unknown/u)).toBeTruthy(),
+      expect(
+        screen.getByText(
+          /Messages reported sent; delivery not confirmed/u,
+        ),
+      ).toBeTruthy(),
     );
+    const postComposerSafety = screen.getByTestId(
+      'live-composer-post-safety',
+    ).props.accessibilityLabel;
+    expect(postComposerSafety).toMatch(/hold remains until its server expiry/u);
+    expect(postComposerSafety).toMatch(/Check Messages before any manual retry/u);
+    expect(postComposerSafety).toMatch(/will not retry automatically/u);
+    expect(postComposerSafety).not.toMatch(/Tapping Open Messages/u);
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('live-composer-post-safety').props.style,
+      ).backgroundColor,
+    ).toBe('#FFF2D8');
     expect(prepareComposerReview).toHaveBeenCalledWith({
       expectedRevision: '1',
       proposalId: 'proposal-1',
@@ -1711,12 +1865,34 @@ describe('production live projections', () => {
     await waitFor(() =>
       expect(screen.getByTestId('live-privacy-wipe-local-data')).toBeTruthy(),
     );
+    expect(
+      screen.getByTestId('live-privacy-action-group').props.accessibilityRole,
+    ).toBe('radiogroup');
+    expect(
+      screen.getByTestId('live-privacy-wipe-local-data').props
+        .accessibilityState,
+    ).toEqual({ selected: false });
     await fireEvent.press(screen.getByTestId('live-privacy-wipe-local-data'));
+    expect(
+      screen.getByTestId('live-privacy-wipe-local-data').props
+        .accessibilityState,
+    ).toEqual({ selected: true });
+    expect(
+      screen.getByTestId(
+        'live-privacy-wipe-local-data-selected-indicator',
+      ),
+    ).toBeTruthy();
     expect(confirmAction).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('live-privacy-prepare'));
     await waitFor(() =>
       expect(screen.getByTestId('live-privacy-confirm')).toBeTruthy(),
     );
+    expect(
+      screen.getByTestId('live-privacy-review-focus').props.accessibilityRole,
+    ).toBe('header');
+    expect(
+      screen.getByTestId('live-privacy-review-focus').props.accessibilityLabel,
+    ).toBe('Confirm privacy action?');
     expect(confirmAction).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('live-privacy-confirm'));
 
@@ -2044,7 +2220,6 @@ describe('production live projections', () => {
             id: 'activity-1' as import('../domain/shared/brand').ActivityId,
             kind: 'delivered' as const,
             occurredAt: generatedAt,
-            actionable: false,
           },
         ],
       }),
@@ -2062,6 +2237,62 @@ describe('production live projections', () => {
     );
     expect(screen.queryByText('delivered')).toBeNull();
     expect(screen.queryByText('2026-07-12T07:00:00Z')).toBeNull();
+    expect(screen.queryByTestId('live-activity-recovery-activity-1')).toBeNull();
+  });
+
+  it('opens the native-projected recovery destination from activity', async () => {
+    const { port } = createPort({
+      listActivity: jest.fn(async () =>
+        ok({
+          items: [
+            {
+              id: 'activity-paused' as import('../domain/shared/brand').ActivityId,
+              kind: 'paused' as const,
+              occurredAt: generatedAt,
+              recovery: { route: 'automation' as const },
+            },
+          ],
+        }),
+      ),
+    });
+
+    await renderLiveApp(port);
+    await fireEvent.press(await screen.findByTestId('live-home-activity'));
+    await fireEvent.press(
+      await screen.findByTestId('live-activity-recovery-activity-paused'),
+    );
+
+    expect(await screen.findByTestId('live-automation-screen')).toBeTruthy();
+    expect(screen.queryByTestId('live-activity-screen')).toBeNull();
+  });
+
+  it('keeps an item-specific recovery available in activity detail', async () => {
+    const { port } = createPort({
+      listActivity: jest.fn(async () =>
+        ok({
+          items: [
+            {
+              id: 'activity-approval' as import('../domain/shared/brand').ActivityId,
+              kind: 'approval-invalidated' as const,
+              occurredAt: generatedAt,
+              recovery: { route: 'people' as const },
+            },
+          ],
+        }),
+      ),
+    });
+
+    await renderLiveApp(port);
+    await fireEvent.press(await screen.findByTestId('live-home-activity'));
+    await fireEvent.press(
+      await screen.findByTestId('live-activity-activity-approval'),
+    );
+    await fireEvent.press(
+      await screen.findByTestId('live-activity-detail-recovery'),
+    );
+
+    expect(await screen.findByTestId('live-people-screen')).toBeTruthy();
+    expect(screen.queryByTestId('live-activity-detail-screen')).toBeNull();
   });
 
   it('opens an actionable attention repair with the current native revision only', async () => {
@@ -2968,6 +3199,14 @@ describe('production live projections', () => {
           platform: 'ios' as const,
           handle: 'ios-activation-review' as ActivationReviewHandle,
           reminderRecipientCount: 1,
+          plannedReminderCount: 1,
+          reminderWindowLabel: '09:00–11:00',
+          reminderHorizon: 'full' as const,
+          coexistence: 'clear' as const,
+          contactsReady: true,
+          messageUiReady: true,
+          protectedStorageReady: true,
+          readiness: iosReadiness,
           deliveryMode: 'user-controlled-composer' as const,
           limitationsDisclosure: 'Reminders are best effort.',
         },
@@ -3011,9 +3250,20 @@ describe('production live projections', () => {
       await screen.findByTestId('live-ios-review-activation'),
     );
     expect(
+      (await screen.findByTestId('live-ios-activation-review-focus')).props
+        .accessibilityRole,
+    ).toBe('header');
+    expect(
       screen.getByText(
         'This enables reminders only. iPhone never sends automatically; you review an editable system Messages screen and tap Send yourself. SMS or MMS carrier charges may apply, and iOS/Messages controls the available sender line and transport.',
       ),
+    ).toBeTruthy();
+    expect(screen.getByText('09:00–11:00')).toBeTruthy();
+    expect(
+      screen.getByText('Current reminder horizon is fully reconciled'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('No Android sender is managing this account'),
     ).toBeTruthy();
     expect(screen.queryByText('Reminders are best effort.')).toBeNull();
     await fireEvent.press(screen.getByTestId('live-ios-confirm-activation'));
@@ -3419,7 +3669,7 @@ describe('production live projections', () => {
     );
     expect(
       screen.getByTestId('route-accessibility-focus').props.accessibilityLabel,
-    ).toBe('Current step: Check this phone');
+    ).toBe('Step 1 of 4: Check this phone');
     setupBackSpy.mockRestore();
   });
 

@@ -154,6 +154,7 @@ final class IOSCompanionAttentionNotifier {
   private static var accountDeletionBlocksAttention: Bool {
     IOSAccountDeletionReceiptStore.shared.hasPendingOrUnreadableReceipt()
       || IOSAccountDeletionRecoveryStore.shared.hasPendingOrUnreadableJournal()
+      || IOSCompanionWipeRecoveryStore.shared.hasPendingOrUnreadableJournal()
   }
 
   private static func permitsExistingAuthorization(

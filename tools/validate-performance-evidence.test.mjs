@@ -1,14 +1,27 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import {
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
-import { validatePerformanceEvidence } from './validate-performance-evidence.mjs';
+import {
+  validatePerformanceEvidence,
+  verifyPerformanceEvidenceReferences,
+} from './validate-performance-evidence.mjs';
 
 const SHA = 'a'.repeat(64);
 const REVISION = 'b'.repeat(40);
 const samples = (count, value) => Array.from({ length: count }, () => value);
 
 const validEvidence = platform => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   platform,
   sourceRevision: REVISION,
   measuredAt: '2026-07-12T00:00:00Z',
@@ -22,12 +35,19 @@ const validEvidence = platform => ({
     model: platform === 'android' ? 'Reference Android' : 'Reference iPhone',
     osVersion: platform === 'android' ? 'Android 16' : 'iOS 26.5',
     ramMiB: platform === 'android' ? 6144 : 4096,
+    physicalDevice: true,
+    deviceIdSha256: '1'.repeat(64),
+    installationSource: platform === 'android' ? 'google-play' : 'testflight',
+    measurementTool: platform === 'android' ? 'Perfetto' : 'XCTest MetricKit',
+    measurementToolVersion: '1.0.0',
   },
   references: {
     protocolReference: 'evidence/performance-protocol-v1',
     protocolSha256: 'c'.repeat(64),
+    protocolBytes: 1024,
     rawResultsReference: `evidence/${platform}-raw-v1`,
     rawResultsSha256: 'd'.repeat(64),
+    rawResultsBytes: 4096,
   },
   shared: {
     coldStartHomeMs: samples(30, 2000),
@@ -107,7 +127,7 @@ test('binds evidence to the production application and normalized references', (
   const result = validate(evidence, 'ios');
   assert.match(
     result.errors.join('\n'),
-    /applicationId must be the ios production identifier/u,
+    /applicationId must match the requested ios release/u,
   );
   assert.match(result.errors.join('\n'), /rawResultsReference is invalid/u);
 });
@@ -117,4 +137,80 @@ test('rejects a normalized but nonexistent measurement calendar date', () => {
   evidence.measuredAt = '2026-02-31T00:00:00Z';
   const result = validate(evidence, 'android');
   assert.match(result.errors.join('\n'), /RFC 3339 UTC instant/u);
+});
+
+test('hashes exactly the protocol and raw-result bytes below the evidence root', () => {
+  const root = mkdtempSync(join(tmpdir(), 'birthday-performance-'));
+  try {
+    mkdirSync(join(root, 'protocol'));
+    mkdirSync(join(root, 'raw'));
+    const protocol = Buffer.from('reviewed protocol bytes');
+    const raw = Buffer.from('private raw measurement bytes');
+    writeFileSync(join(root, 'protocol', 'v1.txt'), protocol);
+    writeFileSync(join(root, 'raw', 'android-v1.jsonl'), raw);
+    const evidence = validEvidence('android');
+    evidence.references = {
+      protocolReference: 'protocol/v1.txt',
+      protocolSha256: createHash('sha256').update(protocol).digest('hex'),
+      protocolBytes: protocol.byteLength,
+      rawResultsReference: 'raw/android-v1.jsonl',
+      rawResultsSha256: createHash('sha256').update(raw).digest('hex'),
+      rawResultsBytes: raw.byteLength,
+    };
+    assert.deepEqual(
+      verifyPerformanceEvidenceReferences(evidence, root).errors,
+      [],
+    );
+
+    writeFileSync(join(root, 'raw', 'android-v1.jsonl'), 'changed');
+    assert.match(
+      verifyPerformanceEvidenceReferences(evidence, root).errors.join('\n'),
+      /raw performance results sha256 does not match/u,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects extra files, symlinks, duplicate references, and escaping paths', () => {
+  const root = mkdtempSync(join(tmpdir(), 'birthday-performance-'));
+  const outside = join(tmpdir(), `birthday-performance-outside-${process.pid}`);
+  try {
+    writeFileSync(join(root, 'protocol.txt'), 'protocol');
+    writeFileSync(join(root, 'raw.txt'), 'raw');
+    writeFileSync(join(root, 'extra.txt'), 'extra');
+    const evidence = validEvidence('ios');
+    evidence.references.protocolReference = 'protocol.txt';
+    evidence.references.rawResultsReference = 'raw.txt';
+    assert.match(
+      verifyPerformanceEvidenceReferences(evidence, root).errors.join('\n'),
+      /unreferenced files|exactly the two referenced/u,
+    );
+
+    rmSync(join(root, 'extra.txt'));
+    writeFileSync(outside, 'outside');
+    rmSync(join(root, 'raw.txt'));
+    symlinkSync(outside, join(root, 'raw.txt'));
+    assert.match(
+      verifyPerformanceEvidenceReferences(evidence, root).errors.join('\n'),
+      /symlink/u,
+    );
+
+    rmSync(join(root, 'raw.txt'));
+    writeFileSync(join(root, 'raw.txt'), 'raw');
+    evidence.references.rawResultsReference =
+      evidence.references.protocolReference;
+    assert.match(
+      verifyPerformanceEvidenceReferences(evidence, root).errors.join('\n'),
+      /distinct files/u,
+    );
+    evidence.references.rawResultsReference = '../outside';
+    assert.match(
+      validate(evidence, 'ios').errors.join('\n'),
+      /rawResultsReference is invalid/u,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { force: true });
+  }
 });

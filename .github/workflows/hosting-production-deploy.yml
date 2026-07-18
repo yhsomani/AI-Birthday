@@ -1,0 +1,605 @@
+name: Hosting production artifact deploy and provenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_revision:
+        description: Exact clean 40-character Git revision selected for production
+        required: true
+        type: string
+      project_id:
+        description: Exact production Firebase project ID
+        required: true
+        type: string
+      project_number:
+        description: Exact production Firebase project number
+        required: true
+        type: string
+      firebase_web_app_id:
+        description: Exact production Firebase web app ID served by Hosting
+        required: true
+        type: string
+      hosting_site_id:
+        description: Exact production Firebase Hosting site ID
+        required: true
+        type: string
+      public_base_url:
+        description: Exact approved production HTTPS origin
+        required: true
+        type: string
+      release_config_sha256:
+        description: SHA-256 of the protected approved Hosting release-config bytes
+        required: true
+        type: string
+      admission_security_project_number:
+        description: Exact separate release-security Google Cloud project number
+        required: true
+        type: string
+      admission_security_project_id:
+        description: Exact separate release-security Google Cloud project ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hosting-production-live-state-${{ inputs.hosting_site_id }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the canonical Hosting artifact without OIDC
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: hosting-production-build
+    permissions:
+      contents: read
+      id-token: none
+    env:
+      CI: 'true'
+      EXPECTED_SOURCE_REVISION: ${{ inputs.source_revision }}
+      PROJECT_ID: ${{ inputs.project_id }}
+      PROJECT_NUMBER: ${{ inputs.project_number }}
+      WEB_APP_ID: ${{ inputs.firebase_web_app_id }}
+      HOSTING_SITE_ID: ${{ inputs.hosting_site_id }}
+      PUBLIC_BASE_URL: ${{ inputs.public_base_url }}
+      RELEASE_CONFIG_SHA256: ${{ inputs.release_config_sha256 }}
+    outputs:
+      artifact-id: ${{ steps.upload-build.outputs.artifact-id }}
+      artifact-digest: ${{ steps.upload-build.outputs.artifact-digest }}
+
+    steps:
+      - name: Check out the exact selected source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate source and build coordinates
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$GITHUB_WORKFLOW_REF" = 'yhsomani/AI-Birthday/.github/workflows/hosting-production-deploy.yml@refs/heads/main'
+          [[ "$GITHUB_REPOSITORY_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$GITHUB_REPOSITORY_OWNER_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          test "$(git rev-parse --verify HEAD)" = "$EXPECTED_SOURCE_REVISION"
+          [[ "$(git rev-parse --verify refs/remotes/origin/main)" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          [[ "$PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]
+          [[ "$PROJECT_NUMBER" =~ ^[1-9][0-9]{5,19}$ ]]
+          [[ "$WEB_APP_ID" =~ ^1:${PROJECT_NUMBER}:web:[0-9a-f]{8,64}$ ]]
+          [[ "$HOSTING_SITE_ID" =~ ^[a-z0-9][a-z0-9-]{4,62}$ ]]
+          [[ "$PUBLIC_BASE_URL" =~ ^https://[^/?#]+/$ ]]
+          [[ "$RELEASE_CONFIG_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          test -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}"
+          test -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}"
+
+      - name: Set up the exact Node.js line
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install all locked build and deploy tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global npm@11.6.0
+          npm ci --prefix backend/hosting
+          npm ci --prefix backend/functions
+          test "$(node --version)" = v24.18.0
+          test "$(npm --version)" = 11.6.0
+          test "$(backend/functions/node_modules/.bin/firebase --version)" = 15.23.0
+
+      - name: Decode protected config and build canonical bytes
+        shell: bash
+        env:
+          HOSTING_RELEASE_CONFIG_BASE64: ${{ secrets.HOSTING_RELEASE_CONFIG_BASE64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$HOSTING_RELEASE_CONFIG_BASE64"
+          config="$RUNNER_TEMP/hosting-release-config.json"
+          printf '%s' "$HOSTING_RELEASE_CONFIG_BASE64" | base64 --decode > "$config"
+          test "$(sha256sum "$config" | cut -d' ' -f1)" = "$RELEASE_CONFIG_SHA256"
+          BIRTHDAY_HOSTING_RELEASE_CONFIG_PATH="$config" npm --prefix backend/hosting run build:release
+          output="release-evidence/hosting-production-deployment"
+          mkdir -p "$output"
+          node tools/hosting-deployment-artifact.mjs \
+            --mode build \
+            --source-root "$GITHUB_WORKSPACE" \
+            --public-root backend/hosting/public \
+            --firebase-config backend/firebase.json \
+            --release-config "$config" \
+            --project-id "$PROJECT_ID" \
+            --site-id "$HOSTING_SITE_ID" \
+            --output "$output/hosting-deployment-artifact.json" \
+            --manifest-output "$output/hosting-deployment-manifest.json"
+          jq -e --arg source "$EXPECTED_SOURCE_REVISION" --arg project "$PROJECT_ID" \
+            --arg site "$HOSTING_SITE_ID" --arg origin "$PUBLIC_BASE_URL" \
+            '.sourceRevision == $source and .projectId == $project and .siteId == $site and .publicBaseUrl == $origin and .firebaseCliVersion == "15.23.0"' \
+            "$output/hosting-deployment-manifest.json" > /dev/null
+          rm -f "$config"
+
+      - name: Reverify and package immutable build handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="release-evidence/hosting-production-deployment"
+          node tools/hosting-deployment-artifact.mjs \
+            --mode extract \
+            --artifact "$output/hosting-deployment-artifact.json" \
+            --output-root "$RUNNER_TEMP/hosting-build-reverify"
+          handoff="$RUNNER_TEMP/hosting-build-handoff"
+          mkdir -p "$handoff/release-evidence/hosting-production-deployment"
+          cp "$output/hosting-deployment-artifact.json" \
+            "$output/hosting-deployment-manifest.json" \
+            "$handoff/release-evidence/hosting-production-deployment/"
+          artifact_sha="$(sha256sum "$output/hosting-deployment-artifact.json" | cut -d' ' -f1)"
+          manifest_sha="$(sha256sum "$output/hosting-deployment-manifest.json" | cut -d' ' -f1)"
+          jq -n --arg sourceRevision "$EXPECTED_SOURCE_REVISION" \
+            --arg projectId "$PROJECT_ID" --arg projectNumber "$PROJECT_NUMBER" \
+            --arg webAppId "$WEB_APP_ID" --arg siteId "$HOSTING_SITE_ID" \
+            --arg publicBaseUrl "$PUBLIC_BASE_URL" --arg runId "$GITHUB_RUN_ID" \
+            --arg runAttempt "$GITHUB_RUN_ATTEMPT" --arg artifactSha256 "$artifact_sha" \
+            --arg manifestSha256 "$manifest_sha" \
+            '{sourceRevision:$sourceRevision,projectId:$projectId,projectNumber:$projectNumber,webAppId:$webAppId,siteId:$siteId,publicBaseUrl:$publicBaseUrl,runId:$runId,runAttempt:$runAttempt,artifactSha256:$artifactSha256,manifestSha256:$manifestSha256}' \
+            > "$handoff/release-evidence/hosting-production-deployment/hosting-build-binding.json"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Upload immutable canonical build handoff
+        id: upload-build
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: hosting-production-build-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: ${{ runner.temp }}/hosting-build-handoff/
+
+  admission:
+    name: Gate deployment as the admission-only reader
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: hosting-production-admission
+    permissions:
+      actions: read
+      id-token: write
+    env:
+      CI: 'true'
+      CLOUDSDK_CORE_DISABLE_PROMPTS: '1'
+      EXPECTED_SOURCE_REVISION: ${{ inputs.source_revision }}
+      PROJECT_ID: ${{ inputs.project_id }}
+      PROJECT_NUMBER: ${{ inputs.project_number }}
+      HOSTING_SITE_ID: ${{ inputs.hosting_site_id }}
+      HOSTING_ADMISSION_SECURITY_PROJECT_NUMBER: ${{ inputs.admission_security_project_number }}
+      HOSTING_ADMISSION_SECURITY_PROJECT_ID: ${{ inputs.admission_security_project_id }}
+      HOSTING_ADMISSION_BUCKET: ${{ vars.HOSTING_ADMISSION_BUCKET }}
+      HOSTING_ADMISSION_READER_WIF_PROVIDER: ${{ vars.HOSTING_ADMISSION_READER_WIF_PROVIDER }}
+      HOSTING_ADMISSION_READER_SERVICE_ACCOUNT: ${{ vars.HOSTING_ADMISSION_READER_SERVICE_ACCOUNT }}
+      BUILD_ARTIFACT_ID: ${{ needs.build.outputs.artifact-id }}
+      BUILD_ARTIFACT_DIGEST: ${{ needs.build.outputs.artifact-digest }}
+    outputs:
+      artifact-id: ${{ steps.upload-admission.outputs.artifact-id }}
+      artifact-digest: ${{ steps.upload-admission.outputs.artifact-digest }}
+      pass-run-id: ${{ steps.admission-pass.outputs.run-id }}
+      pass-run-attempt: ${{ steps.admission-pass.outputs.run-attempt }}
+      pass-repository: ${{ steps.admission-pass.outputs.repository }}
+
+    steps:
+      - name: Download the exact build artifact from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: ${{ runner.temp }}/hosting-build-handoff
+          merge-multiple: true
+
+      - name: Reverify build handoff and admission coordinates
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BUILD_ARTIFACT_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$GITHUB_WORKFLOW_REF" = 'yhsomani/AI-Birthday/.github/workflows/hosting-production-deploy.yml@refs/heads/main'
+          [[ "$GITHUB_REPOSITORY_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$GITHUB_REPOSITORY_OWNER_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$BUILD_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$HOSTING_ADMISSION_SECURITY_PROJECT_NUMBER" =~ ^[1-9][0-9]{5,19}$ ]]
+          [[ "$HOSTING_ADMISSION_SECURITY_PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]
+          test "$HOSTING_ADMISSION_SECURITY_PROJECT_NUMBER" != "$PROJECT_NUMBER"
+          test "$HOSTING_ADMISSION_SECURITY_PROJECT_ID" != "$PROJECT_ID"
+          [[ "$HOSTING_ADMISSION_BUCKET" =~ ^[a-z0-9][a-z0-9-]{4,61}[a-z0-9]$ ]]
+          [[ "$HOSTING_ADMISSION_READER_WIF_PROVIDER" =~ ^projects/${HOSTING_ADMISSION_SECURITY_PROJECT_NUMBER}/locations/global/workloadIdentityPools/[a-z0-9-]{4,32}/providers/[a-z0-9-]{4,32}$ ]]
+          [[ "$HOSTING_ADMISSION_READER_SERVICE_ACCOUNT" =~ ^[a-z][a-z0-9-]{2,62}@${HOSTING_ADMISSION_SECURITY_PROJECT_ID}\.iam\.gserviceaccount\.com$ ]]
+          handoff="$RUNNER_TEMP/hosting-build-handoff"
+          evidence="$handoff/release-evidence/hosting-production-deployment"
+          binding="$evidence/hosting-build-binding.json"
+          jq -e --arg source "$EXPECTED_SOURCE_REVISION" --arg project "$PROJECT_ID" \
+            --arg number "$PROJECT_NUMBER" --arg site "$HOSTING_SITE_ID" \
+            --arg runId "$GITHUB_RUN_ID" --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            '.sourceRevision == $source and .projectId == $project and .projectNumber == $number and .siteId == $site and .runId == $runId and .runAttempt == $runAttempt' \
+            "$binding" > /dev/null
+          test "$(sha256sum "$evidence/hosting-deployment-artifact.json" | cut -d' ' -f1)" = "$(jq -er '.artifactSha256' "$binding")"
+          test "$(sha256sum "$evidence/hosting-deployment-manifest.json" | cut -d' ' -f1)" = "$(jq -er '.manifestSha256' "$binding")"
+
+      - name: Authenticate only as the external admission reader
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ inputs.admission_security_project_id }}
+          workload_identity_provider: ${{ vars.HOSTING_ADMISSION_READER_WIF_PROVIDER }}
+          service_account: ${{ vars.HOSTING_ADMISSION_READER_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Set up the exact Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          version: 575.0.1
+          project_id: ${{ inputs.admission_security_project_id }}
+
+      - name: Fail closed on every retained Hosting admission lease
+        id: admission-pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test "$(gcloud auth list --filter='status:ACTIVE' --format='value(account)')" = "$HOSTING_ADMISSION_READER_SERVICE_ACCOUNT"
+          access_token="$(gcloud auth print-access-token)"
+          handoff="$RUNNER_TEMP/hosting-admission-handoff"
+          evidence="$handoff/release-evidence/hosting-production-deployment"
+          admission_dir="$evidence/hosting-admission-check"
+          mkdir -p "$admission_dir"
+          storage_get() {
+            local url="$1"
+            local destination="$2"
+            {
+              printf '%s\n' 'fail' 'silent' 'show-error' 'proto = "=https"' 'tlsv1.2' 'request = "GET"'
+              printf 'header = "Authorization: Bearer %s"\n' "$access_token"
+              printf 'url = "%s"\n' "$url"
+            } | curl --config - > "$destination"
+          }
+          storage_get "https://storage.googleapis.com/storage/v1/b/${HOSTING_ADMISSION_BUCKET}" "$admission_dir/bucket.json"
+          jq -e --arg bucket "$HOSTING_ADMISSION_BUCKET" --arg project "$HOSTING_ADMISSION_SECURITY_PROJECT_NUMBER" \
+            '.name == $bucket and (.projectNumber | tostring) == $project and (.retentionPolicy.retentionPeriod | tostring) == "900" and .retentionPolicy.isLocked == true and .iamConfiguration.publicAccessPrevention == "enforced" and .iamConfiguration.uniformBucketLevelAccess.enabled == true and (.versioning.enabled // false) == false and ((.softDeletePolicy.retentionDurationSeconds // "0") | tostring) == "0" and (.lifecycle.rule | length) == 1 and .lifecycle.rule[0].action.type == "Delete" and .lifecycle.rule[0].condition.age == 1 and .lifecycle.rule[0].condition.matchesPrefix == ["hosting-production-change-freezes/"]' \
+            "$admission_dir/bucket.json" > /dev/null
+          prefix="hosting-production-change-freezes/${HOSTING_SITE_ID}/"
+          encoded_prefix="$(jq -nr --arg value "$prefix" '$value | @uri')"
+          page_token=''
+          page_number=0
+          : > "$admission_dir/objects.ndjson"
+          while true; do
+            page_number=$((page_number + 1))
+            test "$page_number" -le 100
+            page="$admission_dir/page-${page_number}.json"
+            url="https://storage.googleapis.com/storage/v1/b/${HOSTING_ADMISSION_BUCKET}/o?versions=true&maxResults=1000&prefix=${encoded_prefix}"
+            if [[ -n "$page_token" ]]; then
+              encoded_page_token="$(jq -nr --arg value "$page_token" '$value | @uri')"
+              url="${url}&pageToken=${encoded_page_token}"
+            fi
+            storage_get "$url" "$page"
+            jq -e --arg bucket "$HOSTING_ADMISSION_BUCKET" --arg prefix "$prefix" \
+              '(.kind == "storage#objects") and ((.prefixes // []) | length == 0) and ((.items // []) | all(.[]; .bucket == $bucket and (.name | startswith($prefix))))' "$page" > /dev/null
+            jq -c '.items[]?' "$page" >> "$admission_dir/objects.ndjson"
+            page_token="$(jq -er '.nextPageToken // ""' "$page")"
+            [[ -n "$page_token" ]] || break
+          done
+          object_index=0
+          while IFS= read -r listed_object; do
+            [[ -n "$listed_object" ]] || continue
+            object_index=$((object_index + 1))
+            object_key="$(printf '%06d' "$object_index")"
+            object_name="$(jq -er '.name' <<< "$listed_object")"
+            generation="$(jq -er '.generation | select(test("^[1-9][0-9]{0,19}$"))' <<< "$listed_object")"
+            metageneration="$(jq -er '.metageneration | select(test("^[1-9][0-9]{0,19}$"))' <<< "$listed_object")"
+            time_created="$(jq -er '.timeCreated' <<< "$listed_object")"
+            retention_expiration="$(jq -er '.retentionExpirationTime' <<< "$listed_object")"
+            time_created_epoch="$(date -u -d "$time_created" +%s)"
+            retention_expiration_epoch="$(date -u -d "$retention_expiration" +%s)"
+            test $((retention_expiration_epoch - time_created_epoch)) -eq 900
+            encoded_object="$(jq -nr --arg value "$object_name" '$value | @uri')"
+            metadata="$admission_dir/object-${object_key}-metadata.json"
+            content="$admission_dir/object-${object_key}-content.json"
+            storage_get "https://storage.googleapis.com/storage/v1/b/${HOSTING_ADMISSION_BUCKET}/o/${encoded_object}?generation=${generation}" "$metadata"
+            jq -e --arg bucket "$HOSTING_ADMISSION_BUCKET" --arg name "$object_name" --arg generation "$generation" \
+              --arg metageneration "$metageneration" --arg created "$time_created" --arg retained "$retention_expiration" \
+              '.bucket == $bucket and .name == $name and .generation == $generation and .metageneration == $metageneration and .timeCreated == $created and .retentionExpirationTime == $retained and .contentType == "application/json" and (.temporaryHold != true) and (.eventBasedHold != true)' "$metadata" > /dev/null
+            storage_get "https://storage.googleapis.com/download/storage/v1/b/${HOSTING_ADMISSION_BUCKET}/o/${encoded_object}?alt=media&generation=${generation}" "$content"
+            test "$(jq -er '.size | select(test("^[1-9][0-9]{0,19}$"))' "$metadata")" = "$(wc -c < "$content" | tr -d ' ')"
+            jq -e --arg site "$HOSTING_SITE_ID" \
+              'keys == ["runAttempt","runId","schemaVersion","siteId","sourceRevision","validUntil"] and .schemaVersion == 1 and .siteId == $site and (.sourceRevision | test("^[0-9a-f]{40}$")) and (.runId | test("^[1-9][0-9]{0,19}$")) and (.runAttempt | test("^[1-9][0-9]{0,9}$")) and (.validUntil | test("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,9})?Z$"))' "$content" > /dev/null
+            expected_content="$(jq -cS . "$content")"
+            test "$(wc -c < "$content" | tr -d ' ')" = "${#expected_content}"
+            test "$(cat "$content")" = "$expected_content"
+            source_revision="$(jq -er '.sourceRevision' "$content")"
+            run_id="$(jq -er '.runId' "$content")"
+            run_attempt="$(jq -er '.runAttempt' "$content")"
+            test "$object_name" = "hosting-production-change-freezes/${HOSTING_SITE_ID}/${source_revision}/${run_id}/${run_attempt}.json"
+            valid_until_epoch="$(date -u -d "$(jq -er '.validUntil' "$content")" +%s)"
+            test "$valid_until_epoch" -gt "$time_created_epoch"
+            test "$valid_until_epoch" -le "$retention_expiration_epoch"
+            if (( $(date -u +%s) < valid_until_epoch )); then
+              echo 'A protected current-live GCS admission lease is active; deployment is denied.' >&2
+              exit 1
+            fi
+          done < "$admission_dir/objects.ndjson"
+          object_count="$(wc -l < "$admission_dir/objects.ndjson" | tr -d ' ')"
+          test "$object_count" = "$object_index"
+          jq -s '.' "$admission_dir/objects.ndjson" > "$admission_dir/objects.json"
+          rm -f "$admission_dir/objects.ndjson"
+          manifest_ndjson="$RUNNER_TEMP/hosting-admission-manifest.ndjson"
+          : > "$manifest_ndjson"
+          while IFS= read -r -d '' observed_file; do
+            relative_path="${observed_file#${admission_dir}/}"
+            jq -cn --arg path "$relative_path" --arg sha256 "$(sha256sum "$observed_file" | cut -d' ' -f1)" \
+              --argjson bytes "$(wc -c < "$observed_file" | tr -d ' ')" '{path:$path,bytes:$bytes,sha256:$sha256}' >> "$manifest_ndjson"
+          done < <(find "$admission_dir" -type f -print0 | sort -z)
+          jq -s 'sort_by(.path)' "$manifest_ndjson" > "$evidence/hosting-admission-check-manifest.json"
+          checked_at="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          bucket_metageneration="$(jq -er '.metageneration | select(test("^[1-9][0-9]{0,19}$"))' "$admission_dir/bucket.json")"
+          jq -n --arg applicationProjectId "$PROJECT_ID" --arg applicationProjectNumber "$PROJECT_NUMBER" \
+            --arg sourceRevision "$EXPECTED_SOURCE_REVISION" --arg siteId "$HOSTING_SITE_ID" --arg scannedPrefix "$prefix" \
+            --arg repository "$GITHUB_REPOSITORY" --arg workflowPath '.github/workflows/hosting-production-deploy.yml' \
+            --arg repositoryId "$GITHUB_REPOSITORY_ID" --arg repositoryOwnerId "$GITHUB_REPOSITORY_OWNER_ID" \
+            --arg runId "$GITHUB_RUN_ID" --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg buildArtifactId "$BUILD_ARTIFACT_ID" --arg buildArtifactDigest "$BUILD_ARTIFACT_DIGEST" \
+            --arg securityProjectId "$HOSTING_ADMISSION_SECURITY_PROJECT_ID" --arg securityProjectNumber "$HOSTING_ADMISSION_SECURITY_PROJECT_NUMBER" \
+            --arg bucketName "$HOSTING_ADMISSION_BUCKET" --arg bucketMetageneration "$bucket_metageneration" \
+            --arg checkedAt "$checked_at" --arg checkManifestSha256 "$(sha256sum "$evidence/hosting-admission-check-manifest.json" | cut -d' ' -f1)" \
+            --arg readerServiceAccount "$HOSTING_ADMISSION_READER_SERVICE_ACCOUNT" --arg readerWorkloadIdentityProvider "$HOSTING_ADMISSION_READER_WIF_PROVIDER" \
+            --argjson pageCount "$page_number" --argjson objectCount "$object_count" \
+            '{schemaVersion:1,product:"birthday-autopilot-hosting-admission-pass",status:"passed",applicationProjectId:$applicationProjectId,applicationProjectNumber:$applicationProjectNumber,sourceRevision:$sourceRevision,siteId:$siteId,scannedPrefix:$scannedPrefix,repository:$repository,repositoryId:$repositoryId,repositoryOwnerId:$repositoryOwnerId,workflowPath:$workflowPath,runId:$runId,runAttempt:$runAttempt,buildArtifactId:$buildArtifactId,buildArtifactDigest:$buildArtifactDigest,securityProjectId:$securityProjectId,securityProjectNumber:$securityProjectNumber,bucketName:$bucketName,bucketMetageneration:$bucketMetageneration,retentionSeconds:900,retentionLocked:true,publicAccessPrevention:"enforced",uniformBucketLevelAccess:true,versioningEnabled:false,softDeleteEnabled:false,lifecycleDeleteAgeDays:1,lifecyclePrefix:"hosting-production-change-freezes/",checkedAt:$checkedAt,pageCount:$pageCount,objectCount:$objectCount,checkManifestSha256:$checkManifestSha256,reader:{serviceAccount:$readerServiceAccount,workloadIdentityProvider:$readerWorkloadIdentityProvider}}' \
+            > "$evidence/hosting-admission-pass.json"
+          unset access_token
+          printf 'run-id=%s\n' "$GITHUB_RUN_ID" >> "$GITHUB_OUTPUT"
+          printf 'run-attempt=%s\n' "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+          printf 'repository=%s\n' "$GITHUB_REPOSITORY" >> "$GITHUB_OUTPUT"
+
+      - name: Upload immutable admission PASS handoff
+        id: upload-admission
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: hosting-production-admission-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: ${{ runner.temp }}/hosting-admission-handoff/
+
+  deploy:
+    name: Deploy only after immutable admission PASS
+    needs: [build, admission]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: hosting-production-deploy
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    env:
+      CI: 'true'
+      CLOUDSDK_CORE_DISABLE_PROMPTS: '1'
+      EXPECTED_SOURCE_REVISION: ${{ inputs.source_revision }}
+      PROJECT_ID: ${{ inputs.project_id }}
+      PROJECT_NUMBER: ${{ inputs.project_number }}
+      WEB_APP_ID: ${{ inputs.firebase_web_app_id }}
+      HOSTING_SITE_ID: ${{ inputs.hosting_site_id }}
+      PUBLIC_BASE_URL: ${{ inputs.public_base_url }}
+      BUILD_ARTIFACT_ID: ${{ needs.build.outputs.artifact-id }}
+      BUILD_ARTIFACT_DIGEST: ${{ needs.build.outputs.artifact-digest }}
+      ADMISSION_ARTIFACT_ID: ${{ needs.admission.outputs.artifact-id }}
+      ADMISSION_ARTIFACT_DIGEST: ${{ needs.admission.outputs.artifact-digest }}
+      HOSTING_DEPLOY_WIF_PROVIDER: ${{ vars.HOSTING_DEPLOY_WIF_PROVIDER }}
+      HOSTING_DEPLOY_SERVICE_ACCOUNT: ${{ vars.HOSTING_DEPLOY_SERVICE_ACCOUNT }}
+      PASS_RUN_ID: ${{ needs.admission.outputs.pass-run-id }}
+      PASS_RUN_ATTEMPT: ${{ needs.admission.outputs.pass-run-attempt }}
+      PASS_REPOSITORY: ${{ needs.admission.outputs.pass-repository }}
+
+    steps:
+      - name: Reject reused admission output before any artifact or source action
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PASS_REPOSITORY" = "$GITHUB_REPOSITORY"
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$GITHUB_WORKFLOW_REF" = 'yhsomani/AI-Birthday/.github/workflows/hosting-production-deploy.yml@refs/heads/main'
+          [[ "$GITHUB_REPOSITORY_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$GITHUB_REPOSITORY_OWNER_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          test "$PASS_RUN_ID" = "$GITHUB_RUN_ID"
+          test "$PASS_RUN_ATTEMPT" = "$GITHUB_RUN_ATTEMPT"
+          [[ "$BUILD_ARTIFACT_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$BUILD_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$ADMISSION_ARTIFACT_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$ADMISSION_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+
+      - name: Download exact build and admission artifacts from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }},${{ needs.admission.outputs.artifact-id }}
+          path: ${{ runner.temp }}/hosting-deploy-handoff
+          merge-multiple: true
+
+      - name: Validate immutable PASS and artifact/run bindings before source execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BUILD_ARTIFACT_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$BUILD_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$ADMISSION_ARTIFACT_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$ADMISSION_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          handoff="$RUNNER_TEMP/hosting-deploy-handoff"
+          evidence="$handoff/release-evidence/hosting-production-deployment"
+          pass="$evidence/hosting-admission-pass.json"
+          binding="$evidence/hosting-build-binding.json"
+          jq -e --arg source "$EXPECTED_SOURCE_REVISION" --arg project "$PROJECT_ID" --arg number "$PROJECT_NUMBER" \
+            --arg site "$HOSTING_SITE_ID" --arg runId "$GITHUB_RUN_ID" --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg repositoryId "$GITHUB_REPOSITORY_ID" --arg repositoryOwnerId "$GITHUB_REPOSITORY_OWNER_ID" \
+            --arg buildId "$BUILD_ARTIFACT_ID" --arg buildDigest "$BUILD_ARTIFACT_DIGEST" \
+            '.status == "passed" and .sourceRevision == $source and .applicationProjectId == $project and .applicationProjectNumber == $number and .siteId == $site and .repositoryId == $repositoryId and .repositoryOwnerId == $repositoryOwnerId and .runId == $runId and .runAttempt == $runAttempt and .buildArtifactId == $buildId and .buildArtifactDigest == $buildDigest' "$pass" > /dev/null
+          test "$(sha256sum "$evidence/hosting-deployment-artifact.json" | cut -d' ' -f1)" = "$(jq -er '.artifactSha256' "$binding")"
+          test "$(sha256sum "$evidence/hosting-deployment-manifest.json" | cut -d' ' -f1)" = "$(jq -er '.manifestSha256' "$binding")"
+
+      - name: Check out exact source only after admission PASS
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require selected source to belong to protected main history
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse --verify HEAD)" = "$EXPECTED_SOURCE_REVISION"
+          [[ "$(git rev-parse --verify refs/remotes/origin/main)" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Install locked deploy tooling after admission PASS
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Reverify and extract the canonical deployment input
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global npm@11.6.0
+          npm ci --prefix backend/functions
+          test "$(node --version)" = v24.18.0
+          test "$(backend/functions/node_modules/.bin/firebase --version)" = 15.23.0
+          evidence="$RUNNER_TEMP/hosting-deploy-handoff/release-evidence/hosting-production-deployment"
+          node tools/hosting-deployment-artifact.mjs --mode extract \
+            --artifact "$evidence/hosting-deployment-artifact.json" \
+            --output-root "$RUNNER_TEMP/hosting-deploy-input"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Authenticate as the sole Hosting-mutating identity
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ inputs.project_id }}
+          workload_identity_provider: ${{ vars.HOSTING_DEPLOY_WIF_PROVIDER }}
+          service_account: ${{ vars.HOSTING_DEPLOY_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Set up the exact Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          version: 575.0.1
+          project_id: ${{ inputs.project_id }}
+
+      - name: Retain active deploy identity and release baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$HOSTING_DEPLOY_WIF_PROVIDER" =~ ^projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/[a-z0-9-]{4,32}/providers/[a-z0-9-]{4,32}$ ]]
+          [[ "$HOSTING_DEPLOY_SERVICE_ACCOUNT" =~ ^[a-z][a-z0-9-]{2,62}@${PROJECT_ID}\.iam\.gserviceaccount\.com$ ]]
+          test "$(gcloud auth list --filter='status:ACTIVE' --format='value(account)')" = "$HOSTING_DEPLOY_SERVICE_ACCOUNT"
+          evidence="$RUNNER_TEMP/hosting-deploy-handoff/release-evidence/hosting-production-deployment"
+          jq -n --arg serviceAccount "$HOSTING_DEPLOY_SERVICE_ACCOUNT" --arg workloadIdentityProvider "$HOSTING_DEPLOY_WIF_PROVIDER" \
+            --arg authenticatedAt "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)" \
+            --arg buildArtifactId "$BUILD_ARTIFACT_ID" --arg buildArtifactDigest "$BUILD_ARTIFACT_DIGEST" \
+            --arg admissionArtifactId "$ADMISSION_ARTIFACT_ID" --arg admissionArtifactDigest "$ADMISSION_ARTIFACT_DIGEST" \
+            '{serviceAccount:$serviceAccount,workloadIdentityProvider:$workloadIdentityProvider,authenticatedAt:$authenticatedAt,buildArtifactId:$buildArtifactId,buildArtifactDigest:$buildArtifactDigest,admissionArtifactId:$admissionArtifactId,admissionArtifactDigest:$admissionArtifactDigest}' \
+            > "$evidence/hosting-deploy-identity.json"
+          backend/functions/node_modules/.bin/firebase hosting:sites:get "$HOSTING_SITE_ID" --project "$PROJECT_ID" --json --non-interactive > "$RUNNER_TEMP/hosting-site.json"
+          access_token="$(gcloud auth print-access-token)"
+          { printf '%s\n' 'fail' 'silent' 'show-error' 'proto = "=https"' 'tlsv1.2' 'request = "GET"'; printf 'header = "Authorization: Bearer %s"\n' "$access_token"; printf 'url = "https://firebasehosting.googleapis.com/v1beta1/sites/%s/releases?pageSize=100"\n' "$HOSTING_SITE_ID"; } | curl --config - > "$RUNNER_TEMP/releases-before.json"
+          unset access_token
+
+      - name: Deploy only the extracted canonical Hosting artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/hosting-deploy-handoff/release-evidence/hosting-production-deployment"
+          artifact_sha="$(sha256sum "$evidence/hosting-deployment-artifact.json" | cut -d' ' -f1)"
+          message="birthday-autopilot:${EXPECTED_SOURCE_REVISION}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:${artifact_sha}"
+          deploy_started_at="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          backend/functions/node_modules/.bin/firebase deploy --config "$RUNNER_TEMP/hosting-deploy-input/firebase.json" \
+            --project "$PROJECT_ID" --only hosting --non-interactive --json --message "$message" > "$evidence/firebase-deploy-result.json"
+          deploy_completed_at="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          jq -n --arg deployStartedAt "$deploy_started_at" --arg deployCompletedAt "$deploy_completed_at" \
+            '{deployStartedAt:$deployStartedAt,deployCompletedAt:$deployCompletedAt}' > "$RUNNER_TEMP/hosting-deployment-window.json"
+          jq -e '.status == "success" and .result != null' "$evidence/firebase-deploy-result.json" > /dev/null
+
+      - name: Resolve exact release, version, origin, and web identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/hosting-deploy-handoff/release-evidence/hosting-production-deployment"
+          artifact_sha="$(sha256sum "$evidence/hosting-deployment-artifact.json" | cut -d' ' -f1)"
+          message="birthday-autopilot:${EXPECTED_SOURCE_REVISION}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:${artifact_sha}"
+          access_token="$(gcloud auth print-access-token)"
+          firebase_get() { local url="$1" destination="$2"; { printf '%s\n' 'fail' 'silent' 'show-error' 'proto = "=https"' 'tlsv1.2' 'request = "GET"'; printf 'header = "Authorization: Bearer %s"\n' "$access_token"; printf 'url = "%s"\n' "$url"; } | curl --config - > "$destination"; }
+          firebase_get "https://firebasehosting.googleapis.com/v1beta1/sites/${HOSTING_SITE_ID}/releases?pageSize=100" "$RUNNER_TEMP/releases-after.json"
+          jq -e --arg message "$message" --slurpfile before "$RUNNER_TEMP/releases-before.json" '[.releases[]? | select(.type == "DEPLOY" and .message == $message) | select(.name as $name | ([$before[0].releases[]?.name] | index($name)) == null)] | if length == 1 then .[0] else error("expected exactly one new workflow release") end' \
+            "$RUNNER_TEMP/releases-after.json" > "$evidence/hosting-release-observation.json"
+          version_name="$(jq -er '.version.name' "$evidence/hosting-release-observation.json")"
+          firebase_get "https://firebasehosting.googleapis.com/v1beta1/${version_name}" "$evidence/hosting-version-observation.json"
+          firebase_get "https://firebasehosting.googleapis.com/v1beta1/projects/${PROJECT_ID}/sites/${HOSTING_SITE_ID}" "$evidence/hosting-site-observation.json"
+          public_hostname="$(node -e 'const v=new URL(process.argv[1]);if(v.protocol!=="https:"||v.pathname!=="/"||v.search||v.hash)process.exit(1);process.stdout.write(v.hostname)' "$PUBLIC_BASE_URL")"
+          if [[ "$public_hostname" == "${HOSTING_SITE_ID}.web.app" || "$public_hostname" == "${HOSTING_SITE_ID}.firebaseapp.com" ]]; then
+            cp "$evidence/hosting-site-observation.json" "$evidence/hosting-origin-observation.json"
+          else
+            firebase_get "https://firebasehosting.googleapis.com/v1beta1/projects/${PROJECT_ID}/sites/${HOSTING_SITE_ID}/customDomains/${public_hostname}" "$evidence/hosting-origin-observation.json"
+          fi
+          unset access_token
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 --location --max-redirs 0 \
+            "${PUBLIC_BASE_URL}__/firebase/init.json" > "$evidence/firebase-web-config-observation.json"
+
+      - name: Produce exact deployment provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/hosting-deploy-handoff/release-evidence/hosting-production-deployment"
+          node tools/create-hosting-deployment-provenance.mjs \
+            --artifact "$evidence/hosting-deployment-artifact.json" \
+            --manifest "$evidence/hosting-deployment-manifest.json" \
+            --deploy-result "$evidence/firebase-deploy-result.json" \
+            --deployment-window "$RUNNER_TEMP/hosting-deployment-window.json" \
+            --release-observation "$evidence/hosting-release-observation.json" \
+            --version-observation "$evidence/hosting-version-observation.json" \
+            --site-observation "$evidence/hosting-site-observation.json" \
+            --origin-observation "$evidence/hosting-origin-observation.json" \
+            --firebase-web-config "$evidence/firebase-web-config-observation.json" \
+            --admission-pass "$evidence/hosting-admission-pass.json" \
+            --admission-check-manifest "$evidence/hosting-admission-check-manifest.json" \
+            --admission-check-root "$evidence/hosting-admission-check" \
+            --deploy-identity "$evidence/hosting-deploy-identity.json" \
+            --project-number "$PROJECT_NUMBER" --web-app-id "$WEB_APP_ID" \
+            --output "$evidence/hosting-deployment-provenance.json"
+
+      - name: Retain immutable deployment and provider provenance
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: hosting-production-deployment-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+          path: ${{ runner.temp }}/hosting-deploy-handoff/release-evidence/hosting-production-deployment/

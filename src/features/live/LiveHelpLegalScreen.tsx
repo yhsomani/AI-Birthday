@@ -73,7 +73,12 @@ export function LiveHelpLegalScreen({
 
   return (
     <Screen includeTopInset testID="live-help-legal-screen">
-      <Button label={t('live.common.back')} onPress={onBack} variant="ghost" />
+      <Button
+        label={t('live.common.back')}
+        onPress={onBack}
+        variant="ghost"
+        testID="live-help-back"
+      />
       <AppText variant="title" accessibilityRole="header">
         {t('live.help.title')}
       </AppText>

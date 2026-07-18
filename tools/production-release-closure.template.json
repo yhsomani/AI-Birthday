@@ -1,0 +1,88 @@
+{
+  "$schema": "./production-release-closure.schema.json",
+  "schemaVersion": 1,
+  "product": "birthday-autopilot-production-release-closure",
+  "status": "pending",
+  "source": {
+    "revision": null,
+    "repository": "https://github.com/yhsomani/AI-Birthday.git",
+    "clean": null,
+    "authorityPublicKeySpkiSha256": null
+  },
+  "validity": {
+    "generatedAt": null,
+    "validUntil": null
+  },
+  "release": {
+    "environment": "production",
+    "firebase": {
+      "projectId": null,
+      "projectNumber": null,
+      "androidAppId": null,
+      "iosAppId": null
+    },
+    "android": {
+      "applicationId": "com.yashsomani.birthdayautopilot",
+      "versionCode": null,
+      "versionName": null,
+      "artifactKind": "aab",
+      "artifactFileName": null,
+      "artifactSha256": null,
+      "artifactSigningCertificateSha256": null,
+      "installedSigningCertificateSha1": null,
+      "installedSigningCertificateSha256": null,
+      "deliveredBaseApkFileName": null,
+      "deliveredBaseApkSha256": null
+    },
+    "ios": {
+      "bundleId": "com.yashsomani.birthdayautopilot",
+      "shortVersion": null,
+      "buildNumber": null,
+      "artifactFileName": null,
+      "artifactSha256": null,
+      "distributionCertificateSha256": null
+    },
+    "hosting": {
+      "publicBaseUrl": null,
+      "releaseConfigSha256": null,
+      "deployedArtifactSha256": null
+    }
+  },
+  "components": {
+    "androidDistribution": {
+      "path": "reports/android-distribution-verification.json",
+      "sha256": null,
+      "bytes": 0
+    },
+    "androidPlayDelivery": {
+      "path": "reports/android-play-delivery-verification.json",
+      "sha256": null,
+      "bytes": 0
+    },
+    "iosRelease": {
+      "path": "reports/ios-release-verification.json",
+      "sha256": null,
+      "bytes": 0
+    },
+    "cloud": {
+      "path": "reports/cloud-release-verification.json",
+      "sha256": null,
+      "bytes": 0
+    },
+    "store": {
+      "path": "reports/store-release-verification.json",
+      "sha256": null,
+      "bytes": 0
+    },
+    "hosting": {
+      "path": "reports/hosting-release-verification.json",
+      "sha256": null,
+      "bytes": 0
+    }
+  },
+  "finalApproval": {
+    "decision": "pending",
+    "approvedAt": null,
+    "validUntil": null
+  }
+}

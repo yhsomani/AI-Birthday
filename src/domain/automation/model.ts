@@ -155,6 +155,19 @@ export type ActivationReview =
       platform: 'ios';
       handle: ActivationReviewHandle;
       reminderRecipientCount: number;
+      plannedReminderCount: number;
+      reminderWindowLabel: string;
+      reminderHorizon: 'denied' | 'full' | 'not-built' | 'partial';
+      coexistence:
+        | 'clear'
+        | 'deleting'
+        | 'managed'
+        | 'stale-or-unknown'
+        | 'unavailable';
+      contactsReady: boolean;
+      messageUiReady: boolean;
+      protectedStorageReady: boolean;
+      readiness: ReadinessProjection & { platform: 'ios' };
       deliveryMode: 'user-controlled-composer';
       limitationsDisclosure: string;
     }>;

@@ -48,7 +48,19 @@ test('iOS destination blocking stays in protected native state and removes propo
     workflow,
     /case "block-recipient-destination", "unblock-recipient-destination"/u,
   );
-  assert.match(workflow, /workflow\.occurrences\.removeAll/u);
+  const blockMutation =
+    workflow.match(
+      /private func mutateSelectedDestinationBlock[\s\S]*?private func previewMessage/u,
+    )?.[0] ?? '';
+  assert.match(blockMutation, /Self\.bumpConfiguration/u);
+  assert.match(
+    store,
+    /private static func validateWorkflow[\s\S]*?workflow\.occurrences\.isEmpty/u,
+  );
+  assert.match(
+    store,
+    /private static func invalidateStalePlanArtifacts[\s\S]*?snapshot\.proposals\.removeAll\(\)[\s\S]*?snapshot\.planningIndex = nil/u,
+  );
   assert.match(workflow, /!blockedDestinations\.contains\(destination\)/u);
   assert.match(
     workflow,

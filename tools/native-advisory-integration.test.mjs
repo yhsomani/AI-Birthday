@@ -73,6 +73,7 @@ test('Android secure transitive selections remain explicit and evidence-locked',
   }
   assert.match(build, /lockMode = LockMode\.STRICT/u);
   assert.match(build, /e2eDebugAndroidTestRuntimeClasspath/u);
+  assert.doesNotMatch(build, /smokeDebugAndroidTestRuntimeClasspath/u);
   for (const task of [
     ':app:testDevDebugOptimizedUnitTest',
     ':app:testStagingDebugOptimizedUnitTest',
@@ -80,7 +81,9 @@ test('Android secure transitive selections remain explicit and evidence-locked',
     ':app:compileE2eDebugAndroidTestKotlin',
     ':app:assembleE2eDebugAndroidTest',
     ':app:lintE2eDebug',
+    ':app:lintSmokeDebug',
     ':app:assembleE2eDebug',
+    ':app:assembleSmokeDebug',
   ]) {
     assert.ok(refresh.includes(task), `dependency refresh is missing ${task}`);
     if (task.includes('DebugOptimized')) {

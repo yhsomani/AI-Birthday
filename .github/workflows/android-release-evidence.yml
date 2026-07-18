@@ -1,0 +1,583 @@
+name: Android signed artifact pipeline (candidate is not release)
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Build a protected candidate or verify an already-built exact artifact
+        required: true
+        type: choice
+        options:
+          - build-signed-candidate-not-release
+          - verify-authority-approved-artifact
+      tier:
+        description: Restricted release tier
+        required: true
+        type: choice
+        options:
+          - lab
+          - prod
+      channel:
+        description: Authority-approved distribution channel
+        required: true
+        type: choice
+        options:
+          - google-play
+          - managed-enterprise
+          - controlled-direct
+      candidate_run_id:
+        description: Run containing android-signed-candidate-not-release (verify operation only)
+        required: false
+        type: string
+      supporting_evidence_release_tag:
+        description: Private evidence-repository release tag containing the exact authority-reviewed files (required for both operations)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-candidate:
+    name: Signed candidate is not a releasable artifact
+    if: inputs.operation == 'build-signed-candidate-not-release'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    environment: android-${{ inputs.tier }}-${{ inputs.channel }}-signing-candidate
+    env:
+      INPUT_TIER: ${{ inputs.tier }}
+      INPUT_CHANNEL: ${{ inputs.channel }}
+      INPUT_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      INPUT_SUPPORTING_EVIDENCE_RELEASE_TAG: ${{ inputs.supporting_evidence_release_tag }}
+
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Pin npm
+        run: npm install --global npm@11.6.0
+
+      - name: Set up Java
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
+
+      - name: Install pinned Android SDK components
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager \
+            'platforms;android-36' \
+            'build-tools;36.0.0' \
+            'ndk;27.1.12297006'
+
+      - name: Fail closed unless protected signing, Firebase, and authority inputs exist
+        shell: bash
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          ANDROID_RELEASE_SIGNING_CERT_SHA256: ${{ secrets.ANDROID_RELEASE_SIGNING_CERT_SHA256 }}
+          ANDROID_FIREBASE_CONFIG_BASE64: ${{ secrets.ANDROID_FIREBASE_CONFIG_BASE64 }}
+          ANDROID_PREPACKAGE_EVIDENCE_BASE64: ${{ secrets.ANDROID_PREPACKAGE_EVIDENCE_BASE64 }}
+          ANDROID_PREPACKAGE_EVIDENCE_SIGNATURE_BASE64: ${{ secrets.ANDROID_PREPACKAGE_EVIDENCE_SIGNATURE_BASE64 }}
+          DISTRIBUTION_AUTHORITY_PUBLIC_KEY_BASE64: ${{ secrets.DISTRIBUTION_AUTHORITY_PUBLIC_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          for name in \
+            ANDROID_RELEASE_KEYSTORE_BASE64 \
+            ANDROID_RELEASE_KEYSTORE_PASSWORD \
+            ANDROID_RELEASE_KEY_ALIAS \
+            ANDROID_RELEASE_KEY_PASSWORD \
+            ANDROID_RELEASE_SIGNING_CERT_SHA256 \
+            ANDROID_FIREBASE_CONFIG_BASE64 \
+            ANDROID_PREPACKAGE_EVIDENCE_BASE64 \
+            ANDROID_PREPACKAGE_EVIDENCE_SIGNATURE_BASE64 \
+            DISTRIBUTION_AUTHORITY_PUBLIC_KEY_BASE64; do
+            test -n "${!name:-}" || { echo "Missing protected input: $name" >&2; exit 1; }
+          done
+          test -z "$INPUT_CANDIDATE_RUN_ID"
+          [[ "$INPUT_SUPPORTING_EVIDENCE_RELEASE_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$ ]]
+          [[ "$INPUT_SUPPORTING_EVIDENCE_RELEASE_TAG" != *..* ]]
+          [[ "$ANDROID_RELEASE_SIGNING_CERT_SHA256" =~ ^([0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$|^[0-9A-Fa-f]{64}$ ]]
+          test "$(node --version)" = v24.18.0
+          test "$(npm --version)" = 11.6.0
+          test "$(java -version 2>&1 | sed -n '1s/.*version "\([^"]*\)".*/\1/p' | cut -d. -f1)" = 21
+
+      - name: Install locked mobile dependency graph without protected material
+        run: |
+          npm ci
+          npm run codegen:check
+          npm run doctor:android
+
+      - name: Download exact authority-reviewed supporting bytes
+        shell: bash
+        env:
+          ANDROID_SUPPORTING_EVIDENCE_REPOSITORY: ${{ secrets.ANDROID_SUPPORTING_EVIDENCE_REPOSITORY }}
+          ANDROID_SUPPORTING_EVIDENCE_READ_TOKEN: ${{ secrets.ANDROID_SUPPORTING_EVIDENCE_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ "$ANDROID_SUPPORTING_EVIDENCE_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
+          test -n "$ANDROID_SUPPORTING_EVIDENCE_READ_TOKEN"
+          mkdir -p "$RUNNER_TEMP/supporting-evidence"
+          GH_TOKEN="$ANDROID_SUPPORTING_EVIDENCE_READ_TOKEN" gh release download \
+            "$INPUT_SUPPORTING_EVIDENCE_RELEASE_TAG" \
+            --repo "$ANDROID_SUPPORTING_EVIDENCE_REPOSITORY" \
+            --dir "$RUNNER_TEMP/supporting-evidence"
+          test -n "$(find "$RUNNER_TEMP/supporting-evidence" -type f -print -quit)"
+
+      - name: Decode protected build inputs
+        id: protected
+        shell: bash
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_FIREBASE_CONFIG_BASE64: ${{ secrets.ANDROID_FIREBASE_CONFIG_BASE64 }}
+          ANDROID_PREPACKAGE_EVIDENCE_BASE64: ${{ secrets.ANDROID_PREPACKAGE_EVIDENCE_BASE64 }}
+          ANDROID_PREPACKAGE_EVIDENCE_SIGNATURE_BASE64: ${{ secrets.ANDROID_PREPACKAGE_EVIDENCE_SIGNATURE_BASE64 }}
+          DISTRIBUTION_AUTHORITY_PUBLIC_KEY_BASE64: ${{ secrets.DISTRIBUTION_AUTHORITY_PUBLIC_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          protected="$RUNNER_TEMP/android-protected-inputs"
+          mkdir -m 700 "$protected" "android/app/src/$INPUT_TIER"
+          printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$protected/release.keystore"
+          printf '%s' "$ANDROID_FIREBASE_CONFIG_BASE64" | base64 --decode > "android/app/src/$INPUT_TIER/google-services.json"
+          printf '%s' "$ANDROID_PREPACKAGE_EVIDENCE_BASE64" | base64 --decode > "$protected/prepackage-evidence.json"
+          printf '%s' "$ANDROID_PREPACKAGE_EVIDENCE_SIGNATURE_BASE64" | base64 --decode > "$protected/prepackage-evidence.sig"
+          printf '%s' "$DISTRIBUTION_AUTHORITY_PUBLIC_KEY_BASE64" | base64 --decode > "$protected/release-authority-public.pem"
+          chmod 600 \
+            "$protected"/* \
+            "android/app/src/$INPUT_TIER/google-services.json"
+          test -s "$protected/release.keystore"
+          node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' \
+            "android/app/src/$INPUT_TIER/google-services.json"
+          node --input-type=module - "$protected/prepackage-evidence.json" <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const document = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+          const selected = document.approvals?.find(({ tier }) => tier === process.env.INPUT_TIER);
+          if (selected?.channel !== process.env.INPUT_CHANNEL) {
+            throw new Error('prepackage evidence channel does not match the protected operation');
+          }
+          NODE
+          echo "directory=$protected" >> "$GITHUB_OUTPUT"
+
+      - name: Build one channel-authorized signed candidate
+        shell: bash
+        env:
+          PROTECTED: ${{ steps.protected.outputs.directory }}
+          BIRTHDAY_UPLOAD_STORE_FILE: ${{ steps.protected.outputs.directory }}/release.keystore
+          BIRTHDAY_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          BIRTHDAY_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          BIRTHDAY_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          BIRTHDAY_SIGNING_CERT_SHA256: ${{ secrets.ANDROID_RELEASE_SIGNING_CERT_SHA256 }}
+          BIRTHDAY_DISTRIBUTION_EVIDENCE_FILE: ${{ steps.protected.outputs.directory }}/prepackage-evidence.json
+          BIRTHDAY_DISTRIBUTION_EVIDENCE_SIGNATURE_FILE: ${{ steps.protected.outputs.directory }}/prepackage-evidence.sig
+          BIRTHDAY_DISTRIBUTION_AUTHORITY_PUBLIC_KEY_FILE: ${{ steps.protected.outputs.directory }}/release-authority-public.pem
+          BIRTHDAY_DISTRIBUTION_EVIDENCE_ROOT: ${{ runner.temp }}/supporting-evidence
+        run: |
+          set -euo pipefail
+          case "$INPUT_TIER:$INPUT_CHANNEL" in
+            lab:google-play)
+              task=:app:bundleLabRelease
+              source=app/build/outputs/bundle/labRelease/app-lab-release.aab
+              kind=aab
+              ;;
+            prod:google-play)
+              task=:app:bundleProdRelease
+              source=app/build/outputs/bundle/prodRelease/app-prod-release.aab
+              kind=aab
+              ;;
+            lab:managed-enterprise|lab:controlled-direct)
+              task=:app:assembleLabRelease
+              source=app/build/outputs/apk/lab/release/app-lab-release.apk
+              kind=apk
+              ;;
+            prod:managed-enterprise|prod:controlled-direct)
+              task=:app:assembleProdRelease
+              source=app/build/outputs/apk/prod/release/app-prod-release.apk
+              kind=apk
+              ;;
+            *)
+              echo 'Unsupported tier/channel combination' >&2
+              exit 1
+              ;;
+          esac
+          (cd android && ./gradlew "$task" --no-configuration-cache)
+          output=release-evidence/android-signed-candidate
+          mkdir -p "$output"
+          test -s "android/$source"
+          cp "android/$source" "$output/BirthdayAutopilot.$kind"
+          printf '%s' "$kind" > "$RUNNER_TEMP/android-candidate-kind"
+
+      - name: Remove protected build inputs before evidence tooling
+        shell: bash
+        run: |
+          rm -rf "$RUNNER_TEMP/android-protected-inputs"
+          rm -f "android/app/src/$INPUT_TIER/google-services.json"
+
+      - name: Generate candidate-only supply-chain and provenance evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          output=release-evidence/android-signed-candidate
+          kind=$(cat "$RUNNER_TEMP/android-candidate-kind")
+          artifact="$output/BirthdayAutopilot.$kind"
+          artifact_sha256=$(sha256sum "$artifact" | cut -d' ' -f1)
+          supporting_evidence_sha256=$(node tools/hash-distribution-evidence-root.mjs \
+            "$RUNNER_TEMP/supporting-evidence")
+          if [ "$INPUT_TIER" = lab ]; then
+            runtime_configuration=labReleaseRuntimeClasspath
+            application_id=com.yashsomani.birthdayautopilot.lab
+            version_name=1.0-lab
+          else
+            runtime_configuration=prodReleaseRuntimeClasspath
+            application_id=com.yashsomani.birthdayautopilot
+            version_name=1.0
+          fi
+          ARTIFACT_SHA256="$artifact_sha256" \
+          SUPPORTING_EVIDENCE_SHA256="$supporting_evidence_sha256" \
+          ARTIFACT_KIND="$kind" \
+          APPLICATION_ID="$application_id" \
+          VERSION_NAME="$version_name" \
+          node --input-type=module - "$output/candidate-observation-not-release.json" <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const observation = {
+            schemaVersion: 1,
+            status: 'candidate-not-release',
+            sourceRevision: process.env.GITHUB_SHA,
+            tier: process.env.INPUT_TIER,
+            channel: process.env.INPUT_CHANNEL,
+            applicationId: process.env.APPLICATION_ID,
+            versionCode: 1,
+            versionName: process.env.VERSION_NAME,
+            artifactKind: process.env.ARTIFACT_KIND,
+            artifactSha256: process.env.ARTIFACT_SHA256,
+            supportingEvidenceReleaseTag: process.env.INPUT_SUPPORTING_EVIDENCE_RELEASE_TAG,
+            supportingEvidenceInventorySha256: process.env.SUPPORTING_EVIDENCE_SHA256,
+            builder: {
+              workflowRef: process.env.GITHUB_WORKFLOW_REF,
+              runId: process.env.GITHUB_RUN_ID,
+              runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+            },
+          };
+          writeFileSync(process.argv[2], `${JSON.stringify(observation, null, 2)}\n`, {
+            encoding: 'utf8',
+            flag: 'wx',
+            mode: 0o600,
+          });
+          NODE
+          cp package-lock.json "$output/Mobile-package-lock.json"
+          cp android/app/gradle.lockfile "$output/app-gradle.lockfile"
+          cp android/buildscript-gradle.lockfile "$output/buildscript-gradle.lockfile"
+          cp android/settings-gradle.lockfile "$output/settings-gradle.lockfile"
+          cp android/gradle/verification-metadata.xml "$output/gradle-verification-metadata.xml"
+          npm sbom --sbom-format=cyclonedx > "$output/mobile.cdx.json"
+          node tools/generate-native-sbom.mjs \
+            --kind gradle \
+            --lock android/app/gradle.lockfile \
+            --configuration "$runtime_configuration" \
+            --output "$output/android-runtime.cdx.json" \
+            --application-name Birthday-Autopilot-Android \
+            --version "$version_name"
+          node tools/verify-javascript-licenses.mjs \
+            --output "$output/javascript-licenses.json"
+          node tools/create-evidence-manifest.mjs \
+            --base . \
+            --label android-signed-candidate-not-release \
+            --output "$output/candidate-manifest.json" \
+            "$artifact" \
+            "$output/candidate-observation-not-release.json" \
+            "$output/Mobile-package-lock.json" \
+            "$output/app-gradle.lockfile" \
+            "$output/buildscript-gradle.lockfile" \
+            "$output/settings-gradle.lockfile" \
+            "$output/gradle-verification-metadata.xml" \
+            "$output/mobile.cdx.json" \
+            "$output/android-runtime.cdx.json" \
+            "$output/javascript-licenses.json"
+
+      - name: Retain signed candidate for separate authority review
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: android-signed-candidate-not-release
+          if-no-files-found: error
+          retention-days: 14
+          path: release-evidence/android-signed-candidate/
+
+      - name: Remove ephemeral signing, Firebase, and authority material
+        if: always()
+        shell: bash
+        run: |
+          rm -rf "$RUNNER_TEMP/android-protected-inputs"
+          rm -f "android/app/src/$INPUT_TIER/google-services.json"
+
+  verify-release:
+    name: Verify authority-approved exact Android artifact
+    if: inputs.operation == 'verify-authority-approved-artifact'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: android-${{ inputs.tier }}-${{ inputs.channel }}-release
+    env:
+      INPUT_TIER: ${{ inputs.tier }}
+      INPUT_CHANNEL: ${{ inputs.channel }}
+      INPUT_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      INPUT_SUPPORTING_EVIDENCE_RELEASE_TAG: ${{ inputs.supporting_evidence_release_tag }}
+
+    steps:
+      - name: Check out the exact candidate revision
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Pin npm
+        run: npm install --global npm@11.6.0
+
+      - name: Set up Java
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle for the locked Play AAB decoder
+        if: inputs.channel == 'google-play'
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
+
+      - name: Install pinned Android SDK components
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager \
+            'platforms;android-36' \
+            'build-tools;36.0.0' \
+            'ndk;27.1.12297006'
+
+      - name: Fail closed unless exact runs and authority evidence are supplied
+        shell: bash
+        env:
+          ANDROID_FINAL_EVIDENCE_BASE64: ${{ secrets.ANDROID_FINAL_EVIDENCE_BASE64 }}
+          ANDROID_FINAL_EVIDENCE_SIGNATURE_BASE64: ${{ secrets.ANDROID_FINAL_EVIDENCE_SIGNATURE_BASE64 }}
+          DISTRIBUTION_AUTHORITY_PUBLIC_KEY_BASE64: ${{ secrets.DISTRIBUTION_AUTHORITY_PUBLIC_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          [[ "$INPUT_CANDIDATE_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$INPUT_SUPPORTING_EVIDENCE_RELEASE_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$ ]]
+          [[ "$INPUT_SUPPORTING_EVIDENCE_RELEASE_TAG" != *..* ]]
+          test -n "$ANDROID_FINAL_EVIDENCE_BASE64"
+          test -n "$ANDROID_FINAL_EVIDENCE_SIGNATURE_BASE64"
+          test -n "$DISTRIBUTION_AUTHORITY_PUBLIC_KEY_BASE64"
+          test "$(node --version)" = v24.18.0
+          test "$(npm --version)" = 11.6.0
+          test "$(java -version 2>&1 | sed -n '1s/.*version "\([^"]*\)".*/\1/p' | cut -d. -f1)" = 21
+
+      - name: Install locked graph and prime the offline Play AAB decoder
+        if: inputs.channel == 'google-play'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          (cd android && ./gradlew -q help --no-daemon --no-configuration-cache --console=plain)
+
+      - name: Verify candidate provenance and download immutable inputs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANDROID_SUPPORTING_EVIDENCE_REPOSITORY: ${{ secrets.ANDROID_SUPPORTING_EVIDENCE_REPOSITORY }}
+          ANDROID_SUPPORTING_EVIDENCE_READ_TOKEN: ${{ secrets.ANDROID_SUPPORTING_EVIDENCE_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ "$ANDROID_SUPPORTING_EVIDENCE_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
+          test -n "$ANDROID_SUPPORTING_EVIDENCE_READ_TOKEN"
+          candidate_metadata=$(gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$INPUT_CANDIDATE_RUN_ID")
+          test "$(jq -r .head_sha <<<"$candidate_metadata")" = "$GITHUB_SHA"
+          test "$(jq -r .head_repository.full_name <<<"$candidate_metadata")" = "$GITHUB_REPOSITORY"
+          test "$(jq -r .status <<<"$candidate_metadata")" = completed
+          test "$(jq -r .conclusion <<<"$candidate_metadata")" = success
+          test "$(jq -r .event <<<"$candidate_metadata")" = workflow_dispatch
+          test "$(jq -r .path <<<"$candidate_metadata")" = .github/workflows/android-release-evidence.yml
+          candidate_run_attempt=$(jq -r .run_attempt <<<"$candidate_metadata")
+          [[ "$candidate_run_attempt" =~ ^[1-9][0-9]{0,9}$ ]]
+          echo "EXPECTED_CANDIDATE_RUN_ATTEMPT=$candidate_run_attempt" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/candidate" "$RUNNER_TEMP/supporting-evidence"
+          GH_TOKEN="$GH_TOKEN" gh run download "$INPUT_CANDIDATE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name android-signed-candidate-not-release \
+            --dir "$RUNNER_TEMP/candidate"
+          GH_TOKEN="$ANDROID_SUPPORTING_EVIDENCE_READ_TOKEN" gh release download \
+            "$INPUT_SUPPORTING_EVIDENCE_RELEASE_TAG" \
+            --repo "$ANDROID_SUPPORTING_EVIDENCE_REPOSITORY" \
+            --dir "$RUNNER_TEMP/supporting-evidence"
+          test -n "$(find "$RUNNER_TEMP/supporting-evidence" -type f -print -quit)"
+
+      - name: Decode final authority-signed evidence
+        shell: bash
+        env:
+          ANDROID_FINAL_EVIDENCE_BASE64: ${{ secrets.ANDROID_FINAL_EVIDENCE_BASE64 }}
+          ANDROID_FINAL_EVIDENCE_SIGNATURE_BASE64: ${{ secrets.ANDROID_FINAL_EVIDENCE_SIGNATURE_BASE64 }}
+          DISTRIBUTION_AUTHORITY_PUBLIC_KEY_BASE64: ${{ secrets.DISTRIBUTION_AUTHORITY_PUBLIC_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          protected="$RUNNER_TEMP/android-final-evidence-inputs"
+          mkdir -m 700 "$protected"
+          printf '%s' "$ANDROID_FINAL_EVIDENCE_BASE64" | base64 --decode > "$protected/final-evidence.json"
+          printf '%s' "$ANDROID_FINAL_EVIDENCE_SIGNATURE_BASE64" | base64 --decode > "$protected/final-evidence.sig"
+          printf '%s' "$DISTRIBUTION_AUTHORITY_PUBLIC_KEY_BASE64" | base64 --decode > "$protected/release-authority-public.pem"
+          chmod 600 "$protected"/*
+          test -s "$protected/final-evidence.json"
+          test -s "$protected/final-evidence.sig"
+          test -s "$protected/release-authority-public.pem"
+
+      - name: Bind selected operation to exact candidate observation
+        shell: bash
+        run: |
+          set -euo pipefail
+          observation="$RUNNER_TEMP/candidate/candidate-observation-not-release.json"
+          test -f "$observation"
+          if [ "$INPUT_CHANNEL" = google-play ]; then
+            artifact_kind=aab
+          else
+            artifact_kind=apk
+          fi
+          artifact="$RUNNER_TEMP/candidate/BirthdayAutopilot.$artifact_kind"
+          test -s "$artifact"
+          actual_sha256=$(sha256sum "$artifact" | cut -d' ' -f1)
+          supporting_evidence_sha256=$(node tools/hash-distribution-evidence-root.mjs \
+            "$RUNNER_TEMP/supporting-evidence")
+          EXPECTED_ARTIFACT_KIND="$artifact_kind" \
+          EXPECTED_ARTIFACT_SHA256="$actual_sha256" \
+          EXPECTED_SUPPORTING_EVIDENCE_SHA256="$supporting_evidence_sha256" \
+          node --input-type=module - \
+            "$observation" \
+            "$RUNNER_TEMP/android-final-evidence-inputs/final-evidence.json" <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const value = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+          const finalEvidence = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+          const expected = {
+            schemaVersion: 1,
+            status: 'candidate-not-release',
+            sourceRevision: process.env.GITHUB_SHA,
+            tier: process.env.INPUT_TIER,
+            channel: process.env.INPUT_CHANNEL,
+            artifactKind: process.env.EXPECTED_ARTIFACT_KIND,
+            artifactSha256: process.env.EXPECTED_ARTIFACT_SHA256,
+            supportingEvidenceReleaseTag: process.env.INPUT_SUPPORTING_EVIDENCE_RELEASE_TAG,
+            supportingEvidenceInventorySha256:
+              process.env.EXPECTED_SUPPORTING_EVIDENCE_SHA256,
+          };
+          for (const [field, expectedValue] of Object.entries(expected)) {
+            if (value[field] !== expectedValue) {
+              throw new Error(`candidate observation ${field} does not match the selected immutable input`);
+            }
+          }
+          if (value.builder?.runId !== process.env.INPUT_CANDIDATE_RUN_ID) {
+            throw new Error('candidate observation does not match the selected candidate run');
+          }
+          if (value.builder?.runAttempt !== process.env.EXPECTED_CANDIDATE_RUN_ATTEMPT) {
+            throw new Error('candidate observation does not match the selected candidate run attempt');
+          }
+          const selected = finalEvidence.approvals?.find(
+            ({ tier }) => tier === process.env.INPUT_TIER,
+          );
+          if (selected?.channel !== process.env.INPUT_CHANNEL) {
+            throw new Error('final evidence channel does not match the protected operation');
+          }
+          NODE
+
+      - name: Verify exact signed artifact and all referenced evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          protected="$RUNNER_TEMP/android-final-evidence-inputs"
+          output=release-evidence/android-authority-verified-release
+          mkdir -p "$output"
+          if [ "$INPUT_TIER" = lab ]; then
+            application_id=com.yashsomani.birthdayautopilot.lab
+          else
+            application_id=com.yashsomani.birthdayautopilot
+          fi
+          if [ "$INPUT_CHANNEL" = google-play ]; then
+            artifact="$RUNNER_TEMP/candidate/BirthdayAutopilot.aab"
+            tools/verify-android-aab.sh \
+              "$artifact" \
+              "$application_id" \
+              --play-evidence \
+              "$protected/final-evidence.json" \
+              "$protected/final-evidence.sig" \
+              "$protected/release-authority-public.pem" \
+              "$RUNNER_TEMP/supporting-evidence" \
+              "$INPUT_TIER" | tee "$output/verification-report.txt"
+          else
+            artifact="$RUNNER_TEMP/candidate/BirthdayAutopilot.apk"
+            tools/verify-android-apk.sh \
+              "$artifact" \
+              "$application_id" \
+              --restricted-evidence \
+              "$protected/final-evidence.json" \
+              "$protected/final-evidence.sig" \
+              "$protected/release-authority-public.pem" \
+              "$RUNNER_TEMP/supporting-evidence" \
+              "$INPUT_TIER" | tee "$output/verification-report.txt"
+          fi
+          cp "$artifact" "$output/"
+          cp "$RUNNER_TEMP/candidate/candidate-observation-not-release.json" "$output/"
+          cp "$protected/final-evidence.json" "$output/"
+          cp "$protected/final-evidence.sig" "$output/"
+          cp "$protected/release-authority-public.pem" "$output/"
+          cp -R "$RUNNER_TEMP/supporting-evidence" "$output/supporting-evidence"
+          node tools/create-evidence-manifest.mjs \
+            --base . \
+            --label android-authority-verified-release \
+            --output "$output/verification-manifest.json" \
+            "$output/$(basename "$artifact")" \
+            "$output/candidate-observation-not-release.json" \
+            "$output/final-evidence.json" \
+            "$output/final-evidence.sig" \
+            "$output/release-authority-public.pem" \
+            "$output/supporting-evidence" \
+            "$output/verification-report.txt"
+          if [ "$INPUT_CHANNEL" = google-play ]; then
+            artifact_mode=play-aab
+          else
+            artifact_mode=direct-apk
+          fi
+          node tools/create-android-release-verification-report.mjs \
+            --evidence "$protected/final-evidence.json" \
+            --signature "$protected/final-evidence.sig" \
+            --public-key "$protected/release-authority-public.pem" \
+            --evidence-root "$RUNNER_TEMP/supporting-evidence" \
+            --tier "$INPUT_TIER" \
+            --artifact-mode "$artifact_mode" \
+            --artifact "$artifact" \
+            --verification-report "$output/verification-report.txt" \
+            --verification-manifest "$output/verification-manifest.json" \
+            --output "$output/release-closure-report.json"
+
+      - name: Retain verified authority-bound release evidence package
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: android-authority-verified-release-evidence
+          if-no-files-found: error
+          retention-days: 90
+          path: release-evidence/android-authority-verified-release/
+
+      - name: Remove final authority material working copies
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/android-final-evidence-inputs"

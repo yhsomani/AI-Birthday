@@ -37,6 +37,11 @@ const FORBIDDEN_PRIVATE_KEYS = new Set([
   'recipient',
   'refreshToken',
 ]);
+const CONTENT_FREE_ACTIVITY = {
+  id: 'smoke.activity.1',
+  kind: 'settings-changed',
+  occurredAt: '2026-07-12T00:00:00.000Z',
+};
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -99,12 +104,15 @@ export const validateProductionSmokeFixture = value => {
     );
     assert(
       JSON.stringify(projections['contacts:list'].items) === '[]' &&
-        projections['contacts:list'].totalCount === 0 &&
-        JSON.stringify(projections['activity:list'].items) === '[]',
-      `${platform} fixture contains contact or activity records`,
+        projections['contacts:list'].totalCount === 0,
+      `${platform} fixture contains contact records`,
+    );
+    assert(
+      JSON.stringify(projections['activity:list'].items) ===
+        JSON.stringify([CONTENT_FREE_ACTIVITY]),
+      `${platform} fixture activity is not the exact content-free route record`,
     );
     for (const count of [
-      'activityCount',
       'approvalCount',
       'enabledRecipientCount',
       'localContactCount',
@@ -116,6 +124,10 @@ export const validateProductionSmokeFixture = value => {
         `${platform} ${count} must be zero`,
       );
     }
+    assert(
+      projections['privacy:inventory'].activityCount === 1,
+      `${platform} activityCount must bind the content-free route record`,
+    );
   }
   inspectPrivateKeys(value);
 };

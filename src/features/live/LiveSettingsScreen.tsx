@@ -168,6 +168,35 @@ export function LiveSettingsScreen({
       <AppText variant="title" accessibilityRole="header">
         {t('settings.title')}
       </AppText>
+      <Button
+        label={t('live.settings.openPrivacy')}
+        onPress={onOpenPrivacy}
+        variant="secondary"
+        testID="live-settings-privacy"
+      />
+      <Button
+        label={t('live.settings.openHelpLegal')}
+        onPress={onOpenHelpLegal}
+        variant="secondary"
+        testID="live-settings-help-legal"
+      />
+      <Button
+        label={t('live.nav.attention')}
+        onPress={onOpenAttention}
+        variant="secondary"
+        testID="live-settings-attention"
+      />
+      <Button
+        label={t('live.nav.activity')}
+        onPress={onOpenActivity}
+        variant="secondary"
+      />
+      <Button
+        label={t('live.settings.openDiagnostics')}
+        onPress={onOpenDiagnostics}
+        variant="secondary"
+        testID="live-settings-diagnostics"
+      />
       <Card>
         <SectionHeading title={t('live.settings.platform')} />
         <StatusRow
@@ -362,34 +391,6 @@ export function LiveSettingsScreen({
           />
         </>
       ) : null}
-      <Button
-        label={t('live.nav.attention')}
-        onPress={onOpenAttention}
-        variant="secondary"
-      />
-      <Button
-        label={t('live.nav.activity')}
-        onPress={onOpenActivity}
-        variant="secondary"
-      />
-      <Button
-        label={t('live.settings.openPrivacy')}
-        onPress={onOpenPrivacy}
-        variant="secondary"
-        testID="live-settings-privacy"
-      />
-      <Button
-        label={t('live.settings.openDiagnostics')}
-        onPress={onOpenDiagnostics}
-        variant="secondary"
-        testID="live-settings-diagnostics"
-      />
-      <Button
-        label={t('live.settings.openHelpLegal')}
-        onPress={onOpenHelpLegal}
-        variant="secondary"
-        testID="live-settings-help-legal"
-      />
       <Button
         label={t('live.settings.refresh')}
         onPress={() => {

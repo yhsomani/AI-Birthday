@@ -9,16 +9,23 @@ import {
 } from 'node:crypto';
 import {
   closeSync,
+  constants,
   fstatSync,
   lstatSync,
   openSync,
+  readdirSync,
   readFileSync,
   readSync,
   realpathSync,
 } from 'node:fs';
-import { dirname, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { validateMobileReleaseScenarioEvidence } from './mobile-release-scenario-evidence.mjs';
+import {
+  validatePerformanceEvidence,
+  validatePerformanceEvidenceReferenceFiles,
+} from './validate-performance-evidence.mjs';
 
 const CHANNELS = new Set([
   'google-play',
@@ -117,13 +124,17 @@ const REFERENCED_EVIDENCE = [
   ['legalReviewReference', 'legalReviewSha256'],
 ];
 const MAXIMUM_EVIDENCE_BYTES = 64 * 1024;
+const MAXIMUM_STRUCTURED_EVIDENCE_BYTES = 2 * 1024 * 1024;
 const MAXIMUM_PUBLIC_KEY_BYTES = 8 * 1024;
 const MAXIMUM_PIN_BYTES = 1024;
 const MAXIMUM_ARTIFACT_BYTES = 1024 * 1024 * 1024;
+const MAXIMUM_REFERENCED_EVIDENCE_BYTES = 512 * 1024 * 1024;
+const MAXIMUM_EVIDENCE_ROOT_BYTES = 1024 * 1024 * 1024;
+const MAXIMUM_EVIDENCE_ROOT_FILES = 64;
 const ED25519_SIGNATURE_BYTES = 64;
 const UTC_INSTANT =
   /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?Z$/u;
-const SAFE_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{0,255}$/u;
+const SAFE_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9 ._/@()+-]{0,511}$/u;
 const SAFE_VERSION_NAME = /^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$/u;
 const SHA256 = /^[0-9a-f]{64}$/u;
 const GIT_REVISION = /^[0-9a-f]{40}$/u;
@@ -155,6 +166,7 @@ const CLI_ARGUMENTS = new Set([
   'artifact-mode',
   'artifact-signing-certificate',
   'artifact-file',
+  'evidence-root',
   'output',
 ]);
 
@@ -206,7 +218,10 @@ const assertRequiredKeys = (value, required, label, errors) => {
 const isSafeReference = value =>
   typeof value === 'string' &&
   value === value.trim() &&
-  SAFE_REFERENCE.test(value);
+  SAFE_REFERENCE.test(value) &&
+  !isAbsolute(value) &&
+  !value.includes('\\') &&
+  value.split('/').every(part => part !== '' && part !== '.' && part !== '..');
 
 const hasExactUtcCalendarFields = (value, epochMillis) => {
   const instant = new Date(epochMillis);
@@ -272,6 +287,259 @@ export function sha256File(path, maximumBytes = MAXIMUM_ARTIFACT_BYTES) {
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
   }
+}
+
+const stableMetadata = metadata => ({
+  dev: metadata.dev,
+  ino: metadata.ino,
+  mode: metadata.mode,
+  nlink: metadata.nlink,
+  size: metadata.size,
+  mtimeNs: metadata.mtimeNs,
+  ctimeNs: metadata.ctimeNs,
+});
+
+const sameMetadata = (left, right) =>
+  Object.keys(left).every(key => left[key] === right[key]);
+
+const portablePath = value => value.split(sep).join('/');
+
+const hashStableEvidenceFile = filePath => {
+  const pathBefore = lstatSync(filePath, { bigint: true });
+  if (
+    !pathBefore.isFile() ||
+    pathBefore.isSymbolicLink() ||
+    pathBefore.nlink !== 1n ||
+    pathBefore.size <= 0n ||
+    pathBefore.size > BigInt(MAXIMUM_REFERENCED_EVIDENCE_BYTES)
+  ) {
+    throw new Error(
+      'referenced evidence must be a bounded, non-symlinked, non-hard-linked regular file',
+    );
+  }
+
+  let descriptor;
+  try {
+    descriptor = openSync(
+      filePath,
+      // File-descriptor flags form a bit mask.
+      // eslint-disable-next-line no-bitwise
+      constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+    );
+    const opened = fstatSync(descriptor, { bigint: true });
+    if (
+      !opened.isFile() ||
+      opened.nlink !== 1n ||
+      opened.dev !== pathBefore.dev ||
+      opened.ino !== pathBefore.ino ||
+      opened.size !== pathBefore.size
+    ) {
+      throw new Error('referenced evidence changed before it was read');
+    }
+
+    const digest = createHash('sha256');
+    const buffer = Buffer.allocUnsafe(1024 * 1024);
+    let bytesRead;
+    do {
+      bytesRead = readSync(descriptor, buffer, 0, buffer.byteLength, null);
+      if (bytesRead > 0) digest.update(buffer.subarray(0, bytesRead));
+    } while (bytesRead > 0);
+
+    const after = fstatSync(descriptor, { bigint: true });
+    const pathAfter = lstatSync(filePath, { bigint: true });
+    const openedMetadata = stableMetadata(opened);
+    if (
+      !sameMetadata(openedMetadata, stableMetadata(after)) ||
+      !sameMetadata(openedMetadata, stableMetadata(pathAfter))
+    ) {
+      throw new Error('referenced evidence changed while it was read');
+    }
+    return {
+      bytes: Number(opened.size),
+      metadata: openedMetadata,
+      sha256: digest.digest('hex'),
+    };
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+};
+
+const readStructuredEvidenceFile = (
+  evidenceRoot,
+  reference,
+  expectedDigest,
+  label,
+  errors,
+) => {
+  if (!isSafeReference(reference) || !SHA256.test(expectedDigest ?? '')) {
+    return null;
+  }
+  try {
+    const root = realpathSync(resolve(evidenceRoot));
+    let candidate = root;
+    for (const part of reference.split('/')) {
+      candidate = join(candidate, part);
+      if (lstatSync(candidate).isSymbolicLink()) {
+        throw new Error('contains a symbolic link');
+      }
+    }
+    const file = realpathSync(candidate);
+    const containment = relative(root, file);
+    if (
+      containment === '' ||
+      containment === '..' ||
+      containment.startsWith(`..${sep}`) ||
+      isAbsolute(containment)
+    ) {
+      throw new Error('escapes the evidence root');
+    }
+    let descriptor;
+    try {
+      descriptor = openSync(
+        file,
+        // File-descriptor flags form a bit mask.
+        // eslint-disable-next-line no-bitwise
+        constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+      );
+      const before = fstatSync(descriptor, { bigint: true });
+      if (
+        !before.isFile() ||
+        before.nlink !== 1n ||
+        before.size <= 0n ||
+        before.size > BigInt(MAXIMUM_STRUCTURED_EVIDENCE_BYTES)
+      ) {
+        throw new Error('must be a bounded non-linked regular JSON file');
+      }
+      const bytes = readFileSync(descriptor);
+      const after = fstatSync(descriptor, { bigint: true });
+      const pathAfter = lstatSync(file, { bigint: true });
+      if (
+        BigInt(bytes.byteLength) !== before.size ||
+        !sameMetadata(stableMetadata(before), stableMetadata(after)) ||
+        !sameMetadata(stableMetadata(before), stableMetadata(pathAfter))
+      ) {
+        throw new Error('changed while it was read');
+      }
+      if (sha256(bytes) !== expectedDigest) {
+        throw new Error('digest does not match the approved reference');
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(bytes.toString('utf8'));
+      } catch {
+        throw new Error('must contain valid structured JSON');
+      }
+      if (!isObject(parsed)) throw new Error('must contain a JSON object');
+      return parsed;
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
+    }
+  } catch (error) {
+    errors.push(
+      `${label} cannot be validated: ${
+        error instanceof Error ? error.message : 'inspection failed'
+      }`,
+    );
+    return null;
+  }
+};
+
+export function collectDistributionEvidenceFiles(evidenceRoot) {
+  if (typeof evidenceRoot !== 'string' || evidenceRoot.trim() === '') {
+    throw new Error('distribution evidence root is required');
+  }
+  const requestedRoot = resolve(evidenceRoot);
+  const rootBefore = lstatSync(requestedRoot, { bigint: true });
+  if (!rootBefore.isDirectory() || rootBefore.isSymbolicLink()) {
+    throw new Error(
+      'distribution evidence root must be a non-symlinked directory',
+    );
+  }
+  const root = realpathSync(requestedRoot);
+  const files = new Map();
+  const fileSnapshots = new Map();
+  let totalBytes = 0;
+
+  const walk = directory => {
+    const directoryBefore = lstatSync(directory, { bigint: true });
+    if (!directoryBefore.isDirectory() || directoryBefore.isSymbolicLink()) {
+      throw new Error('distribution evidence contains an unsafe directory');
+    }
+    const names = readdirSync(directory).sort();
+    if (directory !== root && names.length === 0) {
+      throw new Error(
+        'distribution evidence contains an unreferenced directory',
+      );
+    }
+    for (const name of names) {
+      const absolute = join(directory, name);
+      const metadata = lstatSync(absolute, { bigint: true });
+      const relativePath = portablePath(relative(root, absolute));
+      if (
+        relativePath === '' ||
+        relativePath.startsWith('../') ||
+        !isSafeReference(relativePath)
+      ) {
+        throw new Error(
+          `distribution evidence contains an unsafe path: ${relativePath}`,
+        );
+      }
+      if (metadata.isSymbolicLink()) {
+        throw new Error(
+          `distribution evidence contains a symbolic link: ${relativePath}`,
+        );
+      }
+      if (metadata.isDirectory()) {
+        walk(absolute);
+        continue;
+      }
+      if (!metadata.isFile()) {
+        throw new Error(
+          `distribution evidence contains an unsupported entry: ${relativePath}`,
+        );
+      }
+      if (files.size >= MAXIMUM_EVIDENCE_ROOT_FILES) {
+        throw new Error('distribution evidence root contains too many files');
+      }
+      const observed = hashStableEvidenceFile(absolute);
+      totalBytes += observed.bytes;
+      if (totalBytes > MAXIMUM_EVIDENCE_ROOT_BYTES) {
+        throw new Error('distribution evidence root exceeds its size limit');
+      }
+      files.set(
+        relativePath,
+        Object.freeze({ bytes: observed.bytes, sha256: observed.sha256 }),
+      );
+      fileSnapshots.set(absolute, observed.metadata);
+    }
+    const directoryAfter = lstatSync(directory, { bigint: true });
+    if (
+      !sameMetadata(
+        stableMetadata(directoryBefore),
+        stableMetadata(directoryAfter),
+      )
+    ) {
+      throw new Error(
+        'distribution evidence directory changed while inspected',
+      );
+    }
+  };
+
+  walk(root);
+  for (const [absolute, expectedMetadata] of fileSnapshots) {
+    const afterCollection = lstatSync(absolute, { bigint: true });
+    if (
+      afterCollection.isSymbolicLink() ||
+      !sameMetadata(expectedMetadata, stableMetadata(afterCollection))
+    ) {
+      throw new Error('distribution evidence changed during root inspection');
+    }
+  }
+  const rootAfter = lstatSync(requestedRoot, { bigint: true });
+  if (!sameMetadata(stableMetadata(rootBefore), stableMetadata(rootAfter))) {
+    throw new Error('distribution evidence root changed while inspected');
+  }
+  return files;
 }
 
 export function verifyDistributionEvidenceAuthority({
@@ -504,12 +772,12 @@ const validateApproval = (approval, expected, now, label) => {
   }
   if (
     !Array.isArray(approval.launchCountries) ||
-    !approval.launchCountries.includes('IN') ||
+    approval.launchCountries.length === 0 ||
     approval.launchCountries.some(country => !/^[A-Z]{2}$/u.test(country)) ||
     new Set(approval.launchCountries).size !== approval.launchCountries.length
   ) {
     errors.push(
-      `${label} launchCountries must be unique ISO codes and include IN`,
+      `${label} launchCountries must be a non-empty list of unique ISO 3166-1 alpha-2 codes`,
     );
   }
 
@@ -540,6 +808,181 @@ const validateApproval = (approval, expected, now, label) => {
     errors.push(`${label} approval validity exceeds one year`);
   }
   return errors;
+};
+
+const validateStructuredReleaseEvidence = (
+  approval,
+  expected,
+  now,
+  observedFiles,
+  registerBinding,
+  errors,
+) => {
+  const label = `${String(approval.tier ?? 'unknown')} approval`;
+  const strictArtifactDigest =
+    approval.tier === expected.tier &&
+    ['direct-apk', 'play-delivered-apk'].includes(
+      expected.artifactMode ?? 'prepackage',
+    )
+      ? expected.artifactSha256 ?? expected.apkSha256
+      : undefined;
+  for (const [referenceField, digestField, evidenceKind] of [
+    [
+      'certifiedDeviceMatrixReference',
+      'certifiedDeviceMatrixSha256',
+      'android-physical',
+    ],
+    ['carrierMatrixReference', 'carrierMatrixSha256', 'android-carrier'],
+    [
+      'accessibilityEvidenceReference',
+      'accessibilityEvidenceSha256',
+      'android-accessibility',
+    ],
+  ]) {
+    const scenarioDocument = readStructuredEvidenceFile(
+      expected.evidenceRoot,
+      approval[referenceField],
+      approval[digestField],
+      `${label} ${referenceField}`,
+      errors,
+    );
+    if (scenarioDocument === null) continue;
+    const result = validateMobileReleaseScenarioEvidence(scenarioDocument, {
+      expectedKind: evidenceKind,
+      expectedPlatform: 'android',
+      expectedSourceRevision: approval.sourceRevision,
+      expectedArtifactSha256: strictArtifactDigest,
+      expectedSigningCertificateSha256: normalizeCertificate(
+        approval.signingCertificateSha256,
+      ),
+      expectedArtifactVersion: approval.versionName,
+      evidenceFiles: observedFiles,
+      nowMillis: now,
+    });
+    for (const error of result.errors) {
+      errors.push(`${label} ${referenceField}: ${error}`);
+    }
+    for (const reference of result.rawEvidenceReferences) {
+      const row = scenarioDocument.rows?.find(
+        candidate => candidate?.rawEvidenceReference === reference,
+      );
+      registerBinding(
+        reference,
+        row?.rawEvidenceSha256,
+        `${label} ${referenceField} raw evidence`,
+      );
+    }
+  }
+
+  const performanceDocument = readStructuredEvidenceFile(
+    expected.evidenceRoot,
+    approval.performanceEvidenceReference,
+    approval.performanceEvidenceSha256,
+    `${label} performanceEvidenceReference`,
+    errors,
+  );
+  if (performanceDocument === null) return;
+  const expectedPerformanceArtifact =
+    strictArtifactDigest ?? performanceDocument.artifact?.sha256;
+  const performance = validatePerformanceEvidence(performanceDocument, {
+    expectedPlatform: 'android',
+    expectedApplicationId: approval.applicationId,
+    expectedSourceRevision: approval.sourceRevision,
+    expectedArtifactSha256: expectedPerformanceArtifact,
+    nowMillis: now,
+  });
+  for (const error of performance.errors) {
+    errors.push(`${label} performanceEvidenceReference: ${error}`);
+  }
+  const performanceReferences = validatePerformanceEvidenceReferenceFiles(
+    performanceDocument,
+    observedFiles,
+  );
+  for (const error of performanceReferences.errors) {
+    errors.push(`${label} performanceEvidenceReference: ${error}`);
+  }
+  for (const reference of performanceReferences.references) {
+    const references = performanceDocument.references ?? {};
+    const isProtocol = reference === references.protocolReference;
+    registerBinding(
+      reference,
+      isProtocol ? references.protocolSha256 : references.rawResultsSha256,
+      `${label} performanceEvidenceReference support`,
+    );
+  }
+  if (performanceDocument.artifact?.version !== approval.versionName) {
+    errors.push(
+      `${label} performanceEvidenceReference artifact version crosses the release version`,
+    );
+  }
+};
+
+const validateReferencedEvidenceRoot = (document, expected, errors, now) => {
+  let observedFiles;
+  try {
+    observedFiles = collectDistributionEvidenceFiles(expected.evidenceRoot);
+  } catch (error) {
+    errors.push(
+      `distribution evidence root cannot be verified: ${
+        error instanceof Error ? error.message : 'inspection failed'
+      }`,
+    );
+    return;
+  }
+
+  const bindings = new Map();
+  const registerBinding = (reference, expectedDigest, label) => {
+    if (!isSafeReference(reference) || !SHA256.test(expectedDigest ?? '')) {
+      return;
+    }
+    const existing = bindings.get(reference);
+    if (existing !== undefined && existing.digest !== expectedDigest) {
+      errors.push(`${label} reuses ${reference} with a different digest`);
+    } else if (existing === undefined) {
+      bindings.set(reference, { digest: expectedDigest, label });
+    }
+  };
+  for (const approval of document.approvals ?? []) {
+    if (!isObject(approval)) continue;
+    const label = `${String(approval.tier ?? 'unknown')} approval`;
+    for (const [referenceField, digestField] of REFERENCED_EVIDENCE) {
+      const reference = approval[referenceField];
+      const expectedDigest = approval[digestField];
+      if (!isSafeReference(reference) || !SHA256.test(expectedDigest ?? '')) {
+        continue;
+      }
+      registerBinding(reference, expectedDigest, `${label} ${referenceField}`);
+    }
+  }
+
+  for (const approval of document.approvals ?? []) {
+    if (isObject(approval)) {
+      validateStructuredReleaseEvidence(
+        approval,
+        expected,
+        now,
+        observedFiles,
+        registerBinding,
+        errors,
+      );
+    }
+  }
+
+  for (const [reference, binding] of bindings) {
+    const observed = observedFiles.get(reference);
+    if (observed === undefined) {
+      errors.push(`${binding.label} is missing from the evidence root`);
+    } else if (observed.sha256 !== binding.digest) {
+      errors.push(`${binding.label} digest does not match ${reference}`);
+    }
+  }
+  for (const reference of observedFiles.keys()) {
+    if (!bindings.has(reference)) {
+      errors.push(
+        `distribution evidence root contains an unreferenced file: ${reference}`,
+      );
+    }
+  }
 };
 
 export function validateDistributionEvidence(
@@ -597,6 +1040,7 @@ export function validateDistributionEvidence(
   if (new Set(tiers).size !== tiers.length) {
     errors.push('approval tiers must be unique');
   }
+  validateReferencedEvidenceRoot(document, expected, errors, now);
 
   const expectedTierCoordinates = RELEASE_COORDINATES_BY_TIER.get(
     expected.tier,
@@ -879,6 +1323,7 @@ function run() {
     'version-name',
     'artifact-mode',
     'artifact-signing-certificate',
+    'evidence-root',
   ];
   const missing = required.filter(name => !argumentsByName.get(name));
   if (missing.length > 0) {
@@ -1005,6 +1450,7 @@ function run() {
       sourceRevision: source.sourceRevision,
       minimumSupportedApi: 29,
       targetApi: 36,
+      evidenceRoot: argumentsByName.get('evidence-root'),
       ...(artifactSha256 === undefined ? {} : { artifactSha256 }),
     },
     now,

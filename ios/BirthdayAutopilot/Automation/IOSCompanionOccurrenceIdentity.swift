@@ -192,6 +192,30 @@ enum IOSCompanionOccurrenceIdentity {
     )
   }
 
+  /// Extracts only the unauthenticated coordinates needed to locate the
+  /// material that will subsequently verify the full HMAC. Callers must never
+  /// authorize an action from this value; `verifyProposalHandle` remains the
+  /// authentication boundary.
+  static func untrustedProposalCoordinates(
+    _ handle: String
+  ) -> IOSCompanionProposalCoordinates? {
+    guard handle.hasPrefix(proposalPrefix),
+      let payload = decodeBase64URL(String(handle.dropFirst(proposalPrefix.count))),
+      payload.count == 4 + digestByteCount
+    else { return nil }
+    let dayOffset = (UInt16(payload[payload.startIndex]) << 8)
+      | UInt16(payload[payload.startIndex + 1])
+    let ordinal = (UInt16(payload[payload.startIndex + 2]) << 8)
+      | UInt16(payload[payload.startIndex + 3])
+    guard Int(dayOffset) < planningDayCount,
+      Int(ordinal) < maximumContacts
+    else { return nil }
+    return IOSCompanionProposalCoordinates(
+      dayOffset: Int(dayOffset),
+      contactOrdinal: Int(ordinal)
+    )
+  }
+
   private static func authenticationCode(
     namespace: Data,
     domain: String,

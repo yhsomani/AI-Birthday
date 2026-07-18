@@ -10,6 +10,7 @@ import com.yashsomani.birthdayautopilot.core.model.AccountMode
 import com.yashsomani.birthdayautopilot.messages.UserControlledSmsComposer
 import com.yashsomani.birthdayautopilot.messages.UserControlledSmsComposerDraft
 import com.yashsomani.birthdayautopilot.messages.UserControlledSmsComposerOpenResult
+import com.yashsomani.birthdayautopilot.messages.MessageTemplateValidator
 import com.yashsomani.birthdayautopilot.people.RoomContactsConsentRecorder
 import com.yashsomani.birthdayautopilot.planning.BirthdayCapacityPolicy
 import com.yashsomani.birthdayautopilot.storage.database.AccountRecordEntity
@@ -32,6 +33,7 @@ import com.yashsomani.birthdayautopilot.storage.database.ConsentReceiptEntity
 import com.yashsomani.birthdayautopilot.storage.database.InstallationBindingEntity
 import com.yashsomani.birthdayautopilot.storage.database.InstallationRecordState
 import com.yashsomani.birthdayautopilot.storage.database.LocalDestinationGuardEntity
+import com.yashsomani.birthdayautopilot.storage.database.MessageTemplateEntity
 import com.yashsomani.birthdayautopilot.storage.database.PhoneRecordState
 import com.yashsomani.birthdayautopilot.storage.database.PolicyRecordState
 import com.yashsomani.birthdayautopilot.storage.database.RecipientEnrollmentState
@@ -39,6 +41,8 @@ import com.yashsomani.birthdayautopilot.storage.database.RecipientPolicyEntity
 import com.yashsomani.birthdayautopilot.storage.database.ResetSafetyEntity
 import com.yashsomani.birthdayautopilot.storage.database.ResetSafetyStatus
 import com.yashsomani.birthdayautopilot.storage.database.SyncFreshness
+import com.yashsomani.birthdayautopilot.storage.database.TemplateSource
+import com.yashsomani.birthdayautopilot.storage.database.TemplateValidationState
 import java.io.File
 import java.time.Clock
 import java.time.Instant
@@ -373,8 +377,9 @@ class AndroidTodayOccurrenceControllerInstrumentationTest {
   fun closedWindowOffersTheComposerWithoutCreatingAnUnattendedException() = runBlocking {
     markResetSafetyClear()
     database.openHelper.writableDatabase.execSQL(
-      "UPDATE birthday_occurrences_v2 SET resolvedWindowEndMillis = ? WHERE occurrenceId = ?",
-      arrayOf<Any>(NOW_MILLIS, OCCURRENCE_ID),
+      "UPDATE birthday_occurrences_v2 SET resolvedWindowStartMillis = ?, " +
+        "resolvedWindowEndMillis = ? WHERE occurrenceId = ?",
+      arrayOf<Any>(NOW_MILLIS - 2 * 60 * 60 * 1_000, NOW_MILLIS, OCCURRENCE_ID),
     )
     val composer = RecordingComposer(canOpen = true, opens = true)
     val controller = controller(composer)
@@ -409,11 +414,17 @@ class AndroidTodayOccurrenceControllerInstrumentationTest {
     database.openHelper.writableDatabase.execSQL(
       """
       UPDATE birthday_occurrences_v2
-      SET state = 'MISSED', resolvedWindowEndMillis = ?, terminalAtMillis = ?,
+      SET state = 'MISSED', resolvedWindowStartMillis = ?, resolvedWindowEndMillis = ?,
+        terminalAtMillis = ?,
         safeOutcomeCode = 'WINDOW_CLOSED', revision = revision + 1
       WHERE occurrenceId = ?
       """.trimIndent(),
-      arrayOf<Any>(NOW_MILLIS, NOW_MILLIS, OCCURRENCE_ID),
+      arrayOf<Any>(
+        NOW_MILLIS - 2 * 60 * 60 * 1_000,
+        NOW_MILLIS,
+        NOW_MILLIS,
+        OCCURRENCE_ID,
+      ),
     )
     assertEquals(
       OCCURRENCE_ID,
@@ -727,6 +738,27 @@ class AndroidTodayOccurrenceControllerInstrumentationTest {
         updatedAtMillis = NOW_MILLIS - 10_000,
       ),
     )
+    // The real claim preflight requires the approval's current, validator-bound template lineage.
+    ledger.insertMessageTemplate(
+      MessageTemplateEntity(
+        templateId = TEMPLATE_ID,
+        accountId = ACCOUNT_ID,
+        source = TemplateSource.USER,
+        exactTemplateText = "Happy birthday, {firstName}!",
+        languageTag = "en",
+        tone = "warm",
+        placeholderMode = "PERSONALIZED_FIRST_NAME",
+        templateVersion = "template-v1",
+        promptPolicyVersion = null,
+        validatorVersion = MessageTemplateValidator.VALIDATOR_VERSION,
+        modelIdentifier = null,
+        contentHash = "template-content-hash",
+        validationState = TemplateValidationState.VALID,
+        revision = 1,
+        createdAtMillis = NOW_MILLIS - 10_000,
+        updatedAtMillis = NOW_MILLIS - 10_000,
+      ),
+    )
     ledger.insertApprovalSnapshot(
       ApprovalSnapshotEntity(
         approvalId = APPROVAL_ID,
@@ -742,7 +774,7 @@ class AndroidTodayOccurrenceControllerInstrumentationTest {
         destinationFingerprint = DESTINATION_FINGERPRINT,
         maskedPhoneDisplay = "•••• 3210",
         exactMessage = EXACT_BODY,
-        sourceTemplateId = null,
+        sourceTemplateId = TEMPLATE_ID,
         sourceTemplateVersion = "template-v1",
         placeholderMode = "GIVEN_NAME",
         birthdayMonth = 7,
@@ -803,8 +835,9 @@ class AndroidTodayOccurrenceControllerInstrumentationTest {
         policyId = POLICY_ID,
         localDate = LOCAL_DATE,
         timeZoneId = ZONE_ID,
-        resolvedWindowStartMillis = NOW_MILLIS - 60_000,
-        resolvedWindowEndMillis = NOW_MILLIS + 60_000,
+        // Exact 09:00-11:00 Asia/Kolkata binding required by the production claim preflight.
+        resolvedWindowStartMillis = NOW_MILLIS,
+        resolvedWindowEndMillis = NOW_MILLIS + 2 * 60 * 60 * 1_000,
         idempotencyKey = "idempotency-key",
         destinationFingerprint = DESTINATION_FINGERPRINT,
         channel = "SMS",
@@ -871,7 +904,7 @@ class AndroidTodayOccurrenceControllerInstrumentationTest {
   }
 
   private companion object {
-    const val NOW_MILLIS = 1_783_846_800_000L // 2026-07-12T09:00:00+05:30
+    const val NOW_MILLIS = 1_783_827_000_000L // 2026-07-12T09:00:00+05:30
     const val LOCAL_DATE = "2026-07-12"
     const val ZONE_ID = "Asia/Kolkata"
     const val ACCOUNT_ID = "account-id"
@@ -879,6 +912,7 @@ class AndroidTodayOccurrenceControllerInstrumentationTest {
     const val PHONE_ID = "phone-id"
     const val POLICY_ID = "policy-id"
     const val APPROVAL_ID = "approval-id"
+    const val TEMPLATE_ID = "template-id"
     const val RESET_ID = "reset-id"
     val INSTALLATION_ID = "b".repeat(32)
     const val DESTINATION_FINGERPRINT = "destination-fingerprint"

@@ -57,9 +57,14 @@ URL, and the separately protected disabled/lost-account admin workflow. See
   resumed by exact-request replay or the scheduled repair worker;
 - an iOS-only deletion tombstone that transactionally races first Android
   registration;
-- a read-only, content-free, account-global iOS companion status. Any Android
-  account state, deletion state, orphan marker, missing continuity, or unknown
-  state suppresses every in-app composer action;
+- a read-only, content-free, account-global iOS companion status used only as
+  advisory preflight. Any Android account state, deletion state, orphan marker,
+  missing continuity, or unknown state suppresses every in-app composer action;
+- one content-free top-level iOS composer reservation per Firebase account. An
+  exact protected owner capability acquires `PREPARED`, becomes irreversibly
+  sticky before `COMMITTED`, and logically expires on server time within 72
+  hours. Every Android sender mutation reads the same document transactionally;
+  account deletion dominates and removes it;
 - strict callable request schemas. No request accepts a raw name, People ID,
   birthday, phone number, message, prompt, or approval hash;
 - no application logger, request-body logger, service-account key, provider key,
@@ -130,12 +135,66 @@ Node.js capability:
 - `releaseAndroidSender`
 - `coordinationLifecycleStatus`
 - `companionStatus`
+- `acquireIOSComposerReservation`
+- `commitIOSComposerReservation`
+- `releaseIOSComposerReservation`
 - scheduled `sweepDeletionDrains`
 - scheduled `sweepCoordinationOperations`
 
 An exception, timeout, cancellation, or unavailable status is returned only as
 `COORDINATION_UNAVAILABLE`. It is never translated into `armWritten=false` or
 another no-write proof.
+
+### iOS composer-reservation contract
+
+The reservation callables are native-iOS safety coordination, not a remote
+message sender. Acquire and commit accept only:
+
+```json
+{
+  "contractVersion": 1,
+  "ledgerGeneration": "birthday-ledger-v1",
+  "reservationId": "lowercase-random-uuid"
+}
+```
+
+Release omits `ledgerGeneration` and accepts the same contract version plus the
+exact `reservationId`. Firebase Auth identifies the account; all three calls
+enforce and consume limited-use App Check tokens. The service derives a
+domain-separated SHA-256 key from UID plus UUID. Firestore stores that one-way
+key, `PREPARED` or `COMMITTED` phase, reviewed ledger generation, and bounded
+timestamps only. It never stores the UUID, contact, date, destination, phone,
+recipient, message, prompt, proposal, or MessageUI result.
+
+Acquire is one Firestore transaction with deletion, continuity, Android
+presence/fence/operation state, and the existing reservation. A successful
+exact-owner acquire returns server time, a server-time-plus-72-hour logical
+expiry, and whether early release is still permitted. Another live capability
+is refused. The exact owner may revalidate and reuse its capability. Commit
+does not extend the acquire deadline and changes the phase to `COMMITTED`.
+
+iOS durably marks its protected, backup-excluded local capability sticky before
+attempting commit. Consequently a timeout or crash at that boundary cannot
+authorize early release. Only the exact `PREPARED` capability that never began
+sticky commit may release early, and the client clears it only after an exact
+`RELEASED` response. `COMMITTED`, ambiguous-sticky, Cancel, Failed, reported
+Sent, Unknown, process death, sign-out, revoke, and local wipe remain fenced
+until logical expiry. Firestore TTL is physical cleanup only. Local wipe erases
+and verifies the capability journal without calling release; a subsequent
+acquire can therefore be refused as held by another iPhone or an earlier
+protected review on this same phone. Account deletion is the sole live-fence
+operation that transactionally deletes the reservation early.
+
+Registration, renewal, mode change, Birthday/Test claim, Arm and Arm-status
+sealing, Test report, safe retry, transfer, and new or in-progress contact reset
+or sender release all contend on the same reservation document and fail with
+`IOS_COMPOSER_RESERVED` while it is logically live. An exact unexpired
+`COMPLETED` reset/release receipt remains replayable because returning immutable
+privacy proof performs no Android mutation; a different or still-in-progress
+request stays blocked. The first concurrent iOS acquire or Android mutation
+wins. The iOS client dismisses MessageUI to Unknown on background and at least
+five minutes before logical expiry using a monotonic deadline that subtracts
+the complete callable round trip.
 
 ### Destructive reset/release wire contracts
 

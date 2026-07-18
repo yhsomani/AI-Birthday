@@ -16,10 +16,17 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+
+import {
+  createCloudReadonlyObservationReport,
+  validateCloudReadonlyObservationReport,
+  verifyCloudReadonlyArchive,
+} from './create-cloud-readonly-observation-report.mjs';
 
 const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const DEFAULT_AUTHORITY_PIN = path.join(
@@ -37,6 +44,9 @@ const SHA1 = /^[0-9a-f]{40}$/u;
 const TEAM_ID = /^[A-Z0-9]{10}$/u;
 const SERVICE_ACCOUNT =
   /^[a-z][a-z0-9-]{2,62}@[a-z][a-z0-9-]{4,28}[a-z0-9]\.iam\.gserviceaccount\.com$/u;
+const WIF_PROVIDER =
+  /^projects\/[1-9][0-9]{5,19}\/locations\/global\/workloadIdentityPools\/[a-z0-9-]{4,32}\/providers\/[a-z0-9-]{4,32}$/u;
+const BUCKET_NAME = /^[a-z0-9][a-z0-9-]{4,61}[a-z0-9]$/u;
 const BILLING_ACCOUNT = /^[0-9A-F]{6}-[0-9A-F]{6}-[0-9A-F]{6}$/u;
 const UTC_INSTANT =
   /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?Z$/u;
@@ -48,6 +58,17 @@ const MAX_REFERENCE_BYTES = 64 * 1024 * 1024;
 const MAX_TREE_BYTES = 128 * 1024 * 1024;
 const MAX_VALIDITY_MS = 30 * 24 * 60 * 60 * 1_000;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1_000;
+
+const stableJson = value => {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return `{${Object.keys(value)
+      .sort()
+      .map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+};
 
 export const FUNCTIONS_DEPLOYMENT_SOURCE_PATHS = Object.freeze([
   'backend/functions/.npmrc',
@@ -78,18 +99,21 @@ export const HOSTING_DEPLOYMENT_SOURCE_PATHS = Object.freeze([
 export const EXPECTED_CALLABLE_FUNCTIONS = Object.freeze(
   [
     'accountDeletionReceipt',
+    'acquireIOSComposerReservation',
     'armAttempt',
     'authorizeSafeRetry',
     'beginSenderTransfer',
     'changeAccountMode',
     'claimOccurrence',
     'claimTest',
+    'commitIOSComposerReservation',
     'companionStatus',
     'completeSenderTransfer',
     'coordinationLifecycleStatus',
     'getArmStatus',
     'registerAndroidInstallation',
     'releaseAndroidSender',
+    'releaseIOSComposerReservation',
     'renewSenderLease',
     'reportTestOutcome',
     'requestAccountDeletion',
@@ -112,6 +136,7 @@ export const EXPECTED_TTL_COLLECTION_GROUPS = Object.freeze(
     'deletionTombstones',
     'destinationGuards',
     'installations',
+    'iosComposerReservations',
     'occurrenceClaims',
     'occurrenceKeys',
     'testClaims',
@@ -137,6 +162,7 @@ export const REQUIRED_EVIDENCE_IDS = Object.freeze([
   'functions-deployment',
   'functions-live-smoke',
   'hosting-release',
+  'hosting-current-live',
   'iam-effective-permissions',
   'iam-policy',
   'incident-rollback',
@@ -193,6 +219,7 @@ const TOP_LEVEL_KEYS = new Set([
   'observability',
   'costControls',
   'hosting',
+  'hostingReleaseControl',
   'prohibitedServices',
   'verification',
   'operations',
@@ -443,6 +470,13 @@ const HOSTING_KEYS = new Set([
   'firebaseConfigSha256',
   'releaseConfigSha256',
   'deployedArtifactSha256',
+  'deploymentManifestSha256',
+  'deploymentProvenanceSha256',
+  'deploymentConfigSha256',
+  'publicTreeSha256',
+  'providerOriginObservationSha256',
+  'firebaseWebConfigObservationSha256',
+  'currentLiveObservationSha256',
   'recaptchaEnterpriseAppCheckRegistered',
   'securityHeadersVerified',
   'legalCopyApproved',
@@ -450,9 +484,82 @@ const HOSTING_KEYS = new Set([
   'deletionSagaTested',
   'evidenceId',
 ]);
+const HOSTING_RELEASE_CONTROL_KEYS = new Set([
+  'repository',
+  'repositoryId',
+  'repositoryOwnerId',
+  'productionRef',
+  'releaseSecurityProjectId',
+  'releaseSecurityProjectNumber',
+  'applicationIamAnalysisScope',
+  'releaseSecurityIamAnalysisScope',
+  'observer',
+  'admissionReader',
+  'deployer',
+  'identitiesDistinct',
+  'admissionBucket',
+  'applicationAndClientBucketAccessCount',
+  'hostingMutation',
+  'auditLogging',
+  'evidenceId',
+]);
+const HOSTING_RELEASE_IDENTITY_KEYS = new Set([
+  'serviceAccount',
+  'userManagedKeyCount',
+  'wifProvider',
+  'workflowPath',
+  'protectedEnvironment',
+  'subject',
+  'attributeCondition',
+  'attributeMapping',
+  'admissionBucketPermissions',
+]);
+const WIF_MAPPING_KEYS = new Set([
+  'google.subject',
+  'attribute.repository',
+  'attribute.repository_id',
+  'attribute.repository_owner_id',
+  'attribute.workflow_ref',
+  'attribute.ref',
+]);
+const ADMISSION_BUCKET_KEYS = new Set([
+  'name',
+  'resourceName',
+  'metageneration',
+  'publicAccessPrevention',
+  'uniformBucketLevelAccess',
+  'versioningEnabled',
+  'softDeleteRetentionSeconds',
+  'retentionSeconds',
+  'retentionLocked',
+  'lifecycleDeleteAgeDays',
+  'lifecycleMatchesPrefix',
+  'releaseSecurityProjectBucketCount',
+]);
+const HOSTING_MUTATION_KEYS = new Set([
+  'siteResourceName',
+  'serviceAccount',
+  'workflowPath',
+  'mutationIdentityCount',
+  'mutationWorkflowCount',
+  'alternateMutationIdentityCount',
+]);
+const RELEASE_AUDIT_LOGGING_KEYS = new Set([
+  'service',
+  'logTypes',
+  'exemptedMembers',
+  'sinkName',
+  'sinkDestination',
+  'sinkFilter',
+  'sinkDisabled',
+  'sinkExclusions',
+  'logBucketName',
+  'logBucketLocation',
+  'retentionDays',
+]);
 const PROHIBITED_KEYS = new Set([
   'realtimeDatabaseEnabled',
-  'cloudStorageEnabled',
+  'applicationProjectCloudStorageEnabled',
   'fcmEnabled',
   'analyticsEnabled',
   'adSdkEnabled',
@@ -1649,6 +1756,13 @@ const validateHosting = (value, source, errors) => {
     'firebaseConfigSha256',
     'releaseConfigSha256',
     'deployedArtifactSha256',
+    'deploymentManifestSha256',
+    'deploymentProvenanceSha256',
+    'deploymentConfigSha256',
+    'publicTreeSha256',
+    'providerOriginObservationSha256',
+    'firebaseWebConfigObservationSha256',
+    'currentLiveObservationSha256',
   ])
     requireDigest(value[field], `hosting.${field}`, errors);
   if (value.firebaseConfigSha256 !== source?.firebaseJsonSha256)
@@ -1665,6 +1779,363 @@ const validateHosting = (value, source, errors) => {
     requireTrue(value[field], `hosting.${field}`, errors);
   if (value.evidenceId !== 'hosting-release')
     errors.push('hosting.evidenceId is invalid');
+};
+
+const expectedWifCondition = ({
+  workflowPath,
+  environment,
+  repositoryId,
+  repositoryOwnerId,
+}) =>
+  `assertion.repository=='yhsomani/AI-Birthday' && assertion.repository_id=='${repositoryId}' && assertion.repository_owner_id=='${repositoryOwnerId}' && assertion.workflow_ref=='yhsomani/AI-Birthday/${workflowPath}@refs/heads/main' && assertion.ref=='refs/heads/main' && assertion.sub=='repo:yhsomani/AI-Birthday:environment:${environment}'`;
+
+const validateHostingReleaseIdentity = (
+  value,
+  {
+    label,
+    projectNumber,
+    workflowPath,
+    environment,
+    permissions,
+    repositoryId,
+    repositoryOwnerId,
+  },
+  errors,
+) => {
+  if (!exactKeys(value, HOSTING_RELEASE_IDENTITY_KEYS, label, errors)) return;
+  requirePattern(
+    value.serviceAccount,
+    SERVICE_ACCOUNT,
+    `${label}.serviceAccount`,
+    errors,
+  );
+  if (value.userManagedKeyCount !== 0)
+    errors.push(`${label} must have zero user-managed keys`);
+  requirePattern(
+    value.wifProvider,
+    WIF_PROVIDER,
+    `${label}.wifProvider`,
+    errors,
+  );
+  if (
+    typeof value.wifProvider === 'string' &&
+    !value.wifProvider.startsWith(`projects/${projectNumber}/`)
+  ) {
+    errors.push(`${label}.wifProvider belongs to the wrong project`);
+  }
+  if (
+    value.workflowPath !== workflowPath ||
+    value.protectedEnvironment !== environment ||
+    value.subject !== `repo:yhsomani/AI-Birthday:environment:${environment}` ||
+    value.attributeCondition !==
+      expectedWifCondition({
+        workflowPath,
+        environment,
+        repositoryId,
+        repositoryOwnerId,
+      })
+  ) {
+    errors.push(
+      `${label} is not bound to the exact protected workflow/ref/environment`,
+    );
+  }
+  if (
+    exactKeys(
+      value.attributeMapping,
+      WIF_MAPPING_KEYS,
+      `${label}.attributeMapping`,
+      errors,
+    )
+  ) {
+    const expectedMapping = {
+      'google.subject': 'assertion.sub',
+      'attribute.repository': 'assertion.repository',
+      'attribute.repository_id': 'assertion.repository_id',
+      'attribute.repository_owner_id': 'assertion.repository_owner_id',
+      'attribute.workflow_ref': 'assertion.workflow_ref',
+      'attribute.ref': 'assertion.ref',
+    };
+    for (const [key, expected] of Object.entries(expectedMapping)) {
+      if (value.attributeMapping[key] !== expected)
+        errors.push(`${label}.attributeMapping.${key} is not exact`);
+    }
+  }
+  if (!equalStringSet(value.admissionBucketPermissions, permissions)) {
+    errors.push(
+      `${label}.admissionBucketPermissions is not least-privilege exact`,
+    );
+  }
+};
+
+const validateHostingReleaseControl = (
+  value,
+  project,
+  hosting,
+  iam,
+  errors,
+) => {
+  if (
+    !exactKeys(
+      value,
+      HOSTING_RELEASE_CONTROL_KEYS,
+      'hostingReleaseControl',
+      errors,
+    )
+  )
+    return;
+  if (
+    value.repository !== 'yhsomani/AI-Birthday' ||
+    !/^[1-9][0-9]{0,19}$/u.test(value.repositoryId ?? '') ||
+    !/^[1-9][0-9]{0,19}$/u.test(value.repositoryOwnerId ?? '') ||
+    value.productionRef !== 'refs/heads/main'
+  ) {
+    errors.push('hostingReleaseControl repository/ref policy is invalid');
+  }
+  requirePattern(
+    value.releaseSecurityProjectId,
+    PROJECT_ID,
+    'hostingReleaseControl.releaseSecurityProjectId',
+    errors,
+  );
+  requirePattern(
+    value.releaseSecurityProjectNumber,
+    PROJECT_NUMBER,
+    'hostingReleaseControl.releaseSecurityProjectNumber',
+    errors,
+  );
+  if (
+    value.releaseSecurityProjectId === project?.projectId ||
+    value.releaseSecurityProjectNumber === project?.projectNumber
+  ) {
+    errors.push(
+      'Hosting release security must use a separate Google Cloud project',
+    );
+  }
+  const validateAnalysisScope = (scope, projectId, label) => {
+    if (
+      typeof scope !== 'string' ||
+      (!/^organizations\/[1-9][0-9]{5,19}$/u.test(scope) &&
+        scope !== `projects/${projectId}`)
+    ) {
+      errors.push(
+        `${label} must be the observed top organization or the parentless project`,
+      );
+    }
+  };
+  validateAnalysisScope(
+    value.applicationIamAnalysisScope,
+    project?.projectId,
+    'hostingReleaseControl.applicationIamAnalysisScope',
+  );
+  validateAnalysisScope(
+    value.releaseSecurityIamAnalysisScope,
+    value.releaseSecurityProjectId,
+    'hostingReleaseControl.releaseSecurityIamAnalysisScope',
+  );
+  const identityContracts = [
+    [
+      'observer',
+      project?.projectNumber,
+      '.github/workflows/hosting-current-live-observation.yml',
+      'hosting-production-readonly-live',
+      ['storage.buckets.get', 'storage.objects.create', 'storage.objects.get'],
+    ],
+    [
+      'admissionReader',
+      value.releaseSecurityProjectNumber,
+      '.github/workflows/hosting-production-deploy.yml',
+      'hosting-production-admission',
+      ['storage.buckets.get', 'storage.objects.get', 'storage.objects.list'],
+    ],
+    [
+      'deployer',
+      project?.projectNumber,
+      '.github/workflows/hosting-production-deploy.yml',
+      'hosting-production-deploy',
+      [],
+    ],
+  ];
+  for (const [
+    field,
+    providerProject,
+    workflowPath,
+    environment,
+    permissions,
+  ] of identityContracts) {
+    validateHostingReleaseIdentity(
+      value[field],
+      {
+        label: `hostingReleaseControl.${field}`,
+        projectNumber: providerProject,
+        workflowPath,
+        environment,
+        permissions,
+        repositoryId: value.repositoryId,
+        repositoryOwnerId: value.repositoryOwnerId,
+      },
+      errors,
+    );
+  }
+  if (
+    typeof value.observer?.serviceAccount === 'string' &&
+    !value.observer.serviceAccount.endsWith(
+      `@${project?.projectId}.iam.gserviceaccount.com`,
+    )
+  )
+    errors.push(
+      'Hosting observer service account must belong to the application project',
+    );
+  if (
+    typeof value.deployer?.serviceAccount === 'string' &&
+    !value.deployer.serviceAccount.endsWith(
+      `@${project?.projectId}.iam.gserviceaccount.com`,
+    )
+  )
+    errors.push(
+      'Hosting deploy service account must belong to the application project',
+    );
+  if (
+    typeof value.admissionReader?.serviceAccount === 'string' &&
+    !value.admissionReader.serviceAccount.endsWith(
+      `@${value.releaseSecurityProjectId}.iam.gserviceaccount.com`,
+    )
+  )
+    errors.push(
+      'admission reader service account must belong to release security',
+    );
+  const accounts = [
+    value.observer?.serviceAccount,
+    value.admissionReader?.serviceAccount,
+    value.deployer?.serviceAccount,
+  ];
+  const providers = [
+    value.observer?.wifProvider,
+    value.admissionReader?.wifProvider,
+    value.deployer?.wifProvider,
+  ];
+  const pools = providers.map(provider =>
+    typeof provider === 'string' ? provider.split('/providers/')[0] : provider,
+  );
+  if (
+    value.identitiesDistinct !== true ||
+    new Set(accounts).size !== 3 ||
+    new Set(providers).size !== 3 ||
+    new Set(pools).size !== 3 ||
+    accounts.includes(iam?.runtimeServiceAccount) ||
+    accounts.includes(iam?.auditServiceAccount)
+  ) {
+    errors.push(
+      'Hosting release identities, providers, and isolated pools must be mutually distinct',
+    );
+  }
+  if (
+    !exactKeys(
+      value.admissionBucket,
+      ADMISSION_BUCKET_KEYS,
+      'hostingReleaseControl.admissionBucket',
+      errors,
+    )
+  ) {
+    // exactKeys records the structural failure.
+  } else {
+    requirePattern(
+      value.admissionBucket.name,
+      BUCKET_NAME,
+      'hostingReleaseControl.admissionBucket.name',
+      errors,
+    );
+    const expectedResource = `//storage.googleapis.com/projects/_/buckets/${value.admissionBucket.name}`;
+    if (
+      value.admissionBucket.resourceName !== expectedResource ||
+      !/^[1-9][0-9]{0,19}$/u.test(value.admissionBucket.metageneration ?? '') ||
+      value.admissionBucket.publicAccessPrevention !== 'enforced' ||
+      value.admissionBucket.uniformBucketLevelAccess !== true ||
+      value.admissionBucket.versioningEnabled !== false ||
+      value.admissionBucket.softDeleteRetentionSeconds !== 0 ||
+      value.admissionBucket.retentionSeconds !== 900 ||
+      value.admissionBucket.retentionLocked !== true ||
+      value.admissionBucket.lifecycleDeleteAgeDays !== 1 ||
+      value.admissionBucket.lifecycleMatchesPrefix !==
+        'hosting-production-change-freezes/' ||
+      value.admissionBucket.releaseSecurityProjectBucketCount !== 1
+    ) {
+      errors.push(
+        'Hosting admission bucket contract is not exact and immutable',
+      );
+    }
+  }
+  if (value.applicationAndClientBucketAccessCount !== 0) {
+    errors.push(
+      'application runtime, App Check, and mobile/web principals must have zero admission-bucket access',
+    );
+  }
+  if (
+    exactKeys(
+      value.hostingMutation,
+      HOSTING_MUTATION_KEYS,
+      'hostingReleaseControl.hostingMutation',
+      errors,
+    )
+  ) {
+    if (
+      value.hostingMutation.siteResourceName !==
+        `//firebasehosting.googleapis.com/projects/${project?.projectNumber}/sites/${hosting?.siteId}` ||
+      value.hostingMutation.serviceAccount !== value.deployer?.serviceAccount ||
+      value.hostingMutation.workflowPath !==
+        '.github/workflows/hosting-production-deploy.yml' ||
+      value.hostingMutation.mutationIdentityCount !== 1 ||
+      value.hostingMutation.mutationWorkflowCount !== 1 ||
+      value.hostingMutation.alternateMutationIdentityCount !== 0
+    ) {
+      errors.push(
+        'Hosting mutation authority must be exactly one deploy identity/workflow',
+      );
+    }
+  }
+  if (
+    exactKeys(
+      value.auditLogging,
+      RELEASE_AUDIT_LOGGING_KEYS,
+      'hostingReleaseControl.auditLogging',
+      errors,
+    )
+  ) {
+    const logBucketPattern = new RegExp(
+      `^projects/${value.releaseSecurityProjectId}/locations/([a-z]+(?:-[a-z]+[0-9])?|global|eu|us)/buckets/[a-zA-Z0-9._-]{1,100}$`,
+      'u',
+    );
+    const match = logBucketPattern.exec(value.auditLogging.logBucketName ?? '');
+    const expectedFilter = `resource.type="gcs_bucket" AND resource.labels.bucket_name="${value.admissionBucket?.name}"`;
+    if (
+      value.auditLogging.service !== 'storage.googleapis.com' ||
+      !equalStringSet(value.auditLogging.logTypes, [
+        'ADMIN_READ',
+        'DATA_READ',
+        'DATA_WRITE',
+      ]) ||
+      !Array.isArray(value.auditLogging.exemptedMembers) ||
+      value.auditLogging.exemptedMembers.length !== 0 ||
+      !new RegExp(
+        `^projects/${value.releaseSecurityProjectId}/sinks/[A-Za-z][A-Za-z0-9._-]{0,99}$`,
+        'u',
+      ).test(value.auditLogging.sinkName ?? '') ||
+      value.auditLogging.sinkDestination !==
+        `logging.googleapis.com/${value.auditLogging.logBucketName}` ||
+      value.auditLogging.sinkFilter !== expectedFilter ||
+      value.auditLogging.sinkDisabled !== false ||
+      !Array.isArray(value.auditLogging.sinkExclusions) ||
+      value.auditLogging.sinkExclusions.length !== 0 ||
+      match === null ||
+      value.auditLogging.logBucketLocation !== match?.[1] ||
+      value.auditLogging.retentionDays !== 30
+    ) {
+      errors.push(
+        'release-security Data Access audit sink/retention contract is invalid',
+      );
+    }
+  }
+  if (value.evidenceId !== 'live-readonly-audit')
+    errors.push('hostingReleaseControl.evidenceId is invalid');
 };
 
 const validateProhibitedServices = (value, errors) => {
@@ -1850,7 +2321,7 @@ const validateReferences = (references, validity, context, errors) => {
     );
   }
   for (const file of context.evidenceFiles?.keys() ?? []) {
-    if (!paths.has(file))
+    if (!paths.has(file) && !context.allowedCompanionEvidencePaths?.has(file))
       errors.push(`evidence root contains an unreferenced file: ${file}`);
   }
   return ids;
@@ -1952,6 +2423,13 @@ export function validateCloudReleaseEvidence(document, context = {}) {
   validateObservability(document.observability, errors);
   validateCostControls(document.costControls, errors);
   validateHosting(document.hosting, document.source, errors);
+  validateHostingReleaseControl(
+    document.hostingReleaseControl,
+    document.project,
+    document.hosting,
+    document.iam,
+    errors,
+  );
   validateProhibitedServices(document.prohibitedServices, errors);
   validateVerification(document.verification, errors);
   validateOperations(document.operations, document.firestore, errors);
@@ -1961,6 +2439,47 @@ export function validateCloudReleaseEvidence(document, context = {}) {
     context,
     errors,
   );
+  const readonlyReference = Array.isArray(document.evidenceReferences)
+    ? document.evidenceReferences.find(
+        reference => reference.id === 'live-readonly-audit',
+      )
+    : undefined;
+  for (const error of validateCloudReadonlyObservationReport(
+    context.readonlyObservationReport,
+    {
+      reference: readonlyReference,
+      document,
+      expectedSource: context.expectedSource,
+      reportSha256: context.readonlyObservationReportSha256,
+      reportBytes: context.readonlyObservationReportBytes,
+      evidenceFiles: context.evidenceFiles,
+      allowedCompanionPaths: context.allowedCompanionEvidencePaths,
+    },
+  )) {
+    errors.push(error);
+  }
+  const hostingReleaseReference = document.evidenceReferences.find(
+    reference => reference.id === 'hosting-release',
+  );
+  if (
+    hostingReleaseReference?.sha256 !==
+    document.hosting.deploymentProvenanceSha256
+  ) {
+    errors.push(
+      'hosting deployment provenance digest must equal the hosting-release evidence bytes',
+    );
+  }
+  const hostingCurrentReference = document.evidenceReferences.find(
+    reference => reference.id === 'hosting-current-live',
+  );
+  if (
+    hostingCurrentReference?.sha256 !==
+    document.hosting.currentLiveObservationSha256
+  ) {
+    errors.push(
+      'current-live digest must equal the hosting-current-live evidence bytes',
+    );
+  }
   validateApprovals(document.approvals, validity, referenceIds, errors);
 
   return errors;
@@ -2131,6 +2650,105 @@ export function collectCloudEvidenceFiles(evidenceRoot) {
   return files;
 }
 
+export function loadCloudReadonlyObservationReport(
+  evidenceRoot,
+  document,
+  evidenceFiles,
+) {
+  const reference = Array.isArray(document?.evidenceReferences)
+    ? document.evidenceReferences.find(
+        candidate => candidate?.id === 'live-readonly-audit',
+      )
+    : undefined;
+  const safeRelative = value =>
+    typeof value === 'string' &&
+    SAFE_RELATIVE.test(value) &&
+    !path.isAbsolute(value) &&
+    !value.includes('\\') &&
+    value
+      .split('/')
+      .every(part => part !== '' && part !== '.' && part !== '..');
+  if (!safeRelative(reference?.path)) {
+    return {
+      readonlyObservationReport: undefined,
+      readonlyObservationReportSha256: undefined,
+      readonlyObservationReportBytes: undefined,
+      allowedCompanionEvidencePaths: new Set(),
+    };
+  }
+  const root = realpathSync(evidenceRoot);
+  const reportPath = path.resolve(root, reference.path);
+  const relative = path.relative(root, reportPath);
+  if (relative === '..' || relative.startsWith(`..${path.sep}`)) {
+    throw new Error('live-readonly-audit report escapes the evidence root');
+  }
+  const reportBytes = stableFileBytes(reportPath);
+  const report = JSON.parse(reportBytes.toString('utf8'));
+  const allowedCompanionEvidencePaths = new Set();
+  for (const candidate of [
+    report?.evidenceManifest?.path,
+    report?.rawArchive?.path,
+  ]) {
+    if (safeRelative(candidate) && evidenceFiles.has(candidate)) {
+      allowedCompanionEvidencePaths.add(candidate);
+    }
+  }
+  if (allowedCompanionEvidencePaths.size === 2) {
+    const stableCompanionBytes = relativePath => {
+      const bytes = stableFileBytes(path.resolve(root, relativePath));
+      const collected = evidenceFiles.get(relativePath);
+      if (
+        collected?.sha256 !== digest(bytes) ||
+        collected.bytes !== bytes.byteLength
+      ) {
+        throw new Error(
+          `live-readonly-audit companion changed after collection: ${relativePath}`,
+        );
+      }
+      return bytes;
+    };
+    const manifestBytes = stableCompanionBytes(report.evidenceManifest.path);
+    const archiveBytes = stableCompanionBytes(report.rawArchive.path);
+    const { archiveEntries } = verifyCloudReadonlyArchive({
+      manifestBytes,
+      archiveBytes,
+    });
+    const rawRecords = new Map(
+      [...archiveEntries]
+        .filter(
+          ([archivePath, entry]) =>
+            archivePath.startsWith('raw/') && entry.kind === 'file',
+        )
+        .map(([archivePath, entry]) => [
+          archivePath.slice('raw/'.length),
+          {
+            bytes: entry.content,
+            byteCount: entry.bytes,
+            sha256: entry.sha256,
+          },
+        ]),
+    );
+    const recreated = createCloudReadonlyObservationReport({
+      rawRecords,
+      manifestBytes,
+      archiveBytes,
+      manifestFileName: report.evidenceManifest.path,
+      archiveFileName: report.rawArchive.path,
+    });
+    if (stableJson(recreated) !== stableJson(report)) {
+      throw new Error(
+        'live-readonly-audit report is not the semantic projection of retained raw observations',
+      );
+    }
+  }
+  return {
+    readonlyObservationReport: report,
+    readonlyObservationReportSha256: digest(reportBytes),
+    readonlyObservationReportBytes: reportBytes.byteLength,
+    allowedCompanionEvidencePaths,
+  };
+}
+
 export function verifyCloudReleaseAuthority({
   evidenceBytes,
   signatureBytes,
@@ -2175,8 +2793,127 @@ export function verifyCloudReleaseAuthority({
   return true;
 }
 
+export function createCloudReleaseVerificationReport({
+  document,
+  expectedSource,
+  evidenceBytes,
+  authorityPublicKeySpkiSha256,
+}) {
+  const googlePlayAppCheck = document.appCheck.androidRegistrations.find(
+    registration => registration.channel === 'google-play',
+  );
+  const googlePlayOauth = document.identityAndApis.androidOauthClients.find(
+    client => client.channel === 'google-play',
+  );
+  const iosOauth = document.identityAndApis.iosOauthClient;
+  const iosAppCheck = document.appCheck.iosRegistrations[0];
+  const webAppCheck = document.appCheck.webRegistration;
+  if (googlePlayAppCheck === undefined || googlePlayOauth === undefined) {
+    throw new Error(
+      'production closure report requires the Google Play App Check and OAuth channel',
+    );
+  }
+
+  const validUntil = [
+    document.validity.validUntil,
+    ...document.approvals.map(approval => approval.validUntil),
+  ].reduce((earliest, candidate) =>
+    Date.parse(candidate) < Date.parse(earliest) ? candidate : earliest,
+  );
+  return {
+    schemaVersion: 1,
+    product: 'birthday-autopilot-cloud-release-verification',
+    status: 'verified',
+    sourceRevision: expectedSource.revision,
+    evidenceSha256: digest(evidenceBytes),
+    authorityPublicKeySpkiSha256,
+    validUntil,
+    project: {
+      environment: 'production',
+      projectId: document.project.projectId,
+      projectNumber: document.project.projectNumber,
+      androidAppId: document.project.androidAppId,
+      iosAppId: document.project.iosAppId,
+      webAppId: document.project.webAppId,
+      androidPackage: document.project.androidPackage,
+      iosBundle: document.project.iosBundle,
+    },
+    clientTrust: {
+      androidGooglePlay: {
+        appCheckSigningCertificateSha256:
+          googlePlayAppCheck.signingCertificateSha256,
+        oauthAndroidClientId: googlePlayOauth.clientId,
+        oauthSigningCertificateSha1: googlePlayOauth.signingCertificateSha1,
+        webOauthClientId: document.identityAndApis.webOauthClientId,
+      },
+      ios: {
+        oauthClientId: iosOauth.clientId,
+        reversedClientId: iosOauth.reversedClientId,
+        teamId: iosAppCheck.teamId,
+      },
+      web: {
+        firebaseAppId: webAppCheck.firebaseAppId,
+        recaptchaEnterpriseSiteKeySha256: webAppCheck.siteKeySha256,
+      },
+    },
+    hosting: {
+      siteId: document.hosting.siteId,
+      deployedVersionId: document.hosting.deployedVersionId,
+      publicBaseUrl: document.hosting.publicBaseUrl,
+      releaseConfigSha256: document.hosting.releaseConfigSha256,
+      deployedArtifactSha256: document.hosting.deployedArtifactSha256,
+      deploymentManifestSha256: document.hosting.deploymentManifestSha256,
+      deploymentProvenanceSha256: document.hosting.deploymentProvenanceSha256,
+      deploymentConfigSha256: document.hosting.deploymentConfigSha256,
+      publicTreeSha256: document.hosting.publicTreeSha256,
+      providerOriginObservationSha256:
+        document.hosting.providerOriginObservationSha256,
+      firebaseWebConfigObservationSha256:
+        document.hosting.firebaseWebConfigObservationSha256,
+      currentLiveObservationSha256:
+        document.hosting.currentLiveObservationSha256,
+      firebaseConfigSha256: document.hosting.firebaseConfigSha256,
+      hostingSourceTreeSha256: expectedSource.hostingSourceTreeSha256,
+    },
+    hostingReleaseControl: {
+      repositoryId: document.hostingReleaseControl.repositoryId,
+      repositoryOwnerId: document.hostingReleaseControl.repositoryOwnerId,
+      releaseSecurityProjectId:
+        document.hostingReleaseControl.releaseSecurityProjectId,
+      releaseSecurityProjectNumber:
+        document.hostingReleaseControl.releaseSecurityProjectNumber,
+      applicationIamAnalysisScope:
+        document.hostingReleaseControl.applicationIamAnalysisScope,
+      releaseSecurityIamAnalysisScope:
+        document.hostingReleaseControl.releaseSecurityIamAnalysisScope,
+      observerServiceAccount:
+        document.hostingReleaseControl.observer.serviceAccount,
+      observerWifProvider: document.hostingReleaseControl.observer.wifProvider,
+      admissionReaderServiceAccount:
+        document.hostingReleaseControl.admissionReader.serviceAccount,
+      admissionReaderWifProvider:
+        document.hostingReleaseControl.admissionReader.wifProvider,
+      deployServiceAccount:
+        document.hostingReleaseControl.deployer.serviceAccount,
+      deployWifProvider: document.hostingReleaseControl.deployer.wifProvider,
+      admissionBucketName: document.hostingReleaseControl.admissionBucket.name,
+      admissionBucketMetageneration:
+        document.hostingReleaseControl.admissionBucket.metageneration,
+      auditLogBucketName:
+        document.hostingReleaseControl.auditLogging.logBucketName,
+      auditSinkName: document.hostingReleaseControl.auditLogging.sinkName,
+    },
+  };
+}
+
 const parseArgs = argv => {
-  const allowed = new Set(['file', 'evidence-root', 'signature', 'public-key']);
+  const allowed = new Set([
+    'file',
+    'evidence-root',
+    'signature',
+    'public-key',
+    'report',
+  ]);
   const result = {};
   for (let index = 0; index < argv.length; index += 2) {
     const token = argv[index];
@@ -2223,15 +2960,34 @@ const main = () => {
   const evidenceFiles = collectCloudEvidenceFiles(
     path.resolve(args['evidence-root']),
   );
+  const readonlyObservation = loadCloudReadonlyObservationReport(
+    path.resolve(args['evidence-root']),
+    document,
+    evidenceFiles,
+  );
   const errors = validateCloudReleaseEvidence(document, {
     nowMs: Date.now(),
     expectedSource,
     evidenceFiles,
+    ...readonlyObservation,
   });
   if (errors.length > 0)
     throw new Error(
       `cloud release evidence rejected:\n- ${errors.join('\n- ')}`,
     );
+  if (args.report !== undefined) {
+    const report = createCloudReleaseVerificationReport({
+      document,
+      expectedSource,
+      evidenceBytes,
+      authorityPublicKeySpkiSha256: pin.publicKeySpkiSha256,
+    });
+    writeFileSync(path.resolve(args.report), `${stableJson(report)}\n`, {
+      encoding: 'utf8',
+      flag: 'wx',
+      mode: 0o600,
+    });
+  }
   process.stdout.write(
     'Cloud release evidence is valid and authority-signed.\n',
   );

@@ -34,6 +34,12 @@ enum CompanionCapacityFoundationTests {
       tableDigest: tableDigest
     )
 
+    let scanStartedAt = Date()
+    try testLazyOrdinalScanner()
+    try testConfiguredContactScanner(contactIdentifiers: contactIdentifiers)
+    try testTrustedClockPolicy()
+    let scanMilliseconds = elapsedMilliseconds(since: scanStartedAt)
+
     let terminalStartedAt = Date()
     let terminalBytes = try testTerminalLedger(
       namespace: namespace,
@@ -44,9 +50,159 @@ enum CompanionCapacityFoundationTests {
     print(
       "IOS_CAPACITY_FOUNDATIONS_OK "
         + "planning_ms=\(planningMilliseconds) "
+        + "scan_ms=\(scanMilliseconds) "
         + "terminal_ms=\(terminalMilliseconds) "
         + "terminal_bytes=\(terminalBytes) "
         + "total_ms=\(elapsedMilliseconds(since: startedAt))"
+    )
+  }
+
+  private static func testLazyOrdinalScanner() throws {
+    var contextBuilds = 0
+    var materializationAttempts = 0
+    let laterValid: Int? = IOSCompanionLazyOrdinalScanner.first(
+      buildContext: {
+        contextBuilds += 1
+        return "immutable-people-context"
+      },
+      ordinals: { _ in [0, 1, 2] },
+      materialize: { _, ordinal in
+        materializationAttempts += 1
+        return ordinal == 1 ? ordinal : nil
+      }
+    )
+    try expect(laterValid == 1, "an invalid first candidate hid a later valid one")
+    try expect(contextBuilds == 1, "the lazy scan rebuilt its People context")
+    try expect(
+      materializationAttempts == 2,
+      "the lazy scan did not stop at the first valid material"
+    )
+
+    let invalidPrefix = (0..<10_000).map { UInt16($0) }
+    contextBuilds = 0
+    materializationAttempts = 0
+    let lastValid: Int? = IOSCompanionLazyOrdinalScanner.first(
+      buildContext: {
+        contextBuilds += 1
+        return "immutable-people-context"
+      },
+      ordinals: { _ in invalidPrefix },
+      materialize: { _, ordinal in
+        materializationAttempts += 1
+        return ordinal == 9_999 ? ordinal : nil
+      }
+    )
+    try expect(lastValid == 9_999, "a 10k invalid prefix hid its final candidate")
+    try expect(
+      contextBuilds == 1,
+      "a 10k invalid-prefix scan rebuilt People or destination counts"
+    )
+    try expect(
+      materializationAttempts == 10_000,
+      "a 10k invalid-prefix scan skipped or repeated candidates"
+    )
+  }
+
+  private static func testConfiguredContactScanner(
+    contactIdentifiers: [String]
+  ) throws {
+    struct Configuration {
+      let contactId: String
+      let approved: Bool
+    }
+    struct Contact {
+      let contactId: String
+      let usesBlockedDestination: Bool
+    }
+
+    let configurations = contactIdentifiers.enumerated().map {
+      Configuration(contactId: $0.element, approved: $0.offset.isMultiple(of: 2))
+    }
+    let contactsByIdentifier = Dictionary(
+      uniqueKeysWithValues: contactIdentifiers.enumerated().map {
+        (
+          $0.element,
+          Contact(
+            contactId: $0.element,
+            usesBlockedDestination: $0.offset.isMultiple(of: 4)
+          )
+        )
+      }
+    )
+    var identifierReads = 0
+    var predicateReads = 0
+    let affected = try require(
+      IOSCompanionConfiguredContactScanner.matchingIndices(
+        configurations: configurations,
+        contactsByIdentifier: contactsByIdentifier,
+        identifier: {
+          identifierReads += 1
+          return $0.contactId
+        },
+        matches: { configuration, contact in
+          predicateReads += 1
+          return configuration.contactId == contact.contactId
+            && configuration.approved && contact.usesBlockedDestination
+        }
+      ),
+      "the configured-contact scan rejected its 10k supported maximum"
+    )
+    try expect(affected.count == 2_500, "the configured-contact scan lost matches")
+    try expect(
+      identifierReads == 10_000 && predicateReads == 10_000,
+      "the configured-contact scan did more than one resolution pass"
+    )
+
+    let oversized = configurations + [
+      Configuration(contactId: "contact-over-capacity", approved: true)
+    ]
+    try expect(
+      IOSCompanionConfiguredContactScanner.matchingIndices(
+        configurations: oversized,
+        contactsByIdentifier: contactsByIdentifier,
+        identifier: { $0.contactId },
+        matches: { _, _ in true }
+      ) == nil,
+      "an over-capacity configured-contact scan was accepted"
+    )
+  }
+
+  private static func testTrustedClockPolicy() throws {
+    let trusted = Date(timeIntervalSince1970: 1_768_219_200)
+    try expect(
+      IOSCompanionTrustedClockPolicy.materializationNow(
+        localNow: trusted.addingTimeInterval(24 * 60 * 60),
+        trustedServerEstimate: trusted
+      ) == nil,
+      "a day-ahead local clock was trusted for final composer material"
+    )
+    try expect(
+      IOSCompanionTrustedClockPolicy.materializationNow(
+        localNow: trusted.addingTimeInterval(5 * 60),
+        trustedServerEstimate: trusted
+      ) == trusted,
+      "a local clock at the five-minute boundary was rejected"
+    )
+    try expect(
+      IOSCompanionTrustedClockPolicy.materializationNow(
+        localNow: trusted.addingTimeInterval(-(5 * 60)),
+        trustedServerEstimate: trusted
+      ) == trusted,
+      "a local clock at the negative five-minute boundary was rejected"
+    )
+    try expect(
+      IOSCompanionTrustedClockPolicy.materializationNow(
+        localNow: Date(timeIntervalSince1970: .nan),
+        trustedServerEstimate: trusted
+      ) == nil,
+      "a non-finite local clock was trusted"
+    )
+    try expect(
+      IOSCompanionTrustedClockPolicy.materializationNow(
+        localNow: trusted,
+        trustedServerEstimate: nil
+      ) == nil,
+      "missing authenticated time was trusted"
     )
   }
 
@@ -269,6 +425,15 @@ enum CompanionCapacityFoundationTests {
     contactIdentifiers: [String],
     tableDigest: Data
   ) throws {
+    try expect(
+      IOSCompanionOccurrenceIdentity.occurrenceDigest(
+        namespace: namespace,
+        accountGeneration: accountGeneration,
+        contactIdentifier: "people/c123",
+        civilDate: "2026-07-18"
+      ) == nil,
+      "a raw Google People resource name entered occurrence identity"
+    )
     let occurrence = try require(
       IOSCompanionOccurrenceIdentity.occurrenceId(
         namespace: namespace,
@@ -519,6 +684,19 @@ enum CompanionCapacityFoundationTests {
     try expect(
       unknown.check(digest: digests[3], civilDate: "2026-01-12") == .blocked,
       "Unknown released its repeat marker"
+    )
+
+    var promotedAfterContactClear = reportedSent
+    try promotedAfterContactClear.promoteAllToLegacyDateWideFences(
+      recordedAt: committedAt.addingTimeInterval(2)
+    )
+    try expect(
+      promotedAfterContactClear.hasLegacyDateWideFence(civilDate: "2026-01-12")
+        && promotedAfterContactClear.check(
+          digest: absent,
+          civilDate: "2026-01-12"
+        ) == .blocked,
+      "contact clearing did not promote exact markers to a date-wide fence"
     )
 
     var legacy = IOSCompanionTerminalLedger()

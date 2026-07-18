@@ -109,10 +109,11 @@ test('rejects JAR and APK Signing Block metadata even after signature stripping'
 
 test('restricted verifier separates direct and post-Play APK evidence and binds device bytes', () => {
   const source = readFileSync(verifier, 'utf8');
-  assert.match(source, /\$# -ne 7/u);
   assert.match(source, /\$# -ne 8/u);
+  assert.match(source, /\$# -ne 13/u);
   assert.match(source, /--signature "\$restricted_evidence_signature"/u);
   assert.match(source, /--public-key "\$distribution_authority_public_key"/u);
+  assert.match(source, /--evidence-root "\$restricted_evidence_root"/u);
   assert.match(source, /--version-name "\$version_name"/u);
   assert.match(source, /--artifact-mode "\$artifact_mode"/u);
   assert.match(
@@ -121,6 +122,15 @@ test('restricted verifier separates direct and post-Play APK evidence and binds 
   );
   assert.match(source, /--artifact-file "\$apk"/u);
   assert.match(source, /--play-delivered-evidence/u);
+  assert.match(source, /\$\{10\} != "--report"/u);
+  assert.match(source, /\$\{12\} != "--installed-apk-output-root"/u);
+  assert.match(source, /create-play-delivered-verification-report\.mjs/u);
+  assert.match(source, /installed-artifacts\.ndjson/u);
+  assert.match(source, /installedSigningCertificateSha1/u);
+  assert.match(source, /installedSigningCertificateSha256/u);
+  assert.match(source, /installed APK output root must not already exist/u);
+  assert.match(source, /cp -- "\$installed_copy" "\$retained_copy"/u);
+  assert.match(source, /observedAt: new Date\(\)\.toISOString\(\)/u);
   assert.match(source, /cmd package get-install-source/u);
   assert.match(source, /toybox sha256sum/u);
   assert.match(
