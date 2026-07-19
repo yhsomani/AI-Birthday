@@ -34,3 +34,33 @@ it('rejects an empty accessibility label', async () => {
     'AccessibleTextInput requires a non-empty accessibilityLabel',
   );
 });
+
+it('sets accessibilityState disabled when editable is false', async () => {
+  await render(
+    <AccessibleTextInput
+      accessibilityLabel="Test Input"
+      editable={false}
+      testID="accessible-input"
+    />,
+  );
+
+  const input = screen.getByTestId('accessible-input');
+  expect(input.props.accessibilityState).toEqual({ disabled: true });
+});
+
+it('merges existing accessibilityState with disabled state', async () => {
+  await render(
+    <AccessibleTextInput
+      accessibilityLabel="Test Input"
+      accessibilityState={{ expanded: true }}
+      editable={false}
+      testID="accessible-input"
+    />,
+  );
+
+  const input = screen.getByTestId('accessible-input');
+  expect(input.props.accessibilityState).toEqual({
+    disabled: true,
+    expanded: true,
+  });
+});
