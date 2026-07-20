@@ -1,0 +1,81 @@
+{
+  "task": "Audit the current Birthday Autopilot implementation and produce a concrete, dependency-ordered implementation plan to simplify the complete React Native UI, remove or consolidate unnecessary user-facing UI and feature surfaces, and improve every retained core journey so it is understandable, useful, accessible, and faithful to PROJECT_ABOUT.md. This is a planning council for immediate implementation in the current repository, not a speculative redesign. The useful product core is the binding MVP in PROJECT_ABOUT.md: a shared three-tab Home/People/Settings shell; Android Automation Edition with safe native unattended SMS only after all approval and readiness gates; iOS Companion Edition with reminders and explicit foreground MessageUI review only; read-only Google Contacts; explicit recipient enrollment; deterministic templates plus optional PII-free Gemini authoring; approval/proposal review; activity/attention recovery; and privacy/account/data controls. Identify current redundant screens, duplicate controls, vanity metrics, exposed internal diagnostics, confusing copy, excessive cards/chips/actions, missing states, and feature surfaces that belong under task flows or advanced/support areas rather than primary navigation. Do not remove, weaken, hide, or fake any binding safety, consent, privacy, deletion, duplicate-prevention, accessibility, localization, Android/iOS platform-truth, or release-gate behavior. Treat candidate defects as hypotheses and cite exact current paths. Produce small independently verifiable implementation tasks with exact file ownership, acceptance criteria, focused tests, visual/runtime validation, accessibility/localization checks, rollback, and dependencies. The result must be implementable in the current worktree and prioritize the highest user-value simplification slices first.",
+  "constraints": [
+    "PROJECT_ABOUT.md is the sole product and technical authority; code, tests, old council artifacts, README, DESIGN, and screenshots are evidence only.",
+    "Use only Codex GPT-5.6 Sol development agents. The product runtime Firebase AI Logic/Gemini feature remains in scope and must not be removed merely because the council is Codex-only.",
+    "Preserve current uncommitted prompt and council artifacts and every unrelated user change. Do not reset, clean, stage, commit, or broadly reformat.",
+    "The binding primary navigation is exactly Home, People, Settings. Activity opens from Home; setup, repair, review, privacy, legal, diagnostics, and destructive controls are task/detail flows rather than permanent tabs.",
+    "All binding MVP capabilities remain available. Remove only duplicate, misleading, low-value, internal-only, later, or explicitly removed user-facing surfaces; consolidation is preferred when a capability still matters.",
+    "Keep Android automation and iOS companion wording, actions, statuses, and evidence distinct. Never imply iOS unattended sending or Android carrier delivery certainty.",
+    "Optimize for older and less technical adults as well as privacy-conscious and dual-SIM users: one clear primary action, progressive disclosure, plain language, low cognitive load, and truthful repair paths.",
+    "Require English and Hindi parity, screen-reader semantics/focus, 200% text, compact and large viewports, dark/high contrast, reduced motion, bidi/pseudo-RTL safety, and non-color status.",
+    "Do not perform a broad documentation rewrite. Change only behavior-relevant contracts, localization, tests, or runbooks directly coupled to implemented UI behavior.",
+    "Do not make tests pass through mocks, fixture-only production substitutions, hidden functionality, weaker assertions, arbitrary timeouts, or documentation-only claims.",
+    "Every removal must name the replacement path or prove the surface is outside the binding MVP; every retained feature must map to a user job and acceptance evidence.",
+    "Plan both static/component verification and rendered runtime inspection on an available Android emulator and iOS simulator/device when locally possible; classify unavailable physical/external evidence honestly."
+  ],
+  "repo_context": {
+    "root": ".",
+    "paths": [
+      "PROJECT_ABOUT.md",
+      "App.tsx",
+      "src/app/",
+      "src/design-system/",
+      "src/features/live/",
+      "src/features/home/",
+      "src/features/people/",
+      "src/features/activity/",
+      "src/features/settings/",
+      "src/features/setup/",
+      "src/localization/",
+      "src/domain/",
+      "src/application/ports/",
+      "src/infrastructure/native/",
+      "tests/",
+      "e2e/",
+      "tools/live-navigation-contract.test.mjs",
+      "tools/ui-accessibility-contract.test.mjs",
+      "stitch/SCREEN_MANIFEST.md",
+      "stitch/IMPLEMENTATION_CROSSWALK.json"
+    ],
+    "notes": "Inspect the exact current worktree read-only. The production LiveApp paths, native projections, tests, and rendered behavior are stronger evidence than fixture preview screens. The final council plan will be judged and then implemented immediately in atomic slices."
+  },
+  "preferences": {
+    "max_plans": 3,
+    "time_budget_sec": 1800,
+    "random_seed": 756,
+    "language": "English"
+  },
+  "agents": {
+    "planners": [
+      {
+        "name": "codex-product-pruning",
+        "kind": "codex",
+        "model": "gpt-5.6-sol",
+        "reasoning_effort": "xhigh",
+        "extra_args": ["--sandbox", "read-only", "--ephemeral"]
+      },
+      {
+        "name": "codex-ui-accessibility",
+        "kind": "codex",
+        "model": "gpt-5.6-sol",
+        "reasoning_effort": "xhigh",
+        "extra_args": ["--sandbox", "read-only", "--ephemeral"]
+      },
+      {
+        "name": "codex-platform-integration",
+        "kind": "codex",
+        "model": "gpt-5.6-sol",
+        "reasoning_effort": "xhigh",
+        "extra_args": ["--sandbox", "read-only", "--ephemeral"]
+      }
+    ],
+    "judge": {
+      "name": "codex-ui-synthesis-judge",
+      "kind": "codex",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "xhigh",
+      "extra_args": ["--sandbox", "read-only", "--ephemeral"]
+    }
+  }
+}

@@ -13,12 +13,12 @@ import {
   ReadinessBanner,
   Screen,
   SectionHeading,
+  SettingRow,
   StatusRow,
 } from '../../design-system/components/Primitives';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
 import type { TranslationKey } from '../../localization/resources';
 import type { LiveAppPort } from './LiveAppPort';
-import { LiveCloudPrivacyBoundary } from './LiveCloudPrivacyBoundary';
 import { LiveError, LiveLoading } from './LiveProjectionState';
 import { useLiveProjection } from './useLiveProjection';
 
@@ -39,10 +39,12 @@ const resources: readonly Readonly<{
 
 export function LiveHelpLegalScreen({
   onBack,
+  onOpenDiagnostics,
   platform,
   port,
 }: {
   onBack: () => void;
+  onOpenDiagnostics?: (() => void) | undefined;
   platform: PlatformCapability['platform'];
   port: LiveAppPort;
 }) {
@@ -107,12 +109,22 @@ export function LiveHelpLegalScreen({
         ) : null}
       </Card>
 
+      {onOpenDiagnostics ? (
+        <Card>
+          <SettingRow
+            title={t('live.settings.openDiagnostics')}
+            detail={t('live.help.diagnosticsDetail')}
+            onPress={onOpenDiagnostics}
+            testID="live-help-diagnostics"
+          />
+        </Card>
+      ) : null}
+
       <ReadinessBanner
         title={t('live.help.externalCopies')}
         detail={t('live.help.externalCopiesBody')}
         tone="warning"
       />
-      <LiveCloudPrivacyBoundary platform={platform} />
       {openFailed ? (
         <ReadinessBanner
           title={t('live.help.openFailed')}

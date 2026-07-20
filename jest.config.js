@@ -5,7 +5,7 @@ module.exports = {
   // from collecting each other's suites while preserving explicit backend CI.
   testPathIgnorePatterns: ['/node_modules/', '<rootDir>/backend/'],
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|@react-navigation)/)',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-svg)/)',
   ],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

@@ -409,7 +409,7 @@ test('the Android system-composer alternative is foreground, recipient-scoped, a
   assert.doesNotMatch(model, /canonicalRecipient|normalizedPhoneE164/u);
   assert.match(
     home,
-    /choice === 'start-next-year'[\s\S]*?!todayReview\.review\.alternativeChoice[\s\S]*?'live\.home\.keepTodaySchedule'/u,
+    /currentTodayReview\.review\.choice === 'start-next-year'[\s\S]*?!currentTodayReview\.review\.alternativeChoice[\s\S]*?'live\.home\.keepTodaySchedule'/u,
   );
   assert.match(
     manifest,

@@ -35,26 +35,14 @@ tags:
     id: live-home-screen
 - scrollUntilVisible:
     element:
-      id: live-home-message
+      id: live-home-attention
     direction: DOWN
 - tapOn:
-    id: live-home-message
+    id: live-home-attention
 - assertVisible:
-    id: live-message-screen
+    id: live-attention-screen
 - tapOn:
-    id: live-message-back
-- assertVisible:
-    id: live-home-screen
-- scrollUntilVisible:
-    element:
-      id: live-home-automation
-    direction: DOWN
-- tapOn:
-    id: live-home-automation
-- assertVisible:
-    id: live-automation-screen
-- tapOn:
-    id: live-automation-back
+    id: live-attention-back
 - assertVisible:
     id: live-home-screen
 - tapOn:
@@ -62,9 +50,65 @@ tags:
 - assertVisible:
     id: live-people-screen
 - tapOn:
+    id: live-people-filter-ready
+- assertVisible:
+    text: '.*(No one is ready to set up|कोई व्यक्ति सेटअप के लिए तैयार नहीं है).*'
+- tapOn:
+    id: live-people-search
+- inputText: smoke-no-match
+- hideKeyboard
+- assertVisible:
+    text: '.*(No people match this search|इस खोज से कोई व्यक्ति नहीं मिला).*'
+- tapOn:
+    id: live-people-search
+- eraseText: 14
+- hideKeyboard
+- tapOn:
+    id: live-people-filter-all
+- tapOn:
     id: live-tab-settings
 - assertVisible:
     id: live-settings-screen
+- scrollUntilVisible:
+    element:
+      id: live-settings-message
+    direction: DOWN
+- tapOn:
+    id: live-settings-message
+- assertVisible:
+    id: live-message-screen
+- tapOn:
+    id: live-message-back
+- assertVisible:
+    id: live-settings-screen
+- scrollUntilVisible:
+    element:
+      id: live-settings-schedule
+    direction: DOWN
+- tapOn:
+    id: live-settings-schedule
+- assertVisible:
+    id: live-schedule-screen
+- tapOn:
+    id: live-schedule-back
+- assertVisible:
+    id: live-settings-screen
+- scrollUntilVisible:
+    element:
+      id: live-settings-automation
+    direction: DOWN
+- tapOn:
+    id: live-settings-automation
+- assertVisible:
+    id: live-automation-screen
+- tapOn:
+    id: live-automation-back
+- assertVisible:
+    id: live-settings-screen
+- scrollUntilVisible:
+    element:
+      id: live-settings-privacy
+    direction: DOWN
 - tapOn:
     id: live-settings-privacy
 - assertVisible:
@@ -73,36 +117,24 @@ tags:
     id: live-privacy-back
 - assertVisible:
     id: live-settings-screen
-- tapOn:
-    id: live-tab-home
-- assertVisible:
-    id: live-home-screen
-- tapOn:
-    id: live-tab-settings
-- assertVisible:
-    id: live-settings-screen
+- scrollUntilVisible:
+    element:
+      id: live-settings-help-legal
+    direction: DOWN
 - tapOn:
     id: live-settings-help-legal
 - assertVisible:
     id: live-help-legal-screen
 - tapOn:
-    id: live-help-back
-- assertVisible:
-    id: live-settings-screen
-- tapOn:
-    id: live-settings-attention
-- assertVisible:
-    id: live-attention-screen
-- tapOn:
-    id: live-attention-back
-- assertVisible:
-    id: live-settings-screen
-- tapOn:
-    id: live-settings-diagnostics
+    id: live-help-diagnostics
 - assertVisible:
     id: live-diagnostics-screen
 - tapOn:
     id: live-diagnostics-back
+- assertVisible:
+    id: live-help-legal-screen
+- tapOn:
+    id: live-help-back
 - assertVisible:
     id: live-settings-screen
 - tapOn:

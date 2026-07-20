@@ -49,6 +49,8 @@ const reminderBridge = read(
 const companionGateway = read(
   'src/infrastructure/native/ios/CompanionNativeGateway.ts',
 );
+const composerReviewUi = read('src/features/live/LiveComposerReviewScreen.tsx');
+const automationUi = read('src/features/live/LiveAutomationScreen.tsx');
 const podfile = read('ios/Podfile');
 const identity = read(
   'ios/BirthdayAutopilot/Identity/IOSGoogleIdentityCoordinator.swift',
@@ -102,6 +104,71 @@ test('iOS composer is foreground-only, nonce-fenced and never programmatically s
   assert.match(openKeys, /"expectedRevision"/u);
   assert.match(openKeys, /"proposalId"/u);
   assert.doesNotMatch(openKeys, /recipient|body/u);
+});
+
+test('app-owned Composer Review preserves native call order and opaque payload boundaries', () => {
+  const prepareCall =
+    composerReviewUi.match(
+      /companionPort\.prepareComposerReview\(\{[\s\S]*?\}\)/u,
+    )?.[0] ?? '';
+  const openCall =
+    composerReviewUi.match(
+      /companionPort\.openUserConfirmedComposer\(\{[\s\S]*?\}\)/u,
+    )?.[0] ?? '';
+
+  assert.match(prepareCall, /expectedRevision: envelope\.revision/u);
+  assert.match(prepareCall, /proposalId: proposalValue\.proposalId/u);
+  assert.doesNotMatch(
+    prepareCall,
+    /actionNonce|body|maskedDestination|occurrence|recipient|routeId/u,
+  );
+  assert.match(openCall, /actionNonce: review\.actionNonce/u);
+  assert.match(openCall, /expectedRevision: review\.revision/u);
+  assert.match(openCall, /proposalId: review\.proposalId/u);
+  assert.doesNotMatch(
+    openCall,
+    /body|maskedDestination|occurrence|recipient|routeId/u,
+  );
+
+  const prepare = composerReviewUi.indexOf(
+    'companionPort.prepareComposerReview',
+  );
+  const validatePreparedReview = composerReviewUi.indexOf(
+    'result.value.expiresAtEpochMilliseconds > Date.now()',
+    prepare,
+  );
+  const exposePreparedReview = composerReviewUi.indexOf(
+    'setReview(result.value)',
+    validatePreparedReview,
+  );
+  const expiryRecheck = composerReviewUi.indexOf(
+    'review.expiresAtEpochMilliseconds <= Date.now()',
+    exposePreparedReview,
+  );
+  const availabilityCheck = composerReviewUi.indexOf(
+    'companionPort.canOpenComposer()',
+    expiryRecheck,
+  );
+  const open = composerReviewUi.indexOf(
+    'companionPort.openUserConfirmedComposer',
+    availabilityCheck,
+  );
+  const reloadProposal = composerReviewUi.indexOf(
+    'await proposal.reload()',
+    open,
+  );
+
+  assert.ok(prepare > 0);
+  assert.ok(validatePreparedReview > prepare);
+  assert.ok(exposePreparedReview > validatePreparedReview);
+  assert.ok(expiryRecheck > exposePreparedReview);
+  assert.ok(availabilityCheck > expiryRecheck);
+  assert.ok(open > availabilityCheck);
+  assert.ok(reloadProposal > open);
+  assert.doesNotMatch(
+    automationUi,
+    /getNextComposerProposal|prepareComposerReview|canOpenComposer|openUserConfirmedComposer|live-open-composer/u,
+  );
 });
 
 test('iOS composer binds and leases one exact durable People generation', () => {

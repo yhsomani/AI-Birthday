@@ -107,12 +107,14 @@ export function LiveError({
   problem,
   onRetry,
   retryTestID = 'live-retry',
+  showSupportReference = false,
   testID = 'live-projection-error',
 }: {
   title: string;
   problem: NativeProblem;
   onRetry: () => void;
   retryTestID?: string;
+  showSupportReference?: boolean;
   testID?: string;
 }) {
   const { t } = useAppLocalization();
@@ -120,7 +122,7 @@ export function LiveError({
   const detail = t(nativeProblemMessageKey(problem));
   const referenceLabel = t('live.common.reference', { reference });
   useIosVoiceOverAnnouncement(
-    joinAnnouncement(title, detail, referenceLabel),
+    joinAnnouncement(title, detail, showSupportReference ? referenceLabel : ''),
     'assertive',
   );
   return (
@@ -133,11 +135,13 @@ export function LiveError({
       testID={testID}
     >
       <ReadinessBanner title={title} detail={detail} tone="critical" />
-      <Card>
-        <AppText color="muted" variant="caption">
-          {referenceLabel}
-        </AppText>
-      </Card>
+      {showSupportReference ? (
+        <Card>
+          <AppText color="muted" variant="caption">
+            {referenceLabel}
+          </AppText>
+        </Card>
+      ) : null}
       <Button
         label={t('live.common.tryAgain')}
         onPress={onRetry}
@@ -166,21 +170,25 @@ export function LiveRefreshProblem({ problem }: { problem: NativeProblem }) {
 export function LiveActionFeedback({
   problem,
   message,
+  showSupportReference = false,
 }: {
   problem?: NativeProblem | undefined;
   message?: string | undefined;
+  showSupportReference?: boolean;
 }) {
   const { t } = useAppLocalization();
   const title = problem
     ? t('live.error.actionTitle')
     : t('live.action.responseTitle');
   const detail = problem
-    ? t('live.error.actionBody', {
-        message: t(nativeProblemMessageKey(problem)),
-        reference: t('live.common.reference', {
-          reference: nativeProblemReference(problem),
-        }),
-      })
+    ? showSupportReference
+      ? t('live.error.actionBody', {
+          message: t(nativeProblemMessageKey(problem)),
+          reference: t('live.common.reference', {
+            reference: nativeProblemReference(problem),
+          }),
+        })
+      : t(nativeProblemMessageKey(problem))
     : message;
   useIosVoiceOverAnnouncement(
     detail ? joinAnnouncement(title, detail) : undefined,

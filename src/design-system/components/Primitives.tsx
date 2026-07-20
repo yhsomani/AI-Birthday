@@ -7,12 +7,14 @@ import React, {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import {
   AccessibilityInfo,
   LayoutChangeEvent,
   Platform,
   Pressable,
+  PressableProps,
   ScrollView,
   StyleProp,
   StyleSheet,
@@ -44,6 +46,41 @@ type ScreenScrollController = Readonly<{
 const ScreenScrollContext = createContext<ScreenScrollController | undefined>(
   undefined,
 );
+
+const focusOutline = (focused: boolean, color: string): ViewStyle => ({
+  outlineColor: color,
+  outlineOffset: 2,
+  outlineStyle: 'solid',
+  outlineWidth: focused ? 3 : 0,
+});
+
+export function FocusablePressable({
+  onBlur,
+  onFocus,
+  style,
+  ...pressableProps
+}: PressableProps) {
+  const { colors } = useAppTheme();
+  const [focused, setFocused] = useState(false);
+
+  return (
+    <Pressable
+      {...pressableProps}
+      onBlur={event => {
+        setFocused(false);
+        onBlur?.(event);
+      }}
+      onFocus={event => {
+        setFocused(true);
+        onFocus?.(event);
+      }}
+      style={state => [
+        typeof style === 'function' ? style(state) : style,
+        focusOutline(focused, colors.focus),
+      ]}
+    />
+  );
+}
 
 export function Screen({
   children,
@@ -81,7 +118,11 @@ export function Screen({
           ref={scrollView}
           keyboardShouldPersistTaps="handled"
           contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={[styles.screenContent, contentStyle]}
+          contentContainerStyle={[
+            styles.screenContent,
+            contentStyle,
+            styles.screenBounds,
+          ]}
         >
           {children}
         </ScrollView>
@@ -230,6 +271,7 @@ type ButtonProps = {
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   disabled?: boolean;
+  expanded?: boolean;
   accessibilityHint?: string;
   testID?: string;
   icon?: IconName;
@@ -240,11 +282,13 @@ export function Button({
   onPress,
   variant = 'primary',
   disabled = false,
+  expanded,
   accessibilityHint,
   testID,
   icon,
 }: ButtonProps) {
   const { colors, isHighContrast, isReduceMotionEnabled } = useAppTheme();
+  const [focused, setFocused] = useState(false);
   const backgroundColor =
     variant === 'primary'
       ? colors.accent
@@ -265,8 +309,13 @@ export function Button({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled }}
+      accessibilityState={{
+        disabled,
+        ...(expanded === undefined ? {} : { expanded }),
+      }}
       disabled={disabled}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={onPress}
       testID={testID}
       style={({ pressed }) => [
@@ -281,6 +330,7 @@ export function Button({
           opacity: disabled ? 0.48 : 1,
           transform: [{ scale: pressed && !isReduceMotionEnabled ? 0.99 : 1 }],
         },
+        focusOutline(focused, colors.focus),
       ]}
     >
       {icon ? <Icon name={icon} color={foregroundColor} size={20} /> : null}
@@ -463,11 +513,14 @@ export function ChoiceChip({
   testID?: string;
 }) {
   const { colors, isHighContrast } = useAppTheme();
+  const [focused, setFocused] = useState(false);
   return (
     <Pressable
       accessibilityLabel={label}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={onPress}
       testID={testID}
       style={({ pressed }) => [
@@ -478,6 +531,7 @@ export function ChoiceChip({
           borderWidth: isHighContrast ? 2 : 1,
           opacity: pressed ? 0.78 : 1,
         },
+        focusOutline(focused, colors.focus),
       ]}
     >
       {selected ? (
@@ -568,15 +622,19 @@ export function SettingRow({
 }) {
   const { colors } = useAppTheme();
   const { isRtlFixture } = useAppLocalization();
+  const [focused, setFocused] = useState(false);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${title}. ${detail}`}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={onPress}
       testID={testID}
       style={({ pressed }) => [
         styles.settingRow,
         { borderBottomColor: colors.border, opacity: pressed ? 0.72 : 1 },
+        focusOutline(focused, colors.focus),
       ]}
     >
       <View style={styles.flexText}>
@@ -609,6 +667,7 @@ export function LabeledSwitch({
   testID?: string;
 }) {
   const { colors } = useAppTheme();
+  const [focused, setFocused] = useState(false);
   return (
     <Pressable
       accessibilityHint={detail}
@@ -616,10 +675,13 @@ export function LabeledSwitch({
       accessibilityRole="switch"
       accessibilityState={{ checked: value }}
       hitSlop={spacing.sm}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={onValueChange}
       style={({ pressed }) => [
         styles.switchRow,
         { opacity: pressed ? 0.78 : 1 },
+        focusOutline(focused, colors.focus),
       ]}
       testID={testID}
     >
@@ -668,6 +730,7 @@ export function PersonRow({
 }) {
   const { colors } = useAppTheme();
   const { isRtlFixture } = useAppLocalization();
+  const [focused, setFocused] = useState(false);
   return (
     <Pressable
       accessibilityRole={role}
@@ -675,6 +738,8 @@ export function PersonRow({
       accessibilityState={
         role === 'checkbox' ? { checked: selected } : undefined
       }
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={onPress}
       testID={testID}
       style={({ pressed }) => [
@@ -684,6 +749,7 @@ export function PersonRow({
           borderColor: selected ? colors.info : colors.border,
           opacity: pressed ? 0.75 : 1,
         },
+        focusOutline(focused, colors.focus),
       ]}
     >
       <View style={[styles.avatar, { backgroundColor: colors.surfaceMuted }]}>
@@ -743,6 +809,11 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
     gap: spacing.md,
+  },
+  screenBounds: {
+    alignSelf: 'center',
+    maxWidth: 720,
+    width: '100%',
   },
   card: {
     borderRadius: radii.md,

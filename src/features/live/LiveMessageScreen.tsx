@@ -10,8 +10,10 @@ import type {
 } from '../../domain/messages/model';
 import { BUILT_IN_MESSAGE_TEMPLATES } from '../../domain/messages/model';
 import type { NativeRevision } from '../../domain/shared/brand';
-import type { NativeProblem } from '../../domain/shared/result';
-import type { ProjectionEnvelope } from '../../domain/shared/result';
+import type {
+  NativeProblem,
+  ProjectionEnvelope,
+} from '../../domain/shared/result';
 import { validateTemplateDraft } from '../../domain/validation/templateDraft';
 import { AccessibleTextInput } from '../../design-system/components/AccessibleTextInput';
 import { AppText } from '../../design-system/components/AppText';
@@ -19,9 +21,12 @@ import {
   Button,
   Card,
   ChoiceChip,
+  InlineReviewCard,
+  KeyValue,
   ReadinessBanner,
   Screen,
   SectionHeading,
+  SingleChoiceGroup,
   StatusRow,
 } from '../../design-system/components/Primitives';
 import {
@@ -49,6 +54,13 @@ type PreviewState = Readonly<{
   revision: NativeRevision;
 }>;
 
+const defaultFields = {
+  language: 'en',
+  tone: 'warm',
+  placeholderMode: 'given-name',
+  segmentCap: 2,
+} as const;
+
 export function LiveMessageScreen({
   onBack,
   port,
@@ -60,13 +72,17 @@ export function LiveMessageScreen({
   const { t } = useAppLocalization();
   const loadEditor = useCallback(() => port.getMessageEditor(), [port]);
   const editor = useLiveProjection(loadEditor, port, ['messages']);
-  const [language, setLanguage] = useState<MessageLanguage>();
-  const [tone, setTone] = useState<MessageTone>();
+  const [language, setLanguage] = useState<MessageLanguage>(
+    defaultFields.language,
+  );
+  const [tone, setTone] = useState<MessageTone>(defaultFields.tone);
   const [placeholderMode, setPlaceholderMode] = useState<
     'given-name' | 'generic'
-  >();
-  const [segmentCap, setSegmentCap] = useState<1 | 2>();
+  >(defaultFields.placeholderMode);
+  const [segmentCap, setSegmentCap] = useState<1 | 2>(defaultFields.segmentCap);
   const [text, setText] = useState('');
+  const [helpExpanded, setHelpExpanded] = useState(false);
+  const [optionsExpanded, setOptionsExpanded] = useState(false);
   const [preview, setPreview] = useState<PreviewState>();
   const [suggestions, setSuggestions] = useState<GeminiSuggestionsProjection>();
   const [pending, setPending] = useState<'preview' | 'save' | 'suggest'>();
@@ -74,58 +90,105 @@ export function LiveMessageScreen({
   const [message, setMessage] = useState<string>();
   const [localIssue, setLocalIssue] = useState<string>();
   const [savedConflict, setSavedConflict] = useState(false);
+  const [sourceRevision, setSourceRevision] = useState<NativeRevision>();
   const dirtyRef = useRef(false);
   const sourceRevisionRef = useRef<NativeRevision | undefined>(undefined);
+  const editGenerationRef = useRef(0);
+  const previewRequestRef = useRef(0);
+  const saveRequestRef = useRef(0);
+  const suggestionRequestRef = useRef(0);
+  const mountedRef = useRef(true);
+  const editorTrusted =
+    editor.state.kind === 'ready' &&
+    !editor.state.refreshing &&
+    !editor.state.refreshProblem;
+  const editorActionsTrusted =
+    editorTrusted &&
+    editor.state.kind === 'ready' &&
+    sourceRevision === editor.state.result.envelope.revision &&
+    !savedConflict;
 
-  const markDirty = () => {
-    dirtyRef.current = true;
-    setPreview(undefined);
-  };
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      previewRequestRef.current += 1;
+      saveRequestRef.current += 1;
+      suggestionRequestRef.current += 1;
+    };
+  }, []);
 
   const applySaved = useCallback(
     (envelope: ProjectionEnvelope<MessageEditorProjection>) => {
-      const projection = envelope.value;
-      if (projection.kind === 'configured') {
-        setLanguage(projection.draft.language);
-        setTone(projection.draft.tone);
-        setPlaceholderMode(projection.draft.placeholderMode.kind);
-        setSegmentCap(projection.draft.requestedSegmentCap);
-        setText(projection.draft.text);
+      if (envelope.value.kind === 'configured') {
+        setLanguage(envelope.value.draft.language);
+        setTone(envelope.value.draft.tone);
+        setPlaceholderMode(envelope.value.draft.placeholderMode.kind);
+        setSegmentCap(envelope.value.draft.requestedSegmentCap);
+        setText(envelope.value.draft.text);
       } else {
-        setLanguage(undefined);
-        setTone(undefined);
-        setPlaceholderMode(undefined);
-        setSegmentCap(undefined);
+        setLanguage(defaultFields.language);
+        setTone(defaultFields.tone);
+        setPlaceholderMode(defaultFields.placeholderMode);
+        setSegmentCap(defaultFields.segmentCap);
         setText('');
       }
+      editGenerationRef.current += 1;
+      previewRequestRef.current += 1;
+      saveRequestRef.current += 1;
+      suggestionRequestRef.current += 1;
       sourceRevisionRef.current = envelope.revision;
+      setSourceRevision(envelope.revision);
       dirtyRef.current = false;
       setSavedConflict(false);
       setPreview(undefined);
+      setSuggestions(undefined);
+      setLocalIssue(undefined);
+      setProblem(undefined);
     },
     [],
   );
 
   useEffect(() => {
-    if (editor.state.kind !== 'ready') {
+    if (editor.state.kind !== 'ready' || pending === 'save') {
       return;
     }
     const envelope = editor.state.result.envelope;
-    if (sourceRevisionRef.current === envelope.revision) {
+    if (sourceRevision === envelope.revision) {
       return;
     }
-    if (sourceRevisionRef.current === undefined || !dirtyRef.current) {
+    if (sourceRevision === undefined || !dirtyRef.current) {
       applySaved(envelope);
     } else {
       setSavedConflict(true);
     }
-  }, [applySaved, editor.state]);
+  }, [applySaved, editor.state, pending, sourceRevision]);
+
+  const markDirty = () => {
+    dirtyRef.current = true;
+    editGenerationRef.current += 1;
+    previewRequestRef.current += 1;
+    saveRequestRef.current += 1;
+    suggestionRequestRef.current += 1;
+    setPreview(undefined);
+    setSuggestions(undefined);
+    setProblem(undefined);
+    setMessage(undefined);
+    setLocalIssue(undefined);
+    setPending(current => (current === 'save' ? current : undefined));
+  };
+
+  useEffect(() => {
+    if (editorActionsTrusted || pending === 'save') return;
+    previewRequestRef.current += 1;
+    saveRequestRef.current += 1;
+    suggestionRequestRef.current += 1;
+    setPreview(undefined);
+    setSuggestions(undefined);
+    setPending(undefined);
+  }, [editorActionsTrusted, pending]);
 
   const draftFromFields = () => {
-    if (!language || !tone || !placeholderMode || !segmentCap) {
-      setLocalIssue(t('live.error.validation'));
-      return undefined;
-    }
     const validation = validateTemplateDraft({
       language,
       tone,
@@ -146,13 +209,21 @@ export function LiveMessageScreen({
   };
 
   const preparePreview = async () => {
-    if (editor.state.kind !== 'ready') {
+    if (
+      pending !== undefined ||
+      !editorActionsTrusted ||
+      editor.state.kind !== 'ready'
+    ) {
       return;
     }
     const draft = draftFromFields();
     if (!draft) {
       return;
     }
+    const request = previewRequestRef.current + 1;
+    previewRequestRef.current = request;
+    const editGeneration = editGenerationRef.current;
+    const expectedSourceRevision = editor.state.result.envelope.revision;
     setPending('preview');
     setProblem(undefined);
     setMessage(undefined);
@@ -160,17 +231,29 @@ export function LiveMessageScreen({
     try {
       result = await port.previewMessage({
         draft,
-        expectedRevision: editor.state.result.envelope.revision,
+        expectedRevision: expectedSourceRevision,
       });
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
-    if (result.kind === 'error') {
-      if (result.problem.kind === 'stale-revision') {
-        await editor.reload();
+    if (
+      !mountedRef.current ||
+      request !== previewRequestRef.current ||
+      editGeneration !== editGenerationRef.current ||
+      expectedSourceRevision !== sourceRevisionRef.current
+    ) {
+      if (mountedRef.current) {
+        setPending(current => (current === 'preview' ? undefined : current));
       }
+      return;
+    }
+    if (result.kind === 'error') {
       setProblem(result.problem);
       setPending(undefined);
+      if (result.problem.kind === 'stale-revision') {
+        setPreview(undefined);
+        await editor.reload();
+      }
       return;
     }
     setPreview({
@@ -181,9 +264,19 @@ export function LiveMessageScreen({
   };
 
   const savePreview = async () => {
-    if (!preview || preview.preview.kind !== 'valid') {
+    if (
+      pending !== undefined ||
+      !editorActionsTrusted ||
+      editor.state.kind !== 'ready' ||
+      !preview ||
+      preview.preview.kind !== 'valid'
+    ) {
       return;
     }
+    const request = saveRequestRef.current + 1;
+    saveRequestRef.current = request;
+    const editGeneration = editGenerationRef.current;
+    const expectedSourceRevision = editor.state.result.envelope.revision;
     setPending('save');
     setProblem(undefined);
     setMessage(undefined);
@@ -196,34 +289,76 @@ export function LiveMessageScreen({
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
-    if (result.kind === 'error') {
-      if (result.problem.kind === 'stale-revision') {
+    if (
+      !mountedRef.current ||
+      request !== saveRequestRef.current ||
+      editGeneration !== editGenerationRef.current ||
+      expectedSourceRevision !== sourceRevisionRef.current
+    ) {
+      if (!mountedRef.current) return;
+      if (result.kind === 'ok' || result.problem.kind === 'stale-revision') {
         await editor.reload();
-        setPreview(undefined);
+        if (!mountedRef.current) return;
+        setSavedConflict(true);
       }
-      setProblem(result.problem);
-      setPending(undefined);
+      setPending(current => (current === 'save' ? undefined : current));
       return;
     }
+    if (result.kind === 'error') {
+      setProblem(result.problem);
+      setPending(undefined);
+      if (result.problem.kind === 'stale-revision') {
+        setPreview(undefined);
+        await editor.reload();
+      }
+      return;
+    }
+
+    const invalidatedApprovalCount =
+      result.envelope.value.invalidatedApprovalCount;
     dirtyRef.current = false;
+    previewRequestRef.current += 1;
+    suggestionRequestRef.current += 1;
+    setPreview(undefined);
+    setSuggestions(undefined);
     const refreshed = await editor.reload();
-    setMessage(
-      t('live.message.saved', {
-        count: result.envelope.value.invalidatedApprovalCount,
-      }),
-    );
+    if (
+      !mountedRef.current ||
+      request !== saveRequestRef.current ||
+      editGeneration !== editGenerationRef.current
+    ) {
+      if (mountedRef.current) {
+        dirtyRef.current = true;
+        setSavedConflict(true);
+        setPending(current => (current === 'save' ? undefined : current));
+      }
+      return;
+    }
     if (refreshed.kind === 'ok') {
       applySaved(refreshed.envelope);
-      setPreview(undefined);
+      setMessage(t('live.message.saved', { count: invalidatedApprovalCount }));
+    } else {
+      setMessage(
+        t('live.message.savedRecheckFailed', {
+          count: invalidatedApprovalCount,
+        }),
+      );
     }
     setPending(undefined);
   };
 
   const generateSuggestions = async () => {
-    if (!language || !tone || !placeholderMode || !segmentCap) {
-      setLocalIssue(t('live.error.validation'));
+    if (
+      pending !== undefined ||
+      !editorActionsTrusted ||
+      editor.state.kind !== 'ready'
+    ) {
       return;
     }
+    const request = suggestionRequestRef.current + 1;
+    suggestionRequestRef.current = request;
+    const editGeneration = editGenerationRef.current;
+    const expectedSourceRevision = editor.state.result.envelope.revision;
     setPending('suggest');
     setProblem(undefined);
     setMessage(undefined);
@@ -241,18 +376,23 @@ export function LiveMessageScreen({
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
+    if (
+      !mountedRef.current ||
+      request !== suggestionRequestRef.current ||
+      editGeneration !== editGenerationRef.current ||
+      expectedSourceRevision !== sourceRevisionRef.current
+    ) {
+      if (mountedRef.current) {
+        setPending(current => (current === 'suggest' ? undefined : current));
+      }
+      return;
+    }
     if (result.kind === 'error') {
       setProblem(result.problem);
     } else {
       setSuggestions(result.envelope.value);
     }
     setPending(undefined);
-  };
-
-  const reloadSaved = () => {
-    if (editor.state.kind === 'ready') {
-      applySaved(editor.state.result.envelope);
-    }
   };
 
   const applyBuiltIn = (
@@ -263,9 +403,41 @@ export function LiveMessageScreen({
     setPlaceholderMode(template.draft.placeholderMode);
     setSegmentCap(template.draft.requestedSegmentCap as 1 | 2);
     setText(template.draft.text);
-    setSuggestions(undefined);
     markDirty();
   };
+
+  const matchingBuiltIns = BUILT_IN_MESSAGE_TEMPLATES.filter(
+    template => template.draft.language === language,
+  );
+  const suggestionNeedsFallback =
+    suggestions?.kind === 'fallback' || suggestions?.kind === 'failed';
+  const renderBuiltIns = (testIdPrefix: string) => (
+    <>
+      <SectionHeading
+        title={t('live.message.builtInTitle')}
+        supporting={t('live.message.builtInBody')}
+      />
+      {matchingBuiltIns.map(template => (
+        <Card key={`${testIdPrefix}-${template.id}`}>
+          <AppText variant="label">
+            {t(
+              template.draft.placeholderMode === 'given-name'
+                ? 'live.message.givenName'
+                : 'live.message.generic',
+            )}
+          </AppText>
+          <AppText>{template.draft.text}</AppText>
+          <Button
+            label={t('live.message.useBuiltIn')}
+            disabled={pending !== undefined}
+            onPress={() => applyBuiltIn(template)}
+            variant="secondary"
+            testID={`live-message-built-in-${template.id}`}
+          />
+        </Card>
+      ))}
+    </>
+  );
 
   return (
     <Screen includeTopInset testID="live-message-screen">
@@ -294,11 +466,45 @@ export function LiveMessageScreen({
       {editor.state.kind === 'ready' ? (
         <>
           {editor.state.refreshProblem ? (
-            <LiveRefreshProblem problem={editor.state.refreshProblem} />
+            <>
+              <LiveRefreshProblem problem={editor.state.refreshProblem} />
+              <Button
+                label={t('live.common.tryAgain')}
+                disabled={editor.state.refreshing || pending !== undefined}
+                onPress={() => editor.reload()}
+                testID="live-message-check-status"
+              />
+            </>
           ) : null}
-          {editor.state.result.envelope.value.kind === 'not-configured' ? (
-            <StatusRow title={t('live.message.notConfigured')} tone="info" />
-          ) : null}
+
+          <SectionHeading title={t('live.message.currentTitle')} />
+          <Card testID="live-message-current">
+            <StatusRow
+              title={
+                editor.state.refreshing
+                  ? t('live.message.currentChecking')
+                  : editor.state.refreshProblem
+                  ? t('live.message.currentUnverified')
+                  : editor.state.result.envelope.value.kind === 'configured'
+                  ? t('live.message.currentSaved')
+                  : t('live.message.notConfigured')
+              }
+              tone={
+                editor.state.refreshProblem
+                  ? 'warning'
+                  : editor.state.refreshing
+                  ? 'neutral'
+                  : editor.state.result.envelope.value.kind === 'configured'
+                  ? 'positive'
+                  : 'info'
+              }
+              testID="live-message-current-status"
+            />
+            {editor.state.result.envelope.value.kind === 'configured' ? (
+              <AppText>{editor.state.result.envelope.value.draft.text}</AppText>
+            ) : null}
+          </Card>
+
           {savedConflict ? (
             <Card>
               <StatusRow
@@ -307,109 +513,44 @@ export function LiveMessageScreen({
               />
               <Button
                 label={t('live.message.reloadSaved')}
-                onPress={reloadSaved}
+                disabled={pending !== undefined}
+                onPress={() => {
+                  if (editor.state.kind === 'ready') {
+                    applySaved(editor.state.result.envelope);
+                  }
+                }}
                 variant="secondary"
                 testID="live-message-reload-saved"
               />
             </Card>
           ) : null}
 
-          <SectionHeading
-            title={t('live.message.builtInTitle')}
-            supporting={t('live.message.builtInBody')}
-          />
-          {BUILT_IN_MESSAGE_TEMPLATES.map(template => (
-            <Card key={template.id}>
-              <AppText variant="label">
-                {t(
-                  template.draft.language === 'hi'
-                    ? 'live.message.hindi'
-                    : 'live.message.english',
-                )}{' '}
-                ·{' '}
-                {t(
-                  template.draft.placeholderMode === 'given-name'
-                    ? 'live.message.givenName'
-                    : 'live.message.generic',
-                )}
-              </AppText>
-              <AppText>{template.draft.text}</AppText>
-              <Button
-                label={t('live.message.useBuiltIn')}
-                disabled={pending !== undefined}
-                onPress={() => applyBuiltIn(template)}
-                variant="secondary"
-                testID={`live-message-built-in-${template.id}`}
-              />
-            </Card>
-          ))}
-
           <SectionHeading title={t('live.message.language')} />
-          <View accessibilityRole="radiogroup" style={styles.choices}>
-            <ChoiceChip
-              label={t('live.message.english')}
-              selected={language === 'en'}
-              onPress={() => {
-                setLanguage('en');
-                markDirty();
-              }}
-            />
-            <ChoiceChip
-              label={t('live.message.hindi')}
-              selected={language === 'hi'}
-              onPress={() => {
-                setLanguage('hi');
-                markDirty();
-              }}
-            />
-          </View>
-          <SectionHeading title={t('live.message.tone')} />
-          <View accessibilityRole="radiogroup" style={styles.choices}>
-            {(['warm', 'simple', 'cheerful'] as const).map(value => (
+          <SingleChoiceGroup
+            label={t('live.message.language')}
+            testID="live-message-language-group"
+          >
+            <View style={styles.choices}>
               <ChoiceChip
-                key={value}
-                label={t(`live.message.${value}`)}
-                selected={tone === value}
+                label={t('live.message.english')}
+                selected={language === 'en'}
                 onPress={() => {
-                  setTone(value);
+                  setLanguage('en');
                   markDirty();
                 }}
+                testID="live-message-language-en"
               />
-            ))}
-          </View>
-          <SectionHeading title={t('live.message.nameMode')} />
-          <View accessibilityRole="radiogroup" style={styles.choices}>
-            <ChoiceChip
-              label={t('live.message.givenName')}
-              selected={placeholderMode === 'given-name'}
-              onPress={() => {
-                setPlaceholderMode('given-name');
-                markDirty();
-              }}
-            />
-            <ChoiceChip
-              label={t('live.message.generic')}
-              selected={placeholderMode === 'generic'}
-              onPress={() => {
-                setPlaceholderMode('generic');
-                markDirty();
-              }}
-            />
-          </View>
-          <SectionHeading title={t('live.message.segmentCap')} />
-          <View accessibilityRole="radiogroup" style={styles.choices}>
-            {[1, 2].map(value => (
               <ChoiceChip
-                key={value}
-                label={String(value)}
-                selected={segmentCap === value}
+                label={t('live.message.hindi')}
+                selected={language === 'hi'}
                 onPress={() => {
-                  setSegmentCap(value as 1 | 2);
+                  setLanguage('hi');
                   markDirty();
                 }}
+                testID="live-message-language-hi"
               />
-            ))}
-          </View>
+            </View>
+          </SingleChoiceGroup>
 
           <SectionHeading title={t('live.message.text')} />
           <AccessibleTextInput
@@ -438,62 +579,27 @@ export function LiveMessageScreen({
               testID="live-message-validation"
             />
           ) : null}
-          <ReadinessBanner
-            title={t('live.message.geminiPrivacyTitle')}
-            detail={t('live.message.geminiPrivacyBody')}
-            tone="info"
-            testID="live-message-gemini-privacy"
-          />
-          <Button
-            label={
-              pending === 'suggest'
-                ? t('live.message.suggesting')
-                : t('live.message.suggest')
-            }
-            disabled={pending !== undefined}
-            onPress={generateSuggestions}
-            variant="secondary"
-            testID="live-message-suggest"
-          />
-          {suggestions?.kind === 'candidates'
-            ? suggestions.candidates.map((candidate, index) => (
-                <Card key={index}>
-                  <AppText>{candidate}</AppText>
-                  <Button
-                    label={t('live.message.useSuggestion')}
-                    onPress={() => {
-                      setText(candidate);
-                      markDirty();
-                    }}
-                    variant="secondary"
-                    testID={`live-message-suggestion-${index}`}
-                  />
-                </Card>
-              ))
-            : null}
-          {suggestions?.kind === 'fallback' ||
-          suggestions?.kind === 'failed' ? (
-            <StatusRow
-              title={t('live.message.suggestionUnavailable', {
-                reason: t(safeReasonMessageKey(suggestions.reason)),
-              })}
-              tone="warning"
+
+          {editorActionsTrusted && preview?.preview.kind !== 'valid' ? (
+            <Button
+              label={
+                pending === 'preview'
+                  ? t('live.message.previewing')
+                  : t('live.message.preview')
+              }
+              disabled={pending !== undefined}
+              onPress={preparePreview}
+              testID="live-message-preview"
             />
           ) : null}
-          <Button
-            label={
-              pending === 'preview'
-                ? t('live.message.previewing')
-                : t('live.message.preview')
-            }
-            disabled={pending !== undefined}
-            onPress={preparePreview}
-            testID="live-message-preview"
-          />
 
-          {preview?.preview.kind === 'invalid' ? (
-            <Card>
+          {editorActionsTrusted && preview?.preview.kind === 'invalid' ? (
+            <Card testID="live-message-invalid-review">
               <AppText variant="heading">{t('live.message.invalid')}</AppText>
+              <KeyValue
+                label={t('live.message.validation')}
+                value={t('live.message.validationFailed')}
+              />
               {preview.preview.issues.map(issue => (
                 <StatusRow
                   key={`${issue.field}-${issue.code}`}
@@ -503,31 +609,67 @@ export function LiveMessageScreen({
               ))}
             </Card>
           ) : null}
-          {preview?.preview.kind === 'valid' ? (
-            <Card>
-              <AppText variant="heading">
-                {t('live.message.previewTitle')}
-              </AppText>
+          {editorActionsTrusted && preview?.preview.kind === 'valid' ? (
+            <InlineReviewCard
+              reviewKey={preview.preview.handle}
+              testID="live-message-review"
+              title={t('live.message.previewTitle')}
+            >
               {preview.preview.examples.map((example, index) => (
                 <View
                   key={`${index}-${example.displayName}`}
                   style={styles.example}
+                  testID={`live-message-example-${index}`}
                 >
-                  <AppText variant="label">
-                    {t('live.message.example', {
-                      name: bidiIsolate(example.displayName),
-                      segments: example.segmentCount,
-                      encoding: example.encodingLabel,
+                  <KeyValue
+                    label={t('live.message.exampleName')}
+                    value={bidiIsolate(example.displayName)}
+                  />
+                  <KeyValue
+                    label={t('live.message.finalText')}
+                    value={example.finalText}
+                  />
+                  <KeyValue
+                    label={t('live.message.characterCount')}
+                    value={String(example.characterCount)}
+                  />
+                  <KeyValue
+                    label={t('live.message.encoding')}
+                    value={example.encodingLabel}
+                  />
+                  <KeyValue
+                    label={t('live.message.segmentCount')}
+                    value={t('live.common.parts', {
+                      count: example.segmentCount,
                     })}
-                  </AppText>
-                  <AppText>{example.finalText}</AppText>
+                  />
                 </View>
               ))}
+              <KeyValue
+                label={t('live.message.maximumUsed')}
+                value={t('live.common.parts', {
+                  count: preview.preview.maximumSegmentCount,
+                })}
+              />
+              <KeyValue
+                label={t('live.message.maximumCap')}
+                value={t('live.common.parts', { count: segmentCap })}
+              />
+              <KeyValue
+                label={t('live.message.validation')}
+                value={t('live.message.validationPassed')}
+              />
               <AppText color="muted">
                 {t('live.message.affected', {
                   count: preview.preview.affectedRecipientCount,
                 })}
               </AppText>
+              <ReadinessBanner
+                title={t('live.message.approvalConsequenceTitle')}
+                detail={t('live.message.approvalConsequenceBody')}
+                tone="warning"
+                testID="live-message-approval-consequence"
+              />
               <Button
                 label={
                   pending === 'save'
@@ -543,7 +685,168 @@ export function LiveMessageScreen({
                 disabled={pending !== undefined}
                 onPress={() => setPreview(undefined)}
                 variant="secondary"
+                testID="live-message-cancel-review"
               />
+            </InlineReviewCard>
+          ) : null}
+
+          <Button
+            label={
+              helpExpanded
+                ? t('live.message.hideHelp')
+                : t('live.message.showHelp')
+            }
+            onPress={() => setHelpExpanded(current => !current)}
+            variant="secondary"
+            testID="live-message-help-toggle"
+          />
+          {helpExpanded ? (
+            <Card testID="live-message-help">
+              <SectionHeading
+                title={t('live.message.helpTitle')}
+                supporting={t('live.message.helpBody')}
+              />
+              <AppText variant="label">{t('live.message.tone')}</AppText>
+              <SingleChoiceGroup
+                label={t('live.message.tone')}
+                testID="live-message-tone-group"
+              >
+                {(['warm', 'simple', 'cheerful'] as const).map(value => (
+                  <View key={value} style={styles.toneChoice}>
+                    <ChoiceChip
+                      label={t(`live.message.${value}`)}
+                      selected={tone === value}
+                      onPress={() => {
+                        setTone(value);
+                        markDirty();
+                      }}
+                      testID={`live-message-tone-${value}`}
+                    />
+                    <AppText
+                      color="muted"
+                      variant="caption"
+                      testID={`live-message-tone-${value}-sample`}
+                    >
+                      {t(`live.message.${value}Sample`)}
+                    </AppText>
+                  </View>
+                ))}
+              </SingleChoiceGroup>
+              <ReadinessBanner
+                title={t('live.message.geminiPrivacyTitle')}
+                detail={t('live.message.geminiPrivacyBody')}
+                tone="info"
+                testID="live-message-gemini-privacy"
+              />
+              {editorActionsTrusted ? (
+                <Button
+                  label={
+                    pending === 'suggest'
+                      ? t('live.message.suggesting')
+                      : t('live.message.suggest')
+                  }
+                  disabled={pending !== undefined}
+                  onPress={generateSuggestions}
+                  variant="secondary"
+                  testID="live-message-suggest"
+                />
+              ) : null}
+              {suggestions?.kind === 'candidates'
+                ? suggestions.candidates.map((candidate, index) => (
+                    <Card key={index}>
+                      <AppText>{candidate}</AppText>
+                      <Button
+                        label={t('live.message.useSuggestion')}
+                        disabled={pending !== undefined}
+                        onPress={() => {
+                          setText(candidate);
+                          markDirty();
+                        }}
+                        variant="secondary"
+                        testID={`live-message-suggestion-${index}`}
+                      />
+                    </Card>
+                  ))
+                : null}
+              {suggestionNeedsFallback && suggestions ? (
+                <>
+                  <StatusRow
+                    title={t('live.message.suggestionUnavailable', {
+                      reason: t(safeReasonMessageKey(suggestions.reason)),
+                    })}
+                    tone="warning"
+                  />
+                  {renderBuiltIns('fallback')}
+                </>
+              ) : null}
+            </Card>
+          ) : null}
+
+          <Button
+            label={
+              optionsExpanded
+                ? t('live.message.hideOptions')
+                : t('live.message.showOptions')
+            }
+            onPress={() => setOptionsExpanded(current => !current)}
+            variant="secondary"
+            testID="live-message-options-toggle"
+          />
+          {optionsExpanded ? (
+            <Card testID="live-message-options">
+              <SectionHeading
+                title={t('live.message.optionsTitle')}
+                supporting={t('live.message.optionsBody')}
+              />
+              <AppText variant="label">{t('live.message.nameMode')}</AppText>
+              <SingleChoiceGroup
+                label={t('live.message.nameMode')}
+                testID="live-message-name-group"
+              >
+                <View style={styles.choices}>
+                  <ChoiceChip
+                    label={t('live.message.givenName')}
+                    selected={placeholderMode === 'given-name'}
+                    onPress={() => {
+                      setPlaceholderMode('given-name');
+                      markDirty();
+                    }}
+                    testID="live-message-name-given"
+                  />
+                  <ChoiceChip
+                    label={t('live.message.generic')}
+                    selected={placeholderMode === 'generic'}
+                    onPress={() => {
+                      setPlaceholderMode('generic');
+                      markDirty();
+                    }}
+                    testID="live-message-name-generic"
+                  />
+                </View>
+              </SingleChoiceGroup>
+              <AppText variant="label">{t('live.message.segmentCap')}</AppText>
+              <SingleChoiceGroup
+                label={t('live.message.segmentCap')}
+                testID="live-message-segment-group"
+              >
+                <View style={styles.choices}>
+                  {([1, 2] as const).map(value => (
+                    <ChoiceChip
+                      key={value}
+                      label={t('live.message.segmentCapChoice', {
+                        count: value,
+                      })}
+                      selected={segmentCap === value}
+                      onPress={() => {
+                        setSegmentCap(value);
+                        markDirty();
+                      }}
+                      testID={`live-message-segment-${value}`}
+                    />
+                  ))}
+                </View>
+              </SingleChoiceGroup>
+              {!suggestionNeedsFallback ? renderBuiltIns('options') : null}
             </Card>
           ) : null}
         </>
@@ -554,7 +857,8 @@ export function LiveMessageScreen({
 
 const styles = StyleSheet.create({
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  example: { gap: spacing.xs, paddingVertical: spacing.sm },
+  toneChoice: { alignItems: 'flex-start', gap: spacing.xs },
+  example: { gap: spacing.sm, paddingVertical: spacing.sm },
   input: {
     borderRadius: radii.md,
     borderWidth: 1,

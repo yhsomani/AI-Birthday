@@ -88,11 +88,11 @@ test('React Native sends only opaque contact and revision for a reviewed block a
   );
   assert.match(
     screen,
-    /live-person-confirm-destination-\$\{destinationBlockReview\}/u,
+    /live-person-confirm-destination-\$\{currentDestinationReview\.kind\}/u,
   );
   assert.match(
     screen,
-    /const input = \{ contactId, expectedRevision: revision \}/u,
+    /const input = \{[\s\S]*?contactId: review\.contactId,[\s\S]*?expectedRevision: review\.sourceRevision,[\s\S]*?\}/u,
   );
   assert.doesNotMatch(screen, /normalizedDestination/u);
   assert.match(schema, /selectedDestinationBlocked: z\.boolean\(\)/u);

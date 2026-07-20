@@ -15,7 +15,9 @@ import {
   InlineReviewCard,
   LabeledSwitch,
   PersonRow,
+  Screen,
   SearchField,
+  SettingRow,
   SingleChoiceGroup,
 } from './Primitives';
 
@@ -126,6 +128,77 @@ it('exposes radio and checkbox state on minimum-size selectable controls', async
   expect(flattenedStyle('semantic-person').minHeight).toBeGreaterThanOrEqual(
     48,
   );
+});
+
+it('shows and clears the theme focus outline on every shared pressable', async () => {
+  await render(
+    <Providers>
+      <Button label="Continue" onPress={jest.fn()} testID="focus-button" />
+      <ChoiceChip
+        label="Warm"
+        onPress={jest.fn()}
+        selected={false}
+        testID="focus-choice"
+      />
+      <SettingRow
+        detail="Choose the birthday message"
+        onPress={jest.fn()}
+        testID="focus-setting"
+        title="Message"
+      />
+      <LabeledSwitch
+        detail="Pauses new work"
+        onValueChange={jest.fn()}
+        testID="focus-switch"
+        title="Pause"
+        value={false}
+      />
+      <PersonRow
+        accessibilityLabel="Open Asha"
+        birthday="12 July"
+        initials="AS"
+        name="Asha"
+        onPress={jest.fn()}
+        status="Ready"
+        testID="focus-person"
+      />
+    </Providers>,
+  );
+
+  for (const testID of [
+    'focus-button',
+    'focus-choice',
+    'focus-setting',
+    'focus-switch',
+    'focus-person',
+  ]) {
+    await fireEvent(screen.getByTestId(testID), 'focus');
+    expect(flattenedStyle(testID).outlineWidth).toBe(3);
+    await fireEvent(screen.getByTestId(testID), 'blur');
+    expect(flattenedStyle(testID).outlineWidth).toBe(0);
+  }
+});
+
+it('keeps shared screen content centered inside an invariant readable width', async () => {
+  const rendered = await render(
+    <Providers>
+      <Screen contentStyle={{ maxWidth: 2_000 }} testID="bounded-screen">
+        <Button label="Continue" onPress={jest.fn()} />
+      </Screen>
+    </Providers>,
+  );
+
+  const scrollViews = rendered.container.queryAll(
+    node => node.type === 'RCTScrollView',
+  );
+  expect(scrollViews).toHaveLength(1);
+  const scrollView = scrollViews[0]!;
+  const contentStyle = StyleSheet.flatten(
+    scrollView.props.contentContainerStyle,
+  );
+  expect(contentStyle.alignSelf).toBe('center');
+  expect(contentStyle.width).toBe('100%');
+  expect(contentStyle.maxWidth).toBe(720);
 });
 
 it('focuses and announces a newly revealed inline review exactly once', async () => {

@@ -228,7 +228,7 @@ test('product bridges are absent from Smoke while fixture E2E stays unchanged', 
   assert.doesNotMatch(read('index.js'), /FixturePreview|BirthdayAutopilotE2E/u);
 });
 
-test('production-path Maestro flow is app-ID-bound and navigation-only', () => {
+test('production-path Maestro flow is app-ID-bound and read-only', () => {
   const directory = path.join(root, 'e2e/maestro-production-smoke');
   const flows = readdirSync(directory)
     .filter(file => file.endsWith('.yaml'))
@@ -241,10 +241,14 @@ test('production-path Maestro flow is app-ID-bound and navigation-only', () => {
     'live-activity-screen',
     'live-activity-detail-screen',
     'live-message-screen',
+    'live-schedule-screen',
     'live-automation-screen',
     'live-attention-screen',
     'live-diagnostics-screen',
     'live-people-screen',
+    'live-people-search',
+    'live-people-filter-ready',
+    'live-people-filter-all',
     'live-settings-screen',
     'live-privacy-screen',
     'live-help-legal-screen',
@@ -257,8 +261,12 @@ test('production-path Maestro flow is app-ID-bound and navigation-only', () => {
   );
   for (const id of [
     'live-home-activity',
-    'live-home-message',
-    'live-home-automation',
+    'live-home-attention',
+    'live-settings-message',
+    'live-settings-schedule',
+    'live-settings-automation',
+    'live-settings-privacy',
+    'live-settings-help-legal',
   ]) {
     assert.equal(
       scrollBlocks.some(block => block.includes(`id: ${id}`)),
@@ -268,10 +276,16 @@ test('production-path Maestro flow is app-ID-bound and navigation-only', () => {
   }
   for (const id of [
     'live-activity-smoke.activity.1',
+    'live-home-attention',
+    'live-people-filter-ready',
+    'live-people-search',
+    'live-people-filter-all',
+    'live-settings-message',
+    'live-settings-schedule',
+    'live-settings-automation',
     'live-settings-privacy',
     'live-settings-help-legal',
-    'live-settings-attention',
-    'live-settings-diagnostics',
+    'live-help-diagnostics',
   ]) {
     assert.equal(
       commandBlocks.some(
@@ -281,6 +295,30 @@ test('production-path Maestro flow is app-ID-bound and navigation-only', () => {
       `${id} must have its own tap command`,
     );
   }
+  const peopleFlow = flows[0].slice(
+    flows[0].indexOf('id: live-tab-people'),
+    flows[0].indexOf('id: live-tab-settings'),
+  );
+  assert.match(
+    peopleFlow,
+    /id: live-people-filter-ready[\s\S]*No one is ready to set up[\s\S]*id: live-people-search[\s\S]*inputText: smoke-no-match[\s\S]*No people match this search[\s\S]*eraseText: 14[\s\S]*id: live-people-filter-all/u,
+  );
+  assert.doesNotMatch(
+    peopleFlow,
+    /id: live-people-(?:sync|select-page-ready|confirm-page-enrollment)|id: live-person-/u,
+  );
+  assert.doesNotMatch(
+    flows[0],
+    /live-settings-(?:activity|attention|diagnostics)/u,
+  );
+  assert.doesNotMatch(
+    flows[0],
+    /id: live-home-(?:message|automation|refresh)(?:\s|$)/u,
+  );
+  assert.match(
+    flows[0],
+    /id: live-settings-help-legal[\s\S]*id: live-help-legal-screen[\s\S]*id: live-help-diagnostics[\s\S]*id: live-diagnostics-screen[\s\S]*id: live-diagnostics-back[\s\S]*id: live-help-legal-screen[\s\S]*id: live-help-back[\s\S]*id: live-settings-screen/u,
+  );
   assert.match(
     flows[0],
     /extendedWaitUntil:\s*\n\s+visible:\s*\n\s+id: live-app-shell\s*\n\s+timeout: 120000/u,

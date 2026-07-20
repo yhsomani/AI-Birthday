@@ -128,15 +128,17 @@ test('high-risk Stitch owners contain their real production state and route anch
   const privacy = read('src/features/live/LivePrivacyScreen.tsx');
   const activity = read('src/features/live/LiveActivityScreen.tsx');
   const automation = read('src/features/live/LiveAutomationScreen.tsx');
+  const composerReview = read('src/features/live/LiveComposerReviewScreen.tsx');
   const activationModel = read('src/domain/automation/model.ts');
   const shell = read('src/features/live/LiveAppShell.tsx');
 
   assert.deepEqual(entry('A06')?.implementation, [
-    'src/features/live/LivePrivacyScreen.tsx',
+    'src/features/live/LiveActivityScreen.tsx',
   ]);
-  assert.match(privacy, /kind: 'clear-activity'/u);
-  assert.match(privacy, /prepareAction/u);
-  assert.match(privacy, /confirmAction/u);
+  assert.match(activity, /kind: 'clear-activity'/u);
+  assert.match(activity, /prepareAction/u);
+  assert.match(activity, /confirmAction/u);
+  assert.doesNotMatch(privacy, /kind: 'clear-activity'/u);
 
   assert.ok(
     entry('T06')?.implementation.includes(
@@ -174,5 +176,20 @@ test('high-risk Stitch owners contain their real production state and route anch
   }
   assert.match(automation, /iosActivationSnapshotComplete/u);
   assert.match(automation, /live-ios-activation-snapshot-blocked/u);
-  assert.match(automation, /live-open-composer/u);
+  assert.doesNotMatch(automation, /live-open-composer/u);
+  assert.match(composerReview, /live-open-composer/u);
+
+  assert.deepEqual(entry('H03')?.implementation, [
+    'src/features/live/LiveComposerReviewScreen.tsx',
+    'src/features/live/LiveHomeScreen.tsx',
+    'src/features/live/LiveMessageScreen.tsx',
+  ]);
+  assert.deepEqual(entry('H06')?.implementation, [
+    'src/features/live/LiveComposerReviewScreen.tsx',
+    'src/features/live/LiveHomeScreen.tsx',
+  ]);
+  assert.match(
+    shell,
+    /<Stack\.Screen[\s\S]{0,120}?name="ComposerReview"[\s\S]{0,120}?component=\{LiveComposerReviewRoute\}/u,
+  );
 });

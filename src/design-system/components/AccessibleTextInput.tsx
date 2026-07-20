@@ -1,5 +1,7 @@
-import React, { forwardRef } from 'react';
-import { TextInput, TextInputProps } from 'react-native';
+import React, { forwardRef, useState } from 'react';
+import { StyleSheet, TextInput, TextInputProps } from 'react-native';
+
+import { useAppTheme } from '../../app/providers/ThemeProvider';
 
 export type AccessibleTextInputProps = Omit<
   TextInputProps,
@@ -12,9 +14,12 @@ export const AccessibleTextInput = forwardRef<
   TextInput,
   AccessibleTextInputProps
 >(function AccessibleTextInputComponent(
-  { accessibilityLabel, ...inputProps },
+  { accessibilityLabel, onBlur, onFocus, style, ...inputProps },
   reference,
 ) {
+  const { colors } = useAppTheme();
+  const [focused, setFocused] = useState(false);
+  const focusColorStyle = { outlineColor: colors.focus };
   const normalizedLabel = accessibilityLabel.trim();
   if (!normalizedLabel) {
     throw new Error(
@@ -28,7 +33,27 @@ export const AccessibleTextInput = forwardRef<
       accessibilityLabel={normalizedLabel}
       allowFontScaling
       maxFontSizeMultiplier={2}
+      onBlur={event => {
+        setFocused(false);
+        onBlur?.(event);
+      }}
+      onFocus={event => {
+        setFocused(true);
+        onFocus?.(event);
+      }}
       ref={reference}
+      style={[
+        style,
+        styles.focusOutline,
+        focusColorStyle,
+        focused ? styles.focused : styles.unfocused,
+      ]}
     />
   );
+});
+
+const styles = StyleSheet.create({
+  focusOutline: { outlineOffset: 2, outlineStyle: 'solid' },
+  focused: { outlineWidth: 3 },
+  unfocused: { outlineWidth: 0 },
 });

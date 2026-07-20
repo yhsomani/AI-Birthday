@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  AppState,
-  BackHandler,
-  Linking,
-  StyleSheet,
-} from 'react-native';
+import { AppState, BackHandler, Linking, StyleSheet } from 'react-native';
 import {
   act,
   cleanup,
@@ -117,6 +112,15 @@ const renderLiveApp = (
     />,
   );
 
+const openSettingsDestination = async (
+  destination: 'automation' | 'message' | 'schedule',
+) => {
+  await fireEvent.press(await screen.findByTestId('live-tab-settings'));
+  await fireEvent.press(
+    await screen.findByTestId(`live-settings-${destination}`),
+  );
+};
+
 const capability = {
   platform: 'android',
   deliveryMode: 'unattended-device-sms',
@@ -141,6 +145,24 @@ const account: AccountProjection = {
     kind: 'automation-active',
     epochLabel: 'This device',
   },
+};
+
+const androidAccountForSender = (
+  kind: 'test-only' | 'paused-repair' | 'automation-active',
+): AccountProjection => ({
+  kind: 'connected',
+  displayEmail: 'user@example.test' as PrivateEmail,
+  sender: {
+    platform: 'android',
+    kind,
+    epochLabel: 'This device',
+  },
+});
+
+const latestPassedTest = {
+  platform: 'android' as const,
+  phase: 'passed' as const,
+  updatedAt: generatedAt,
 };
 
 const completeBootstrap: BootstrapProjection = {
@@ -216,6 +238,27 @@ const iosHome: HomeProjection = {
   },
 };
 
+const nextBirthday = {
+  occurrenceId: 'occurrence-next' as OccurrenceId,
+  recipient: 'Live Contact' as PrivateDisplayName,
+  localDate: '2026-07-18' as import('../domain/shared/temporal').LocalDate,
+  windowLabel: '09:00–11:00',
+  maskedPhone: '•••• 4321',
+  exactText: 'Happy birthday!' as PrivateMessageText,
+};
+
+const iosDueHome: HomeProjection = {
+  ...iosHome,
+  counts: {
+    ...iosHome.counts,
+    today: 1,
+  },
+  next: {
+    ...nextBirthday,
+    occurrenceId: 'occurrence-1' as OccurrenceId,
+  },
+};
+
 const liveHome = (effective: 'active' | 'paused-repair'): HomeProjection => ({
   automation: {
     platform: 'android',
@@ -261,6 +304,74 @@ const completeSetup: SetupProjection = {
   automation: liveHome('active').automation,
 };
 
+const configuredMessage = {
+  kind: 'configured' as const,
+  draft: {
+    language: 'en' as const,
+    tone: 'warm' as const,
+    placeholderMode: {
+      kind: 'generic' as const,
+      requiredCount: 0 as const,
+    },
+    text: 'Happy birthday!' as PrivateMessageText,
+    requestedSegmentCap: 1 as const,
+  },
+};
+
+const configuredPolicy = {
+  kind: 'configured' as const,
+  draft: {
+    primaryStart: '09:00' as const,
+    primaryEnd: '11:00' as const,
+    latePolicy: { kind: 'none' as const },
+    dailyCap: 10,
+  },
+};
+
+const iosCompleteSetup: SetupProjection = {
+  step: 'complete',
+  initialActivationCompleted: true,
+  eligibility: iosBootstrap.eligibility,
+  account: iosAccount,
+  contacts: {
+    kind: 'fresh',
+    completedAt: generatedAt,
+    contactCount: 1,
+  },
+  readiness: iosReadiness,
+  automation: iosHome.automation,
+};
+
+const lifecycleRepairFixture = () => {
+  const repairingAccount: AccountProjection = {
+    kind: 'cleanup-pending',
+    operation: 'repair',
+    issue: {
+      id: 'repairing-lifecycle-lease' as IssueId,
+      code: 'coordination-unavailable',
+      severity: 'blocking',
+      blocks: ['test', 'activation', 'birthday'],
+    },
+  };
+  const repairingBootstrap: BootstrapProjection = {
+    ...completeBootstrap,
+    account: repairingAccount,
+    setupStep: 'complete',
+  };
+  const repairingSetup: SetupProjection = {
+    ...completeSetup,
+    step: 'complete',
+    account: repairingAccount,
+    automation: {
+      platform: 'android',
+      desired: 'paused',
+      effective: 'paused-repair',
+      readiness,
+    },
+  };
+  return { repairingAccount, repairingBootstrap, repairingSetup } as const;
+};
+
 const contactSummary = (
   kind: 'enabled' | 'paused' = 'enabled',
 ): ContactSummary => ({
@@ -290,6 +401,21 @@ const contactDetail = (
   birthdayChoices: [],
   selectedDestinationBlocked: false,
   nextOccurrenceLabel: '18 July 2026',
+});
+
+const contactDetailNeedingApproval = (): ContactDetail => ({
+  ...contactDetail(),
+  summary: {
+    ...contactSummary(),
+    readiness: {
+      kind: 'needs-attention',
+      reasons: ['approval-invalid'],
+    },
+    enrollment: {
+      kind: 'enabled',
+      approval: { kind: 'missing' },
+    },
+  },
 });
 
 const privacyInventory: PrivacyInventory = {
@@ -324,6 +450,14 @@ const internalError = <Value,>(): NativeResult<Value> => ({
   },
 });
 
+const deferred = <Value,>() => {
+  let resolve!: (value: Value) => void;
+  const promise = new Promise<Value>(next => {
+    resolve = next;
+  });
+  return { promise, resolve } as const;
+};
+
 type PortHarness = Readonly<{
   port: LiveAppPort;
   emit(event: ProjectionInvalidation): void;
@@ -356,14 +490,12 @@ const createPort = (
     ),
     getCurrentOperation: jest.fn(async () => ok({ kind: 'none' as const })),
     getPendingRoute: jest.fn(async () => ok({ kind: 'none' as const })),
-    getPolicyEditor: jest.fn(async () =>
-      ok({ kind: 'not-configured' as const }),
-    ),
+    getPolicyEditor: jest.fn(async () => ok(configuredPolicy)),
     getApproval: jest.fn(async () =>
       ok({ kind: 'valid' as const, approvedAt: generatedAt }),
     ),
     getBirthdayJob: jest.fn(async () => internalError()),
-    getMessageEditor: jest.fn(async () => internalError()),
+    getMessageEditor: jest.fn(async () => ok(configuredMessage)),
     getNextComposerProposal: jest.fn(async () => internalError()),
     getLatestTest: jest.fn(async () => internalError()),
     listPeople: jest.fn(async () =>
@@ -453,7 +585,18 @@ afterEach(async () => {
 
 describe('production live projections', () => {
   it('renders a successful native Home route without importing or rendering fixtures', async () => {
-    const getHome = jest.fn(async () => ok(liveHome('active')));
+    const getHome = jest.fn(async () =>
+      ok({
+        ...liveHome('active'),
+        next: nextBirthday,
+        counts: {
+          ...liveHome('active').counts,
+          nextSevenDays: 1,
+        },
+        schedulerHeartbeatAt: generatedAt,
+        lastCoordinationSuccessAt: generatedAt,
+      }),
+    );
     const { port } = createPort({ getHome });
 
     await renderLiveApp(port);
@@ -470,12 +613,64 @@ describe('production live projections', () => {
     expect(screen.queryByText(/Synthetic data/u)).toBeNull();
     expect(screen.queryByText(/Interactive UI fixture/u)).toBeNull();
     expect(getHome).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Live Contact')).toBeTruthy();
+    expect(screen.getByText('18 July 2026')).toBeTruthy();
+    expect(screen.queryByText('Happy birthday!')).toBeNull();
+    const approvedMessageToggle = screen.getByTestId(
+      'live-home-approved-message-toggle',
+    );
+    expect(approvedMessageToggle.props.accessibilityLabel).toBe(
+      'View approved message',
+    );
+    await fireEvent.press(approvedMessageToggle);
+    expect(screen.getByTestId('live-home-approved-message')).toBeTruthy();
+    expect(screen.getByText('Happy birthday!')).toBeTruthy();
     expect(
-      screen.getByTestId('live-home-active-sender').props.accessibilityLabel,
-    ).toContain('This device');
+      screen.getByTestId('live-home-approved-message-toggle').props
+        .accessibilityLabel,
+    ).toBe('Hide approved message');
+    await fireEvent.press(
+      screen.getByTestId('live-home-approved-message-toggle'),
+    );
+    expect(screen.queryByTestId('live-home-approved-message')).toBeNull();
+    expect(screen.queryByText('Happy birthday!')).toBeNull();
+    expect(screen.getByText('At a glance')).toBeTruthy();
+    const summaryRows = screen
+      .getAllByRole('text')
+      .filter(node =>
+        [
+          'Birthdays. 0 today · 1 in the next 7 days',
+          'People. 1 enabled · 0 need attention',
+        ].includes(node.props.accessibilityLabel),
+      );
+    expect(summaryRows).toHaveLength(2);
+    expect(
+      new Set(summaryRows.map(row => row.props.accessibilityLabel)).size,
+    ).toBe(2);
+    expect(screen.getByTestId('live-home-activity')).toBeTruthy();
+    expect(screen.queryByTestId('live-home-attention')).toBeNull();
+    expect(screen.queryByTestId('live-home-automation')).toBeNull();
+    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
+    expect(screen.getByTestId('live-home-pause')).toBeTruthy();
+    expect(screen.queryByTestId('live-home-message')).toBeNull();
+    expect(screen.queryByTestId('live-home-refresh')).toBeNull();
+    expect(screen.queryByTestId('live-home-active-sender')).toBeNull();
+    expect(screen.queryByText('Protected service')).toBeNull();
+    expect(screen.queryByText('Scheduler heartbeat')).toBeNull();
+    expect(screen.queryByText('Last safety check')).toBeNull();
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(3);
+    expect(tabs.map(tab => tab.props.accessibilityLabel)).toEqual([
+      'Home',
+      'People',
+      'Settings',
+    ]);
     const homeTab = screen.getByTestId('live-tab-home');
     expect(homeTab.props.accessibilityRole).toBe('tab');
-    expect(homeTab.props.accessibilityState).toEqual({ selected: true });
+    expect(homeTab.props.accessibilityState).toEqual({
+      disabled: false,
+      selected: true,
+    });
     expect(screen.getByTestId('live-tab-list').props.accessibilityRole).toBe(
       'tablist',
     );
@@ -486,12 +681,284 @@ describe('production live projections', () => {
           : homeTab.props.style,
       ).minHeight,
     ).toBeGreaterThanOrEqual(48);
+    await fireEvent(screen.getByTestId('live-tab-home'), 'focus');
+    const focusedHomeTab = screen.getByTestId('live-tab-home');
+    expect(
+      StyleSheet.flatten(
+        typeof focusedHomeTab.props.style === 'function'
+          ? focusedHomeTab.props.style({ pressed: false })
+          : focusedHomeTab.props.style,
+      ).outlineWidth,
+    ).toBe(3);
+    await fireEvent(screen.getByTestId('live-tab-home'), 'blur');
 
     await fireEvent.press(screen.getByTestId('live-tab-settings'));
     await waitFor(() =>
       expect(screen.getByTestId('live-settings-screen')).toBeTruthy(),
     );
-    expect(screen.getByText('Android Automation Edition')).toBeTruthy();
+    const usefulSettingsRows = [
+      screen.getByTestId('live-settings-message'),
+      screen.getByTestId('live-settings-schedule'),
+      screen.getByTestId('live-settings-automation'),
+      screen.getByTestId('live-settings-privacy'),
+      screen.getByTestId('live-settings-help-legal'),
+    ];
+    const accessibleLabels = usefulSettingsRows.map(
+      row => row.props.accessibilityLabel,
+    );
+    expect(accessibleLabels.every(label => typeof label === 'string')).toBe(
+      true,
+    );
+    expect(new Set(accessibleLabels).size).toBe(usefulSettingsRows.length);
+    const settingsGroupNames = ['Birthday plan', 'Account and privacy', 'Help'];
+    for (const name of settingsGroupNames) {
+      expect(screen.getByRole('header', { name })).toBeTruthy();
+    }
+    expect(new Set(settingsGroupNames).size).toBe(settingsGroupNames.length);
+    expect(
+      screen.getByTestId('live-settings-automation').props.accessibilityLabel,
+    ).toMatch(/^Android sending\./u);
+    expect(screen.queryByTestId('live-settings-attention')).toBeNull();
+    expect(screen.queryByTestId('live-settings-activity')).toBeNull();
+    expect(screen.queryByTestId('live-settings-diagnostics')).toBeNull();
+    expect(screen.queryByTestId('live-settings-refresh')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Activity' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Needs attention' }),
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Diagnostics' })).toBeNull();
+    expect(screen.queryByText('Phone readiness')).toBeNull();
+    expect(screen.queryByText('Privacy summary')).toBeNull();
+    expect(screen.queryByText('Appearance follows this phone')).toBeNull();
+    expect(screen.queryByText('Language follows this phone')).toBeNull();
+  });
+
+  it('prioritizes Fix issues over a simultaneous today review and plan action', async () => {
+    const needsRepairHome: HomeProjection = {
+      ...liveHome('paused-repair'),
+      next: nextBirthday,
+      automation: {
+        platform: 'android',
+        desired: 'paused',
+        effective: 'paused-repair',
+        readiness,
+      },
+      counts: {
+        ...liveHome('paused-repair').counts,
+        today: 1,
+        nextSevenDays: 1,
+      },
+    };
+    const { port } = createPort({
+      getHome: jest.fn(async () => ok(needsRepairHome)),
+    });
+
+    await renderLiveApp(port);
+
+    const repair = await screen.findByTestId('live-home-attention');
+    expect(repair.props.accessibilityLabel).toBe('Fix issues');
+    expect(screen.getAllByTestId('live-home-attention')).toHaveLength(1);
+    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
+    expect(screen.queryByTestId('live-home-automation')).toBeNull();
+    expect(screen.getByTestId('live-home-activity')).toBeTruthy();
+    expect(screen.queryByTestId('live-home-message')).toBeNull();
+    expect(screen.queryByTestId('live-home-refresh')).toBeNull();
+  });
+
+  it.each(['not-configured', 'test-only'] as const)(
+    'offers one contextual setup action for Android %s and returns Back to Home',
+    async effective => {
+      const inactiveHome: HomeProjection = {
+        ...liveHome('active'),
+        automation: {
+          platform: 'android',
+          desired: 'paused',
+          effective,
+          readiness,
+        },
+      };
+      const { port } = createPort({
+        getHome: jest.fn(async () => ok(inactiveHome)),
+      });
+
+      await renderLiveApp(port);
+
+      const setup = await screen.findByTestId('live-home-automation');
+      expect(setup.props.accessibilityLabel).toBe('Set up birthday plan');
+      expect(screen.getAllByTestId('live-home-automation')).toHaveLength(1);
+      expect(screen.queryByTestId('live-home-attention')).toBeNull();
+      expect(screen.queryByTestId('live-home-review-today')).toBeNull();
+      expect(screen.queryByTestId('live-home-pause')).toBeNull();
+
+      await fireEvent.press(setup);
+      expect(await screen.findByTestId('live-automation-screen')).toBeTruthy();
+      await fireEvent.press(screen.getByTestId('live-automation-back'));
+      expect(await screen.findByTestId('live-home-screen')).toBeTruthy();
+    },
+  );
+
+  it('prioritizes Android setup over a due action while automation is test-only', async () => {
+    const testOnlyDueHome: HomeProjection = {
+      ...activationReadyHome,
+      next: nextBirthday,
+      counts: {
+        ...activationReadyHome.counts,
+        today: 1,
+        nextSevenDays: 1,
+      },
+    };
+    const { port } = createPort({
+      getHome: jest.fn(async () => ok(testOnlyDueHome)),
+    });
+
+    await renderLiveApp(port);
+
+    expect(await screen.findByTestId('live-home-automation')).toBeTruthy();
+    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
+  });
+
+  it('keeps pausing behind an explicit Home review and native revision check', async () => {
+    const getHome = jest
+      .fn()
+      .mockResolvedValueOnce(ok(liveHome('active'), revision('4')))
+      .mockResolvedValue(ok(activationReadyHome, revision('5')));
+    const pauseAll = jest.fn(async () =>
+      ok(activationReadyHome.automation, revision('5')),
+    );
+    const { port } = createPort({ getHome, pauseAll });
+
+    await renderLiveApp(port);
+
+    await fireEvent.press(await screen.findByTestId('live-home-pause'));
+    expect(await screen.findByText('Pause birthday actions?')).toBeTruthy();
+    expect(screen.queryByTestId('live-home-pause')).toBeNull();
+    expect(screen.queryByTestId('live-home-attention')).toBeNull();
+    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
+    expect(screen.queryByTestId('live-home-automation')).toBeNull();
+    expect(pauseAll).not.toHaveBeenCalled();
+
+    await fireEvent.press(screen.getByTestId('live-home-confirm-pause'));
+
+    await waitFor(() => expect(pauseAll).toHaveBeenCalledTimes(1));
+    expect(pauseAll).toHaveBeenCalledWith({ expectedRevision: '4' });
+    expect(getHome).toHaveBeenCalledTimes(2);
+    expect(
+      await screen.findByText('Birthday actions are paused.'),
+    ).toBeTruthy();
+    expect(screen.getByTestId('live-home-automation')).toBeTruthy();
+  });
+
+  it('retires a Home pause review when the same mode is reloaded at a new revision', async () => {
+    const getHome = jest
+      .fn()
+      .mockResolvedValueOnce(ok(liveHome('active'), revision('4')))
+      .mockResolvedValue(ok(liveHome('active'), revision('5')));
+    const pauseAll = jest.fn(async () =>
+      ok(activationReadyHome.automation, revision('6')),
+    );
+    const harness = createPort({ getHome, pauseAll });
+
+    await renderLiveApp(harness.port);
+    await fireEvent.press(await screen.findByTestId('live-home-pause'));
+    expect(await screen.findByTestId('live-home-confirm-pause')).toBeTruthy();
+
+    await act(async () => {
+      harness.emit({ revision: revision('5'), areas: ['home'] });
+    });
+
+    await waitFor(() =>
+      expect(getHome.mock.calls.length).toBeGreaterThanOrEqual(2),
+    );
+    await waitFor(() =>
+      expect(screen.queryByTestId('live-home-confirm-pause')).toBeNull(),
+    );
+    expect(screen.getByTestId('live-home-pause')).toBeTruthy();
+    expect(pauseAll).not.toHaveBeenCalled();
+  });
+
+  it('hides healthy iPhone internals while keeping a useful ready Home', async () => {
+    const healthyCompanionPort: LiveCompanionPort = {
+      canOpenComposer: jest.fn(async () => true),
+      getReminderStatus: jest.fn(async () => ({
+        kind: 'ok' as const,
+        value: {
+          authorization: 'authorized' as const,
+          failedCount: 0,
+          kind: 'ok' as const,
+          plannedDateCount: 1,
+          scheduledCount: 1,
+          truncated: false,
+        },
+      })),
+      openNotificationSettings: jest.fn(),
+      openUserConfirmedComposer: jest.fn(),
+      prepareComposerReview: jest.fn(),
+      requestReminderAuthorization: jest.fn(),
+    };
+    const readyHome: HomeProjection = {
+      ...iosHome,
+      next: nextBirthday,
+    };
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
+      getHome: jest.fn(async () => ok(readyHome)),
+    });
+
+    await renderLiveApp(port, healthyCompanionPort);
+
+    expect(
+      await screen.findByText('Birthday reminders are ready'),
+    ).toBeTruthy();
+    await waitFor(() =>
+      expect(healthyCompanionPort.getReminderStatus).toHaveBeenCalledTimes(1),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByText('iPhone reminder and Messages readiness'),
+      ).toBeNull(),
+    );
+    expect(screen.queryByText('Allowed')).toBeNull();
+    expect(screen.queryByText('1 reminder scheduled')).toBeNull();
+    expect(screen.queryByText('1 birthday date planned')).toBeNull();
+    expect(screen.queryByText('Available for your review')).toBeNull();
+    expect(screen.queryByTestId('live-home-attention')).toBeNull();
+    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
+    expect(screen.queryByTestId('live-home-automation')).toBeNull();
+    expect(screen.queryByTestId('live-home-refresh')).toBeNull();
+    expect(screen.getByTestId('live-home-activity')).toBeTruthy();
+
+    const labels = [
+      screen.getByTestId('live-home-approved-message-toggle'),
+      screen.getByTestId('live-home-activity'),
+      screen.getByTestId('live-home-pause'),
+    ].map(control => control.props.accessibilityLabel);
+    expect(labels.every(label => typeof label === 'string')).toBe(true);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it('offers one contextual manage-plan action when iPhone reminders are paused', async () => {
+    const pausedHome: HomeProjection = {
+      ...iosHome,
+      automation: {
+        platform: 'ios',
+        desired: 'paused',
+        effective: 'paused',
+        readiness: iosReadiness,
+      },
+    };
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
+      getHome: jest.fn(async () => ok(pausedHome)),
+    });
+
+    await renderLiveApp(port);
+
+    const manage = await screen.findByTestId('live-home-automation');
+    expect(manage.props.accessibilityLabel).toBe('Review birthday plan');
+    expect(screen.getAllByTestId('live-home-automation')).toHaveLength(1);
+    expect(screen.queryByTestId('live-home-attention')).toBeNull();
+    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
+    expect(screen.queryByTestId('live-home-pause')).toBeNull();
   });
 
   it('opens only fixed verified Hosting routes from Help and legal', async () => {
@@ -512,12 +979,8 @@ describe('production live projections', () => {
     expect(await screen.findByTestId('live-help-legal-screen')).toBeTruthy();
     expect(screen.getByText('Birthday Autopilot 0.1.0 (1)')).toBeTruthy();
     expect(screen.getByText(/every supported-device/u)).toBeTruthy();
-    expect(screen.getByTestId('live-cloud-privacy-boundary')).toBeTruthy();
-    expect(screen.getByText(/content-free, not data-free/u)).toBeTruthy();
-    expect(screen.getByText(/Firebase Installations token/u)).toBeTruthy();
-    expect(
-      screen.getByText(/cannot promise immediate erasure of provider logs/u),
-    ).toBeTruthy();
+    expect(screen.queryByTestId('live-cloud-privacy-boundary')).toBeNull();
+    expect(screen.queryByText(/content-free, not data-free/u)).toBeNull();
     await fireEvent.press(screen.getByTestId('live-help-privacy'));
     await waitFor(() =>
       expect(openURL).toHaveBeenCalledWith(
@@ -599,9 +1062,13 @@ describe('production live projections', () => {
       await screen.findByText('iPhone reminder and Messages readiness'),
     ).toBeTruthy();
     expect(screen.getByText('Not allowed')).toBeTruthy();
-    expect(screen.getByText('1 reminder scheduled')).toBeTruthy();
-    expect(screen.getByText('3 birthday dates planned')).toBeTruthy();
+    expect(screen.queryByText('1 reminder scheduled')).toBeNull();
+    expect(screen.queryByText('3 birthday dates planned')).toBeNull();
     expect(screen.getByText('2 reminders could not be scheduled')).toBeTruthy();
+    expect(
+      screen.getByText('Some dates could not fit in iPhone’s reminder limit.'),
+    ).toBeTruthy();
+    expect(screen.getByText('Earliest unscheduled birthday')).toBeTruthy();
     expect(screen.getByText('19 July 2026')).toBeTruthy();
     expect(screen.getByText('Unavailable on this device')).toBeTruthy();
     expect(
@@ -609,7 +1076,99 @@ describe('production live projections', () => {
     ).toBeTruthy();
   });
 
-  it('refreshes iPhone reminder and composer status even when Home revision is unchanged', async () => {
+  it('withholds the due iPhone review action when MessageUI is unavailable', async () => {
+    const companionPort: LiveCompanionPort = {
+      canOpenComposer: jest.fn(async () => false),
+      getReminderStatus: jest.fn(async () => ({
+        kind: 'ok' as const,
+        value: {
+          authorization: 'authorized' as const,
+          failedCount: 0,
+          kind: 'ok' as const,
+          plannedDateCount: 1,
+          scheduledCount: 1,
+          truncated: false,
+        },
+      })),
+      openNotificationSettings: jest.fn(),
+      openUserConfirmedComposer: jest.fn(),
+      prepareComposerReview: jest.fn(),
+      requestReminderAuthorization: jest.fn(),
+    };
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
+      getHome: jest.fn(async () => ok(iosDueHome)),
+    });
+
+    await renderLiveApp(port, companionPort);
+
+    expect(await screen.findByText('Unavailable on this device')).toBeTruthy();
+    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
+  });
+
+  it('withholds the due iPhone review action when native composer readiness is blocked', async () => {
+    const blockedHome: HomeProjection = {
+      ...iosDueHome,
+      automation: {
+        platform: 'ios',
+        desired: 'paused',
+        effective: 'paused',
+        readiness: {
+          ...iosReadiness,
+          composer: {
+            kind: 'blocked',
+            issues: [
+              {
+                id: 'ios-managed-elsewhere' as IssueId,
+                code: 'active-sender-other-device',
+                severity: 'blocking',
+                blocks: ['composer'],
+              },
+            ],
+          },
+        },
+      },
+    };
+    const companionPort: LiveCompanionPort = {
+      canOpenComposer: jest.fn(async () => true),
+      getReminderStatus: jest.fn(async () => ({
+        kind: 'ok' as const,
+        value: {
+          authorization: 'authorized' as const,
+          failedCount: 0,
+          kind: 'ok' as const,
+          plannedDateCount: 1,
+          scheduledCount: 1,
+          truncated: false,
+        },
+      })),
+      openNotificationSettings: jest.fn(),
+      openUserConfirmedComposer: jest.fn(),
+      prepareComposerReview: jest.fn(),
+      requestReminderAuthorization: jest.fn(),
+    };
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
+      getHome: jest.fn(async () => ok(blockedHome)),
+    });
+
+    await renderLiveApp(port, companionPort);
+
+    expect(
+      await screen.findByText('Managed by an active Android sender'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
+    expect(screen.getByTestId('live-home-automation')).toBeTruthy();
+  });
+
+  it('refreshes iPhone warning status on foreground without restoring a Home refresh button', async () => {
+    let appStateHandler: ((state: 'active' | 'background') => void) | undefined;
+    jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_event, handler) => {
+        appStateHandler = handler as (state: 'active' | 'background') => void;
+        return { remove: jest.fn() };
+      });
     const getReminderStatus = jest
       .fn()
       .mockResolvedValueOnce({
@@ -656,13 +1215,17 @@ describe('production live projections', () => {
 
     expect(await screen.findByText('Not allowed')).toBeTruthy();
     expect(screen.getByText('Unavailable on this device')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('live-home-refresh'));
+    expect(screen.queryByTestId('live-home-refresh')).toBeNull();
 
-    expect(await screen.findByText('Allowed')).toBeTruthy();
-    expect(screen.getByText('Available for your review')).toBeTruthy();
+    await act(async () => appStateHandler?.('background'));
+    await act(async () => appStateHandler?.('active'));
+
+    await waitFor(() => expect(getReminderStatus).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('Not allowed')).toBeNull();
+    expect(screen.queryByText('Unavailable on this device')).toBeNull();
     expect(getReminderStatus).toHaveBeenCalledTimes(2);
     expect(canOpenComposer).toHaveBeenCalledTimes(2);
-    expect(getHome).toHaveBeenCalledTimes(2);
+    expect(getHome).toHaveBeenCalledTimes(1);
   });
 
   it('requests Android safety alerts once and routes later denial to phone settings', async () => {
@@ -713,6 +1276,25 @@ describe('production live projections', () => {
         activeOtherDeviceLabel: 'Pixel 8',
       },
     };
+    const transferPendingAccount: AccountProjection = {
+      kind: 'connected',
+      displayEmail: 'user@example.test' as PrivateEmail,
+      sender: {
+        platform: 'android',
+        kind: 'transfer-pending',
+        preissuedPermitMayFinish: true,
+        drainUntil: instant('2026-07-12T07:01:00Z'),
+      },
+    };
+    const testOnlyAccount: AccountProjection = {
+      kind: 'connected',
+      displayEmail: 'user@example.test' as PrivateEmail,
+      sender: {
+        platform: 'android',
+        kind: 'test-only',
+        epochLabel: 'Current sender epoch',
+      },
+    };
     const operationId = `transfer_${'b'.repeat(
       32,
     )}` as SenderTransferOperationId;
@@ -720,23 +1302,29 @@ describe('production live projections', () => {
       .fn()
       .mockResolvedValueOnce(ok({ kind: 'none' as const }))
       .mockResolvedValueOnce(
-        ok({
-          kind: 'remote-draining' as const,
-          id: operationId,
-          preissuedPermitMayFinish: true as const,
-          reason: 'transfer-pending' as const,
-          updatedAt: generatedAt,
-          drainUntil: instant('2026-07-12T07:01:00Z'),
-        }),
+        ok(
+          {
+            kind: 'remote-draining' as const,
+            id: operationId,
+            preissuedPermitMayFinish: true as const,
+            reason: 'transfer-pending' as const,
+            updatedAt: generatedAt,
+            drainUntil: instant('2026-07-12T07:01:00Z'),
+          },
+          revision('2'),
+        ),
       )
       .mockResolvedValue(
-        ok({
-          kind: 'complete' as const,
-          id: operationId,
-          preissuedPermitMayFinish: false as const,
-          completedAt: instant('2026-07-12T07:02:00Z'),
-          requiresTest: true as const,
-        }),
+        ok(
+          {
+            kind: 'complete' as const,
+            id: operationId,
+            preissuedPermitMayFinish: false as const,
+            completedAt: instant('2026-07-12T07:02:00Z'),
+            requiresTest: true as const,
+          },
+          revision('3'),
+        ),
       );
     const prepareSenderTransfer = jest.fn(async () =>
       ok(
@@ -773,8 +1361,13 @@ describe('production live projections', () => {
         requiresTest: true as const,
       }),
     );
+    const getAccount = jest
+      .fn()
+      .mockResolvedValueOnce(ok(standbyAccount))
+      .mockResolvedValueOnce(ok(transferPendingAccount, revision('2')))
+      .mockResolvedValue(ok(testOnlyAccount, revision('3')));
     const { port } = createPort({
-      getAccount: jest.fn(async () => ok(standbyAccount)),
+      getAccount,
       getSenderTransferOperation,
       prepareSenderTransfer,
       beginSenderTransfer,
@@ -836,11 +1429,14 @@ describe('production live projections', () => {
 
     expect(screen.queryByText('Safety alerts')).toBeNull();
     expect(screen.queryByText('Android sender phone')).toBeNull();
+    expect(
+      screen.getByTestId('live-settings-automation').props.accessibilityLabel,
+    ).toMatch(/^iPhone reminders\./u);
     expect(getNotificationPermission).not.toHaveBeenCalled();
     expect(getSenderTransferOperation).not.toHaveBeenCalled();
   });
 
-  it('follows phone appearance and language while showing the complete Android inventory', async () => {
+  it('keeps phone preferences and the detailed inventory out of Settings while preserving them in Privacy', async () => {
     const inventory = {
       ...privacyInventory,
       activityCount: 3,
@@ -848,19 +1444,29 @@ describe('production live projections', () => {
       lastContactsSyncAt: generatedAt,
       consentVersions: ['contacts-v1', 'privacy-v2'],
     };
+    const getInventory = jest.fn(async () => ok(inventory));
     const { port } = createPort({
-      getInventory: jest.fn(async () => ok(inventory)),
+      getInventory,
     });
 
     await renderLiveApp(port);
     await fireEvent.press(await screen.findByTestId('live-tab-settings'));
 
-    expect(
-      await screen.findByText('Appearance follows this phone'),
-    ).toBeTruthy();
-    expect(screen.getByText('Language follows this phone')).toBeTruthy();
+    expect(screen.queryByText('Appearance follows this phone')).toBeNull();
+    expect(screen.queryByText('Language follows this phone')).toBeNull();
     expect(screen.queryByTestId('live-appearance-dark')).toBeNull();
     expect(screen.queryByTestId('live-language-hi')).toBeNull();
+    expect(screen.queryByText('Saved message templates')).toBeNull();
+    expect(screen.queryByText('Recorded consent versions')).toBeNull();
+    expect(getInventory).not.toHaveBeenCalled();
+
+    await fireEvent.press(screen.getByTestId('live-settings-privacy'));
+
+    expect(await screen.findByTestId('live-privacy-screen')).toBeTruthy();
+    expect(screen.queryByText('Saved message templates')).toBeNull();
+    await fireEvent.press(
+      screen.getByTestId('live-privacy-data-details-toggle'),
+    );
     expect(screen.getByText('Saved message templates')).toBeTruthy();
     expect(screen.getByText('Last Contacts sync')).toBeTruthy();
     expect(screen.getByText('Recorded consent versions')).toBeTruthy();
@@ -875,6 +1481,10 @@ describe('production live projections', () => {
     expect(
       screen.getByText(/cannot promise immediate erasure of provider logs/u),
     ).toBeTruthy();
+    expect(screen.getAllByTestId('live-cloud-privacy-boundary')).toHaveLength(
+      1,
+    );
+    expect(getInventory).toHaveBeenCalledTimes(1);
   });
 
   it('shows the iOS minimum composer marker instead of Android ledger retention', async () => {
@@ -887,6 +1497,10 @@ describe('production live projections', () => {
 
     await renderLiveApp(port);
     await fireEvent.press(await screen.findByTestId('live-tab-settings'));
+    await fireEvent.press(screen.getByTestId('live-settings-privacy'));
+    await fireEvent.press(
+      screen.getByTestId('live-privacy-data-details-toggle'),
+    );
 
     expect(
       await screen.findByText(/minimum opaque composer marker/u),
@@ -918,6 +1532,35 @@ describe('production live projections', () => {
     expect(getHome).toHaveBeenCalledTimes(2);
   });
 
+  it('removes a retained complete shell while lifecycle bootstrap truth refreshes and fails', async () => {
+    const bootstrapRefresh = deferred<NativeResult<BootstrapProjection>>();
+    const getBootstrap = jest
+      .fn()
+      .mockResolvedValueOnce(ok(completeBootstrap, revision('1')))
+      .mockImplementationOnce(() => bootstrapRefresh.promise);
+    const harness = createPort({ getBootstrap });
+
+    await renderLiveApp(harness.port);
+    expect(await screen.findByTestId('live-app-shell')).toBeTruthy();
+
+    await act(async () => {
+      harness.emit({ revision: revision('2'), areas: ['account'] });
+    });
+    await waitFor(() =>
+      expect(screen.queryByTestId('live-app-shell')).toBeNull(),
+    );
+    expect(screen.getByTestId('native-app-boundary')).toBeTruthy();
+
+    await act(async () => {
+      bootstrapRefresh.resolve(internalError());
+    });
+    expect(
+      await screen.findByTestId('native-bootstrap-unavailable'),
+    ).toBeTruthy();
+    expect(screen.getByTestId('native-bootstrap-retry')).toBeTruthy();
+    expect(screen.queryByTestId('live-app-shell')).toBeNull();
+  });
+
   it('does not retry a stale revision mutation and safely requeries details', async () => {
     const getPerson = jest
       .fn()
@@ -942,13 +1585,16 @@ describe('production live projections', () => {
     );
     await fireEvent.press(screen.getByTestId('live-person-contact-live-1'));
     await waitFor(() =>
-      expect(screen.getByTestId('live-person-pause')).toBeTruthy(),
+      expect(screen.getByTestId('live-person-manage-toggle')).toBeTruthy(),
     );
     expect(screen.getByTestId('live-person-detail-screen').props.edges).toEqual(
       ['top', 'left', 'right', 'bottom'],
     );
 
+    await fireEvent.press(screen.getByTestId('live-person-manage-toggle'));
     await fireEvent.press(screen.getByTestId('live-person-pause'));
+    expect(pauseRecipient).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId('live-person-confirm-pause'));
 
     await waitFor(() => expect(getPerson).toHaveBeenCalledTimes(2));
     expect(pauseRecipient).toHaveBeenCalledTimes(1);
@@ -975,10 +1621,13 @@ describe('production live projections', () => {
     );
     await fireEvent.press(screen.getByTestId('live-person-contact-live-1'));
     await waitFor(() =>
-      expect(screen.getByTestId('live-person-pause')).toBeTruthy(),
+      expect(screen.getByTestId('live-person-manage-toggle')).toBeTruthy(),
     );
 
+    await fireEvent.press(screen.getByTestId('live-person-manage-toggle'));
     await fireEvent.press(screen.getByTestId('live-person-pause'));
+    expect(pauseRecipient).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId('live-person-confirm-pause'));
 
     await waitFor(() =>
       expect(screen.getByText('Action not completed')).toBeTruthy(),
@@ -1006,14 +1655,218 @@ describe('production live projections', () => {
     await fireEvent.press(
       await screen.findByTestId('live-person-contact-live-1'),
     );
+    await fireEvent.press(
+      await screen.findByTestId('live-person-manage-toggle'),
+    );
     await fireEvent.press(await screen.findByTestId('live-person-pause'));
+    expect(pauseRecipient).not.toHaveBeenCalled();
+    await fireEvent.press(
+      await screen.findByTestId('live-person-confirm-pause'),
+    );
 
-    expect(await screen.findByText(/NATIVE_CONTRACT_INVALID/u)).toBeTruthy();
+    expect(await screen.findByText('Action not completed')).toBeTruthy();
+    expect(screen.queryByText(/NATIVE_CONTRACT_INVALID/u)).toBeNull();
     expect(pauseRecipient).toHaveBeenCalledTimes(1);
     expect(getPerson).toHaveBeenCalledTimes(2);
     expect(
       screen.getByTestId('live-person-enrollment').props.accessibilityLabel,
     ).toContain('Enabled');
+  });
+
+  it('fails closed when person detail returns a different contact', async () => {
+    const otherContactId = 'contact-live-other' as ContactId;
+    const getPerson = jest.fn(async () =>
+      ok({
+        ...contactDetail(),
+        summary: { ...contactSummary(), id: otherContactId },
+      }),
+    );
+    const { port } = createPort({ getPerson });
+
+    await renderLiveApp(port);
+    await fireEvent.press(await screen.findByTestId('live-tab-people'));
+    await fireEvent.press(
+      await screen.findByTestId('live-person-contact-live-1'),
+    );
+
+    expect(await screen.findByText('Person details are unavailable')).toBeTruthy();
+    expect(screen.queryByText(/NATIVE_CONTRACT_INVALID/u)).toBeNull();
+    expect(screen.queryByTestId('live-person-manage-toggle')).toBeNull();
+    expect(screen.queryByTestId('live-review-approval')).toBeNull();
+  });
+
+  it('keeps person mutations collapsed until Manage this person is expanded', async () => {
+    const phoneId = 'phone-manage-choice' as PhoneChoiceId;
+    const getPerson = jest.fn(async () =>
+      ok({
+        ...contactDetail(),
+        phoneChoices: [
+          {
+            id: phoneId,
+            maskedDisplay: '•••• 4321',
+            sourceLabel: 'Google mobile',
+            selectable: true,
+          },
+        ],
+        selectedPhoneId: phoneId,
+      }),
+    );
+    const { port } = createPort({ getPerson });
+
+    await renderLiveApp(port);
+    await fireEvent.press(await screen.findByTestId('live-tab-people'));
+    await fireEvent.press(
+      await screen.findByTestId('live-person-contact-live-1'),
+    );
+
+    const manage = await screen.findByTestId('live-person-manage-toggle');
+    expect(manage.props.accessibilityState).toEqual({
+      disabled: false,
+      expanded: false,
+    });
+    expect(screen.queryByTestId('live-person-manage')).toBeNull();
+    expect(screen.queryByTestId('live-person-pause')).toBeNull();
+    expect(screen.queryByTestId('live-person-exclude')).toBeNull();
+    expect(screen.queryByTestId('live-person-block-destination')).toBeNull();
+
+    await fireEvent.press(manage);
+    expect(
+      screen.getByTestId('live-person-manage-toggle').props.accessibilityState,
+    ).toEqual({ disabled: false, expanded: true });
+    expect(screen.getByTestId('live-person-manage')).toBeTruthy();
+    expect(screen.getByTestId('live-person-pause')).toBeTruthy();
+    expect(screen.getByTestId('live-person-exclude')).toBeTruthy();
+    expect(screen.getByTestId('live-person-block-destination')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('live-person-manage-toggle'));
+    expect(screen.queryByTestId('live-person-manage')).toBeNull();
+    expect(screen.queryByTestId('live-person-pause')).toBeNull();
+  });
+
+  it('retires an open person confirmation when contact truth is invalidated', async () => {
+    const getPerson = jest
+      .fn()
+      .mockResolvedValueOnce(ok(contactDetail(), revision('1')))
+      .mockResolvedValueOnce(ok(contactDetail(), revision('2')));
+    const pauseRecipient = jest.fn(async () => internalError());
+    const harness = createPort({ getPerson, pauseRecipient });
+
+    await renderLiveApp(harness.port);
+    await fireEvent.press(await screen.findByTestId('live-tab-people'));
+    await fireEvent.press(
+      await screen.findByTestId('live-person-contact-live-1'),
+    );
+    await fireEvent.press(
+      await screen.findByTestId('live-person-manage-toggle'),
+    );
+    await fireEvent.press(await screen.findByTestId('live-person-pause'));
+    const retiredConfirm = await screen.findByTestId(
+      'live-person-confirm-pause',
+    );
+
+    await act(async () => {
+      harness.emit({ revision: revision('2'), areas: ['contacts'] });
+    });
+    await waitFor(() => expect(getPerson).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.queryByTestId('live-person-confirm-pause')).toBeNull(),
+    );
+    await fireEvent.press(retiredConfirm);
+    expect(pauseRecipient).not.toHaveBeenCalled();
+  });
+
+  it('submits a person confirmation only once while native work is pending', async () => {
+    const pauseResult =
+      deferred<Awaited<ReturnType<LiveAppPort['pauseRecipient']>>>();
+    const getPerson = jest
+      .fn()
+      .mockResolvedValueOnce(ok(contactDetail(), revision('1')))
+      .mockResolvedValueOnce(ok(contactDetail('paused'), revision('2')));
+    const pauseRecipient = jest.fn(() => pauseResult.promise);
+    const { port } = createPort({ getPerson, pauseRecipient });
+
+    await renderLiveApp(port);
+    await fireEvent.press(await screen.findByTestId('live-tab-people'));
+    await fireEvent.press(
+      await screen.findByTestId('live-person-contact-live-1'),
+    );
+    await fireEvent.press(
+      await screen.findByTestId('live-person-manage-toggle'),
+    );
+    await fireEvent.press(await screen.findByTestId('live-person-pause'));
+    const confirm = await screen.findByTestId('live-person-confirm-pause');
+
+    const pendingConfirmation = fireEvent.press(confirm);
+    await waitFor(() => expect(pauseRecipient).toHaveBeenCalledTimes(1));
+    await fireEvent.press(screen.getByTestId('live-person-confirm-pause'));
+    expect(pauseRecipient).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      pauseResult.resolve(
+        ok(
+          { changedContactIds: [contactId], invalidatedApprovalCount: 0 },
+          revision('2'),
+        ),
+      );
+    });
+    await pendingConfirmation;
+    await waitFor(() => expect(getPerson).toHaveBeenCalledTimes(2));
+    expect(
+      screen.getByTestId('live-person-enrollment').props.accessibilityLabel,
+    ).toContain('Paused');
+  });
+
+  it('settles one pause after native invalidation arrives before success', async () => {
+    const pauseResult =
+      deferred<Awaited<ReturnType<LiveAppPort['pauseRecipient']>>>();
+    const pausedDetail = contactDetail('paused');
+    const getPerson = jest
+      .fn()
+      .mockResolvedValueOnce(ok(contactDetail(), revision('1')))
+      .mockResolvedValueOnce(ok(pausedDetail, revision('2')))
+      .mockResolvedValueOnce(ok(pausedDetail, revision('2')));
+    const pauseRecipient = jest.fn(() => pauseResult.promise);
+    const harness = createPort({ getPerson, pauseRecipient });
+
+    await renderLiveApp(harness.port);
+    await fireEvent.press(await screen.findByTestId('live-tab-people'));
+    await fireEvent.press(
+      await screen.findByTestId('live-person-contact-live-1'),
+    );
+    await fireEvent.press(
+      await screen.findByTestId('live-person-manage-toggle'),
+    );
+    await fireEvent.press(await screen.findByTestId('live-person-pause'));
+    const pendingConfirmation = fireEvent.press(
+      await screen.findByTestId('live-person-confirm-pause'),
+    );
+    await waitFor(() => expect(pauseRecipient).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      harness.emit({ revision: revision('2'), areas: ['contacts'] });
+    });
+    await waitFor(() => expect(getPerson).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      pauseResult.resolve(
+        ok(
+          { changedContactIds: [contactId], invalidatedApprovalCount: 0 },
+          revision('2'),
+        ),
+      );
+    });
+    await pendingConfirmation;
+
+    await waitFor(() => expect(getPerson).toHaveBeenCalledTimes(3));
+    expect(pauseRecipient).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByText(
+        'The pause was saved and details were checked again.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('live-person-enrollment').props.accessibilityLabel,
+    ).toContain('Paused');
   });
 
   it('requires confirmation to block and unblock only the selected native destination', async () => {
@@ -1086,6 +1939,10 @@ describe('production live projections', () => {
     await fireEvent.press(
       await screen.findByTestId('live-person-contact-live-1'),
     );
+    expect(screen.queryByTestId('live-person-block-destination')).toBeNull();
+    await fireEvent.press(
+      await screen.findByTestId('live-person-manage-toggle'),
+    );
     await fireEvent.press(
       await screen.findByTestId('live-person-block-destination'),
     );
@@ -1103,9 +1960,15 @@ describe('production live projections', () => {
         expectedRevision: '1',
       }),
     );
-    expect(await screen.findByTestId('live-person-destination-blocked')).toBeTruthy();
+    expect(await screen.findByTestId('live-person-source-repair')).toBeTruthy();
     expect(screen.queryByTestId('live-review-approval')).toBeNull();
-    await fireEvent.press(screen.getByTestId('live-person-unblock-destination'));
+    expect(screen.queryByTestId('live-person-unblock-destination')).toBeNull();
+    await fireEvent.press(
+      await screen.findByTestId('live-person-manage-toggle'),
+    );
+    await fireEvent.press(
+      screen.getByTestId('live-person-unblock-destination'),
+    );
     expect(unblockRecipientDestination).not.toHaveBeenCalled();
     await fireEvent.press(
       screen.getByTestId('live-person-confirm-destination-unblock'),
@@ -1118,7 +1981,9 @@ describe('production live projections', () => {
       }),
     );
     await waitFor(() =>
-      expect(screen.queryByTestId('live-person-destination-blocked')).toBeNull(),
+      expect(
+        screen.queryByTestId('live-person-source-repair'),
+      ).toBeNull(),
     );
     expect(screen.getByText(/No previous approval was restored/u)).toBeTruthy();
   });
@@ -1204,6 +2069,85 @@ describe('production live projections', () => {
     );
     expect(screen.queryByTestId('live-activity-screen')).toBeNull();
     backSpy.mockRestore();
+  });
+
+  it('keeps Activity and Fix issues rooted on Home and returns both flows there', async () => {
+    const { port } = createPort({
+      getHome: jest.fn(async () => ok(liveHome('paused-repair'))),
+    });
+
+    await renderLiveApp(port);
+    await screen.findByTestId('live-home-screen');
+
+    await fireEvent.press(screen.getByTestId('live-home-attention'));
+    expect(await screen.findByTestId('live-attention-screen')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('live-attention-back'));
+    expect(await screen.findByTestId('live-home-screen')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('live-home-activity'));
+    expect(await screen.findByTestId('live-activity-screen')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('live-activity-back'));
+    expect(await screen.findByTestId('live-home-screen')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('live-tab-settings'));
+    expect(await screen.findByTestId('live-settings-screen')).toBeTruthy();
+    expect(screen.queryByTestId('live-settings-activity')).toBeNull();
+    expect(screen.queryByTestId('live-settings-attention')).toBeNull();
+  });
+
+  it.each([
+    ['message', 'live-message-screen', 'live-message-back'],
+    ['schedule', 'live-schedule-screen', 'live-schedule-back'],
+    ['automation', 'live-automation-screen', 'live-automation-back'],
+    ['privacy', 'live-privacy-screen', 'live-privacy-back'],
+    ['help-legal', 'live-help-legal-screen', 'live-help-back'],
+  ] as const)(
+    'returns the useful Settings %s leaf to its visible Settings origin',
+    async (destination, screenId, backId) => {
+      const { port } = createPort();
+
+      await renderLiveApp(port);
+      await fireEvent.press(await screen.findByTestId('live-tab-settings'));
+      await fireEvent.press(
+        await screen.findByTestId(`live-settings-${destination}`),
+      );
+      expect(await screen.findByTestId(screenId)).toBeTruthy();
+      await fireEvent.press(screen.getByTestId(backId));
+      expect(await screen.findByTestId('live-settings-screen')).toBeTruthy();
+    },
+  );
+
+  it('reuses the Schedule leaf for contextual missing-policy repair and returns to Automation', async () => {
+    const missingPolicyHome: HomeProjection = {
+      ...activationReadyHome,
+      automation: {
+        ...activationReadyHome.automation,
+        desired: 'paused',
+        effective: 'not-configured',
+      },
+    };
+    const { port } = createPort({
+      getHome: jest.fn(async () => ok(missingPolicyHome)),
+      getAccount: jest.fn(async () => ok(androidAccountForSender('test-only'))),
+      getPolicyEditor: jest.fn(async () =>
+        ok({ kind: 'not-configured' as const }),
+      ),
+    });
+
+    await renderLiveApp(port);
+    await openSettingsDestination('automation');
+    expect(await screen.findByTestId('live-automation-screen')).toBeTruthy();
+    expect(screen.queryByTestId('live-policy-editor')).toBeNull();
+
+    await fireEvent.press(
+      await screen.findByTestId('live-automation-open-schedule'),
+    );
+    expect(await screen.findByTestId('live-schedule-screen')).toBeTruthy();
+    expect(screen.getByTestId('live-policy-editor')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('live-schedule-back'));
+    expect(await screen.findByTestId('live-automation-screen')).toBeTruthy();
+    expect(screen.queryByTestId('live-policy-editor')).toBeNull();
   });
 
   it('explains iOS reported-Sent and final MessageUI visibility boundaries in activity detail', async () => {
@@ -1302,10 +2246,7 @@ describe('production live projections', () => {
     const harness = createPort({ getMessageEditor });
 
     await renderLiveApp(harness.port);
-    await waitFor(() =>
-      expect(screen.getByTestId('live-home-message')).toBeTruthy(),
-    );
-    await fireEvent.press(screen.getByTestId('live-home-message'));
+    await openSettingsDestination('message');
     await waitFor(() =>
       expect(screen.getByTestId('live-message-input')).toBeTruthy(),
     );
@@ -1358,7 +2299,8 @@ describe('production live projections', () => {
           examples: [
             {
               displayName: 'Live Contact' as PrivateDisplayName,
-              finalText: 'Native suggested birthday message' as PrivateMessageText,
+              finalText:
+                'Native suggested birthday message' as PrivateMessageText,
               characterCount: 33,
               segmentCount: 1,
               encodingLabel: 'gsm-7' as const,
@@ -1388,7 +2330,12 @@ describe('production live projections', () => {
     });
 
     await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-home-message'));
+    await openSettingsDestination('message');
+    expect(screen.queryByTestId('live-message-gemini-privacy')).toBeNull();
+    expect(generateSuggestions).not.toHaveBeenCalled();
+    await fireEvent.press(
+      await screen.findByTestId('live-message-help-toggle'),
+    );
     expect(
       await screen.findByTestId('live-message-gemini-privacy'),
     ).toBeTruthy();
@@ -1406,9 +2353,14 @@ describe('production live projections', () => {
     await waitFor(() =>
       expect(screen.getByTestId('live-message-save')).toBeTruthy(),
     );
-    expect(
-      screen.getByText('\u2068Live Contact\u2069 · 1 part(s) · gsm-7'),
-    ).toBeTruthy();
+    expect(screen.getByText('\u2068Live Contact\u2069')).toBeTruthy();
+    expect(screen.getByText('Characters')).toBeTruthy();
+    expect(screen.getByText('33')).toBeTruthy();
+    expect(screen.getByText('SMS encoding')).toBeTruthy();
+    expect(screen.getByText('gsm-7')).toBeTruthy();
+    expect(screen.getAllByText('1 SMS part(s)').length).toBeGreaterThanOrEqual(
+      2,
+    );
     expect(saveMessage).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('live-message-save'));
 
@@ -1446,7 +2398,7 @@ describe('production live projections', () => {
     });
 
     await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-home-message'));
+    await openSettingsDestination('message');
     await fireEvent.changeText(
       await screen.findByTestId('live-message-input'),
       'Happy birthday! See https://example.com',
@@ -1485,13 +2437,16 @@ describe('production live projections', () => {
       },
     }));
     const getHome = jest.fn(async () => ok(activationReadyHome));
-    const { port } = createPort({ prepareActivation, activate, getHome });
+    const { port } = createPort({
+      prepareActivation,
+      activate,
+      getHome,
+      getAccount: jest.fn(async () => ok(androidAccountForSender('test-only'))),
+      getLatestTest: jest.fn(async () => ok(latestPassedTest)),
+    });
 
     await renderLiveApp(port);
-    await waitFor(() =>
-      expect(screen.getByTestId('live-home-automation')).toBeTruthy(),
-    );
-    await fireEvent.press(screen.getByTestId('live-home-automation'));
+    await openSettingsDestination('automation');
     await waitFor(() =>
       expect(screen.getByTestId('live-review-activation')).toBeTruthy(),
     );
@@ -1527,10 +2482,23 @@ describe('production live projections', () => {
       ),
     );
     const startTest = jest.fn(async () => internalError());
-    const { port } = createPort({ prepareTest, startTest });
+    const { port } = createPort({
+      getHome: jest.fn(async () =>
+        ok({
+          ...activationReadyHome,
+          automation: {
+            ...activationReadyHome.automation,
+            effective: 'not-configured' as const,
+          },
+        }),
+      ),
+      getAccount: jest.fn(async () => ok(androidAccountForSender('test-only'))),
+      prepareTest,
+      startTest,
+    });
 
     await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-home-automation'));
+    await openSettingsDestination('automation');
     await fireEvent.changeText(
       await screen.findByTestId('live-test-phone'),
       '+919876543210',
@@ -1568,12 +2536,14 @@ describe('production live projections', () => {
     const activate = jest.fn(async () => internalError());
     const harness = createPort({
       getHome: jest.fn(async () => ok(activationReadyHome)),
+      getAccount: jest.fn(async () => ok(androidAccountForSender('test-only'))),
+      getLatestTest: jest.fn(async () => ok(latestPassedTest)),
       prepareActivation,
       activate,
     });
 
     await renderLiveApp(harness.port);
-    await fireEvent.press(await screen.findByTestId('live-home-automation'));
+    await openSettingsDestination('automation');
     await fireEvent.press(await screen.findByTestId('live-review-activation'));
     await waitFor(() =>
       expect(screen.getByTestId('live-confirm-activation')).toBeTruthy(),
@@ -1601,7 +2571,7 @@ describe('production live projections', () => {
     });
 
     await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-home-automation'));
+    await openSettingsDestination('automation');
 
     await waitFor(() =>
       expect(
@@ -1613,7 +2583,7 @@ describe('production live projections', () => {
     expect(screen.queryByText('sent-from-device')).toBeNull();
   });
 
-  it('opens iOS Messages only with a reviewed opaque proposal and reports uncertainty', async () => {
+  it('enters the due iOS review from Home and opens Messages only with a reviewed opaque proposal', async () => {
     const proposalId = 'proposal-1' as ComposerProposalId;
     const getNextComposerProposal = jest.fn(async () =>
       ok({
@@ -1660,18 +2630,16 @@ describe('production live projections', () => {
     };
     const { port } = createPort({
       getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosHome)),
+      getHome: jest.fn(async () => ok(iosDueHome)),
       getNextComposerProposal,
     });
 
     await renderLiveApp(port, companionPort);
-    await waitFor(() =>
-      expect(screen.getByTestId('live-home-automation')).toBeTruthy(),
-    );
-    await fireEvent.press(screen.getByTestId('live-home-automation'));
+    await fireEvent.press(await screen.findByTestId('live-home-review-today'));
     await waitFor(() =>
       expect(screen.getByTestId('live-prepare-composer')).toBeTruthy(),
     );
+    expect(screen.getByTestId('live-composer-review-screen')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('live-prepare-composer'));
     await waitFor(() =>
       expect(screen.getByTestId('live-open-composer')).toBeTruthy(),
@@ -1708,16 +2676,15 @@ describe('production live projections', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(
-          /Messages reported sent; delivery not confirmed/u,
-        ),
+        screen.getByText(/Messages reported sent; delivery not confirmed/u),
       ).toBeTruthy(),
     );
-    const postComposerSafety = screen.getByTestId(
-      'live-composer-post-safety',
-    ).props.accessibilityLabel;
+    const postComposerSafety = screen.getByTestId('live-composer-post-safety')
+      .props.accessibilityLabel;
     expect(postComposerSafety).toMatch(/hold remains until its server expiry/u);
-    expect(postComposerSafety).toMatch(/Check Messages before any manual retry/u);
+    expect(postComposerSafety).toMatch(
+      /Check Messages before any manual retry/u,
+    );
     expect(postComposerSafety).toMatch(/will not retry automatically/u);
     expect(postComposerSafety).not.toMatch(/Tapping Open Messages/u);
     expect(
@@ -1736,7 +2703,58 @@ describe('production live projections', () => {
     });
   });
 
-  it('explains the required Google Contacts reconnect before an iOS draft review', async () => {
+  it('keeps every Messages composer control out of iOS Settings Automation', async () => {
+    const getNextComposerProposal = jest.fn(async () =>
+      ok({ kind: 'none' as const }),
+    );
+    const companionPort: LiveCompanionPort = {
+      canOpenComposer: jest.fn(async () => true),
+      getReminderStatus: jest.fn(async () => ({
+        kind: 'ok' as const,
+        value: {
+          authorization: 'authorized' as const,
+          failedCount: 0,
+          kind: 'ok' as const,
+          plannedDateCount: 1,
+          scheduledCount: 1,
+          truncated: false,
+        },
+      })),
+      openNotificationSettings: jest.fn(),
+      openUserConfirmedComposer: jest.fn(),
+      prepareComposerReview: jest.fn(),
+      requestReminderAuthorization: jest.fn(),
+    };
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
+      getHome: jest.fn(async () => ok(iosDueHome)),
+      getNextComposerProposal,
+    });
+
+    await renderLiveApp(port, companionPort);
+    await openSettingsDestination('automation');
+    expect(await screen.findByTestId('live-automation-screen')).toBeTruthy();
+    expect(
+      screen.getAllByRole('header', { name: 'iPhone reminders' }),
+    ).not.toHaveLength(0);
+    expect(screen.queryByText(/automation/iu)).toBeNull();
+    for (const id of [
+      'live-composer-review-screen',
+      'live-prepare-composer',
+      'live-ios-composer-review',
+      'live-composer-final-disclosure',
+      'live-open-composer',
+      'live-composer-repair-contacts',
+      'live-composer-post-safety',
+    ]) {
+      expect(screen.queryByTestId(id)).toBeNull();
+    }
+    expect(getNextComposerProposal).not.toHaveBeenCalled();
+    expect(companionPort.prepareComposerReview).not.toHaveBeenCalled();
+    expect(companionPort.openUserConfirmedComposer).not.toHaveBeenCalled();
+  });
+
+  it('repairs required Google Contacts access from the due iOS Home review', async () => {
     const continueWithGoogle = jest.fn(async () => ok(iosAccount));
     const companionPort: LiveCompanionPort = {
       canOpenComposer: jest.fn(async () => true),
@@ -1762,7 +2780,7 @@ describe('production live projections', () => {
     const { port } = createPort({
       continueWithGoogle,
       getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosHome)),
+      getHome: jest.fn(async () => ok(iosDueHome)),
       getNextComposerProposal: jest.fn(async () =>
         ok({
           kind: 'ready' as const,
@@ -1776,7 +2794,7 @@ describe('production live projections', () => {
     });
 
     await renderLiveApp(port, companionPort);
-    await fireEvent.press(await screen.findByTestId('live-home-automation'));
+    await fireEvent.press(await screen.findByTestId('live-home-review-today'));
     await fireEvent.press(await screen.findByTestId('live-prepare-composer'));
 
     expect(
@@ -1785,9 +2803,13 @@ describe('production live projections', () => {
       ),
     ).toBeTruthy();
     expect(
-      screen.getByText(
+      screen.queryByText(
         'Technical code: COMPOSER_CONTACTS_RECONNECT_REQUIRED',
       ),
+    ).toBeNull();
+    await fireEvent.press(screen.getByTestId('live-composer-support-toggle'));
+    expect(
+      screen.getByText('Technical code: COMPOSER_CONTACTS_RECONNECT_REQUIRED'),
     ).toBeTruthy();
     expect(screen.queryByTestId('live-open-composer')).toBeNull();
 
@@ -1814,13 +2836,14 @@ describe('production live projections', () => {
     const { port } = createPort({
       getBootstrap: jest.fn(async () => ok(iosBootstrap)),
       getHome: jest.fn(async () => ok(iosHome)),
+      getSetup: jest.fn(async () => ok(iosCompleteSetup)),
       getNextComposerProposal: jest.fn(async () =>
         ok({ kind: 'none' as const }),
       ),
     });
 
     await renderLiveApp(port, companionPort);
-    await fireEvent.press(await screen.findByTestId('live-home-automation'));
+    await openSettingsDestination('automation');
 
     await waitFor(() =>
       expect(screen.getByText(/Reminder status is unavailable/u)).toBeTruthy(),
@@ -1828,14 +2851,17 @@ describe('production live projections', () => {
     expect(screen.queryByTestId('live-open-composer')).toBeNull();
   });
 
-  it('requires a native privacy review before starting a destructive operation', async () => {
+  it('requires a native privacy review and revalidates root lifecycle truth after confirmation', async () => {
     const prepareAction = jest.fn(async () =>
       ok(
         {
           handle: 'privacy-review-1' as PrivacyReviewHandle,
           kind: 'wipe-local-data' as const,
           titleKey: 'privacy.wipe.title',
-          consequenceKeys: ['privacy.wipe.contacts'],
+          consequenceKeys: [
+            'privacy.consequence.automation-paused',
+            'privacy.consequence.local-data-erased',
+          ],
           preissuedPermitMayFinish: false,
           remoteConnectionRequired: false,
           externalSmsCopiesNotErased: true as const,
@@ -1843,15 +2869,39 @@ describe('production live projections', () => {
         revision('4'),
       ),
     );
-    const confirmAction = jest.fn(async () =>
-      ok({
-        kind: 'queued' as const,
-        id: 'privacy-operation-1' as PrivacyOperationId,
-        action: 'wipe-local-data' as const,
-        updatedAt: generatedAt,
-      }),
-    );
-    const { port } = createPort({ prepareAction, confirmAction });
+    const confirmedOperation = {
+      kind: 'queued' as const,
+      id: 'privacy-operation-1' as PrivacyOperationId,
+      action: 'wipe-local-data' as const,
+      updatedAt: generatedAt,
+    };
+    const confirmAction = jest.fn(async () => ok(confirmedOperation));
+    const getCurrentOperation = jest
+      .fn()
+      .mockResolvedValueOnce(ok({ kind: 'none' as const }))
+      .mockResolvedValue(ok(confirmedOperation));
+    const pendingAccount: AccountProjection = {
+      kind: 'cleanup-pending',
+      operation: 'sign-out',
+      issue: {
+        id: 'privacy-root-revalidation' as IssueId,
+        code: 'coordination-unavailable',
+        severity: 'blocking',
+        blocks: ['test', 'activation', 'birthday'],
+      },
+    };
+    const getBootstrap = jest
+      .fn()
+      .mockResolvedValueOnce(ok(completeBootstrap))
+      .mockResolvedValue(
+        ok({ ...completeBootstrap, account: pendingAccount }, revision('2')),
+      );
+    const { port } = createPort({
+      prepareAction,
+      confirmAction,
+      getBootstrap,
+      getCurrentOperation,
+    });
 
     await renderLiveApp(port);
     await waitFor(() =>
@@ -1865,25 +2915,14 @@ describe('production live projections', () => {
     await waitFor(() =>
       expect(screen.getByTestId('live-privacy-wipe-local-data')).toBeTruthy(),
     );
+    expect(screen.getByTestId('live-privacy-group-data-on-phone')).toBeTruthy();
     expect(
-      screen.getByTestId('live-privacy-action-group').props.accessibilityRole,
-    ).toBe('radiogroup');
-    expect(
-      screen.getByTestId('live-privacy-wipe-local-data').props
-        .accessibilityState,
-    ).toEqual({ selected: false });
-    await fireEvent.press(screen.getByTestId('live-privacy-wipe-local-data'));
-    expect(
-      screen.getByTestId('live-privacy-wipe-local-data').props
-        .accessibilityState,
-    ).toEqual({ selected: true });
-    expect(
-      screen.getByTestId(
-        'live-privacy-wipe-local-data-selected-indicator',
-      ),
+      screen.getByTestId('live-privacy-group-delete-account'),
     ).toBeTruthy();
+    expect(screen.queryByTestId('live-privacy-action-group')).toBeNull();
+    expect(screen.queryByTestId('live-privacy-prepare')).toBeNull();
+    await fireEvent.press(screen.getByTestId('live-privacy-wipe-local-data'));
     expect(confirmAction).not.toHaveBeenCalled();
-    await fireEvent.press(screen.getByTestId('live-privacy-prepare'));
     await waitFor(() =>
       expect(screen.getByTestId('live-privacy-confirm')).toBeTruthy(),
     );
@@ -1897,8 +2936,10 @@ describe('production live projections', () => {
     await fireEvent.press(screen.getByTestId('live-privacy-confirm'));
 
     await waitFor(() =>
-      expect(screen.getByText(/still running/u)).toBeTruthy(),
+      expect(screen.getByTestId('live-setup-screen')).toBeTruthy(),
     );
+    expect(screen.queryByTestId('live-privacy-screen')).toBeNull();
+    expect(getBootstrap).toHaveBeenCalledTimes(2);
     expect(prepareAction).toHaveBeenCalledWith({
       kind: 'wipe-local-data',
       expectedRevision: '1',
@@ -1911,24 +2952,25 @@ describe('production live projections', () => {
 
   it('recovers a durable privacy operation after the screen is recreated', async () => {
     const operationId = 'privacy-operation-recovery' as PrivacyOperationId;
-    const getCurrentOperation = jest.fn(async () =>
-      ok({
-        kind: 'remote-pending' as const,
-        id: operationId,
-        action: 'disconnect-contacts' as const,
-        reason: 'coordination-unavailable' as const,
-        updatedAt: generatedAt,
-      }),
-    );
-    const resumeOperation = jest.fn(async () =>
-      ok({
-        kind: 'complete' as const,
-        id: operationId,
-        action: 'disconnect-contacts' as const,
-        completedAt: generatedAt,
-        externalSmsCopiesNotErased: true as const,
-      }),
-    );
+    const pendingOperation = {
+      kind: 'remote-pending' as const,
+      id: operationId,
+      action: 'disconnect-contacts' as const,
+      reason: 'coordination-unavailable' as const,
+      updatedAt: generatedAt,
+    };
+    const completedOperation = {
+      kind: 'complete' as const,
+      id: operationId,
+      action: 'disconnect-contacts' as const,
+      completedAt: generatedAt,
+      externalSmsCopiesNotErased: true as const,
+    };
+    const getCurrentOperation = jest
+      .fn()
+      .mockResolvedValueOnce(ok(pendingOperation))
+      .mockResolvedValue(ok(completedOperation));
+    const resumeOperation = jest.fn(async () => ok(completedOperation));
     const { port } = createPort({ getCurrentOperation, resumeOperation });
 
     await renderLiveApp(port);
@@ -1947,6 +2989,24 @@ describe('production live projections', () => {
 
   it('requires a second native review before erasing this device while account deletion is unresolved', async () => {
     const operationId = 'privacy-delete-unresolved' as PrivacyOperationId;
+    const pendingDeletionOperation = {
+      kind: 'remote-pending' as const,
+      id: operationId,
+      action: 'delete-account' as const,
+      reason: 'network-offline' as const,
+      updatedAt: generatedAt,
+    };
+    const confirmedDeletionOperation = {
+      kind: 'remote-unknown' as const,
+      id: operationId,
+      action: 'delete-account' as const,
+      reason: 'coordination-unavailable' as const,
+      updatedAt: generatedAt,
+      localDataErased: true as const,
+      remoteDeletionComplete: false as const,
+      sameAccountRetryAvailable: false,
+      externalSmsCopiesNotErased: true as const,
+    };
     const prepareAction = jest.fn(async () =>
       ok(
         {
@@ -1964,29 +3024,16 @@ describe('production live projections', () => {
         revision('7'),
       ),
     );
-    const confirmAction = jest.fn(async () =>
-      ok({
-        kind: 'remote-unknown' as const,
-        id: operationId,
-        action: 'delete-account' as const,
-        reason: 'coordination-unavailable' as const,
-        updatedAt: generatedAt,
-        localDataErased: true as const,
-        remoteDeletionComplete: false as const,
-        sameAccountRetryAvailable: false,
-        externalSmsCopiesNotErased: true as const,
-      }),
-    );
+    const confirmAction = jest.fn(async () => ok(confirmedDeletionOperation));
     const { port } = createPort({
-      getCurrentOperation: jest.fn(async () =>
-        ok({
-          kind: 'remote-pending' as const,
-          id: operationId,
-          action: 'delete-account' as const,
-          reason: 'network-offline' as const,
-          updatedAt: generatedAt,
-        }),
-      ),
+      getCurrentOperation: jest
+        .fn()
+        .mockResolvedValueOnce(ok(pendingDeletionOperation))
+        .mockResolvedValue(ok(confirmedDeletionOperation)),
+      getLatestDeletionReceipt: jest
+        .fn()
+        .mockResolvedValueOnce(ok({ kind: 'none' as const }))
+        .mockResolvedValue(ok(confirmedDeletionOperation)),
       prepareAction,
       confirmAction,
     });
@@ -2017,8 +3064,13 @@ describe('production live projections', () => {
       handle: 'privacy-pending-wipe-review',
       expectedRevision: '7',
     });
+    await waitFor(() =>
+      expect(screen.getByTestId('live-privacy-deletion-status')).toBeTruthy(),
+    );
     expect(
-      await screen.findByText(/online deletion is not confirmed/u),
+      screen.getByText(
+        'Local app data is erased; online deletion is not confirmed',
+      ),
     ).toBeTruthy();
     await fireEvent.press(screen.getByTestId('live-privacy-deletion-help'));
     expect(await screen.findByTestId('live-help-legal-screen')).toBeTruthy();
@@ -2041,19 +3093,23 @@ describe('production live projections', () => {
       ...unknownReceipt,
       sameAccountRetryAvailable: true,
     };
-    const continueWithGoogle = jest.fn(async () =>
-      ok({
-        kind: 'cleanup-pending' as const,
-        operation: 'delete' as const,
-        issue: {
-          id: 'delete-replay' as IssueId,
-          code: 'firebase-account-deleting' as const,
-          severity: 'blocking' as const,
-          blocks: ['activation'] as const,
-        },
-      }),
-    );
+    const retryAccount = {
+      kind: 'cleanup-pending' as const,
+      operation: 'delete' as const,
+      issue: {
+        id: 'delete-replay' as IssueId,
+        code: 'firebase-account-deleting' as const,
+        severity: 'blocking' as const,
+        blocks: ['activation'] as const,
+      },
+    };
+    const continueWithGoogle = jest.fn(async () => ok(retryAccount));
     const { port } = createPort({
+      getAccount: jest
+        .fn()
+        .mockResolvedValueOnce(ok(account))
+        .mockResolvedValueOnce(ok(account))
+        .mockResolvedValue(ok(retryAccount)),
       getCurrentOperation: jest.fn(async () => ok(unknownReceipt)),
       getLatestDeletionReceipt: jest
         .fn()
@@ -2121,33 +3177,34 @@ describe('production live projections', () => {
 
   it('repairs an unreadable Android cleanup journal only through server proof', async () => {
     const operationId = 'privacy-operation-repair' as PrivacyOperationId;
-    const repairLifecycleState = jest.fn(async () =>
-      ok({
-        kind: 'local-wiping' as const,
-        id: operationId,
-        action: 'disconnect-contacts' as const,
-        updatedAt: generatedAt,
-      }),
-    );
+    const repairAccount = {
+      kind: 'cleanup-pending' as const,
+      operation: 'repair' as const,
+      issue: {
+        id: 'cleanup-repair' as IssueId,
+        code: 'coordination-unavailable' as const,
+        severity: 'blocking' as const,
+        blocks: ['test', 'activation', 'birthday'] as const,
+      },
+    };
+    const repairedOperation = {
+      kind: 'local-wiping' as const,
+      id: operationId,
+      action: 'disconnect-contacts' as const,
+      updatedAt: generatedAt,
+    };
+    const repairLifecycleState = jest.fn(async () => ok(repairedOperation));
     const { port } = createPort({
-      getAccount: jest.fn(async () =>
-        ok({
-          kind: 'cleanup-pending' as const,
-          operation: 'repair' as const,
-          issue: {
-            id: 'cleanup-repair' as IssueId,
-            code: 'coordination-unavailable' as const,
-            severity: 'blocking' as const,
-            blocks: ['test', 'activation', 'birthday'] as const,
-          },
-        }),
-      ),
-      getCurrentOperation: jest.fn(async () =>
-        ok({
-          kind: 'unavailable' as const,
-          reason: 'coordination-unavailable' as const,
-        }),
-      ),
+      getAccount: jest.fn(async () => ok(repairAccount)),
+      getCurrentOperation: jest
+        .fn()
+        .mockResolvedValueOnce(
+          ok({
+            kind: 'unavailable' as const,
+            reason: 'coordination-unavailable' as const,
+          }),
+        )
+        .mockResolvedValue(ok(repairedOperation)),
       repairLifecycleState,
     });
 
@@ -2178,7 +3235,10 @@ describe('production live projections', () => {
           handle: 'privacy-review-1' as PrivacyReviewHandle,
           kind: 'wipe-local-data' as const,
           titleKey: 'privacy.wipe.title',
-          consequenceKeys: ['privacy.wipe.contacts'],
+          consequenceKeys: [
+            'privacy.consequence.automation-paused',
+            'privacy.consequence.local-data-erased',
+          ],
           preissuedPermitMayFinish: false,
           remoteConnectionRequired: false,
           externalSmsCopiesNotErased: true as const,
@@ -2186,16 +3246,22 @@ describe('production live projections', () => {
         revision('4'),
       ),
     );
-    const confirmAction = jest.fn(async () =>
-      ok({
-        kind: 'failed' as const,
-        id: 'privacy-operation-1' as PrivacyOperationId,
-        action: 'wipe-local-data' as const,
-        reason: 'network-offline' as const,
-        updatedAt: generatedAt,
-      }),
-    );
-    const { port } = createPort({ prepareAction, confirmAction });
+    const failedOperation = {
+      kind: 'failed' as const,
+      id: 'privacy-operation-1' as PrivacyOperationId,
+      action: 'wipe-local-data' as const,
+      reason: 'network-offline' as const,
+      updatedAt: generatedAt,
+    };
+    const confirmAction = jest.fn(async () => ok(failedOperation));
+    const { port } = createPort({
+      prepareAction,
+      confirmAction,
+      getCurrentOperation: jest
+        .fn()
+        .mockResolvedValueOnce(ok({ kind: 'none' as const }))
+        .mockResolvedValue(ok(failedOperation)),
+    });
 
     await renderLiveApp(port);
     await fireEvent.press(await screen.findByTestId('live-tab-settings'));
@@ -2203,12 +3269,11 @@ describe('production live projections', () => {
     await fireEvent.press(
       await screen.findByTestId('live-privacy-wipe-local-data'),
     );
-    await fireEvent.press(screen.getByTestId('live-privacy-prepare'));
     await fireEvent.press(await screen.findByTestId('live-privacy-confirm'));
 
-    await waitFor(() =>
-      expect(screen.getByText(/protected operation failed/u)).toBeTruthy(),
-    );
+    expect(
+      await screen.findAllByText(/protected operation failed/u),
+    ).not.toHaveLength(0);
     expect(screen.queryByTestId('live-privacy-refresh-operation')).toBeNull();
   });
 
@@ -2237,10 +3302,12 @@ describe('production live projections', () => {
     );
     expect(screen.queryByText('delivered')).toBeNull();
     expect(screen.queryByText('2026-07-12T07:00:00Z')).toBeNull();
-    expect(screen.queryByTestId('live-activity-recovery-activity-1')).toBeNull();
+    expect(
+      screen.queryByTestId('live-activity-recovery-activity-1'),
+    ).toBeNull();
   });
 
-  it('opens the native-projected recovery destination from activity', async () => {
+  it('opens a native-projected recovery only from activity detail', async () => {
     const { port } = createPort({
       listActivity: jest.fn(async () =>
         ok({
@@ -2258,8 +3325,14 @@ describe('production live projections', () => {
 
     await renderLiveApp(port);
     await fireEvent.press(await screen.findByTestId('live-home-activity'));
+    expect(
+      screen.queryByTestId('live-activity-recovery-activity-paused'),
+    ).toBeNull();
     await fireEvent.press(
-      await screen.findByTestId('live-activity-recovery-activity-paused'),
+      await screen.findByTestId('live-activity-activity-paused'),
+    );
+    await fireEvent.press(
+      await screen.findByTestId('live-activity-detail-recovery'),
     );
 
     expect(await screen.findByTestId('live-automation-screen')).toBeTruthy();
@@ -2300,13 +3373,13 @@ describe('production live projections', () => {
       ok([
         {
           id: 'issue-1' as IssueId,
-          code: 'notification-permission-missing' as const,
+          code: 'background-restricted' as const,
           severity: 'blocking' as const,
           blocks: ['birthday' as const],
           action: {
             kind: 'native-action' as const,
             handle: 'action-1' as ActionHandle,
-            labelKey: 'settings.notifications',
+            labelKey: 'settings.background',
           },
         },
       ]),
@@ -2334,16 +3407,18 @@ describe('production live projections', () => {
       expect(screen.getByTestId('live-attention-action-issue-1')).toBeTruthy(),
     );
     expect(
-      screen.getByText(/Allow notifications to see reminders/u),
+      screen.getByText(/Allow Birthday Autopilot to run in the background/u),
     ).toBeTruthy();
+    expect(screen.queryByText(/background-restricted/u)).toBeNull();
+    await fireEvent.press(screen.getByTestId('live-attention-support-toggle'));
+    expect(screen.getByTestId('live-attention-support-issue-1')).toBeTruthy();
     expect(
-      screen.getByText('Technical code: notification-permission-missing'),
+      screen.getByText('Technical code: background-restricted'),
     ).toBeTruthy();
-    expect(screen.queryByText('notification-permission-missing')).toBeNull();
     await fireEvent.press(screen.getByTestId('live-attention-action-issue-1'));
 
     await waitFor(() =>
-      expect(screen.getByText(/No fix is assumed/u)).toBeTruthy(),
+      expect(screen.getByText(/No repair is assumed/u)).toBeTruthy(),
     );
     expect(performAction).toHaveBeenCalledTimes(1);
     expect(performAction).toHaveBeenCalledWith({
@@ -2355,8 +3430,19 @@ describe('production live projections', () => {
   it('requires explicit phone and leap-day birthday choices with revision CAS', async () => {
     const phoneId = 'phone-1' as PhoneChoiceId;
     const birthdayId = 'birthday-1' as BirthdayChoiceId;
-    const detailed: ContactDetail = {
+    const initial: ContactDetail = {
       ...contactDetail(),
+      summary: {
+        ...contactSummary(),
+        readiness: {
+          kind: 'needs-attention',
+          reasons: ['phone-choice-required', 'leap-policy-required'],
+        },
+        enrollment: {
+          kind: 'enabled',
+          approval: { kind: 'invalidated', reasons: ['phone-changed'] },
+        },
+      },
       phoneChoices: [
         {
           id: phoneId,
@@ -2370,14 +3456,46 @@ describe('production live projections', () => {
           id: birthdayId,
           displayLabel: '29 February',
           hasYear: false,
-          selectable: true,
+          selectable: false,
           issue: 'leap-policy-required',
         },
       ],
+      selectedBirthdayId: birthdayId,
     };
-    const getPerson = jest.fn(async () => ok(detailed));
-    const choosePhone = jest.fn(async () => ok(detailed));
-    const chooseBirthday = jest.fn(async () => ok(detailed));
+    const afterPhone: ContactDetail = {
+      ...initial,
+      summary: {
+        ...initial.summary,
+        readiness: {
+          kind: 'needs-attention',
+          reasons: ['leap-policy-required'],
+        },
+      },
+      selectedPhoneId: phoneId,
+    };
+    const afterBirthday: ContactDetail = {
+      ...afterPhone,
+      summary: {
+        ...afterPhone.summary,
+        readiness: {
+          kind: 'needs-attention',
+          reasons: ['approval-invalid'],
+        },
+      },
+      birthdayChoices: afterPhone.birthdayChoices.map(choice => ({
+        ...choice,
+        issue: undefined,
+      })),
+    };
+    const getPerson = jest
+      .fn()
+      .mockResolvedValueOnce(ok(initial, revision('1')))
+      .mockResolvedValueOnce(ok(afterPhone, revision('2')))
+      .mockResolvedValueOnce(ok(afterBirthday, revision('3')));
+    const choosePhone = jest.fn(async () => ok(afterPhone, revision('2')));
+    const chooseBirthday = jest.fn(async () =>
+      ok(afterBirthday, revision('3')),
+    );
     const { port } = createPort({ getPerson, choosePhone, chooseBirthday });
 
     await renderLiveApp(port);
@@ -2392,6 +3510,7 @@ describe('production live projections', () => {
     await waitFor(() =>
       expect(screen.getByTestId('live-choose-phone-phone-1')).toBeTruthy(),
     );
+    expect(screen.queryByTestId('live-choose-birthday-birthday-1')).toBeNull();
     await fireEvent.press(screen.getByTestId('live-choose-phone-phone-1'));
     await fireEvent.press(screen.getByTestId('live-confirm-choice'));
     await waitFor(() => expect(choosePhone).toHaveBeenCalledTimes(1));
@@ -2401,9 +3520,15 @@ describe('production live projections', () => {
       expectedRevision: '1',
     });
 
-    await fireEvent.press(
-      screen.getByTestId('live-choose-birthday-birthday-1'),
+    const selectedLeapChoice = await screen.findByTestId(
+      'live-choose-birthday-birthday-1',
     );
+    expect(screen.queryByTestId('live-choose-phone-phone-1')).toBeNull();
+    await fireEvent.press(selectedLeapChoice);
+    expect(screen.getByText('For a 29 February birthday')).toBeTruthy();
+    expect(
+      screen.getByTestId('live-confirm-choice').props.accessibilityState,
+    ).toEqual({ disabled: true });
     await fireEvent.press(
       screen.getByRole('radio', { name: 'Use 28 February' }),
     );
@@ -2413,8 +3538,9 @@ describe('production live projections', () => {
       contactId: 'contact-live-1',
       birthdayId: 'birthday-1',
       leapPolicy: 'feb-28',
-      expectedRevision: '1',
+      expectedRevision: '2',
     });
+    await waitFor(() => expect(getPerson).toHaveBeenCalledTimes(3));
   });
 
   it('opens only the generic Google Contacts repair route and resyncs on return', async () => {
@@ -2425,7 +3551,9 @@ describe('production live projections', () => {
         appStateHandler = handler as (state: 'active' | 'background') => void;
         return { remove: jest.fn() };
       });
-    const canOpenURL = jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
+    const canOpenURL = jest
+      .spyOn(Linking, 'canOpenURL')
+      .mockResolvedValue(true);
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     const getPerson = jest.fn(async () =>
       ok({
@@ -2467,9 +3595,70 @@ describe('production live projections', () => {
 
     await waitFor(() => expect(syncContacts).toHaveBeenCalledWith('user'));
     await waitFor(() => expect(getPerson).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/no repair was assumed/u)).toBeTruthy();
+  });
+
+  it('does not claim Google Contacts success when reload has another revision', async () => {
+    let appStateHandler: ((state: 'active' | 'background') => void) | undefined;
+    jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_event, handler) => {
+        appStateHandler = handler as (state: 'active' | 'background') => void;
+        return { remove: jest.fn() };
+      });
+    jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const sourceRepairDetail: ContactDetail = {
+      ...contactDetail(),
+      summary: {
+        ...contactSummary(),
+        readiness: {
+          kind: 'needs-attention',
+          reasons: ['birthday-missing'],
+        },
+      },
+    };
+    const getPerson = jest
+      .fn()
+      .mockResolvedValueOnce(ok(sourceRepairDetail, revision('1')))
+      .mockResolvedValueOnce(ok(sourceRepairDetail, revision('3')));
+    const syncContacts = jest.fn(async () =>
+      ok(
+        {
+          kind: 'fresh' as const,
+          completedAt: generatedAt,
+          contactCount: 1,
+        },
+        revision('2'),
+      ),
+    );
+    const { port } = createPort({ getPerson, syncContacts });
+
+    await renderLiveApp(port);
+    await fireEvent.press(await screen.findByTestId('live-tab-people'));
+    await fireEvent.press(
+      await screen.findByTestId('live-person-contact-live-1'),
+    );
+    await fireEvent.press(
+      await screen.findByTestId('live-person-open-google-contacts'),
+    );
+    await act(async () => appStateHandler?.('background'));
+    await act(async () => appStateHandler?.('active'));
+
+    expect(await screen.findByText('Action not completed')).toBeTruthy();
+    expect(screen.queryByText(/NATIVE_CONTRACT_INVALID/u)).toBeNull();
     expect(
-      await screen.findByText(/no repair was assumed/u),
+      screen.getByText(
+        'Contacts synced, but these details could not be checked again.',
+      ),
     ).toBeTruthy();
+    expect(
+      screen.queryByText(
+        'Contacts were synced again. Review the updated birthday and phone; no repair was assumed.',
+      ),
+    ).toBeNull();
+    expect(syncContacts).toHaveBeenCalledTimes(1);
+    expect(getPerson).toHaveBeenCalledTimes(2);
   });
 
   it('confirms the exact Android approval review handle before saving', async () => {
@@ -2507,7 +3696,11 @@ describe('production live projections', () => {
         readiness,
       }),
     );
-    const { port } = createPort({ prepareApprovals, confirmApprovals });
+    const { port } = createPort({
+      getPerson: jest.fn(async () => ok(contactDetailNeedingApproval())),
+      prepareApprovals,
+      confirmApprovals,
+    });
 
     await renderLiveApp(port);
     await fireEvent.press(await screen.findByTestId('live-tab-people'));
@@ -2525,6 +3718,67 @@ describe('production live projections', () => {
     expect(confirmApprovals).toHaveBeenCalledWith({
       handle: 'approval-review-1',
       expectedRevision: '6',
+    });
+  });
+
+  it('shows an already-valid exact approval as read-only with Close only', async () => {
+    const prepareApprovals = jest.fn(async () =>
+      ok(
+        {
+          handle: 'approval-review-valid' as ApprovalReviewHandle,
+          items: [
+            {
+              platform: 'android' as const,
+              contactId,
+              recipient: 'Live Contact' as PrivateDisplayName,
+              maskedPhone: '•••• 4321',
+              birthdayLabel: '18 July',
+              exactText: 'Already approved birthday text' as PrivateMessageText,
+              windowLabel: '09:00–11:00',
+              simLabel: 'SIM 1',
+              segmentCount: 2,
+              chargeDisclosure: 'Carrier charges may apply.',
+              consentDisclosure: 'You approved this exact message.',
+            },
+          ],
+          readyCount: 1,
+          blockedCount: 0,
+          explicitConfirmationRequired: true as const,
+        },
+        revision('6'),
+      ),
+    );
+    const confirmApprovals = jest.fn(async () =>
+      ok({
+        platform: 'android' as const,
+        desired: 'on' as const,
+        effective: 'active' as const,
+        readiness,
+      }),
+    );
+    const { port } = createPort({ prepareApprovals, confirmApprovals });
+
+    await renderLiveApp(port);
+    await fireEvent.press(await screen.findByTestId('live-tab-people'));
+    await fireEvent.press(
+      await screen.findByTestId('live-person-contact-live-1'),
+    );
+    await fireEvent.press(await screen.findByTestId('live-review-approval'));
+
+    expect(
+      await screen.findByText('Already approved birthday text'),
+    ).toBeTruthy();
+    expect(screen.getByText('2 SMS part(s)')).toBeTruthy();
+    expect(screen.queryByTestId('live-confirm-approval')).toBeNull();
+    expect(screen.getByTestId('live-close-approved-review')).toBeTruthy();
+    expect(confirmApprovals).not.toHaveBeenCalled();
+
+    await fireEvent.press(screen.getByTestId('live-close-approved-review'));
+    expect(screen.queryByTestId('live-person-approval-review')).toBeNull();
+    expect(confirmApprovals).not.toHaveBeenCalled();
+    expect(prepareApprovals).toHaveBeenCalledWith({
+      contactIds: [contactId],
+      expectedRevision: '1',
     });
   });
 
@@ -2574,12 +3828,15 @@ describe('production live projections', () => {
     );
     const { port } = createPort({
       getHome: jest.fn(async () => ok(activationReadyHome)),
+      getAccount: jest.fn(async () => ok(androidAccountForSender('test-only'))),
+      getLatestTest: jest.fn(async () => ok(latestPassedTest)),
+      getPerson: jest.fn(async () => ok(contactDetailNeedingApproval())),
       prepareActivation,
       prepareApprovals,
     });
 
     await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-home-automation'));
+    await openSettingsDestination('automation');
     await fireEvent.press(await screen.findByTestId('live-review-activation'));
     expect(
       await screen.findByText(
@@ -2605,12 +3862,8 @@ describe('production live projections', () => {
         'पुष्टि करने पर सुरक्षित भावी जन्मदिन कामों के लिए यही प्राप्तकर्ता, चुना फ़ोन नंबर, जन्मदिन, संदेश, समय-सीमा, SIM और भाग योजना सहेजी जाती है।',
       ),
     ).toBeTruthy();
-    expect(
-      screen.queryByText('NATIVE ENGLISH CHARGE DISCLOSURE'),
-    ).toBeNull();
-    expect(
-      screen.queryByText('NATIVE ENGLISH CONSENT DISCLOSURE'),
-    ).toBeNull();
+    expect(screen.queryByText('NATIVE ENGLISH CHARGE DISCLOSURE')).toBeNull();
+    expect(screen.queryByText('NATIVE ENGLISH CONSENT DISCLOSURE')).toBeNull();
   });
 
   it('previews and shares content-free diagnostics with revision CAS', async () => {
@@ -2639,9 +3892,13 @@ describe('production live projections', () => {
     );
     await fireEvent.press(screen.getByTestId('live-tab-settings'));
     await waitFor(() =>
-      expect(screen.getByTestId('live-settings-diagnostics')).toBeTruthy(),
+      expect(screen.getByTestId('live-settings-help-legal')).toBeTruthy(),
     );
-    await fireEvent.press(screen.getByTestId('live-settings-diagnostics'));
+    await fireEvent.press(screen.getByTestId('live-settings-help-legal'));
+    await waitFor(() =>
+      expect(screen.getByTestId('live-help-diagnostics')).toBeTruthy(),
+    );
+    await fireEvent.press(screen.getByTestId('live-help-diagnostics'));
     await waitFor(() =>
       expect(screen.getByTestId('live-diagnostics-preview')).toBeTruthy(),
     );
@@ -2650,7 +3907,7 @@ describe('production live projections', () => {
       expect(screen.getByTestId('live-diagnostics-share')).toBeTruthy(),
     );
     expect(screen.getAllByText(/excludes names, phone numbers/u)).toHaveLength(
-      2,
+      1,
     );
     expect(screen.getByText('1 technical check reported')).toBeTruthy();
     expect(screen.getByText('Earliest retained status change')).toBeTruthy();
@@ -2663,9 +3920,18 @@ describe('production live projections', () => {
       expect(screen.getByText(/sharing was cancelled/u)).toBeTruthy(),
     );
     expect(shareDiagnostics).toHaveBeenCalledWith({ expectedRevision: '5' });
+
+    await fireEvent.press(screen.getByTestId('live-diagnostics-back'));
+    await waitFor(() =>
+      expect(screen.getByTestId('live-help-legal-screen')).toBeTruthy(),
+    );
+    await fireEvent.press(screen.getByTestId('live-help-back'));
+    await waitFor(() =>
+      expect(screen.getByTestId('live-settings-screen')).toBeTruthy(),
+    );
   });
 
-  it('consumes cold and warm native routes into their safe review screens', async () => {
+  it('consumes cold and warm iOS reminder routes into Composer Review above Home', async () => {
     const getPendingRoute = jest
       .fn()
       .mockResolvedValueOnce(
@@ -2678,32 +3944,49 @@ describe('production live projections', () => {
       )
       .mockResolvedValueOnce(
         ok({
-          kind: 'attention' as const,
+          kind: 'automation-review' as const,
           routeId:
             'a4f2a2c0-8df3-4b2e-b9e4-661a2050d4a1' as import('../domain/shared/brand').NativeRouteId,
-          source: 'attention' as const,
+          source: 'birthday-reminder' as const,
         }),
-      );
-    const harness = createPort({ getPendingRoute });
+      )
+      .mockResolvedValue(ok({ kind: 'none' as const }));
+    const harness = createPort({
+      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
+      getHome: jest.fn(async () => ok(iosDueHome)),
+      getNextComposerProposal: jest.fn(async () =>
+        ok({ kind: 'none' as const }),
+      ),
+      getPendingRoute,
+    });
 
     await renderLiveApp(harness.port);
     await waitFor(() =>
-      expect(screen.getByTestId('live-automation-screen')).toBeTruthy(),
+      expect(screen.getByTestId('live-composer-review-screen')).toBeTruthy(),
     );
+    expect(screen.queryByTestId('live-automation-screen')).toBeNull();
     expect(screen.queryByTestId('live-message-screen')).toBeNull();
     expect(getPendingRoute).toHaveBeenCalledTimes(1);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    await fireEvent.press(screen.getByTestId('live-composer-review-back'));
     await waitFor(() =>
       expect(screen.getByTestId('live-home-screen')).toBeTruthy(),
+    );
+    await fireEvent.press(screen.getByTestId('live-tab-settings'));
+    await waitFor(() =>
+      expect(screen.getByTestId('live-settings-screen')).toBeTruthy(),
     );
     await act(async () => {
       harness.emitRoute({ kind: 'available' });
     });
     await waitFor(() =>
-      expect(screen.getByTestId('live-attention-screen')).toBeTruthy(),
+      expect(screen.getByTestId('live-composer-review-screen')).toBeTruthy(),
     );
     expect(getPendingRoute).toHaveBeenCalledTimes(2);
+    await fireEvent.press(screen.getByTestId('live-composer-review-back'));
+    await waitFor(() =>
+      expect(screen.getByTestId('live-home-screen')).toBeTruthy(),
+    );
   });
 
   it('previews and saves a strict Android policy review handle', async () => {
@@ -2746,12 +4029,13 @@ describe('production live projections', () => {
     });
 
     await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-home-automation'));
+    await openSettingsDestination('schedule');
     await fireEvent.changeText(
       await screen.findByTestId('live-policy-start'),
       '10:00',
     );
     await fireEvent.changeText(screen.getByTestId('live-policy-end'), '12:00');
+    await fireEvent.press(screen.getByTestId('live-policy-options-toggle'));
     await fireEvent.changeText(
       screen.getByTestId('live-policy-daily-cap'),
       '5',
@@ -2800,9 +4084,28 @@ describe('production live projections', () => {
       ),
     );
     const savePolicy = jest.fn(async () => ok(iosHome.automation));
+    const companionPort: LiveCompanionPort = {
+      canOpenComposer: jest.fn(async () => true),
+      getReminderStatus: jest.fn(async () => ({
+        kind: 'ok' as const,
+        value: {
+          authorization: 'authorized' as const,
+          failedCount: 0,
+          kind: 'ok' as const,
+          plannedDateCount: 1,
+          scheduledCount: 1,
+          truncated: false,
+        },
+      })),
+      openNotificationSettings: jest.fn(),
+      openUserConfirmedComposer: jest.fn(),
+      prepareComposerReview: jest.fn(),
+      requestReminderAuthorization: jest.fn(),
+    };
     const { port } = createPort({
       getBootstrap: jest.fn(async () => ok(iosBootstrap)),
       getHome: jest.fn(async () => ok(iosHome)),
+      getAccount: jest.fn(async () => ok(iosAccount)),
       getPolicyEditor: jest.fn(async () => ok(configured)),
       getNextComposerProposal: jest.fn(async () =>
         ok({ kind: 'none' as const }),
@@ -2811,9 +4114,11 @@ describe('production live projections', () => {
       savePolicy,
     });
 
-    await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-home-automation'));
+    await renderLiveApp(port, companionPort);
+    await openSettingsDestination('schedule');
     expect(screen.queryByTestId('live-policy-daily-cap')).toBeNull();
+    expect(screen.queryByText(/60 civil dates/u)).toBeNull();
+    await fireEvent.press(screen.getByTestId('live-policy-options-toggle'));
     expect(await screen.findByText(/60 civil dates/u)).toBeTruthy();
     await fireEvent.press(screen.getByTestId('live-policy-preview'));
     expect(await screen.findByText(/checked 400 days/u)).toBeTruthy();
@@ -2849,7 +4154,7 @@ describe('production live projections', () => {
     });
 
     await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-home-automation'));
+    await openSettingsDestination('schedule');
     await fireEvent.changeText(
       await screen.findByTestId('live-policy-start'),
       'not-a-time',
@@ -2865,6 +4170,7 @@ describe('production live projections', () => {
 
   it('selects only Ready and Off people before confirmation', async () => {
     const secondId = 'contact-live-2' as ContactId;
+    const enabledId = 'contact-live-enabled' as ContactId;
     const readyOff = (id: ContactId, name: string): ContactSummary => ({
       ...contactSummary(),
       id,
@@ -2875,8 +4181,27 @@ describe('production live projections', () => {
       readyOff(contactId, 'First Ready'),
       readyOff(secondId, 'Second Ready'),
     ];
-    const prepareEnrollmentReview = jest.fn(async () =>
+    const allContacts = [
+      ...candidates,
+      {
+        ...contactSummary(),
+        id: enabledId,
+        displayName: 'Already Enabled' as PrivateDisplayName,
+      },
+    ];
+    let currentRevision = '1';
+    const listPeople = jest.fn(async () =>
       ok(
+        { items: allContacts, totalCount: allContacts.length },
+        revision(currentRevision),
+      ),
+    );
+    const getHome = jest.fn(async () =>
+      ok(liveHome('active'), revision(currentRevision)),
+    );
+    const prepareEnrollmentReview = jest.fn(async () => {
+      currentRevision = '4';
+      return ok(
         {
           handle:
             'enrollment-review-1' as import('../domain/shared/brand').EnrollmentReviewHandle,
@@ -2886,18 +4211,21 @@ describe('production live projections', () => {
           explicitConfirmationRequired: true as const,
         },
         revision('4'),
-      ),
-    );
-    const confirmEnrollment = jest.fn(async () =>
-      ok({
-        changedContactIds: [contactId, secondId],
-        invalidatedApprovalCount: 0,
-      }),
-    );
+      );
+    });
+    const confirmEnrollment = jest.fn(async () => {
+      currentRevision = '5';
+      return ok(
+        {
+          changedContactIds: [contactId, secondId],
+          invalidatedApprovalCount: 0,
+        },
+        revision('5'),
+      );
+    });
     const { port } = createPort({
-      listPeople: jest.fn(async () =>
-        ok({ items: candidates, totalCount: candidates.length }),
-      ),
+      getHome,
+      listPeople,
       prepareEnrollmentReview,
       confirmEnrollment,
     });
@@ -2907,10 +4235,17 @@ describe('production live projections', () => {
     await fireEvent.press(
       await screen.findByTestId('live-people-select-page-ready'),
     );
+    expect(screen.getByText('3 people')).toBeTruthy();
     expect((await screen.findAllByText('First Ready')).length).toBeGreaterThan(
       0,
     );
     expect(screen.getAllByText('Second Ready').length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(
+        'Review the 2 people below. 0 of 2 selected people were confirmed before this group.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/0 of 3 selected people/u)).toBeNull();
     expect(confirmEnrollment).not.toHaveBeenCalled();
     await fireEvent.press(
       screen.getByTestId('live-people-confirm-page-enrollment'),
@@ -2998,6 +4333,9 @@ describe('production live projections', () => {
     );
     const { port } = createPort({
       confirmEnrollment,
+      getHome: jest.fn(async () =>
+        ok(liveHome('active'), revision(String(currentRevision))),
+      ),
       listPeople,
       prepareEnrollmentReview,
     });
@@ -3142,7 +4480,7 @@ describe('production live projections', () => {
       listPeople: jest.fn(async () =>
         ok({ items: [contactSummary()], totalCount: 1 }),
       ),
-      getPerson: jest.fn(async () => ok(contactDetail())),
+      getPerson: jest.fn(async () => ok(contactDetailNeedingApproval())),
       prepareApprovals,
       confirmApprovals,
     });
@@ -3174,7 +4512,7 @@ describe('production live projections', () => {
       automation: {
         platform: 'ios',
         desired: 'paused',
-        effective: 'not-configured',
+        effective: 'paused',
         readiness: iosReadiness,
       },
     };
@@ -3187,12 +4525,10 @@ describe('production live projections', () => {
         readiness: iosReadiness,
       },
     };
-    const getHome = jest
-      .fn()
-      .mockResolvedValueOnce(ok(notConfigured))
-      .mockResolvedValueOnce(ok(notConfigured))
-      .mockResolvedValueOnce(ok(iosHome, revision('2')))
-      .mockResolvedValue(ok(paused, revision('3')));
+    let currentHome = notConfigured;
+    let currentRevision = revision('1');
+    let initialActivationCompleted = false;
+    const getHome = jest.fn(async () => ok(currentHome, currentRevision));
     const prepareActivation = jest.fn(async () =>
       ok(
         {
@@ -3213,8 +4549,17 @@ describe('production live projections', () => {
         revision('7'),
       ),
     );
-    const activate = jest.fn(async () => ok(iosHome.automation));
-    const pauseAll = jest.fn(async () => ok(paused.automation));
+    const activate = jest.fn(async () => {
+      currentHome = iosHome;
+      currentRevision = revision('2');
+      initialActivationCompleted = true;
+      return ok(iosHome.automation, currentRevision);
+    });
+    const pauseAll = jest.fn(async () => {
+      currentHome = paused;
+      currentRevision = revision('3');
+      return ok(paused.automation, currentRevision);
+    });
     const companionPort: LiveCompanionPort = {
       canOpenComposer: jest.fn(async () => false),
       getReminderStatus: jest.fn(async () => ({
@@ -3224,7 +4569,7 @@ describe('production live projections', () => {
           failedCount: 0,
           kind: 'ok' as const,
           plannedDateCount: 1,
-          scheduledCount: 1,
+          scheduledCount: currentHome.automation.desired === 'paused' ? 0 : 1,
           truncated: false,
         },
       })),
@@ -3235,7 +4580,24 @@ describe('production live projections', () => {
     };
     const { port } = createPort({
       getBootstrap: jest.fn(async () => ok(iosBootstrap)),
+      getAccount: jest.fn(async () => ok(iosAccount, currentRevision)),
       getHome,
+      getSetup: jest.fn(async () =>
+        ok(
+          {
+            ...iosCompleteSetup,
+            initialActivationCompleted,
+            automation: currentHome.automation,
+          },
+          currentRevision,
+        ),
+      ),
+      getMessageEditor: jest.fn(async () =>
+        ok(configuredMessage, currentRevision),
+      ),
+      getPolicyEditor: jest.fn(async () =>
+        ok(configuredPolicy, currentRevision),
+      ),
       getNextComposerProposal: jest.fn(async () =>
         ok({ kind: 'none' as const }),
       ),
@@ -3245,7 +4607,8 @@ describe('production live projections', () => {
     });
 
     await renderLiveApp(port, companionPort);
-    await fireEvent.press(await screen.findByTestId('live-home-automation'));
+    await fireEvent.press(await screen.findByTestId('live-product-setup-next'));
+    expect(await screen.findByTestId('live-automation-screen')).toBeTruthy();
     await fireEvent.press(
       await screen.findByTestId('live-ios-review-activation'),
     );
@@ -3307,13 +4670,14 @@ describe('production live projections', () => {
     const { port } = createPort({
       getBootstrap: jest.fn(async () => ok(iosBootstrap)),
       getHome: jest.fn(async () => ok(iosHome)),
+      getSetup: jest.fn(async () => ok(iosCompleteSetup)),
       getNextComposerProposal: jest.fn(async () =>
         ok({ kind: 'none' as const }),
       ),
     });
 
     await renderLiveApp(port, companionPort);
-    await fireEvent.press(await screen.findByTestId('live-home-automation'));
+    await openSettingsDestination('automation');
     expect(
       await screen.findByText('2 reminders could not be scheduled'),
     ).toBeTruthy();
@@ -3366,7 +4730,14 @@ describe('production live projections', () => {
     });
 
     await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-home-review-today'));
+    const todayAction = await screen.findByTestId('live-home-review-today');
+    expect(todayAction.props.accessibilityLabel).toBe(
+      'Review today’s birthday decision',
+    );
+    expect(screen.getAllByTestId('live-home-review-today')).toHaveLength(1);
+    expect(screen.queryByTestId('live-home-attention')).toBeNull();
+    expect(screen.queryByTestId('live-home-automation')).toBeNull();
+    await fireEvent.press(todayAction);
     expect(await screen.findByText('Happy birthday!')).toBeTruthy();
     expect(confirmTodayOccurrence).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('live-home-confirm-today'));
@@ -3383,6 +4754,190 @@ describe('production live projections', () => {
       choice: 'send-through-normal-path',
       expectedRevision: '5',
     });
+  });
+
+  it('does not reinstall a deferred today review after Home is invalidated', async () => {
+    const todayHome: HomeProjection = {
+      ...liveHome('active'),
+      next: {
+        ...nextBirthday,
+        occurrenceId: 'occurrence-stale-review' as OccurrenceId,
+      },
+      counts: { ...liveHome('active').counts, today: 1 },
+    };
+    const getHome = jest
+      .fn()
+      .mockResolvedValueOnce(ok(todayHome, revision('1')))
+      .mockResolvedValue(
+        ok(
+          {
+            ...todayHome,
+            next: {
+              ...todayHome.next!,
+              occurrenceId: 'occurrence-current' as OccurrenceId,
+            },
+          },
+          revision('2'),
+        ),
+      );
+    let harness!: PortHarness;
+    const prepareTodayOccurrence = jest.fn(async () => {
+      harness.emit({ revision: revision('2'), areas: ['home'] });
+      return ok(
+        {
+          handle:
+            'stale-today-review' as import('../domain/shared/brand').TodayOccurrenceReviewHandle,
+          recipient: 'Private old recipient' as PrivateDisplayName,
+          maskedDestination: '•••• 9999',
+          exactText: 'Stale private message' as PrivateMessageText,
+          choice: 'send-through-normal-path' as const,
+          limitationsDisclosure: 'Review disclosure.',
+        },
+        revision('3'),
+      );
+    });
+    const confirmTodayOccurrence = jest.fn();
+    harness = createPort({
+      confirmTodayOccurrence,
+      getHome,
+      prepareTodayOccurrence,
+    });
+
+    await renderLiveApp(harness.port);
+    await fireEvent.press(await screen.findByTestId('live-home-review-today'));
+    await waitFor(() =>
+      expect(prepareTodayOccurrence).toHaveBeenCalledTimes(1),
+    );
+
+    await waitFor(() =>
+      expect(getHome.mock.calls.length).toBeGreaterThanOrEqual(2),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText('Stale private message')).toBeNull(),
+    );
+    expect(screen.queryByText('Private old recipient')).toBeNull();
+    expect(screen.queryByTestId('live-home-confirm-today')).toBeNull();
+    expect(confirmTodayOccurrence).not.toHaveBeenCalled();
+  });
+
+  it('clears exact today review content when the app returns to foreground', async () => {
+    const appStateHandlers: Array<(state: 'active' | 'background') => void> =
+      [];
+    jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_event, handler) => {
+        appStateHandlers.push(
+          handler as (state: 'active' | 'background') => void,
+        );
+        return { remove: jest.fn() };
+      });
+    const todayHome: HomeProjection = {
+      ...liveHome('active'),
+      next: nextBirthday,
+      counts: { ...liveHome('active').counts, today: 1 },
+    };
+    const confirmTodayOccurrence = jest.fn();
+    const { port } = createPort({
+      confirmTodayOccurrence,
+      getHome: jest.fn(async () => ok(todayHome, revision('1'))),
+      prepareTodayOccurrence: jest.fn(async () =>
+        ok(
+          {
+            handle:
+              'foreground-today-review' as import('../domain/shared/brand').TodayOccurrenceReviewHandle,
+            recipient: 'Foreground recipient' as PrivateDisplayName,
+            maskedDestination: '•••• 4321',
+            exactText: 'Foreground private message' as PrivateMessageText,
+            choice: 'send-through-normal-path' as const,
+            limitationsDisclosure: 'Review disclosure.',
+          },
+          revision('2'),
+        ),
+      ),
+    });
+
+    await renderLiveApp(port);
+    await fireEvent.press(await screen.findByTestId('live-home-review-today'));
+    expect(await screen.findByText('Foreground private message')).toBeTruthy();
+
+    await act(async () => {
+      appStateHandlers.forEach(handler => handler('active'));
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByText('Foreground private message')).toBeNull(),
+    );
+    expect(screen.queryByText('Foreground recipient')).toBeNull();
+    expect(screen.queryByTestId('live-home-confirm-today')).toBeNull();
+    expect(confirmTodayOccurrence).not.toHaveBeenCalled();
+  });
+
+  it('does not restore a stale today error after invalidation during recovery reload', async () => {
+    const todayHome: HomeProjection = {
+      ...liveHome('active'),
+      next: nextBirthday,
+      counts: { ...liveHome('active').counts, today: 1 },
+    };
+    let harness!: PortHarness;
+    let homeRequests = 0;
+    const getHome = jest.fn(async () => {
+      homeRequests += 1;
+      if (homeRequests === 2) {
+        harness.emit({ revision: revision('3'), areas: ['home'] });
+      }
+      return ok(todayHome, revision(String(homeRequests)));
+    });
+    harness = createPort({
+      getHome,
+      prepareTodayOccurrence: jest.fn(async () => ({
+        kind: 'error' as const,
+        problem: {
+          kind: 'stale-revision' as const,
+          latestRevision: revision('2'),
+        },
+      })),
+    });
+
+    await renderLiveApp(harness.port);
+    await fireEvent.press(await screen.findByTestId('live-home-review-today'));
+
+    await waitFor(() =>
+      expect(getHome.mock.calls.length).toBeGreaterThanOrEqual(3),
+    );
+    expect(screen.queryByText('Action not completed')).toBeNull();
+  });
+
+  it('withholds Home mutations when a retained projection refresh fails', async () => {
+    const todayHome: HomeProjection = {
+      ...liveHome('active'),
+      next: nextBirthday,
+      counts: { ...liveHome('active').counts, today: 1 },
+    };
+    const getHome = jest
+      .fn()
+      .mockResolvedValueOnce(ok(todayHome, revision('1')))
+      .mockResolvedValue(internalError<HomeProjection>());
+    const prepareTodayOccurrence = jest.fn();
+    const pauseAll = jest.fn();
+    const harness = createPort({ getHome, pauseAll, prepareTodayOccurrence });
+
+    await renderLiveApp(harness.port);
+    expect(await screen.findByTestId('live-home-review-today')).toBeTruthy();
+    expect(screen.getByTestId('live-home-pause')).toBeTruthy();
+
+    await act(async () => {
+      harness.emit({ revision: revision('2'), areas: ['home'] });
+    });
+
+    expect(await screen.findByText('Could not refresh')).toBeTruthy();
+    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
+    expect(screen.queryByTestId('live-home-pause')).toBeNull();
+    expect(
+      screen.queryByTestId('live-home-approved-message-toggle'),
+    ).toBeNull();
+    expect(prepareTodayOccurrence).not.toHaveBeenCalled();
+    expect(pauseAll).not.toHaveBeenCalled();
   });
 
   it('opens the Android system composer only after its explicit reviewed choice', async () => {
@@ -3527,6 +5082,9 @@ describe('production live projections', () => {
     await renderLiveApp(port);
     await fireEvent.press(await screen.findByTestId('live-tab-settings'));
     await fireEvent.press(await screen.findByTestId('live-settings-privacy'));
+    await fireEvent.press(
+      screen.getByTestId('live-privacy-data-details-toggle'),
+    );
 
     expect(await screen.findByText('Saved message templates')).toBeTruthy();
     expect(screen.getByText('contacts-v1')).toBeTruthy();
@@ -3556,14 +5114,16 @@ describe('production live projections', () => {
       remoteDeletionComplete: false as const,
       externalSmsCopiesNotErased: true as const,
     };
+    const unavailableReceipt = {
+      kind: 'unavailable' as const,
+      reason: 'coordination-unavailable' as const,
+    };
     const { port } = createPort({
-      getLatestDeletionReceipt: jest.fn(async () => ok(drainingReceipt)),
-      checkAccountDeletionStatus: jest.fn(async () =>
-        ok({
-          kind: 'unavailable' as const,
-          reason: 'coordination-unavailable' as const,
-        }),
-      ),
+      getLatestDeletionReceipt: jest
+        .fn()
+        .mockResolvedValueOnce(ok(drainingReceipt))
+        .mockResolvedValue(ok(unavailableReceipt)),
+      checkAccountDeletionStatus: jest.fn(async () => ok(unavailableReceipt)),
     });
 
     await renderLiveApp(port);
@@ -3578,7 +5138,405 @@ describe('production live projections', () => {
     ).toBeTruthy();
   });
 
-  it('keeps the deletion stage neutral throughout blocked setup', async () => {
+  it('gives a Setup lifecycle-repair state precedence over a complete Bootstrap account', async () => {
+    const { repairingSetup } = lifecycleRepairFixture();
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(completeBootstrap)),
+      getSetup: jest.fn(async () => ok(repairingSetup)),
+    });
+
+    await renderLiveApp(port);
+
+    expect(await screen.findByTestId('live-setup-repair-reauth')).toBeTruthy();
+    expect(screen.queryByTestId('live-app-shell')).toBeNull();
+    expect(screen.queryByTestId('live-product-setup-journey')).toBeNull();
+    expect(screen.queryByTestId('live-setup-defer')).toBeNull();
+  });
+
+  it('fails closed when Bootstrap requires lifecycle repair but Setup does not', async () => {
+    const { repairingBootstrap } = lifecycleRepairFixture();
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(repairingBootstrap)),
+      getSetup: jest.fn(async () => ok(completeSetup)),
+    });
+
+    await renderLiveApp(port);
+
+    expect(
+      await screen.findByTestId('live-setup-projection-conflict'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('live-app-shell')).toBeNull();
+    expect(screen.queryByTestId('live-setup-action')).toBeNull();
+    expect(screen.queryByTestId('live-setup-defer')).toBeNull();
+  });
+
+  it('fails closed before ordinary early-setup actions when Bootstrap and Setup revisions differ', async () => {
+    const signedOutAccount: AccountProjection = {
+      kind: 'signed-out',
+      retainedSetup: 'none',
+    };
+    const earlyBootstrap: BootstrapProjection = {
+      ...completeBootstrap,
+      account: signedOutAccount,
+      setupStep: 'google-account',
+    };
+    const earlySetup: SetupProjection = {
+      ...completeSetup,
+      account: signedOutAccount,
+      initialActivationCompleted: false,
+      step: 'google-account',
+    };
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(earlyBootstrap, revision('1'))),
+      getSetup: jest.fn(async () => ok(earlySetup, revision('2'))),
+    });
+
+    await renderLiveApp(port);
+
+    expect(
+      await screen.findByTestId('live-setup-projection-conflict'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('live-setup-action')).toBeNull();
+    expect(screen.queryByTestId('live-setup-defer')).toBeNull();
+  });
+
+  it('fails closed before the product journey or shell when Bootstrap and Setup revisions differ', async () => {
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(completeBootstrap, revision('1'))),
+      getSetup: jest.fn(async () => ok(completeSetup, revision('2'))),
+    });
+
+    await renderLiveApp(port);
+
+    expect(
+      await screen.findByTestId('native-product-setup-unavailable'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('live-app-shell')).toBeNull();
+    expect(screen.queryByTestId('live-product-setup-journey')).toBeNull();
+  });
+
+  it.each([
+    ['disconnect', 'disconnect-contacts'],
+    ['revoke', 'revoke-google-access'],
+    ['sign-out', 'sign-out-wipe'],
+  ] as const)(
+    'routes complete-bootstrap Android %s cleanup to its exact resumable operation',
+    async (accountOperation, privacyAction) => {
+      const cleanupAccount: AccountProjection = {
+        kind: 'cleanup-pending',
+        operation: accountOperation,
+        issue: {
+          id: `cleanup-${accountOperation}` as IssueId,
+          code: 'coordination-unavailable',
+          severity: 'blocking',
+          blocks: ['test', 'activation', 'birthday'],
+        },
+      };
+      const cleanupBootstrap: BootstrapProjection = {
+        ...completeBootstrap,
+        account: cleanupAccount,
+        setupStep: 'complete',
+      };
+      const cleanupSetup: SetupProjection = {
+        ...completeSetup,
+        step: 'complete',
+        account: cleanupAccount,
+        automation: {
+          platform: 'android',
+          desired: 'paused',
+          effective: 'deleting',
+          readiness,
+        },
+      };
+      const operationId = `privacy-${accountOperation}` as PrivacyOperationId;
+      const currentOperation = {
+        kind: 'remote-pending' as const,
+        id: operationId,
+        action: privacyAction,
+        reason: 'coordination-unavailable' as const,
+        updatedAt: generatedAt,
+      };
+      const resumeOperation = jest.fn(async () =>
+        ok({
+          kind: 'complete' as const,
+          id: operationId,
+          action: privacyAction,
+          completedAt: generatedAt,
+          externalSmsCopiesNotErased: true as const,
+        }),
+      );
+      const getOperation = jest.fn(async () => ok(currentOperation));
+      const { port } = createPort({
+        getBootstrap: jest.fn(async () => ok(cleanupBootstrap)),
+        getCurrentOperation: jest.fn(async () => ok(currentOperation)),
+        getOperation,
+        getSetup: jest.fn(async () => ok(cleanupSetup)),
+        resumeOperation,
+      });
+
+      await renderLiveApp(port);
+
+      expect(await screen.findByTestId('live-setup-screen')).toBeTruthy();
+      expect(screen.queryByTestId('live-app-shell')).toBeNull();
+      expect(screen.queryByTestId('live-setup-action')).toBeNull();
+      await fireEvent.press(screen.getByTestId('live-setup-refresh-cleanup'));
+      await waitFor(() =>
+        expect(getOperation).toHaveBeenCalledWith(operationId),
+      );
+      await fireEvent.press(screen.getByTestId('live-setup-resume-cleanup'));
+      await waitFor(() => expect(resumeOperation).toHaveBeenCalledTimes(1));
+      expect(resumeOperation).toHaveBeenCalledWith(operationId);
+    },
+  );
+
+  it('withholds a retained cleanup operation after its status refresh fails', async () => {
+    const cleanupAccount: AccountProjection = {
+      kind: 'cleanup-pending',
+      operation: 'revoke',
+      issue: {
+        id: 'cleanup-stale-operation' as IssueId,
+        code: 'coordination-unavailable',
+        severity: 'blocking',
+        blocks: ['test', 'activation', 'birthday'],
+      },
+    };
+    const cleanupBootstrap: BootstrapProjection = {
+      ...completeBootstrap,
+      account: cleanupAccount,
+      setupStep: 'complete',
+    };
+    const cleanupSetup: SetupProjection = {
+      ...completeSetup,
+      account: cleanupAccount,
+      automation: {
+        platform: 'android',
+        desired: 'paused',
+        effective: 'deleting',
+        readiness,
+      },
+    };
+    const getCurrentOperation = jest
+      .fn()
+      .mockResolvedValueOnce(
+        ok({
+          kind: 'remote-pending' as const,
+          id: 'privacy-stale-operation' as PrivacyOperationId,
+          action: 'revoke-google-access' as const,
+          reason: 'coordination-unavailable' as const,
+          updatedAt: generatedAt,
+        }),
+      )
+      .mockResolvedValue(internalError());
+    const harness = createPort({
+      getBootstrap: jest.fn(async () => ok(cleanupBootstrap)),
+      getCurrentOperation,
+      getSetup: jest.fn(async () => ok(cleanupSetup)),
+    });
+
+    await renderLiveApp(harness.port);
+    expect(await screen.findByTestId('live-setup-resume-cleanup')).toBeTruthy();
+
+    await act(async () => {
+      harness.emit({ revision: revision('2'), areas: ['privacy'] });
+    });
+
+    expect(
+      await screen.findByTestId('live-setup-cleanup-unavailable'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('live-setup-resume-cleanup')).toBeNull();
+  });
+
+  it('routes complete-bootstrap iOS cleanup to its exact resumable operation', async () => {
+    const cleanupAccount: AccountProjection = {
+      kind: 'cleanup-pending',
+      operation: 'disconnect',
+      issue: {
+        id: 'ios-cleanup-disconnect' as IssueId,
+        code: 'coordination-unavailable',
+        severity: 'blocking',
+        blocks: ['composer'],
+      },
+    };
+    const cleanupBootstrap: BootstrapProjection = {
+      ...iosBootstrap,
+      account: cleanupAccount,
+      setupStep: 'complete',
+    };
+    const cleanupSetup: SetupProjection = {
+      step: 'complete',
+      initialActivationCompleted: true,
+      eligibility: iosBootstrap.eligibility,
+      account: cleanupAccount,
+      contacts: {
+        kind: 'fresh',
+        completedAt: generatedAt,
+        contactCount: 1,
+      },
+      readiness: iosReadiness,
+      automation: {
+        platform: 'ios',
+        desired: 'paused',
+        effective: 'paused',
+        readiness: iosReadiness,
+      },
+    };
+    const operationId = 'privacy-ios-disconnect' as PrivacyOperationId;
+    const resumeOperation = jest.fn(async () =>
+      ok({
+        kind: 'complete' as const,
+        id: operationId,
+        action: 'disconnect-contacts' as const,
+        completedAt: generatedAt,
+        externalSmsCopiesNotErased: true as const,
+      }),
+    );
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(cleanupBootstrap)),
+      getCurrentOperation: jest.fn(async () =>
+        ok({
+          kind: 'remote-pending' as const,
+          id: operationId,
+          action: 'disconnect-contacts' as const,
+          reason: 'coordination-unavailable' as const,
+          updatedAt: generatedAt,
+        }),
+      ),
+      getSetup: jest.fn(async () => ok(cleanupSetup)),
+      resumeOperation,
+    });
+
+    await renderLiveApp(port);
+
+    expect(await screen.findByTestId('live-setup-screen')).toBeTruthy();
+    expect(screen.queryByTestId('live-app-shell')).toBeNull();
+    expect(screen.queryByTestId('live-setup-action')).toBeNull();
+    await fireEvent.press(screen.getByTestId('live-setup-resume-cleanup'));
+    await waitFor(() =>
+      expect(resumeOperation).toHaveBeenCalledWith(operationId),
+    );
+  });
+
+  it('routes complete-bootstrap iOS deletion to authoritative deletion status', async () => {
+    const deletingAccount: AccountProjection = {
+      kind: 'cleanup-pending',
+      operation: 'delete',
+      issue: {
+        id: 'ios-cleanup-delete' as IssueId,
+        code: 'coordination-unavailable',
+        severity: 'blocking',
+        blocks: ['composer'],
+      },
+    };
+    const deletingBootstrap: BootstrapProjection = {
+      ...iosBootstrap,
+      account: deletingAccount,
+      setupStep: 'complete',
+    };
+    const deletingSetup: SetupProjection = {
+      step: 'complete',
+      initialActivationCompleted: true,
+      eligibility: iosBootstrap.eligibility,
+      account: deletingAccount,
+      contacts: {
+        kind: 'fresh',
+        completedAt: generatedAt,
+        contactCount: 1,
+      },
+      readiness: iosReadiness,
+      automation: {
+        platform: 'ios',
+        desired: 'paused',
+        effective: 'paused',
+        readiness: iosReadiness,
+      },
+    };
+    const checkAccountDeletionStatus = jest.fn(async () =>
+      ok({
+        kind: 'unavailable' as const,
+        reason: 'coordination-unavailable' as const,
+      }),
+    );
+    const { port } = createPort({
+      checkAccountDeletionStatus,
+      getBootstrap: jest.fn(async () => ok(deletingBootstrap)),
+      getSetup: jest.fn(async () => ok(deletingSetup)),
+    });
+
+    await renderLiveApp(port);
+
+    expect(await screen.findByTestId('live-setup-screen')).toBeTruthy();
+    expect(screen.queryByTestId('live-app-shell')).toBeNull();
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Check account deletion' }),
+    );
+    await waitFor(() =>
+      expect(checkAccountDeletionStatus).toHaveBeenCalledTimes(1),
+    );
+    expect(screen.queryByTestId('live-setup-resume-cleanup')).toBeNull();
+  });
+
+  it('routes a complete-bootstrap connected Android sender deleting state to exact lifecycle recovery', async () => {
+    const deletingSenderAccount: AccountProjection = {
+      kind: 'connected',
+      displayEmail: 'user@example.test' as PrivateEmail,
+      sender: {
+        platform: 'android',
+        kind: 'deleting',
+        preissuedPermitMayFinish: true,
+      },
+    };
+    const deletingBootstrap: BootstrapProjection = {
+      ...completeBootstrap,
+      account: deletingSenderAccount,
+      setupStep: 'complete',
+    };
+    const deletingSetup: SetupProjection = {
+      ...completeSetup,
+      step: 'complete',
+      account: deletingSenderAccount,
+      automation: {
+        platform: 'android',
+        desired: 'paused',
+        effective: 'deleting',
+        readiness,
+      },
+    };
+    const operationId = 'privacy-connected-deleting' as PrivacyOperationId;
+    const resumeOperation = jest.fn(async () =>
+      ok({
+        kind: 'remote-draining' as const,
+        id: operationId,
+        action: 'delete-account' as const,
+        updatedAt: generatedAt,
+      }),
+    );
+    const { port } = createPort({
+      getBootstrap: jest.fn(async () => ok(deletingBootstrap)),
+      getCurrentOperation: jest.fn(async () =>
+        ok({
+          kind: 'remote-pending' as const,
+          id: operationId,
+          action: 'delete-account' as const,
+          reason: 'coordination-unavailable' as const,
+          updatedAt: generatedAt,
+        }),
+      ),
+      getSetup: jest.fn(async () => ok(deletingSetup)),
+      resumeOperation,
+    });
+
+    await renderLiveApp(port);
+
+    expect(await screen.findByTestId('live-setup-screen')).toBeTruthy();
+    expect(screen.queryByTestId('live-app-shell')).toBeNull();
+    expect(screen.queryByTestId('live-setup-action')).toBeNull();
+    await fireEvent.press(screen.getByTestId('live-setup-resume-cleanup'));
+    await waitFor(() =>
+      expect(resumeOperation).toHaveBeenCalledWith(operationId),
+    );
+  });
+
+  it('keeps the deletion stage neutral and reachable from a complete bootstrap', async () => {
     const deletingAccount: AccountProjection = {
       kind: 'cleanup-pending',
       operation: 'delete',
@@ -3592,7 +5550,7 @@ describe('production live projections', () => {
     const deletingBootstrap: BootstrapProjection = {
       ...completeBootstrap,
       account: deletingAccount,
-      setupStep: 'compatibility',
+      setupStep: 'complete',
     };
     const deletingSetup: SetupProjection = {
       step: 'compatibility',
@@ -3738,7 +5696,7 @@ describe('production live projections', () => {
     expect(screen.getByText(/same-account recovery was checked/u)).toBeTruthy();
   });
 
-  it('keeps exact-account lifecycle repair reachable from blocked setup', async () => {
+  it('keeps exact-account lifecycle repair reachable from a complete bootstrap', async () => {
     const repairingAccount: AccountProjection = {
       kind: 'cleanup-pending',
       operation: 'repair',
@@ -3752,7 +5710,7 @@ describe('production live projections', () => {
     const repairingBootstrap: BootstrapProjection = {
       ...completeBootstrap,
       account: repairingAccount,
-      setupStep: 'google-account',
+      setupStep: 'complete',
     };
     const repairingSetup: SetupProjection = {
       step: 'google-account',
@@ -3815,17 +5773,204 @@ describe('production live projections', () => {
     expect(
       await screen.findByText('The protected operation is complete.'),
     ).toBeTruthy();
+    expect(
+      screen.queryByTestId('live-setup-repair-revoke-google-access'),
+    ).toBeNull();
+  });
+
+  it('expires lifecycle repair identity before the native five-minute lease', async () => {
+    const { repairingAccount, repairingBootstrap, repairingSetup } =
+      lifecycleRepairFixture();
+    const { port } = createPort({
+      continueWithGoogle: jest.fn(async () =>
+        ok(repairingAccount, revision('7')),
+      ),
+      getBootstrap: jest.fn(async () => ok(repairingBootstrap, revision('7'))),
+      getSetup: jest.fn(async () => ok(repairingSetup, revision('7'))),
+    });
+
+    const realSetTimeout = globalThis.setTimeout;
+    let expireIdentity: (() => void) | undefined;
+    jest.spyOn(Date, 'now').mockReturnValue(1_721_347_200_000);
+    jest
+      .spyOn(globalThis, 'setTimeout')
+      .mockImplementation((handler, delay, ...arguments_) => {
+        if (delay === 4 * 60 * 1_000) {
+          expireIdentity = handler as () => void;
+          return 98_765 as unknown as ReturnType<typeof setTimeout>;
+        }
+        return realSetTimeout(handler, delay, ...arguments_);
+      });
+
+    await renderLiveApp(port);
+    await fireEvent.press(
+      await screen.findByTestId('live-setup-repair-reauth'),
+    );
+    expect(
+      await screen.findByTestId('live-setup-repair-disconnect-contacts'),
+    ).toBeTruthy();
+
+    await act(async () => {
+      expireIdentity?.();
+    });
+
+    expect(
+      screen.queryByTestId('live-setup-repair-disconnect-contacts'),
+    ).toBeNull();
+  });
+
+  it('revokes lifecycle repair identity when the app backgrounds', async () => {
+    const appStateHandlers: Array<(state: 'active' | 'background') => void> =
+      [];
+    jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_event, handler) => {
+        appStateHandlers.push(
+          handler as (state: 'active' | 'background') => void,
+        );
+        return { remove: jest.fn() };
+      });
+    const { repairingAccount, repairingBootstrap, repairingSetup } =
+      lifecycleRepairFixture();
+    const { port } = createPort({
+      continueWithGoogle: jest.fn(async () =>
+        ok(repairingAccount, revision('8')),
+      ),
+      getBootstrap: jest.fn(async () => ok(repairingBootstrap, revision('8'))),
+      getSetup: jest.fn(async () => ok(repairingSetup, revision('8'))),
+    });
+
+    await renderLiveApp(port);
+    await fireEvent.press(
+      await screen.findByTestId('live-setup-repair-reauth'),
+    );
+    expect(
+      await screen.findByTestId('live-setup-repair-disconnect-contacts'),
+    ).toBeTruthy();
+
+    await act(async () => {
+      appStateHandlers.forEach(handler => handler('background'));
+    });
+
+    expect(
+      screen.queryByTestId('live-setup-repair-disconnect-contacts'),
+    ).toBeNull();
+  });
+
+  it('revokes lifecycle repair identity on a later native invalidation', async () => {
+    const { repairingAccount, repairingBootstrap, repairingSetup } =
+      lifecycleRepairFixture();
+    const harness = createPort({
+      continueWithGoogle: jest.fn(async () =>
+        ok(repairingAccount, revision('9')),
+      ),
+      getBootstrap: jest.fn(async () => ok(repairingBootstrap, revision('9'))),
+      getSetup: jest.fn(async () => ok(repairingSetup, revision('9'))),
+    });
+
+    await renderLiveApp(harness.port);
+    await fireEvent.press(
+      await screen.findByTestId('live-setup-repair-reauth'),
+    );
+    expect(
+      await screen.findByTestId('live-setup-repair-disconnect-contacts'),
+    ).toBeTruthy();
+
+    await act(async () => {
+      harness.emit({ revision: revision('10'), areas: ['privacy'] });
+    });
+
+    expect(
+      screen.queryByTestId('live-setup-repair-disconnect-contacts'),
+    ).toBeNull();
+  });
+
+  it('accepts only the matching in-flight identity invalidation and revokes on the next one', async () => {
+    const { repairingAccount, repairingBootstrap, repairingSetup } =
+      lifecycleRepairFixture();
+    let harness!: PortHarness;
+    const continueWithGoogle = jest.fn(async () => {
+      harness.emit({
+        revision: revision('14'),
+        areas: ['bootstrap', 'setup', 'account'],
+      });
+      return ok(repairingAccount, revision('14'));
+    });
+    harness = createPort({
+      continueWithGoogle,
+      getBootstrap: jest.fn(async () => ok(repairingBootstrap, revision('14'))),
+      getSetup: jest.fn(async () => ok(repairingSetup, revision('14'))),
+    });
+
+    await renderLiveApp(harness.port);
+    await fireEvent.press(
+      await screen.findByTestId('live-setup-repair-reauth'),
+    );
+    await waitFor(() => expect(continueWithGoogle).toHaveBeenCalledTimes(1));
+
+    expect(
+      await screen.findByTestId('live-setup-repair-disconnect-contacts'),
+    ).toBeTruthy();
+
+    await act(async () => {
+      harness.emit({ revision: revision('15'), areas: ['privacy'] });
+    });
+    expect(
+      screen.queryByTestId('live-setup-repair-disconnect-contacts'),
+    ).toBeNull();
+  });
+
+  it('fails lifecycle repair identity closed when refreshed projection revisions differ', async () => {
+    const { repairingAccount, repairingBootstrap, repairingSetup } =
+      lifecycleRepairFixture();
+    const getSetup = jest
+      .fn()
+      .mockResolvedValueOnce(ok(repairingSetup, revision('11')))
+      .mockResolvedValue(ok(repairingSetup, revision('12')));
+    const getBootstrap = jest
+      .fn()
+      .mockResolvedValueOnce(ok(repairingBootstrap, revision('11')))
+      .mockResolvedValue(ok(repairingBootstrap, revision('12')));
+    const { port } = createPort({
+      continueWithGoogle: jest.fn(async () =>
+        ok(repairingAccount, revision('11')),
+      ),
+      getBootstrap,
+      getSetup,
+    });
+
+    await renderLiveApp(port);
+    await fireEvent.press(
+      await screen.findByTestId('live-setup-repair-reauth'),
+    );
+    await waitFor(() => expect(getSetup).toHaveBeenCalledTimes(2));
+
+    expect(
+      screen.queryByTestId('live-setup-repair-disconnect-contacts'),
+    ).toBeNull();
   });
 
   it('routes incomplete native state to setup and fails unsupported actions closed', async () => {
+    const unsupportedEligibility = {
+      kind: 'unsupported' as const,
+      capability,
+      primaryIssue: {
+        id: 'setup-compatibility-background' as IssueId,
+        code: 'background-restricted' as const,
+        severity: 'blocking' as const,
+        blocks: ['activation' as const, 'birthday' as const],
+      },
+      otherIssues: [],
+    };
     const incompleteBootstrap: BootstrapProjection = {
       ...completeBootstrap,
+      eligibility: unsupportedEligibility,
       setupStep: 'compatibility',
     };
     const setupProjection: SetupProjection = {
       step: 'compatibility',
       initialActivationCompleted: false,
-      eligibility: completeBootstrap.eligibility,
+      eligibility: unsupportedEligibility,
       account: { kind: 'signed-out', retainedSetup: 'none' },
       contacts: {
         kind: 'authorization-required',
@@ -3848,11 +5993,24 @@ describe('production live projections', () => {
       refreshCompatibility,
     });
 
-    await renderLiveApp(port);
+    const rendered = await renderLiveApp(port);
     await waitFor(() =>
       expect(screen.getByTestId('live-setup-screen')).toBeTruthy(),
     );
     expect(screen.queryByTestId('live-app-shell')).toBeNull();
+    expect(screen.getByText(/Step 1 of 4:/u)).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Allow Birthday Autopilot to run in the background, then check readiness again.',
+      ),
+    ).toBeTruthy();
+    const setupTree = JSON.stringify(rendered.toJSON());
+    expect(setupTree.indexOf('live-setup-eligibility')).toBeLessThan(
+      setupTree.indexOf('live-setup-cost-consent'),
+    );
+    expect(setupTree.indexOf('live-setup-cost-consent')).toBeLessThan(
+      setupTree.indexOf('live-setup-action'),
+    );
 
     await fireEvent.press(screen.getByTestId('live-setup-action'));
 
@@ -3863,6 +6021,93 @@ describe('production live projections', () => {
     expect(getHome).not.toHaveBeenCalled();
     expect(screen.getByText(/Nothing was changed/u)).toBeTruthy();
   });
+
+  it.each(['android', 'ios'] as const)(
+    'starts a supported signed-out %s install at Step 1 and resumes it in-session after Finish later',
+    async platform => {
+      const platformCapability =
+        platform === 'android' ? capability : iosCapability;
+      const platformReadiness =
+        platform === 'android' ? readiness : iosReadiness;
+      const signedOutAccount: AccountProjection = {
+        kind: 'signed-out',
+        retainedSetup: 'none',
+      };
+      const platformEligibility = {
+        kind: 'supported' as const,
+        capability: platformCapability,
+        channelLabel: 'test',
+        chargeDisclosureVersion:
+          platform === 'android' ? 'carrier-v1' : 'composer-v1',
+      };
+      const bootstrap: BootstrapProjection = {
+        capability: platformCapability,
+        eligibility: platformEligibility,
+        account: signedOutAccount,
+        setupStep: 'google-account',
+      };
+      const setupProjection: SetupProjection = {
+        step: 'google-account',
+        initialActivationCompleted: false,
+        eligibility: platformEligibility,
+        account: signedOutAccount,
+        contacts: { kind: 'never-synced' },
+        readiness: platformReadiness,
+        automation:
+          platform === 'android'
+            ? {
+                platform: 'android',
+                desired: 'paused',
+                effective: 'not-configured',
+                readiness,
+              }
+            : {
+                platform: 'ios',
+                desired: 'paused',
+                effective: 'not-configured',
+                readiness: iosReadiness,
+              },
+      };
+      const getPendingRoute = jest.fn(async () =>
+        ok({ kind: 'attention' as const }),
+      );
+      const { port } = createPort({
+        getBootstrap: jest.fn(async () => ok(bootstrap)),
+        getPendingRoute,
+        getSetup: jest.fn(async () => ok(setupProjection)),
+      });
+
+      await renderLiveApp(port);
+
+      expect(await screen.findByText(/Step 1 of 4:/u)).toBeTruthy();
+      expect(screen.queryByText(/Step 2 of 4:/u)).toBeNull();
+      expect(screen.getByTestId('live-setup-eligibility')).toBeTruthy();
+      expect(screen.getByTestId('live-setup-cost-consent')).toBeTruthy();
+      expect(
+        screen.getByRole('button', { name: 'Continue with Google' }),
+      ).toBeTruthy();
+      expect(screen.queryByTestId('live-setup-contacts-privacy')).toBeNull();
+
+      await fireEvent.press(screen.getByTestId('live-setup-defer'));
+      expect(await screen.findByTestId('live-home-screen')).toBeTruthy();
+      expect(screen.getByTestId('live-home-setup-incomplete')).toBeTruthy();
+      expect(screen.queryByTestId('live-attention-screen')).toBeNull();
+      expect(getPendingRoute).not.toHaveBeenCalled();
+      expect(
+        screen.getByTestId('live-tab-people').props.accessibilityState,
+      ).toMatchObject({ disabled: true });
+      expect(
+        screen.getByTestId('live-tab-settings').props.accessibilityState,
+      ).toMatchObject({ disabled: true });
+      await fireEvent.press(screen.getByTestId('live-tab-settings'));
+      expect(screen.queryByTestId('live-settings-screen')).toBeNull();
+      expect(screen.getByTestId('live-home-setup-incomplete')).toBeTruthy();
+
+      await fireEvent.press(screen.getByTestId('live-home-continue-setup'));
+      expect(await screen.findByTestId('live-setup-screen')).toBeTruthy();
+      expect(screen.getByText(/Step 1 of 4:/u)).toBeTruthy();
+    },
+  );
 
   it('shows the Android Contacts cloud boundary immediately before read-only consent', async () => {
     const contactsConsentSetup: SetupProjection = {
@@ -3949,6 +6194,68 @@ describe('production live projections', () => {
     expect(
       screen.getByRole('button', { name: 'Allow read-only Google Contacts' }),
     ).toBeTruthy();
+  });
+
+  it('keeps the current setup action fail-closed during recheck and after setup recheck failure', async () => {
+    const contactsConsentSetup: SetupProjection = {
+      ...completeSetup,
+      step: 'contacts-disclosure',
+      initialActivationCompleted: false,
+      contacts: {
+        kind: 'authorization-required',
+        reason: 'contacts-authorization-required',
+      },
+      automation: {
+        platform: 'android',
+        desired: 'paused',
+        effective: 'not-configured',
+        readiness,
+      },
+    };
+    const setupRefresh = deferred<NativeResult<SetupProjection>>();
+    const authorization = deferred<NativeResult<{ kind: 'accepted' }>>();
+    const getSetup = jest
+      .fn()
+      .mockResolvedValueOnce(ok(contactsConsentSetup))
+      .mockImplementationOnce(() => setupRefresh.promise)
+      .mockResolvedValue(internalError());
+    const authorizeContacts = jest.fn(() => authorization.promise);
+    const { port } = createPort({
+      authorizeContacts,
+      getBootstrap: jest.fn(async () =>
+        ok({ ...completeBootstrap, setupStep: 'contacts-disclosure' as const }),
+      ),
+      getSetup,
+    });
+
+    await renderLiveApp(port);
+    const action = await screen.findByTestId('live-setup-action');
+    fireEvent.press(action);
+
+    expect(authorizeContacts).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('live-setup-action').props.accessibilityState,
+      ).toEqual(expect.objectContaining({ disabled: true })),
+    );
+    await fireEvent.press(screen.getByTestId('live-setup-action'));
+    expect(authorizeContacts).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      authorization.resolve(ok({ kind: 'accepted' }));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(getSetup).toHaveBeenCalledTimes(2));
+    expect(
+      screen.getByTestId('live-setup-action').props.accessibilityState,
+    ).toEqual(expect.objectContaining({ disabled: true }));
+
+    await act(async () => {
+      setupRefresh.resolve(internalError());
+    });
+    expect(await screen.findByText('Setup status is unavailable')).toBeTruthy();
+    expect(screen.queryByTestId('live-setup-action')).toBeNull();
+    expect(authorizeContacts).toHaveBeenCalledTimes(1);
   });
 
   it('blocks Contacts behind the explicit sender transfer gate on a standby Android install', async () => {
@@ -4077,10 +6384,14 @@ describe('production live projections', () => {
     ).toBeTruthy();
     expect(screen.getByText('Step 3 of 4')).toBeTruthy();
     expect(screen.queryByTestId('live-app-shell')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Choose people' })).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'Choose people' }),
+      screen.getByText('Welcome, Google and Contacts are complete.'),
     ).toBeTruthy();
     expect(screen.queryByTestId('live-product-setup-people')).toBeNull();
+    expect(screen.queryByTestId('live-product-setup-message')).toBeNull();
+    expect(screen.queryByTestId('live-product-setup-automation')).toBeNull();
+    expect(screen.queryByTestId('live-product-setup-approvals')).toBeNull();
 
     let journeyHardwareBack: (() => boolean | null | undefined) | undefined;
     const journeyBackSpy = jest
@@ -4119,6 +6430,18 @@ describe('production live projections', () => {
 
     await fireEvent.press(screen.getByTestId('live-product-setup-defer'));
     expect(await screen.findByTestId('live-home-screen')).toBeTruthy();
+    expect(screen.getByTestId('live-home-setup-incomplete')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continue setup' })).toBeTruthy();
+    expect(screen.queryByTestId('live-home-automation')).toBeNull();
+
+    await fireEvent.press(screen.getByTestId('live-home-continue-setup'));
+    expect(
+      await screen.findByTestId('live-product-setup-journey'),
+    ).toBeTruthy();
+    expect(screen.getByText('Step 3 of 4')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('live-product-setup-defer'));
+    expect(await screen.findByTestId('live-home-screen')).toBeTruthy();
     await first.unmount();
 
     const second = await renderLiveApp(port);
@@ -4137,6 +6460,344 @@ describe('production live projections', () => {
     expect(
       screen.getByRole('button', { name: 'Test and turn on automation' }),
     ).toBeTruthy();
+    expect(
+      screen.getByText(
+        'People, message, window and exact approvals are complete.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('live-product-setup-people')).toBeNull();
+    expect(screen.queryByTestId('live-product-setup-message')).toBeNull();
+    expect(screen.queryByTestId('live-product-setup-automation')).toBeNull();
+    expect(screen.queryByTestId('live-product-setup-approvals')).toBeNull();
+  });
+
+  it('routes the exact unfinished window task to Schedule without exposing Step 4 early', async () => {
+    const configuredHome: HomeProjection = {
+      ...activationReadyHome,
+      counts: {
+        ...activationReadyHome.counts,
+        configured: 1,
+        enabled: 1,
+      },
+    };
+    const { port } = createPort({
+      getHome: jest.fn(async () => ok(configuredHome)),
+      getMessageEditor: jest.fn(async () => ok(configuredMessage)),
+      getPolicyEditor: jest.fn(async () =>
+        ok({ kind: 'not-configured' as const }),
+      ),
+      getSetup: jest.fn(async () =>
+        ok({
+          ...completeSetup,
+          initialActivationCompleted: false,
+          automation: configuredHome.automation,
+        }),
+      ),
+    });
+
+    await renderLiveApp(port);
+
+    expect(await screen.findByText('Step 3 of 4')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Choose the time window' }),
+    ).toBeTruthy();
+    expect(screen.queryByText('Step 4 of 4')).toBeNull();
+    expect(screen.queryByTestId('live-product-setup-automation')).toBeNull();
+
+    await fireEvent.press(screen.getByTestId('live-product-setup-next'));
+    expect(await screen.findByTestId('live-schedule-screen')).toBeTruthy();
+    expect(screen.queryByTestId('live-automation-screen')).toBeNull();
+
+    await fireEvent.press(screen.getByTestId('live-schedule-back'));
+    expect(
+      await screen.findByTestId('live-product-setup-journey'),
+    ).toBeTruthy();
+    expect(screen.getByText('Step 3 of 4')).toBeTruthy();
+  });
+
+  it('opens the exact blocking Android readiness repair from Step 4 and keeps activation hidden', async () => {
+    const warningHandle = 'setup-warning-action' as ActionHandle;
+    const blockingHandle = 'setup-blocking-action' as ActionHandle;
+    const blockedReadiness: ReadinessProjection = {
+      ...readiness,
+      activation: {
+        kind: 'blocked',
+        issues: [
+          {
+            id: 'setup-warning-issue' as IssueId,
+            code: 'data-saver-restricted',
+            severity: 'warning',
+            blocks: ['activation'],
+            action: {
+              kind: 'native-action',
+              handle: warningHandle,
+              labelKey: 'RAW_WARNING_NATIVE_LABEL',
+            },
+          },
+          {
+            id: 'setup-blocking-issue' as IssueId,
+            code: 'background-restricted',
+            severity: 'blocking',
+            blocks: ['activation'],
+            action: {
+              kind: 'native-action',
+              handle: blockingHandle,
+              labelKey: 'RAW_BLOCKING_NATIVE_LABEL',
+            },
+          },
+        ],
+      },
+    };
+    const blockedHome: HomeProjection = {
+      ...activationReadyHome,
+      automation: {
+        platform: 'android',
+        desired: 'paused',
+        effective: 'test-only',
+        readiness: blockedReadiness,
+      },
+      counts: {
+        ...activationReadyHome.counts,
+        configured: 1,
+        enabled: 1,
+      },
+    };
+    const getAccount = jest.fn(async () =>
+      ok(androidAccountForSender('test-only')),
+    );
+    const getHome = jest.fn(async () => ok(blockedHome));
+    const getLatestTest = jest.fn(async () => ok(latestPassedTest));
+    const getMessageEditor = jest.fn(async () => ok(configuredMessage));
+    const getPolicyEditor = jest.fn(async () => ok(configuredPolicy));
+    const performAction = jest.fn(async () =>
+      ok({ kind: 'opened' as const }, revision('2')),
+    );
+    const { port } = createPort({
+      getAccount,
+      getHome,
+      getLatestTest,
+      getMessageEditor,
+      getPolicyEditor,
+      getSetup: jest.fn(async () =>
+        ok({
+          ...completeSetup,
+          initialActivationCompleted: false,
+          readiness: blockedReadiness,
+          automation: blockedHome.automation,
+        }),
+      ),
+      performAction,
+    });
+
+    await renderLiveApp(port);
+    expect(await screen.findByText('Step 4 of 4')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('live-product-setup-next'));
+
+    expect(
+      await screen.findByTestId('live-automation-readiness-action'),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Fix on this phone' }),
+    ).toBeTruthy();
+    expect(screen.queryByText('RAW_WARNING_NATIVE_LABEL')).toBeNull();
+    expect(screen.queryByText('RAW_BLOCKING_NATIVE_LABEL')).toBeNull();
+    expect(screen.queryByTestId('live-review-activation')).toBeNull();
+
+    await fireEvent.press(
+      screen.getByTestId('live-automation-readiness-action'),
+    );
+
+    await waitFor(() =>
+      expect(performAction).toHaveBeenCalledWith({
+        handle: blockingHandle,
+        expectedRevision: '1',
+      }),
+    );
+    expect(
+      await screen.findByText(
+        'The phone step opened. Return and choose Check again after making a choice.',
+      ),
+    ).toBeTruthy();
+    expect(getAccount.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(getHome.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(getLatestTest.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(getMessageEditor.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(getPolicyEditor.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByTestId('live-review-activation')).toBeNull();
+  });
+
+  it.each([
+    ['Home', 'home'],
+    ['Message', 'messages'],
+    ['Policy', 'automation'],
+  ] as const)(
+    'disables setup Next while a retained %s projection refreshes and after it fails',
+    async (_label, area) => {
+      const configuredHome: HomeProjection = {
+        ...activationReadyHome,
+        counts: {
+          ...activationReadyHome.counts,
+          configured: 1,
+          enabled: 1,
+        },
+      };
+      const setupMessageProjection = {
+        kind: 'configured' as const,
+        draft: {
+          language: 'en' as const,
+          tone: 'warm' as const,
+          placeholderMode: { kind: 'generic' as const, requiredCount: 0 },
+          text: 'Happy birthday!' as PrivateMessageText,
+          requestedSegmentCap: 1 as const,
+        },
+      };
+      const setupPolicyProjection = {
+        kind: 'configured' as const,
+        draft: {
+          primaryStart: '09:00' as const,
+          primaryEnd: '11:00' as const,
+          latePolicy: { kind: 'none' as const },
+          dailyCap: 10,
+        },
+      };
+      const refresh = deferred<NativeResult<unknown>>();
+      let homeRequests = 0;
+      let messageRequests = 0;
+      let policyRequests = 0;
+      const getHome = jest.fn(async () => {
+        homeRequests += 1;
+        return area === 'home' && homeRequests > 1
+          ? ((await refresh.promise) as NativeResult<HomeProjection>)
+          : ok(configuredHome);
+      });
+      const getMessageEditor = jest.fn(async () => {
+        messageRequests += 1;
+        return area === 'messages' && messageRequests > 1
+          ? ((await refresh.promise) as NativeResult<
+              typeof setupMessageProjection
+            >)
+          : ok(setupMessageProjection);
+      });
+      const getPolicyEditor = jest.fn(async () => {
+        policyRequests += 1;
+        return area === 'automation' && policyRequests > 1
+          ? ((await refresh.promise) as NativeResult<
+              typeof setupPolicyProjection
+            >)
+          : ok(setupPolicyProjection);
+      });
+      const harness = createPort({
+        getHome,
+        getMessageEditor,
+        getPolicyEditor,
+        getSetup: jest.fn(async () =>
+          ok({
+            ...completeSetup,
+            initialActivationCompleted: false,
+            automation: configuredHome.automation,
+          }),
+        ),
+      });
+
+      await renderLiveApp(harness.port);
+      expect(await screen.findByText('Step 4 of 4')).toBeTruthy();
+      expect(
+        screen.getByTestId('live-product-setup-next').props.accessibilityState,
+      ).toEqual(expect.objectContaining({ disabled: false }));
+
+      await act(async () => {
+        harness.emit({ revision: revision('2'), areas: [area] });
+      });
+
+      await waitFor(() => {
+        const requests =
+          area === 'home'
+            ? getHome
+            : area === 'messages'
+            ? getMessageEditor
+            : getPolicyEditor;
+        expect(requests).toHaveBeenCalledTimes(2);
+        expect(
+          screen.getByTestId('live-product-setup-next').props
+            .accessibilityState,
+        ).toEqual(expect.objectContaining({ disabled: true }));
+      });
+
+      await act(async () => {
+        refresh.resolve(internalError<unknown>());
+      });
+
+      expect(
+        await screen.findByText('Saved setup could not be checked'),
+      ).toBeTruthy();
+      expect(
+        screen.getByTestId('live-product-setup-next').props.accessibilityState,
+      ).toEqual(expect.objectContaining({ disabled: true }));
+    },
+  );
+
+  it('fails setup progress closed when stable global projections have different revisions', async () => {
+    const configuredHome: HomeProjection = {
+      ...activationReadyHome,
+      counts: {
+        ...activationReadyHome.counts,
+        configured: 1,
+        enabled: 1,
+      },
+    };
+    const { port } = createPort({
+      getHome: jest.fn(async () => ok(configuredHome, revision('1'))),
+      getMessageEditor: jest.fn(async () =>
+        ok(
+          {
+            kind: 'configured' as const,
+            draft: {
+              language: 'en' as const,
+              tone: 'warm' as const,
+              placeholderMode: {
+                kind: 'generic' as const,
+                requiredCount: 0,
+              },
+              text: 'Happy birthday!' as PrivateMessageText,
+              requestedSegmentCap: 1 as const,
+            },
+          },
+          revision('2'),
+        ),
+      ),
+      getPolicyEditor: jest.fn(async () =>
+        ok(
+          {
+            kind: 'configured' as const,
+            draft: {
+              primaryStart: '09:00' as const,
+              primaryEnd: '11:00' as const,
+              latePolicy: { kind: 'none' as const },
+              dailyCap: 10,
+            },
+          },
+          revision('1'),
+        ),
+      ),
+      getSetup: jest.fn(async () =>
+        ok({
+          ...completeSetup,
+          initialActivationCompleted: false,
+          automation: configuredHome.automation,
+        }),
+      ),
+    });
+
+    await renderLiveApp(port);
+
+    expect(
+      await screen.findByText('Saved setup could not be checked'),
+    ).toBeTruthy();
+    expect(screen.getByText('Step 3 of 4')).toBeTruthy();
+    expect(screen.queryByText('Step 4 of 4')).toBeNull();
+    expect(
+      screen.getByTestId('live-product-setup-next').props.accessibilityState,
+    ).toEqual(expect.objectContaining({ disabled: true }));
   });
 
   it('routes enrolled Android recipients through one exact batch approval before Test', async () => {
@@ -4160,8 +6821,11 @@ describe('production live projections', () => {
         enabled: 0,
       },
     };
-    const prepareApprovals = jest.fn(async () =>
-      ok(
+    let approvalSaved = false;
+    let approvalRevision = revision('1');
+    const prepareApprovals = jest.fn(async () => {
+      approvalRevision = revision('6');
+      return ok(
         {
           handle: 'guided-approval-review' as ApprovalReviewHandle,
           items: [
@@ -4183,12 +6847,14 @@ describe('production live projections', () => {
           blockedCount: 0,
           explicitConfirmationRequired: true as const,
         },
-        revision('6'),
-      ),
-    );
-    const confirmApprovals = jest.fn(async () =>
-      ok(activationReadyHome.automation),
-    );
+        approvalRevision,
+      );
+    });
+    const confirmApprovals = jest.fn(async () => {
+      approvalSaved = true;
+      approvalRevision = revision('7');
+      return ok(activationReadyHome.automation, approvalRevision);
+    });
     const { port } = createPort({
       confirmApprovals,
       getHome: jest.fn(async () => ok(configuredHome)),
@@ -4223,7 +6889,13 @@ describe('production live projections', () => {
         }),
       ),
       listPeople: jest.fn(async () =>
-        ok({ items: [pendingContact], totalCount: 1 }),
+        ok(
+          {
+            items: approvalSaved ? [] : [pendingContact],
+            totalCount: approvalSaved ? 0 : 1,
+          },
+          approvalRevision,
+        ),
       ),
       prepareApprovals,
     });
@@ -4262,7 +6934,127 @@ describe('production live projections', () => {
     });
   });
 
-  it('prepares and confirms exact approvals for chosen people beyond the first 50', async () => {
+  it('invalidates an exact batch review and disables retained candidates when native truth refresh fails', async () => {
+    const pendingContact: ContactSummary = {
+      ...contactSummary(),
+      readiness: {
+        kind: 'needs-attention',
+        reasons: ['approval-invalid'],
+      },
+      enrollment: {
+        kind: 'paused',
+        reason: 'approval-invalid',
+        approval: { kind: 'missing' },
+      },
+    };
+    const configuredHome: HomeProjection = {
+      ...activationReadyHome,
+      counts: {
+        ...activationReadyHome.counts,
+        configured: 1,
+        enabled: 0,
+      },
+    };
+    const candidateRefresh =
+      deferred<NativeResult<{ items: ContactSummary[]; totalCount: number }>>();
+    let prepared = false;
+    let returnedVerifiedPrepareReload = false;
+    const listPeople = jest.fn(async () => {
+      if (!prepared) {
+        return ok({ items: [pendingContact], totalCount: 1 });
+      }
+      if (!returnedVerifiedPrepareReload) {
+        returnedVerifiedPrepareReload = true;
+        return ok({ items: [pendingContact], totalCount: 1 }, revision('6'));
+      }
+      return candidateRefresh.promise;
+    });
+    const prepareApprovals = jest.fn(async () => {
+      prepared = true;
+      return ok(
+        {
+          handle: 'stale-guided-review' as ApprovalReviewHandle,
+          items: [
+            {
+              platform: 'android' as const,
+              contactId,
+              recipient: 'Live Contact' as PrivateDisplayName,
+              maskedPhone: '•••• 4321',
+              birthdayLabel: '18 July',
+              exactText: 'Happy birthday!' as PrivateMessageText,
+              windowLabel: '09:00–11:00',
+              simLabel: 'SIM 1',
+              segmentCount: 1,
+              chargeDisclosure: 'Native label is not UI copy.',
+              consentDisclosure: 'Native label is not UI copy.',
+            },
+          ],
+          readyCount: 1,
+          blockedCount: 0,
+          explicitConfirmationRequired: true as const,
+        },
+        revision('6'),
+      );
+    });
+    const confirmApprovals = jest.fn(async () =>
+      ok(activationReadyHome.automation),
+    );
+    const harness = createPort({
+      confirmApprovals,
+      getHome: jest.fn(async () => ok(configuredHome)),
+      getMessageEditor: jest.fn(async () => ok(configuredMessage)),
+      getPolicyEditor: jest.fn(async () => ok(configuredPolicy)),
+      getSetup: jest.fn(async () =>
+        ok({
+          ...completeSetup,
+          initialActivationCompleted: false,
+          automation: configuredHome.automation,
+        }),
+      ),
+      listPeople,
+      prepareApprovals,
+    });
+
+    await renderLiveApp(harness.port);
+    await fireEvent.press(
+      await screen.findByRole('button', { name: 'Review exact messages' }),
+    );
+    await fireEvent.press(
+      await screen.findByTestId('live-batch-approval-prepare'),
+    );
+    const staleConfirm = await screen.findByTestId(
+      'live-batch-approval-confirm',
+    );
+
+    const requestsBeforeInvalidation = listPeople.mock.calls.length;
+    await act(async () => {
+      harness.emit({ revision: revision('7'), areas: ['contacts'] });
+    });
+
+    await waitFor(() =>
+      expect(listPeople.mock.calls.length).toBeGreaterThan(
+        requestsBeforeInvalidation,
+      ),
+    );
+    expect(screen.queryByTestId('live-batch-approval-confirm')).toBeNull();
+    await fireEvent.press(staleConfirm);
+    expect(confirmApprovals).not.toHaveBeenCalled();
+
+    await act(async () => {
+      candidateRefresh.resolve(internalError());
+    });
+    const retainedPrepare = await screen.findByTestId(
+      'live-batch-approval-prepare',
+    );
+    expect(retainedPrepare.props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
+    await fireEvent.press(retainedPrepare);
+    expect(prepareApprovals).toHaveBeenCalledTimes(1);
+    expect(confirmApprovals).not.toHaveBeenCalled();
+  });
+
+  it('continues exact approvals beyond 50 when native invalidates before confirm resolves', async () => {
     const contacts = Array.from({ length: 51 }, (_, index) => ({
       ...contactSummary(),
       id: `approval-large-${index + 1}` as ContactId,
@@ -4279,10 +7071,13 @@ describe('production live projections', () => {
     const byId = new Map(contacts.map(contact => [contact.id, contact]));
     const approved = new Set<ContactId>();
     const reviewIds = new Map<string, readonly ContactId[]>();
+    let harness!: PortHarness;
     let currentRevision = 1;
     let reviewSequence = 0;
     const listPeople = jest.fn(
-      async (query: { cursor?: import('../domain/shared/brand').PageCursor }) => {
+      async (query: {
+        cursor?: import('../domain/shared/brand').PageCursor;
+      }) => {
         const pending = contacts.filter(contact => !approved.has(contact.id));
         if (pending.length === 0) {
           return ok(
@@ -4341,16 +7136,17 @@ describe('production live projections', () => {
         );
       },
     );
-    const confirmApprovals = jest.fn(
-      async ({ handle }: { handle: string }) => {
-        (reviewIds.get(handle) ?? []).forEach(id => approved.add(id));
-        currentRevision += 1;
-        return ok(
-          activationReadyHome.automation,
-          revision(String(currentRevision)),
-        );
-      },
-    );
+    const confirmApprovals = jest.fn(async ({ handle }: { handle: string }) => {
+      (reviewIds.get(handle) ?? []).forEach(id => approved.add(id));
+      currentRevision += 1;
+      const resultRevision = revision(String(currentRevision));
+      const result = ok(activationReadyHome.automation, resultRevision);
+      harness.emit({
+        revision: resultRevision,
+        areas: ['contacts', 'automation', 'home', 'readiness'],
+      });
+      return result;
+    });
     const configuredHome: HomeProjection = {
       ...activationReadyHome,
       counts: {
@@ -4359,7 +7155,7 @@ describe('production live projections', () => {
         enabled: contacts.length,
       },
     };
-    const { port } = createPort({
+    harness = createPort({
       confirmApprovals,
       getHome: jest.fn(async () => ok(configuredHome)),
       getMessageEditor: jest.fn(async () =>
@@ -4396,7 +7192,7 @@ describe('production live projections', () => {
       prepareApprovals,
     });
 
-    await renderLiveApp(port);
+    await renderLiveApp(harness.port);
     await fireEvent.press(
       await screen.findByRole('button', { name: 'Review exact messages' }),
     );
@@ -4569,7 +7365,7 @@ describe('production live projections', () => {
         readiness: iosReadiness,
       },
     };
-    const configuredMessage = {
+    const neverEnabledMessage = {
       kind: 'configured' as const,
       draft: {
         language: 'en' as const,
@@ -4582,7 +7378,7 @@ describe('production live projections', () => {
         requestedSegmentCap: 1 as const,
       },
     };
-    const configuredPolicy = {
+    const neverEnabledPolicy = {
       kind: 'configured' as const,
       draft: {
         primaryStart: '09:00',
@@ -4604,8 +7400,8 @@ describe('production live projections', () => {
       getBootstrap: jest.fn(async () => ok(iosBootstrap)),
       getHome: jest.fn(async () => ok(pausedHome)),
       getSetup: jest.fn(async () => ok(neverEnabledSetup)),
-      getMessageEditor: jest.fn(async () => ok(configuredMessage)),
-      getPolicyEditor: jest.fn(async () => ok(configuredPolicy)),
+      getMessageEditor: jest.fn(async () => ok(neverEnabledMessage)),
+      getPolicyEditor: jest.fn(async () => ok(neverEnabledPolicy)),
     });
 
     const first = await renderLiveApp(neverEnabled.port);
@@ -4622,7 +7418,9 @@ describe('production live projections', () => {
     });
     await renderLiveApp(intentionallyPaused.port);
 
-    expect(await screen.findByText('Birthday reminders are paused')).toBeTruthy();
+    expect(
+      await screen.findByText('Birthday reminders are paused'),
+    ).toBeTruthy();
     expect(screen.queryByTestId('live-product-setup-journey')).toBeNull();
   });
 
@@ -4643,7 +7441,7 @@ describe('production live projections', () => {
         initialActivationCompleted: false,
         automation: interruptedHome.automation,
       };
-      const configuredMessage = {
+      const firstActivationMessage = {
         kind: 'configured' as const,
         draft: {
           language: 'en' as const,
@@ -4656,7 +7454,7 @@ describe('production live projections', () => {
           requestedSegmentCap: 1 as const,
         },
       };
-      const configuredPolicy = {
+      const firstActivationPolicy = {
         kind: 'configured' as const,
         draft: {
           primaryStart: '09:00',
@@ -4668,8 +7466,8 @@ describe('production live projections', () => {
       const firstActivation = createPort({
         getHome: jest.fn(async () => ok(interruptedHome)),
         getSetup: jest.fn(async () => ok(interruptedSetup)),
-        getMessageEditor: jest.fn(async () => ok(configuredMessage)),
-        getPolicyEditor: jest.fn(async () => ok(configuredPolicy)),
+        getMessageEditor: jest.fn(async () => ok(firstActivationMessage)),
+        getPolicyEditor: jest.fn(async () => ok(firstActivationPolicy)),
       });
 
       const first = await renderLiveApp(firstActivation.port);

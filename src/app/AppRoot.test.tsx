@@ -364,8 +364,8 @@ describe('production-safe data source selection', () => {
     expect(screen.queryByText('Synthetic preview data')).toBeNull();
     expect(screen.getByText(/Nothing was changed/)).toBeTruthy();
     expect(
-      screen.getByText('Support reference: NATIVE_BRIDGE_UNAVAILABLE'),
-    ).toBeTruthy();
+      screen.queryByText('Support reference: NATIVE_BRIDGE_UNAVAILABLE'),
+    ).toBeNull();
 
     await fireEvent.press(screen.getByTestId('native-bootstrap-retry'));
     await waitFor(() => expect(getBootstrap).toHaveBeenCalledTimes(2));

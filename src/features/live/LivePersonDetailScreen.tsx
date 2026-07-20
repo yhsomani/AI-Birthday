@@ -8,6 +8,7 @@ import type {
   EnrollmentReview,
   PeopleMutationProjection,
 } from '../../domain/contacts/model';
+import type { PlatformCapability } from '../../domain/shared/platform';
 import type {
   BirthdayChoiceId,
   ContactId,
@@ -15,12 +16,12 @@ import type {
   PhoneChoiceId,
 } from '../../domain/shared/brand';
 import type { NativeProblem, NativeResult } from '../../domain/shared/result';
-import type { PlatformCapability } from '../../domain/shared/platform';
 import { AppText } from '../../design-system/components/AppText';
 import {
   Button,
   Card,
   ChoiceChip,
+  InlineReviewCard,
   KeyValue,
   ReadinessBanner,
   Screen,
@@ -28,9 +29,9 @@ import {
   StatusRow,
 } from '../../design-system/components/Primitives';
 import { spacing } from '../../design-system/tokens/theme';
-import { useAppLocalization } from '../../localization/LocalizationProvider';
 import { bidiIsolate } from '../../localization/bidi';
 import { formatLiveInstant } from '../../localization/formatLive';
+import { useAppLocalization } from '../../localization/LocalizationProvider';
 import {
   approvalInvalidationMessageKey,
   safeReasonMessageKey,
@@ -49,24 +50,74 @@ import {
 } from './nativeProblem';
 import { useLiveProjection } from './useLiveProjection';
 
-type EnrollmentReviewState = Readonly<{
-  review: EnrollmentReview;
-  revision: NativeRevision;
+type TrustBinding = Readonly<{
+  contactId: ContactId;
+  destinationBlocked: boolean;
+  destinationId?: PhoneChoiceId | undefined;
+  generation: number;
+  sourceRevision: NativeRevision;
 }>;
 
-type ApprovalReviewState = Readonly<{
-  review: ApprovalBatchReview;
-  revision: NativeRevision;
-}>;
+type EnrollmentReviewState = TrustBinding &
+  Readonly<{
+    review: EnrollmentReview;
+    revision: NativeRevision;
+  }>;
+
+type ApprovalReviewState = TrustBinding &
+  Readonly<{
+    mode: 'confirm' | 'view';
+    review: ApprovalBatchReview;
+    revision: NativeRevision;
+  }>;
 
 type ChoiceReview =
-  | Readonly<{ kind: 'phone'; id: PhoneChoiceId }>
-  | Readonly<{
-      kind: 'birthday';
-      id: BirthdayChoiceId;
-      leapRequired: boolean;
-      leapPolicy?: LeapDayPolicy | undefined;
-    }>;
+  | (TrustBinding &
+      Readonly<{
+        kind: 'phone';
+        id: PhoneChoiceId;
+        label: string;
+      }>)
+  | (TrustBinding &
+      Readonly<{
+        kind: 'birthday';
+        id: BirthdayChoiceId;
+        label: string;
+        leapRequired: boolean;
+        leapPolicy?: LeapDayPolicy | undefined;
+      }>);
+
+type RecipientReview = TrustBinding &
+  Readonly<{
+    kind: 'exclude' | 'pause';
+  }>;
+
+type DestinationReview = TrustBinding &
+  Readonly<{
+    kind: 'block' | 'unblock';
+    maskedPhone: string;
+    phoneId: PhoneChoiceId;
+  }>;
+
+type ReviewRefs = Readonly<{
+  approval?: ApprovalReviewState | undefined;
+  choice?: ChoiceReview | undefined;
+  destination?: DestinationReview | undefined;
+  enrollment?: EnrollmentReviewState | undefined;
+  recipient?: RecipientReview | undefined;
+}>;
+
+type SyncNotice = Readonly<{
+  detail: string;
+  tone: 'info' | 'warning';
+}>;
+
+type MutationSettlement = Readonly<{
+  contactId: ContactId;
+  generation: number;
+  request: number;
+  invalidated: boolean;
+}>;
 
 const GOOGLE_CONTACTS_URL = 'https://contacts.google.com/';
 const GOOGLE_CONTACTS_REPAIR_ISSUES = new Set<ContactIssueCode>([
@@ -76,6 +127,8 @@ const GOOGLE_CONTACTS_REPAIR_ISSUES = new Set<ContactIssueCode>([
   'source-contact-deleted',
   'stable-source-missing',
   'phone-ambiguous-region',
+  'phone-invalid',
+  'phone-blocked-form',
 ]);
 
 export function LivePersonDetailScreen({
@@ -98,29 +151,197 @@ export function LivePersonDetailScreen({
     'contacts',
     'automation',
   ]);
+
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<NativeProblem>();
   const [message, setMessage] = useState<string>();
+  const [syncNotice, setSyncNotice] = useState<SyncNotice>();
+  const [manageExpanded, setManageExpanded] = useState(false);
   const [enrollmentReview, setEnrollmentReview] =
     useState<EnrollmentReviewState>();
   const [approvalReview, setApprovalReview] = useState<ApprovalReviewState>();
   const [choiceReview, setChoiceReview] = useState<ChoiceReview>();
-  const [confirmExclude, setConfirmExclude] = useState(false);
-  const [destinationBlockReview, setDestinationBlockReview] = useState<
-    'block' | 'unblock'
-  >();
-  const syncAfterGoogleContactsReturn = useRef(false);
+  const [recipientReview, setRecipientReview] = useState<RecipientReview>();
+  const [destinationReview, setDestinationReview] =
+    useState<DestinationReview>();
 
-  useEffect(() => {
-    syncAfterGoogleContactsReturn.current = false;
+  const mountedRef = useRef(true);
+  const contactRef = useRef(contactId);
+  const generationRef = useRef(0);
+  const requestSequenceRef = useRef(0);
+  const googleRequestSequenceRef = useRef(0);
+  const boundRequestInFlightRef = useRef(false);
+  const mutationSettlementRef = useRef<MutationSettlement | undefined>(
+    undefined,
+  );
+  const protectedBindingRef = useRef<TrustBinding | undefined>(undefined);
+  const reviewRef = useRef<ReviewRefs>({});
+  const syncAfterGoogleContactsReturn = useRef(false);
+  const projectionTruthRef = useRef<
+    Readonly<{
+      contactId?: ContactId | undefined;
+      destinationBlocked: boolean;
+      destinationId?: PhoneChoiceId | undefined;
+      revision?: NativeRevision | undefined;
+      usable: boolean;
+    }>
+  >({ destinationBlocked: false, usable: false });
+
+  contactRef.current = contactId;
+  reviewRef.current = {
+    approval: approvalReview,
+    choice: choiceReview,
+    destination: destinationReview,
+    enrollment: enrollmentReview,
+    recipient: recipientReview,
+  };
+
+  const readyEnvelope =
+    detail.state.kind === 'ready' ? detail.state.result.envelope : undefined;
+  const projectionUsable =
+    detail.state.kind === 'ready' &&
+    !detail.state.refreshing &&
+    !detail.state.refreshProblem &&
+    readyEnvelope?.value.summary.id === contactId;
+  const projectionRevision = readyEnvelope?.revision;
+  const projectionContactId = readyEnvelope?.value.summary.id;
+  const projectionDestinationId = readyEnvelope?.value.selectedPhoneId;
+  const projectionDestinationBlocked =
+    readyEnvelope?.value.selectedDestinationBlocked ?? false;
+
+  projectionTruthRef.current = {
+    contactId: projectionContactId,
+    destinationBlocked: projectionDestinationBlocked,
+    destinationId: projectionDestinationId,
+    revision: projectionRevision,
+    usable: projectionUsable,
+  };
+
+  const isBindingCurrent = useCallback((binding: TrustBinding) => {
+    const truth = projectionTruthRef.current;
+    return (
+      mountedRef.current &&
+      binding.generation === generationRef.current &&
+      protectedBindingRef.current?.generation === binding.generation &&
+      truth.usable &&
+      truth.contactId === binding.contactId &&
+      truth.revision === binding.sourceRevision &&
+      truth.destinationId === binding.destinationId &&
+      truth.destinationBlocked === binding.destinationBlocked
+    );
+  }, []);
+
+  const retireProtectedState = useCallback(() => {
+    generationRef.current += 1;
+    requestSequenceRef.current += 1;
+    boundRequestInFlightRef.current = false;
+    mutationSettlementRef.current = undefined;
+    protectedBindingRef.current = undefined;
+    reviewRef.current = {};
+    if (!mountedRef.current) return;
     setEnrollmentReview(undefined);
     setApprovalReview(undefined);
     setChoiceReview(undefined);
-    setConfirmExclude(false);
-    setDestinationBlockReview(undefined);
+    setRecipientReview(undefined);
+    setDestinationReview(undefined);
+    setManageExpanded(false);
+    setPending(false);
+  }, []);
+
+  const startBoundWork = useCallback(
+    (sourceRevision: NativeRevision): TrustBinding | undefined => {
+      if (boundRequestInFlightRef.current) return undefined;
+      const truth = projectionTruthRef.current;
+      if (
+        !truth.usable ||
+        truth.contactId !== contactId ||
+        truth.revision !== sourceRevision
+      ) {
+        return undefined;
+      }
+      const destinationId = truth.destinationId;
+      const destinationBlocked = truth.destinationBlocked;
+      retireProtectedState();
+      const binding: TrustBinding = {
+        contactId,
+        destinationBlocked,
+        destinationId,
+        generation: generationRef.current,
+        sourceRevision,
+      };
+      protectedBindingRef.current = binding;
+      return binding;
+    },
+    [contactId, retireProtectedState],
+  );
+
+  const beginBoundRequest = (binding: TrustBinding): number | undefined => {
+    if (boundRequestInFlightRef.current || !isBindingCurrent(binding)) {
+      return undefined;
+    }
+    const request = requestSequenceRef.current + 1;
+    requestSequenceRef.current = request;
+    boundRequestInFlightRef.current = true;
+    setPending(true);
     setProblem(undefined);
     setMessage(undefined);
-  }, [contactId]);
+    setSyncNotice(undefined);
+    return request;
+  };
+
+  const isBoundRequestCurrent = (binding: TrustBinding, request: number) =>
+    request === requestSequenceRef.current && isBindingCurrent(binding);
+
+  const beginMutationRequest = (binding: TrustBinding): number | undefined => {
+    const request = beginBoundRequest(binding);
+    if (request === undefined) return undefined;
+    mutationSettlementRef.current = {
+      contactId: binding.contactId,
+      generation: binding.generation,
+      invalidated: false,
+      request,
+    };
+    return request;
+  };
+
+  const isMutationSettlementCurrent = (
+    binding: TrustBinding,
+    request: number,
+  ) => {
+    const settlement = mutationSettlementRef.current;
+    return (
+      mountedRef.current &&
+      contactRef.current === binding.contactId &&
+      settlement?.contactId === binding.contactId &&
+      settlement.generation === binding.generation &&
+      settlement.request === request &&
+      requestSequenceRef.current === request
+    );
+  };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+      requestSequenceRef.current += 1;
+      googleRequestSequenceRef.current += 1;
+      boundRequestInFlightRef.current = false;
+      mutationSettlementRef.current = undefined;
+      protectedBindingRef.current = undefined;
+      reviewRef.current = {};
+      syncAfterGoogleContactsReturn.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    googleRequestSequenceRef.current += 1;
+    syncAfterGoogleContactsReturn.current = false;
+    retireProtectedState();
+    setProblem(undefined);
+    setMessage(undefined);
+    setSyncNotice(undefined);
+  }, [contactId, retireProtectedState]);
 
   useEffect(
     () =>
@@ -129,50 +350,167 @@ export function LivePersonDetailScreen({
           event.areas.includes('contacts') ||
           event.areas.includes('automation')
         ) {
-          setEnrollmentReview(undefined);
-          setApprovalReview(undefined);
-          setChoiceReview(undefined);
-          setConfirmExclude(false);
-          setDestinationBlockReview(undefined);
+          const settlement = mutationSettlementRef.current;
+          if (
+            settlement &&
+            settlement.contactId === contactRef.current &&
+            settlement.request === requestSequenceRef.current
+          ) {
+            mutationSettlementRef.current = {
+              ...settlement,
+              invalidated: true,
+            };
+            return;
+          }
+          retireProtectedState();
         }
       }),
-    [port],
+    [port, retireProtectedState],
   );
 
   useEffect(() => {
+    const binding = protectedBindingRef.current;
+    if (binding && !isBindingCurrent(binding)) {
+      const settlement = mutationSettlementRef.current;
+      if (
+        settlement?.contactId === binding.contactId &&
+        settlement.generation === binding.generation &&
+        settlement.request === requestSequenceRef.current
+      ) {
+        return;
+      }
+      retireProtectedState();
+    }
+  }, [
+    isBindingCurrent,
+    projectionContactId,
+    projectionDestinationBlocked,
+    projectionDestinationId,
+    projectionRevision,
+    projectionUsable,
+    retireProtectedState,
+  ]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
+      googleRequestSequenceRef.current += 1;
+      retireProtectedState();
       if (nextState !== 'active' || !syncAfterGoogleContactsReturn.current) {
         return;
       }
+
       syncAfterGoogleContactsReturn.current = false;
+      const requestedContactId = contactRef.current;
+      const request = googleRequestSequenceRef.current + 1;
+      googleRequestSequenceRef.current = request;
       setPending(true);
       setProblem(undefined);
       setMessage(undefined);
+      setSyncNotice(undefined);
+
       (async () => {
+        let synced: Awaited<ReturnType<LiveAppPort['syncContacts']>>;
         try {
-          const synced = await port.syncContacts('user');
-          if (synced.kind === 'error') {
-            setProblem(synced.problem);
+          synced = await port.syncContacts('user');
+        } catch {
+          synced = { kind: 'error', problem: nativeBridgeProblem };
+        }
+        if (
+          !mountedRef.current ||
+          request !== googleRequestSequenceRef.current ||
+          requestedContactId !== contactRef.current
+        ) {
+          return;
+        }
+        if (synced.kind === 'error') {
+          setProblem(synced.problem);
+          setPending(false);
+          return;
+        }
+
+        const syncProjection = synced.envelope.value;
+        if (syncProjection.kind === 'fresh') {
+          const refreshed = await detail.reload();
+          if (
+            !mountedRef.current ||
+            request !== googleRequestSequenceRef.current ||
+            requestedContactId !== contactRef.current
+          ) {
+            return;
+          }
+          if (refreshed.kind === 'error') {
+            setProblem(refreshed.problem);
+            setSyncNotice({
+              detail: t('live.person.googleContactsReloadFailed'),
+              tone: 'warning',
+            });
+          } else if (
+            refreshed.envelope.value.summary.id !== requestedContactId ||
+            refreshed.envelope.revision !== synced.envelope.revision
+          ) {
+            setProblem(nativeContractProblem);
+            setSyncNotice({
+              detail: t('live.person.googleContactsReloadFailed'),
+              tone: 'warning',
+            });
           } else {
-            await detail.reload();
             setMessage(t('live.person.googleContactsSynced'));
           }
-        } catch {
-          setProblem(nativeBridgeProblem);
+          setPending(false);
+          return;
+        }
+
+        if (syncProjection.kind === 'syncing') {
+          setSyncNotice({
+            detail: t('live.person.googleContactsSyncing'),
+            tone: 'info',
+          });
+        } else {
+          const reason =
+            syncProjection.kind === 'stale' ||
+            syncProjection.kind === 'failed-retained' ||
+            syncProjection.kind === 'authorization-required'
+              ? t(safeReasonMessageKey(syncProjection.reason))
+              : undefined;
+          setSyncNotice({
+            detail: reason
+              ? `${t('live.person.googleContactsSyncIncomplete')} ${reason}`
+              : t('live.person.googleContactsSyncIncomplete'),
+            tone: 'warning',
+          });
         }
         setPending(false);
       })().catch(() => undefined);
     });
     return () => subscription.remove();
-  }, [detail, port, t]);
+  }, [detail, port, retireProtectedState, t]);
+
+  const handleBack = () => {
+    googleRequestSequenceRef.current += 1;
+    syncAfterGoogleContactsReturn.current = false;
+    retireProtectedState();
+    onBack();
+  };
 
   const openGoogleContacts = async () => {
+    if (!projectionTruthRef.current.usable) return;
+    const requestedContactId = contactId;
+    const request = googleRequestSequenceRef.current + 1;
+    googleRequestSequenceRef.current = request;
     setPending(true);
     setProblem(undefined);
     setMessage(undefined);
+    setSyncNotice(undefined);
     syncAfterGoogleContactsReturn.current = true;
     try {
       const supported = await Linking.canOpenURL(GOOGLE_CONTACTS_URL);
+      if (
+        !mountedRef.current ||
+        request !== googleRequestSequenceRef.current ||
+        requestedContactId !== contactRef.current
+      ) {
+        return;
+      }
       if (!supported) {
         syncAfterGoogleContactsReturn.current = false;
         setProblem(nativeBridgeProblem);
@@ -180,127 +518,178 @@ export function LivePersonDetailScreen({
         return;
       }
       await Linking.openURL(GOOGLE_CONTACTS_URL);
-      setMessage(t('live.person.googleContactsOpened'));
+      if (
+        mountedRef.current &&
+        request === googleRequestSequenceRef.current &&
+        requestedContactId === contactRef.current
+      ) {
+        setMessage(t('live.person.googleContactsOpened'));
+        setPending(false);
+      }
     } catch {
-      syncAfterGoogleContactsReturn.current = false;
-      setProblem(nativeBridgeProblem);
+      if (
+        mountedRef.current &&
+        request === googleRequestSequenceRef.current &&
+        requestedContactId === contactRef.current
+      ) {
+        syncAfterGoogleContactsReturn.current = false;
+        setProblem(nativeBridgeProblem);
+        setPending(false);
+      }
     }
-    setPending(false);
   };
 
-  const fail = async (
-    actionProblem: NativeProblem,
-    refreshAfterAcceptedContractFailure = false,
+  const failBoundRequest = async (
+    binding: TrustBinding,
+    request: number,
+    nextProblem: NativeProblem,
+    reload = nextProblem.kind === 'stale-revision',
   ) => {
-    if (
-      actionProblem.kind === 'stale-revision' ||
-      refreshAfterAcceptedContractFailure
-    ) {
-      await detail.reload();
-      setEnrollmentReview(undefined);
-      setApprovalReview(undefined);
-      setChoiceReview(undefined);
-      setConfirmExclude(false);
-      setDestinationBlockReview(undefined);
-    }
-    setProblem(actionProblem);
-    setPending(false);
+    if (!isBoundRequestCurrent(binding, request)) return;
+    const requestedContactId = binding.contactId;
+    retireProtectedState();
+    if (!mountedRef.current || requestedContactId !== contactRef.current)
+      return;
+    setProblem(nextProblem);
+    if (reload) await detail.reload();
   };
 
-  const reloadAfterAccepted = async (acceptedMessage: string) => {
+  const failMutationRequest = async (
+    binding: TrustBinding,
+    request: number,
+    nextProblem: NativeProblem,
+    reload = nextProblem.kind === 'stale-revision',
+  ) => {
+    if (!isMutationSettlementCurrent(binding, request)) return;
+    const invalidated = mutationSettlementRef.current?.invalidated === true;
+    const requestedContactId = binding.contactId;
+    retireProtectedState();
+    if (!mountedRef.current || requestedContactId !== contactRef.current) {
+      return;
+    }
+    setProblem(nextProblem);
+    if (reload || invalidated) await detail.reload();
+  };
+
+  const reloadAfterMutationAccepted = async (
+    binding: TrustBinding,
+    request: number,
+    acceptedMessage: string,
+  ) => {
+    if (!isMutationSettlementCurrent(binding, request)) return;
+    const requestedContactId = binding.contactId;
+    retireProtectedState();
     const refreshed = await detail.reload();
-    setEnrollmentReview(undefined);
-    setApprovalReview(undefined);
-    setChoiceReview(undefined);
-    setConfirmExclude(false);
-    setDestinationBlockReview(undefined);
-    setMessage(
-      refreshed.kind === 'ok'
-        ? acceptedMessage
-        : t('live.person.acceptedUnverified'),
-    );
-    setPending(false);
+    if (!mountedRef.current || requestedContactId !== contactRef.current) {
+      return;
+    }
+    if (refreshed.kind === 'error') {
+      setMessage(t('live.person.acceptedUnverified'));
+      return;
+    }
+    if (refreshed.envelope.value.summary.id !== requestedContactId) {
+      setProblem(nativeContractProblem);
+      return;
+    }
+    setMessage(acceptedMessage);
   };
 
   const finishMutation = async (
+    binding: TrustBinding,
+    request: number,
     result: NativeResult<PeopleMutationProjection>,
     acceptedMessage: string,
   ) => {
+    if (!isMutationSettlementCurrent(binding, request)) return;
     if (result.kind === 'error') {
-      await fail(result.problem);
+      await failMutationRequest(binding, request, result.problem);
       return;
     }
     if (
       result.envelope.value.changedContactIds.length !== 1 ||
-      result.envelope.value.changedContactIds[0] !== contactId
+      result.envelope.value.changedContactIds[0] !== binding.contactId
     ) {
-      await fail(nativeContractProblem, true);
+      await failMutationRequest(binding, request, nativeContractProblem, true);
       return;
     }
-    await reloadAfterAccepted(acceptedMessage);
+    await reloadAfterMutationAccepted(binding, request, acceptedMessage);
   };
 
-  const prepareEnrollment = async (revision: NativeRevision) => {
-    setPending(true);
-    setProblem(undefined);
-    setMessage(undefined);
+  const prepareEnrollment = async (sourceRevision: NativeRevision) => {
+    const binding = startBoundWork(sourceRevision);
+    if (!binding) return;
+    const request = beginBoundRequest(binding);
+    if (request === undefined) return;
     let result: Awaited<ReturnType<LiveAppPort['prepareEnrollmentReview']>>;
     try {
       result = await port.prepareEnrollmentReview({
-        contactIds: [contactId],
-        expectedRevision: revision,
+        contactIds: [binding.contactId],
+        expectedRevision: binding.sourceRevision,
       });
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
+    if (!isBoundRequestCurrent(binding, request)) return;
     if (result.kind === 'error') {
-      await fail(result.problem);
+      await failBoundRequest(binding, request, result.problem);
       return;
     }
     const returnedContact = result.envelope.value.recipients[0];
     const validReview =
+      result.envelope.value.explicitConfirmationRequired === true &&
       result.envelope.value.recipients.length === 1 &&
       result.envelope.value.readyCount === 1 &&
       result.envelope.value.attentionCount === 0 &&
-      returnedContact?.id === contactId &&
+      returnedContact?.id === binding.contactId &&
       returnedContact.readiness.kind === 'ready' &&
       returnedContact.enrollment.kind === 'off';
     if (!validReview) {
-      await fail(nativeContractProblem);
+      await failBoundRequest(binding, request, nativeContractProblem, true);
       return;
     }
-    setEnrollmentReview({
+    const nextReview: EnrollmentReviewState = {
+      ...binding,
       review: result.envelope.value,
       revision: result.envelope.revision,
-    });
+    };
+    reviewRef.current = { enrollment: nextReview };
+    setEnrollmentReview(nextReview);
+    boundRequestInFlightRef.current = false;
     setPending(false);
   };
 
   const confirmEnrollment = async () => {
-    if (!enrollmentReview) {
-      return;
-    }
-    setPending(true);
+    const review = reviewRef.current.enrollment;
+    if (!review || !isBindingCurrent(review)) return;
+    const request = beginMutationRequest(review);
+    if (request === undefined) return;
     let result: Awaited<ReturnType<LiveAppPort['confirmEnrollment']>>;
     try {
       result = await port.confirmEnrollment({
-        handle: enrollmentReview.review.handle,
-        expectedRevision: enrollmentReview.revision,
+        handle: review.review.handle,
+        expectedRevision: review.revision,
       });
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
-    await finishMutation(result, t('live.person.enrollmentAccepted'));
+    await finishMutation(
+      review,
+      request,
+      result,
+      t('live.person.enrollmentAccepted'),
+    );
   };
 
-  const runRecipientMutation = async (
-    kind: 'pause' | 'restore' | 'exclude',
-    revision: NativeRevision,
+  const performRecipientMutation = async (
+    kind: 'exclude' | 'pause' | 'restore',
+    binding: TrustBinding,
   ) => {
-    setPending(true);
-    setProblem(undefined);
-    setMessage(undefined);
-    const input = { contactId, expectedRevision: revision };
+    const request = beginMutationRequest(binding);
+    if (request === undefined) return;
+    const input = {
+      contactId: binding.contactId,
+      expectedRevision: binding.sourceRevision,
+    };
     let result: NativeResult<PeopleMutationProjection>;
     try {
       result =
@@ -313,6 +702,8 @@ export function LivePersonDetailScreen({
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
     await finishMutation(
+      binding,
+      request,
       result,
       t(
         kind === 'pause'
@@ -324,142 +715,252 @@ export function LivePersonDetailScreen({
     );
   };
 
-  const runDestinationBlockMutation = async (
-    kind: 'block' | 'unblock',
-    revision: NativeRevision,
-  ) => {
-    setPending(true);
-    setProblem(undefined);
-    setMessage(undefined);
-    const input = { contactId, expectedRevision: revision };
+  const runDirectRestore = async (sourceRevision: NativeRevision) => {
+    const binding = startBoundWork(sourceRevision);
+    if (binding) await performRecipientMutation('restore', binding);
+  };
+
+  const confirmRecipientMutation = async () => {
+    const review = reviewRef.current.recipient;
+    if (!review || !isBindingCurrent(review)) return;
+    await performRecipientMutation(review.kind, review);
+  };
+
+  const performDestinationMutation = async (review: DestinationReview) => {
+    if (
+      !isBindingCurrent(review) ||
+      review.destinationId !== review.phoneId ||
+      review.destinationBlocked !== (review.kind === 'unblock')
+    ) {
+      retireProtectedState();
+      return;
+    }
+    const request = beginMutationRequest(review);
+    if (request === undefined) return;
+    const input = {
+      contactId: review.contactId,
+      expectedRevision: review.sourceRevision,
+    };
     let result: NativeResult<PeopleMutationProjection>;
     try {
       result =
-        kind === 'block'
+        review.kind === 'block'
           ? await port.blockRecipientDestination(input)
           : await port.unblockRecipientDestination(input);
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
     await finishMutation(
+      review,
+      request,
       result,
       t(
-        kind === 'block'
+        review.kind === 'block'
           ? 'live.person.destinationBlockAccepted'
           : 'live.person.destinationUnblockAccepted',
       ),
     );
   };
 
-  const confirmChoice = async (revision: NativeRevision) => {
-    if (!choiceReview) {
-      return;
-    }
+  const confirmDestinationMutation = async () => {
+    const review = reviewRef.current.destination;
+    if (review) await performDestinationMutation(review);
+  };
+
+  const confirmChoice = async () => {
+    const review = reviewRef.current.choice;
+    if (!review || !isBindingCurrent(review)) return;
     if (
-      choiceReview.kind === 'birthday' &&
-      choiceReview.leapRequired &&
-      !choiceReview.leapPolicy
+      review.kind === 'birthday' &&
+      review.leapRequired &&
+      !review.leapPolicy
     ) {
       return;
     }
-    setPending(true);
-    setProblem(undefined);
-    setMessage(undefined);
+    const request = beginMutationRequest(review);
+    if (request === undefined) return;
     let result: Awaited<ReturnType<LiveAppPort['getPerson']>>;
     try {
       result =
-        choiceReview.kind === 'phone'
+        review.kind === 'phone'
           ? await port.choosePhone({
-              contactId,
-              phoneId: choiceReview.id,
-              expectedRevision: revision,
+              contactId: review.contactId,
+              phoneId: review.id,
+              expectedRevision: review.sourceRevision,
             })
           : await port.chooseBirthday({
-              contactId,
-              birthdayId: choiceReview.id,
-              ...(choiceReview.leapPolicy
-                ? { leapPolicy: choiceReview.leapPolicy }
-                : {}),
-              expectedRevision: revision,
+              contactId: review.contactId,
+              birthdayId: review.id,
+              ...(review.leapPolicy ? { leapPolicy: review.leapPolicy } : {}),
+              expectedRevision: review.sourceRevision,
             });
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
+    if (!isMutationSettlementCurrent(review, request)) return;
     if (result.kind === 'error') {
-      await fail(result.problem);
+      await failMutationRequest(review, request, result.problem);
       return;
     }
     const selectedChoiceMatches =
-      result.envelope.value.summary.id === contactId &&
-      (choiceReview.kind === 'phone'
-        ? result.envelope.value.selectedPhoneId === choiceReview.id
-        : result.envelope.value.selectedBirthdayId === choiceReview.id);
+      result.envelope.value.summary.id === review.contactId &&
+      (review.kind === 'phone'
+        ? result.envelope.value.selectedPhoneId === review.id
+        : result.envelope.value.selectedBirthdayId === review.id);
     if (!selectedChoiceMatches) {
-      await fail(nativeContractProblem, true);
+      await failMutationRequest(review, request, nativeContractProblem, true);
       return;
     }
-    await reloadAfterAccepted(t('live.person.choiceAccepted'));
+    await reloadAfterMutationAccepted(
+      review,
+      request,
+      t('live.person.choiceAccepted'),
+    );
   };
 
-  const prepareApproval = async (revision: NativeRevision) => {
-    setPending(true);
-    setProblem(undefined);
-    setMessage(undefined);
+  const prepareApproval = async (
+    sourceRevision: NativeRevision,
+    mode: 'confirm' | 'view',
+  ) => {
+    const binding = startBoundWork(sourceRevision);
+    if (!binding) return;
+    const request = beginBoundRequest(binding);
+    if (request === undefined) return;
     let result: Awaited<ReturnType<LiveAppPort['prepareApprovals']>>;
     try {
       result = await port.prepareApprovals({
-        contactIds: [contactId],
-        expectedRevision: revision,
+        contactIds: [binding.contactId],
+        expectedRevision: binding.sourceRevision,
       });
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
+    if (!isBoundRequestCurrent(binding, request)) return;
     if (result.kind === 'error') {
-      await fail(result.problem);
+      await failBoundRequest(binding, request, result.problem);
       return;
     }
     const valid =
+      result.envelope.value.explicitConfirmationRequired === true &&
       result.envelope.value.items.length === 1 &&
       result.envelope.value.readyCount === 1 &&
       result.envelope.value.blockedCount === 0 &&
       result.envelope.value.items.every(
         item =>
-          item.platform === capability.platform && item.contactId === contactId,
+          item.platform === capability.platform &&
+          item.contactId === binding.contactId,
       );
     if (!valid) {
-      await fail(nativeBridgeProblem);
+      await failBoundRequest(binding, request, nativeContractProblem, true);
       return;
     }
-    setApprovalReview({
+    const nextReview: ApprovalReviewState = {
+      ...binding,
+      mode,
       review: result.envelope.value,
       revision: result.envelope.revision,
-    });
+    };
+    reviewRef.current = { approval: nextReview };
+    setApprovalReview(nextReview);
+    boundRequestInFlightRef.current = false;
     setPending(false);
   };
 
   const confirmApproval = async () => {
-    if (!approvalReview) {
+    const review = reviewRef.current.approval;
+    if (!review || review.mode !== 'confirm' || !isBindingCurrent(review)) {
       return;
     }
-    setPending(true);
+    const request = beginMutationRequest(review);
+    if (request === undefined) return;
     let result: Awaited<ReturnType<LiveAppPort['confirmApprovals']>>;
     try {
       result = await port.confirmApprovals({
-        handle: approvalReview.review.handle,
-        expectedRevision: approvalReview.revision,
+        handle: review.review.handle,
+        expectedRevision: review.revision,
       });
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
+    if (!isMutationSettlementCurrent(review, request)) return;
     if (result.kind === 'error') {
-      await fail(result.problem);
+      await failMutationRequest(review, request, result.problem);
       return;
     }
     if (result.envelope.value.platform !== capability.platform) {
-      await fail(nativePlatformMismatchProblem, true);
+      await failMutationRequest(
+        review,
+        request,
+        nativePlatformMismatchProblem,
+        true,
+      );
       return;
     }
-    await reloadAfterAccepted(t('live.person.approvalAccepted'));
+    await reloadAfterMutationAccepted(
+      review,
+      request,
+      t('live.person.approvalAccepted'),
+    );
+  };
+
+  const openChoiceReview = (
+    choice:
+      | Readonly<{
+          kind: 'phone';
+          id: PhoneChoiceId;
+          label: string;
+        }>
+      | Readonly<{
+          kind: 'birthday';
+          id: BirthdayChoiceId;
+          label: string;
+          leapRequired: boolean;
+        }>,
+    sourceRevision: NativeRevision,
+  ) => {
+    const binding = startBoundWork(sourceRevision);
+    if (!binding) return;
+    const nextReview: ChoiceReview = { ...binding, ...choice };
+    reviewRef.current = { choice: nextReview };
+    setChoiceReview(nextReview);
+    setProblem(undefined);
+    setMessage(undefined);
+  };
+
+  const openRecipientReview = (
+    kind: 'exclude' | 'pause',
+    sourceRevision: NativeRevision,
+  ) => {
+    const binding = startBoundWork(sourceRevision);
+    if (!binding) return;
+    const nextReview: RecipientReview = { ...binding, kind };
+    reviewRef.current = { recipient: nextReview };
+    setRecipientReview(nextReview);
+  };
+
+  const openDestinationReview = (
+    kind: 'block' | 'unblock',
+    sourceRevision: NativeRevision,
+    phoneId: PhoneChoiceId,
+    maskedPhone: string,
+  ) => {
+    const binding = startBoundWork(sourceRevision);
+    if (
+      !binding ||
+      binding.destinationId !== phoneId ||
+      binding.destinationBlocked !== (kind === 'unblock')
+    ) {
+      if (binding) retireProtectedState();
+      return;
+    }
+    const nextReview: DestinationReview = {
+      ...binding,
+      kind,
+      maskedPhone,
+      phoneId,
+    };
+    reviewRef.current = { destination: nextReview };
+    setDestinationReview(nextReview);
   };
 
   if (detail.state.kind === 'loading') {
@@ -467,7 +968,7 @@ export function LivePersonDetailScreen({
       <Screen includeTopInset testID="live-person-detail-screen">
         <Button
           label={t('live.person.back')}
-          onPress={onBack}
+          onPress={handleBack}
           variant="ghost"
         />
         <LiveLoading label={t('live.person.loading')} />
@@ -479,13 +980,16 @@ export function LivePersonDetailScreen({
       <Screen includeTopInset testID="live-person-detail-screen">
         <Button
           label={t('live.person.back')}
-          onPress={onBack}
+          onPress={handleBack}
           variant="ghost"
         />
         <LiveError
           title={t('live.person.unavailable')}
           problem={detail.state.problem}
-          onRetry={() => detail.reload()}
+          onRetry={() => {
+            retireProtectedState();
+            return detail.reload();
+          }}
         />
       </Screen>
     );
@@ -493,24 +997,111 @@ export function LivePersonDetailScreen({
 
   const projection = detail.state.result.envelope.value;
   const revision = detail.state.result.envelope.revision;
+  if (projection.summary.id !== contactId) {
+    return (
+      <Screen includeTopInset testID="live-person-detail-screen">
+        <Button
+          label={t('live.person.back')}
+          onPress={handleBack}
+          variant="ghost"
+        />
+        <LiveError
+          title={t('live.person.unavailable')}
+          problem={nativeContractProblem}
+          onRetry={() => {
+            retireProtectedState();
+            return detail.reload();
+          }}
+        />
+      </Screen>
+    );
+  }
+
   const enrollment = projection.summary.enrollment;
-  const canEnroll =
-    enrollment.kind === 'off' && projection.summary.readiness.kind === 'ready';
+  const readinessReasons =
+    projection.summary.readiness.kind === 'ready'
+      ? []
+      : projection.summary.readiness.reasons;
+  const readinessReasonSet = new Set(readinessReasons);
+  const structuralReasons = readinessReasons.filter(
+    reason => reason !== 'approval-invalid',
+  );
   const sourceRepairNeeded =
-    (projection.summary.readiness.kind !== 'ready' &&
-      projection.summary.readiness.reasons.some(reason =>
-        GOOGLE_CONTACTS_REPAIR_ISSUES.has(reason),
-      )) ||
+    readinessReasons.some(reason =>
+      GOOGLE_CONTACTS_REPAIR_ISSUES.has(reason),
+    ) ||
+    projection.phoneChoices.some(
+      choice =>
+        choice.issue !== undefined &&
+        GOOGLE_CONTACTS_REPAIR_ISSUES.has(choice.issue),
+    );
+  const ambiguousRegionRepairNeeded =
+    readinessReasonSet.has('phone-ambiguous-region') ||
     projection.phoneChoices.some(
       choice => choice.issue === 'phone-ambiguous-region',
     );
-  const ambiguousRegionRepairNeeded = projection.phoneChoices.some(
-    choice => choice.issue === 'phone-ambiguous-region',
-  );
+  const phoneSelectionNeeded =
+    !sourceRepairNeeded &&
+    projection.phoneChoices.length > 0 &&
+    (readinessReasonSet.has('phone-choice-required') ||
+      readinessReasonSet.has('duplicate-destination') ||
+      projection.selectedPhoneId === undefined ||
+      projection.phoneChoices.some(
+        choice =>
+          choice.issue === 'phone-choice-required' ||
+          choice.issue === 'duplicate-destination',
+      ));
+  const leapPolicyNeeded =
+    readinessReasonSet.has('leap-policy-required') ||
+    projection.birthdayChoices.some(
+      choice => choice.issue === 'leap-policy-required',
+    );
+  const birthdaySelectionNeeded =
+    !sourceRepairNeeded &&
+    !phoneSelectionNeeded &&
+    projection.birthdayChoices.length > 0 &&
+    (readinessReasonSet.has('birthday-choice-required') ||
+      readinessReasonSet.has('birthday-conflict') ||
+      projection.birthdayChoices.some(
+        choice =>
+          choice.issue === 'birthday-choice-required' ||
+          choice.issue === 'birthday-conflict',
+      ) ||
+      leapPolicyNeeded);
+  const birthdayChoices = leapPolicyNeeded
+    ? projection.birthdayChoices.filter(
+        choice =>
+          choice.id === projection.selectedBirthdayId ||
+          choice.issue === 'leap-policy-required',
+      )
+    : projection.birthdayChoices;
   const approval =
     enrollment.kind === 'enabled' || enrollment.kind === 'paused'
       ? enrollment.approval
       : undefined;
+  const structuralRepairNeeded =
+    structuralReasons.length > 0 ||
+    sourceRepairNeeded ||
+    phoneSelectionNeeded ||
+    birthdaySelectionNeeded ||
+    projection.selectedDestinationBlocked;
+  const job =
+    enrollment.kind === 'off' || enrollment.kind === 'excluded'
+      ? 'set-up'
+      : approval?.kind === 'valid' && !structuralRepairNeeded
+      ? 'view-approved'
+      : 'review-changes';
+  const canEnroll =
+    projectionUsable &&
+    enrollment.kind === 'off' &&
+    projection.summary.readiness.kind === 'ready' &&
+    !projection.selectedDestinationBlocked;
+  const canReviewApproval =
+    projectionUsable &&
+    (enrollment.kind === 'enabled' || enrollment.kind === 'paused') &&
+    structuralReasons.length === 0 &&
+    !projection.selectedDestinationBlocked;
+
   const approvalText = !approval
     ? t('live.person.approvalNone')
     : approval.kind === 'missing'
@@ -535,11 +1126,39 @@ export function LivePersonDetailScreen({
         })
       : t(`live.common.${enrollment.kind}`);
 
+  const currentEnrollmentReview =
+    enrollmentReview && isBindingCurrent(enrollmentReview)
+      ? enrollmentReview
+      : undefined;
+  const currentApprovalReview =
+    approvalReview && isBindingCurrent(approvalReview)
+      ? approvalReview
+      : undefined;
+  const currentChoiceReview =
+    choiceReview && isBindingCurrent(choiceReview) ? choiceReview : undefined;
+  const currentRecipientReview =
+    recipientReview && isBindingCurrent(recipientReview)
+      ? recipientReview
+      : undefined;
+  const currentDestinationReview =
+    destinationReview && isBindingCurrent(destinationReview)
+      ? destinationReview
+      : undefined;
+  const reviewStateExists = Boolean(
+    enrollmentReview ||
+      approvalReview ||
+      choiceReview ||
+      recipientReview ||
+      destinationReview,
+  );
+  const protectedFlowActive =
+    reviewStateExists || (pending && protectedBindingRef.current !== undefined);
+
   return (
     <Screen includeTopInset testID="live-person-detail-screen">
       <Button
         label={t('live.person.back')}
-        onPress={onBack}
+        onPress={handleBack}
         variant="ghost"
         testID="live-person-back"
       />
@@ -547,12 +1166,34 @@ export function LivePersonDetailScreen({
         {projection.summary.displayName}
       </AppText>
       <AppText color="muted">{t('live.person.privateBody')}</AppText>
+
       {detail.state.refreshProblem ? (
-        <LiveRefreshProblem problem={detail.state.refreshProblem} />
+        <>
+          <LiveRefreshProblem problem={detail.state.refreshProblem} />
+          <Button
+            label={t('live.person.checkAgain')}
+            onPress={() => {
+              retireProtectedState();
+              detail.reload().catch(() => undefined);
+            }}
+            variant="secondary"
+            testID="live-person-check-again"
+          />
+        </>
+      ) : detail.state.refreshing ? (
+        <LiveLoading label={t('live.common.checkingState')} />
       ) : null}
       <LiveActionFeedback problem={problem} message={message} />
+      {syncNotice ? (
+        <ReadinessBanner
+          title={t('live.person.googleContactsRepairTitle')}
+          detail={syncNotice.detail}
+          tone={syncNotice.tone}
+          testID="live-person-google-sync-notice"
+        />
+      ) : null}
 
-      <Card>
+      <Card testID="live-person-summary">
         <KeyValue
           label={t('live.person.birthday')}
           value={
@@ -563,166 +1204,82 @@ export function LivePersonDetailScreen({
           label={t('live.person.phone')}
           value={projection.summary.maskedPhone ?? t('live.common.needsReview')}
         />
-        <KeyValue
-          label={t('live.person.nextOccurrence')}
-          value={projection.nextOccurrenceLabel ?? t('live.common.notPlanned')}
-        />
-        <KeyValue
-          label={t('live.person.latestOutcome')}
-          value={projection.lastOutcomeLabel ?? t('live.common.noOutcome')}
-        />
         <StatusRow
           title={t('live.person.enrollment')}
           detail={enrollmentText}
           tone={enrollment.kind === 'enabled' ? 'positive' : 'neutral'}
           testID="live-person-enrollment"
         />
-        <StatusRow
-          title={t('live.person.approval')}
-          detail={approvalText}
-          tone={approval?.kind === 'valid' ? 'positive' : 'warning'}
-        />
+        {approval ? (
+          <StatusRow
+            title={t('live.person.approval')}
+            detail={approvalText}
+            tone={approval.kind === 'valid' ? 'positive' : 'warning'}
+          />
+        ) : null}
+        {job === 'view-approved' ? (
+          <>
+            <KeyValue
+              label={t('live.person.nextOccurrence')}
+              value={
+                projection.nextOccurrenceLabel ?? t('live.common.notPlanned')
+              }
+            />
+            <KeyValue
+              label={t('live.person.latestOutcome')}
+              value={projection.lastOutcomeLabel ?? t('live.common.noOutcome')}
+            />
+          </>
+        ) : null}
       </Card>
 
-      <ReadinessBanner
-        title={t(
-          capability.platform === 'android'
-            ? 'live.person.androidSafety'
-            : 'live.person.iosSafety',
-        )}
-        detail={t(
-          capability.platform === 'android'
-            ? 'live.person.androidSafetyBody'
-            : 'live.person.iosSafetyBody',
-        )}
-        tone="info"
-      />
-
-      {projection.selectedDestinationBlocked ? (
+      {projectionUsable && !reviewStateExists ? (
         <ReadinessBanner
-          title={t('live.person.destinationBlockedTitle')}
-          detail={t('live.person.destinationBlockedBody')}
-          tone="warning"
-          testID="live-person-destination-blocked"
+          title={t(
+            job === 'set-up'
+              ? 'live.person.jobSetupTitle'
+              : job === 'review-changes'
+              ? 'live.person.jobReviewChangesTitle'
+              : 'live.person.jobApprovedTitle',
+          )}
+          detail={t(
+            job === 'set-up'
+              ? 'live.person.jobSetupBody'
+              : job === 'review-changes'
+              ? 'live.person.jobReviewChangesBody'
+              : 'live.person.jobApprovedBody',
+          )}
+          tone={
+            job === 'view-approved'
+              ? 'positive'
+              : job === 'review-changes'
+              ? 'warning'
+              : 'info'
+          }
+          testID={`live-person-job-${job}`}
         />
       ) : null}
 
-      {sourceRepairNeeded ? (
-        <Card>
-          <ReadinessBanner
-            title={t('live.person.googleContactsRepairTitle')}
-            detail={t(
-              ambiguousRegionRepairNeeded
-                ? 'live.person.googleContactsRegionRepairBody'
-                : 'live.person.googleContactsRepairBody',
-            )}
-            tone="warning"
-          />
-          <Button
-            label={
-              pending
-                ? t('live.common.checking')
-                : t('live.person.openGoogleContacts')
-            }
-            disabled={pending}
-            onPress={openGoogleContacts}
-            testID="live-person-open-google-contacts"
-          />
-        </Card>
-      ) : null}
-
-      {projection.phoneChoices.length > 0 ? (
-        <>
-          <SectionHeading
-            title={t('live.person.phoneChoices')}
-            supporting={t('live.person.phoneChoicesBody')}
-          />
-          {projection.phoneChoices.map(choice => (
-            <Card key={choice.id}>
-              <StatusRow
-                title={`${choice.maskedDisplay} · ${choice.sourceLabel}`}
-                detail={
-                  choice.id === projection.selectedPhoneId
-                    ? t('live.common.selected')
-                    : choice.issue
-                    ? t(safeReasonMessageKey(choice.issue))
-                    : choice.selectable
-                    ? t('live.common.availableReview')
-                    : t('live.common.unavailable')
-                }
-                tone={
-                  choice.id === projection.selectedPhoneId
-                    ? 'positive'
-                    : 'neutral'
-                }
-              />
-              {choice.selectable && choice.id !== projection.selectedPhoneId ? (
-                <Button
-                  label={t('live.person.choosePhone')}
-                  onPress={() =>
-                    setChoiceReview({ kind: 'phone', id: choice.id })
-                  }
-                  variant="secondary"
-                  testID={`live-choose-phone-${choice.id}`}
-                />
-              ) : null}
-            </Card>
-          ))}
-        </>
-      ) : null}
-
-      {projection.birthdayChoices.length > 0 ? (
-        <>
-          <SectionHeading
-            title={t('live.person.birthdayChoices')}
-            supporting={t('live.person.birthdayChoicesBody')}
-          />
-          {projection.birthdayChoices.map(choice => (
-            <Card key={choice.id}>
-              <StatusRow
-                title={choice.displayLabel}
-                detail={
-                  choice.id === projection.selectedBirthdayId
-                    ? t('live.common.selected')
-                    : choice.issue
-                    ? t(safeReasonMessageKey(choice.issue))
-                    : choice.selectable
-                    ? t('live.common.availableReview')
-                    : t('live.common.unavailable')
-                }
-                tone={
-                  choice.id === projection.selectedBirthdayId
-                    ? 'positive'
-                    : 'neutral'
-                }
-              />
-              {choice.selectable &&
-              choice.id !== projection.selectedBirthdayId ? (
-                <Button
-                  label={t('live.person.chooseBirthday')}
-                  onPress={() =>
-                    setChoiceReview({
-                      kind: 'birthday',
-                      id: choice.id,
-                      leapRequired: choice.issue === 'leap-policy-required',
-                    })
-                  }
-                  variant="secondary"
-                  testID={`live-choose-birthday-${choice.id}`}
-                />
-              ) : null}
-            </Card>
-          ))}
-        </>
-      ) : null}
-
-      {choiceReview ? (
-        <Card>
+      {currentChoiceReview ? (
+        <Card testID="live-person-choice-review">
           <AppText variant="heading">{t('live.person.confirmChoice')}</AppText>
-          {choiceReview.kind === 'birthday' && choiceReview.leapRequired ? (
+          <KeyValue
+            label={t(
+              currentChoiceReview.kind === 'phone'
+                ? 'live.person.phone'
+                : 'live.person.birthday',
+            )}
+            value={currentChoiceReview.label}
+          />
+          {currentChoiceReview.kind === 'birthday' &&
+          currentChoiceReview.leapRequired ? (
             <>
               <SectionHeading title={t('live.person.leapPolicy')} />
-              <View style={styles.choices} accessibilityRole="radiogroup">
+              <View
+                style={styles.choices}
+                accessibilityLabel={t('live.person.leapPolicy')}
+                accessibilityRole="radiogroup"
+              >
                 {(
                   [
                     ['feb-28', 'live.person.leapFeb28'],
@@ -733,9 +1290,16 @@ export function LivePersonDetailScreen({
                   <ChoiceChip
                     key={value}
                     label={t(label)}
-                    selected={choiceReview.leapPolicy === value}
+                    selected={currentChoiceReview.leapPolicy === value}
                     onPress={() =>
-                      setChoiceReview({ ...choiceReview, leapPolicy: value })
+                      setChoiceReview(current => {
+                        if (!current || current.kind !== 'birthday') {
+                          return current;
+                        }
+                        const next = { ...current, leapPolicy: value };
+                        reviewRef.current = { choice: next };
+                        return next;
+                      })
                     }
                   />
                 ))}
@@ -746,30 +1310,32 @@ export function LivePersonDetailScreen({
             label={t('live.person.confirmChoice')}
             disabled={
               pending ||
-              (choiceReview.kind === 'birthday' &&
-                choiceReview.leapRequired &&
-                !choiceReview.leapPolicy)
+              (currentChoiceReview.kind === 'birthday' &&
+                currentChoiceReview.leapRequired &&
+                !currentChoiceReview.leapPolicy)
             }
-            onPress={() => confirmChoice(revision)}
+            onPress={() => confirmChoice().catch(() => undefined)}
             testID="live-confirm-choice"
           />
           <Button
             label={t('live.common.cancel')}
-            onPress={() => setChoiceReview(undefined)}
+            disabled={pending}
+            onPress={retireProtectedState}
             variant="secondary"
           />
         </Card>
       ) : null}
 
-      {enrollmentReview ? (
-        <Card>
-          <AppText variant="heading">
-            {t('live.person.confirmEnrollment')}
-          </AppText>
+      {currentEnrollmentReview ? (
+        <InlineReviewCard
+          reviewKey={currentEnrollmentReview.review.handle}
+          testID="live-person-enrollment-review"
+          title={t('live.person.confirmEnrollment')}
+        >
           <AppText>
             {t('live.person.readyAttention', {
-              ready: enrollmentReview.review.readyCount,
-              attention: enrollmentReview.review.attentionCount,
+              ready: currentEnrollmentReview.review.readyCount,
+              attention: currentEnrollmentReview.review.attentionCount,
             })}
           </AppText>
           <AppText color="muted">
@@ -782,28 +1348,29 @@ export function LivePersonDetailScreen({
                 : t('live.person.confirmEnrollment')
             }
             disabled={pending}
-            onPress={confirmEnrollment}
+            onPress={() => confirmEnrollment().catch(() => undefined)}
             testID="live-person-confirm-enrollment"
           />
           <Button
             label={t('live.person.cancelReview')}
             disabled={pending}
-            onPress={() => setEnrollmentReview(undefined)}
+            onPress={retireProtectedState}
             variant="secondary"
           />
-        </Card>
+        </InlineReviewCard>
       ) : null}
 
-      {approvalReview ? (
-        <Card>
-          <AppText variant="heading">
-            {t(
-              capability.platform === 'android'
-                ? 'live.person.approvalTitle'
-                : 'live.person.iosApprovalTitle',
-            )}
-          </AppText>
-          {approvalReview.review.items.map(item => (
+      {currentApprovalReview ? (
+        <InlineReviewCard
+          reviewKey={`${currentApprovalReview.review.handle}-${currentApprovalReview.mode}`}
+          testID="live-person-approval-review"
+          title={t(
+            capability.platform === 'android'
+              ? 'live.person.approvalTitle'
+              : 'live.person.iosApprovalTitle',
+          )}
+        >
+          {currentApprovalReview.review.items.map(item => (
             <View key={item.contactId} style={styles.reviewItem}>
               <AppText variant="label">{item.recipient}</AppText>
               <KeyValue
@@ -828,6 +1395,12 @@ export function LivePersonDetailScreen({
                     label={t('live.home.window')}
                     value={item.windowLabel}
                   />
+                  <KeyValue
+                    label={t('live.automation.segmentCount')}
+                    value={t('live.common.parts', {
+                      count: item.segmentCount,
+                    })}
+                  />
                   <AppText color="muted">
                     {t('live.person.androidChargeDisclosure')}
                   </AppText>
@@ -848,121 +1421,102 @@ export function LivePersonDetailScreen({
               </AppText>
             </View>
           ))}
+          {currentApprovalReview.mode === 'confirm' ? (
+            <>
+              <Button
+                label={t('live.person.approvalConfirm')}
+                disabled={pending}
+                onPress={() => confirmApproval().catch(() => undefined)}
+                testID="live-confirm-approval"
+              />
+              <Button
+                label={t('live.common.cancel')}
+                disabled={pending}
+                onPress={retireProtectedState}
+                variant="secondary"
+              />
+            </>
+          ) : (
+            <Button
+              label={t('live.common.close')}
+              disabled={pending}
+              onPress={retireProtectedState}
+              variant="secondary"
+              testID="live-close-approved-review"
+            />
+          )}
+        </InlineReviewCard>
+      ) : null}
+
+      {currentRecipientReview ? (
+        <Card testID={`live-person-${currentRecipientReview.kind}-review`}>
+          <AppText variant="heading">
+            {t(
+              currentRecipientReview.kind === 'pause'
+                ? 'live.person.pauseTitle'
+                : 'live.person.excludeTitle',
+            )}
+          </AppText>
+          <AppText>
+            {t(
+              currentRecipientReview.kind === 'pause'
+                ? 'live.person.pauseBody'
+                : 'live.person.excludeBody',
+            )}
+          </AppText>
           <Button
-            label={t('live.person.approvalConfirm')}
+            label={
+              pending
+                ? t(
+                    currentRecipientReview.kind === 'pause'
+                      ? 'live.person.pausing'
+                      : 'live.person.excluding',
+                  )
+                : t(
+                    currentRecipientReview.kind === 'pause'
+                      ? 'live.person.pause'
+                      : 'live.person.excludeConfirm',
+                  )
+            }
             disabled={pending}
-            onPress={confirmApproval}
-            testID="live-confirm-approval"
+            onPress={() => confirmRecipientMutation().catch(() => undefined)}
+            variant={
+              currentRecipientReview.kind === 'exclude' ? 'danger' : 'secondary'
+            }
+            testID={
+              currentRecipientReview.kind === 'pause'
+                ? 'live-person-confirm-pause'
+                : 'live-person-confirm-exclude'
+            }
           />
           <Button
-            label={t('live.common.cancel')}
-            onPress={() => setApprovalReview(undefined)}
+            label={
+              currentRecipientReview.kind === 'exclude'
+                ? t('live.person.excludeKeep')
+                : t('live.common.cancel')
+            }
+            disabled={pending}
+            onPress={retireProtectedState}
             variant="secondary"
           />
         </Card>
       ) : null}
 
-      {!enrollmentReview && canEnroll ? (
-        <Button
-          label={
-            pending
-              ? t('live.person.preparing')
-              : t('live.person.reviewEnrollment')
-          }
-          disabled={pending}
-          onPress={() => prepareEnrollment(revision)}
-          testID="live-person-review-enrollment"
-        />
-      ) : null}
-      {enrollment.kind === 'off' && !canEnroll ? (
-        <ReadinessBanner
-          title={t('live.person.enrollmentBlocked')}
-          detail={t('live.person.enrollmentBlockedBody')}
-          tone="warning"
-        />
-      ) : null}
-      {(enrollment.kind === 'enabled' || enrollment.kind === 'paused') &&
-      !projection.selectedDestinationBlocked ? (
-        <Button
-          label={t(
-            capability.platform === 'android'
-              ? 'live.person.approvalReview'
-              : 'live.person.iosApprovalReview',
-          )}
-          disabled={pending}
-          onPress={() => prepareApproval(revision)}
-          testID="live-review-approval"
-        />
-      ) : null}
-      {enrollment.kind === 'enabled' ? (
-        <Button
-          label={pending ? t('live.person.pausing') : t('live.person.pause')}
-          disabled={pending}
-          onPress={() => runRecipientMutation('pause', revision)}
-          variant="secondary"
-          testID="live-person-pause"
-        />
-      ) : null}
-      {enrollment.kind === 'paused' || enrollment.kind === 'excluded' ? (
-        <Button
-          label={
-            pending ? t('live.person.restoring') : t('live.person.restore')
-          }
-          disabled={pending}
-          onPress={() => runRecipientMutation('restore', revision)}
-          variant="secondary"
-          testID="live-person-restore"
-        />
-      ) : null}
-      {enrollment.kind !== 'excluded' && confirmExclude ? (
-        <Card>
-          <AppText variant="heading">{t('live.person.excludeTitle')}</AppText>
-          <AppText>{t('live.person.excludeBody')}</AppText>
-          <Button
-            label={
-              pending
-                ? t('live.person.excluding')
-                : t('live.person.excludeConfirm')
-            }
-            disabled={pending}
-            onPress={() => runRecipientMutation('exclude', revision)}
-            variant="danger"
-            testID="live-person-confirm-exclude"
-          />
-          <Button
-            label={t('live.person.excludeKeep')}
-            disabled={pending}
-            onPress={() => setConfirmExclude(false)}
-            variant="secondary"
-          />
-        </Card>
-      ) : null}
-      {enrollment.kind !== 'excluded' && !confirmExclude ? (
-        <Button
-          label={t('live.person.exclude')}
-          disabled={pending}
-          onPress={() => setConfirmExclude(true)}
-          variant="ghost"
-          testID="live-person-exclude"
-        />
-      ) : null}
-      {projection.selectedPhoneId && destinationBlockReview ? (
-        <Card>
+      {currentDestinationReview ? (
+        <Card testID="live-person-destination-review">
           <AppText variant="heading">
             {t(
-              destinationBlockReview === 'block'
+              currentDestinationReview.kind === 'block'
                 ? 'live.person.destinationBlockTitle'
                 : 'live.person.destinationUnblockTitle',
             )}
           </AppText>
           <AppText>
             {t(
-              destinationBlockReview === 'block'
+              currentDestinationReview.kind === 'block'
                 ? 'live.person.destinationBlockBody'
                 : 'live.person.destinationUnblockBody',
-              {
-                phone: bidiIsolate(projection.summary.maskedPhone ?? ''),
-              },
+              { phone: bidiIsolate(currentDestinationReview.maskedPhone) },
             )}
           </AppText>
           <Button
@@ -970,62 +1524,324 @@ export function LivePersonDetailScreen({
               pending
                 ? t('live.common.saving')
                 : t(
-                    destinationBlockReview === 'block'
+                    currentDestinationReview.kind === 'block'
                       ? 'live.person.destinationBlockConfirm'
                       : 'live.person.destinationUnblockConfirm',
                   )
             }
             disabled={pending}
-            onPress={() =>
-              runDestinationBlockMutation(destinationBlockReview, revision)
-            }
+            onPress={() => confirmDestinationMutation().catch(() => undefined)}
             variant={
-              destinationBlockReview === 'block' ? 'danger' : 'secondary'
+              currentDestinationReview.kind === 'block' ? 'danger' : 'secondary'
             }
-            testID={`live-person-confirm-destination-${destinationBlockReview}`}
+            testID={`live-person-confirm-destination-${currentDestinationReview.kind}`}
           />
           <Button
             label={t('live.common.cancel')}
             disabled={pending}
-            onPress={() => setDestinationBlockReview(undefined)}
+            onPress={retireProtectedState}
             variant="secondary"
           />
         </Card>
       ) : null}
-      {projection.selectedPhoneId && !destinationBlockReview ? (
-        <Button
-          label={t(
-            projection.selectedDestinationBlocked
-              ? 'live.person.destinationUnblock'
-              : 'live.person.destinationBlock',
-          )}
-          disabled={pending}
-          onPress={() =>
-            setDestinationBlockReview(
-              projection.selectedDestinationBlocked ? 'unblock' : 'block',
+
+      {!protectedFlowActive && projectionUsable ? (
+        <>
+          {sourceRepairNeeded ? (
+            <Card testID="live-person-source-repair">
+              <ReadinessBanner
+                title={t('live.person.googleContactsRepairTitle')}
+                detail={t(
+                  ambiguousRegionRepairNeeded
+                    ? 'live.person.googleContactsRegionRepairBody'
+                    : 'live.person.googleContactsRepairBody',
+                )}
+                tone="warning"
+              />
+              <Button
+                label={
+                  pending
+                    ? t('live.common.checking')
+                    : t('live.person.openGoogleContacts')
+                }
+                disabled={pending}
+                onPress={() => openGoogleContacts().catch(() => undefined)}
+                testID="live-person-open-google-contacts"
+              />
+            </Card>
+          ) : phoneSelectionNeeded ? (
+            <>
+              <SectionHeading
+                title={t('live.person.phoneChoices')}
+                supporting={t('live.person.phoneChoicesBody')}
+              />
+              {projection.phoneChoices.map(choice => (
+                <Card key={choice.id}>
+                  <StatusRow
+                    title={`${choice.maskedDisplay} · ${choice.sourceLabel}`}
+                    detail={
+                      choice.id === projection.selectedPhoneId
+                        ? t('live.common.selected')
+                        : choice.issue
+                        ? t(safeReasonMessageKey(choice.issue))
+                        : choice.selectable
+                        ? t('live.common.availableReview')
+                        : t('live.common.unavailable')
+                    }
+                    tone={
+                      choice.id === projection.selectedPhoneId
+                        ? 'positive'
+                        : 'neutral'
+                    }
+                  />
+                  {choice.selectable &&
+                  choice.id !== projection.selectedPhoneId ? (
+                    <Button
+                      label={t('live.person.choosePhoneNamed', {
+                        phone: bidiIsolate(choice.maskedDisplay),
+                      })}
+                      onPress={() =>
+                        openChoiceReview(
+                          {
+                            kind: 'phone',
+                            id: choice.id,
+                            label: choice.maskedDisplay,
+                          },
+                          revision,
+                        )
+                      }
+                      variant="secondary"
+                      testID={`live-choose-phone-${choice.id}`}
+                    />
+                  ) : null}
+                </Card>
+              ))}
+            </>
+          ) : birthdaySelectionNeeded ? (
+            <>
+              <SectionHeading
+                title={t('live.person.birthdayChoices')}
+                supporting={t('live.person.birthdayChoicesBody')}
+              />
+              {birthdayChoices.map(choice => {
+                const selected = choice.id === projection.selectedBirthdayId;
+                const needsLeapPolicy =
+                  choice.issue === 'leap-policy-required' ||
+                  (selected && leapPolicyNeeded);
+                return (
+                  <Card key={choice.id}>
+                    <StatusRow
+                      title={choice.displayLabel}
+                      detail={
+                        selected && needsLeapPolicy
+                          ? t(safeReasonMessageKey('leap-policy-required'))
+                          : selected
+                          ? t('live.common.selected')
+                          : choice.issue
+                          ? t(safeReasonMessageKey(choice.issue))
+                          : choice.selectable
+                          ? t('live.common.availableReview')
+                          : t('live.common.unavailable')
+                      }
+                      tone={selected ? 'positive' : 'neutral'}
+                    />
+                    {(choice.selectable || (selected && needsLeapPolicy)) &&
+                    (!selected || needsLeapPolicy) ? (
+                      <Button
+                        label={t('live.person.chooseBirthdayNamed', {
+                          birthday: bidiIsolate(choice.displayLabel),
+                        })}
+                        onPress={() =>
+                          openChoiceReview(
+                            {
+                              kind: 'birthday',
+                              id: choice.id,
+                              label: choice.displayLabel,
+                              leapRequired: needsLeapPolicy,
+                            },
+                            revision,
+                          )
+                        }
+                        variant="secondary"
+                        testID={`live-choose-birthday-${choice.id}`}
+                      />
+                    ) : null}
+                  </Card>
+                );
+              })}
+            </>
+          ) : projection.selectedDestinationBlocked ? (
+            <ReadinessBanner
+              title={t('live.person.destinationBlockedTitle')}
+              detail={t('live.person.destinationBlockedBody')}
+              tone="warning"
+              testID="live-person-destination-blocked"
+            />
+          ) : enrollment.kind === 'off' ? (
+            canEnroll ? (
+              <Button
+                label={
+                  pending
+                    ? t('live.person.preparing')
+                    : t('live.person.reviewEnrollment')
+                }
+                disabled={pending}
+                onPress={() =>
+                  prepareEnrollment(revision).catch(() => undefined)
+                }
+                testID="live-person-review-enrollment"
+              />
+            ) : (
+              <ReadinessBanner
+                title={t('live.person.enrollmentBlocked')}
+                detail={t('live.person.enrollmentBlockedBody')}
+                tone="warning"
+              />
             )
-          }
-          variant={
-            projection.selectedDestinationBlocked ? 'secondary' : 'ghost'
-          }
-          testID={
-            projection.selectedDestinationBlocked
-              ? 'live-person-unblock-destination'
-              : 'live-person-block-destination'
-          }
-        />
+          ) : enrollment.kind === 'enabled' || enrollment.kind === 'paused' ? (
+            canReviewApproval ? (
+              <Button
+                label={t(
+                  approval?.kind === 'valid'
+                    ? 'live.person.viewApproved'
+                    : 'live.person.reviewChanges',
+                )}
+                disabled={pending}
+                onPress={() =>
+                  prepareApproval(
+                    revision,
+                    approval?.kind === 'valid' ? 'view' : 'confirm',
+                  ).catch(() => undefined)
+                }
+                testID="live-review-approval"
+              />
+            ) : (
+              <ReadinessBanner
+                title={t('live.person.enrollmentBlocked')}
+                detail={t('live.person.enrollmentBlockedBody')}
+                tone="warning"
+              />
+            )
+          ) : null}
+
+          <Button
+            label={t(
+              manageExpanded ? 'live.person.hideManage' : 'live.person.manage',
+            )}
+            disabled={!projectionUsable || pending}
+            expanded={manageExpanded}
+            onPress={() => setManageExpanded(current => !current)}
+            testID="live-person-manage-toggle"
+            variant="secondary"
+          />
+
+          {manageExpanded ? (
+            <Card testID="live-person-manage">
+              <SectionHeading title={t('live.person.manage')} />
+              {enrollment.kind === 'enabled' ? (
+                <>
+                  <AppText color="muted">{t('live.person.pauseBody')}</AppText>
+                  <Button
+                    label={t('live.person.pause')}
+                    disabled={pending}
+                    onPress={() => openRecipientReview('pause', revision)}
+                    variant="secondary"
+                    testID="live-person-pause"
+                  />
+                </>
+              ) : enrollment.kind === 'paused' ? (
+                <Button
+                  label={
+                    pending
+                      ? t('live.person.resuming')
+                      : t('live.person.resume')
+                  }
+                  disabled={pending}
+                  onPress={() =>
+                    runDirectRestore(revision).catch(() => undefined)
+                  }
+                  variant="secondary"
+                  testID="live-person-resume"
+                />
+              ) : enrollment.kind === 'excluded' ? (
+                <Button
+                  label={
+                    pending
+                      ? t('live.person.includingAgain')
+                      : t('live.person.includeAgain')
+                  }
+                  disabled={pending}
+                  onPress={() =>
+                    runDirectRestore(revision).catch(() => undefined)
+                  }
+                  variant="secondary"
+                  testID="live-person-include"
+                />
+              ) : null}
+
+              {enrollment.kind !== 'excluded' ? (
+                <>
+                  <AppText color="muted">
+                    {t('live.person.excludeBody')}
+                  </AppText>
+                  <Button
+                    label={t('live.person.exclude')}
+                    disabled={pending}
+                    onPress={() => openRecipientReview('exclude', revision)}
+                    variant="ghost"
+                    testID="live-person-exclude"
+                  />
+                </>
+              ) : null}
+
+              {projection.selectedPhoneId ? (
+                <>
+                  <AppText color="muted">
+                    {t(
+                      projection.selectedDestinationBlocked
+                        ? 'live.person.destinationUnblockBody'
+                        : 'live.person.destinationBlockBody',
+                      {
+                        phone: bidiIsolate(
+                          projection.summary.maskedPhone ?? '',
+                        ),
+                      },
+                    )}
+                  </AppText>
+                  <Button
+                    label={t(
+                      projection.selectedDestinationBlocked
+                        ? 'live.person.destinationUnblock'
+                        : 'live.person.destinationBlock',
+                    )}
+                    disabled={pending}
+                    onPress={() =>
+                      openDestinationReview(
+                        projection.selectedDestinationBlocked
+                          ? 'unblock'
+                          : 'block',
+                        revision,
+                        projection.selectedPhoneId as PhoneChoiceId,
+                        projection.summary.maskedPhone ?? '',
+                      )
+                    }
+                    variant={
+                      projection.selectedDestinationBlocked
+                        ? 'secondary'
+                        : 'ghost'
+                    }
+                    testID={
+                      projection.selectedDestinationBlocked
+                        ? 'live-person-unblock-destination'
+                        : 'live-person-block-destination'
+                    }
+                  />
+                </>
+              ) : null}
+            </Card>
+          ) : null}
+        </>
       ) : null}
-      <Button
-        label={
-          detail.state.refreshing
-            ? t('live.common.refreshing')
-            : t('live.person.refresh')
-        }
-        disabled={detail.state.refreshing || pending}
-        onPress={() => detail.reload()}
-        variant="secondary"
-        testID="live-person-refresh"
-      />
     </Screen>
   );
 }

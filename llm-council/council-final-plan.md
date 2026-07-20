@@ -1,5 +1,13 @@
-WARNING: proceeding, even though we could not create PATH aliases: Operation not permitted (os error 1)
-2026-07-18T17:20:27.356592Z  WARN codex_state::runtime: failed to open state db at /Users/yashsomani/.codex/state_5.sqlite: failed to migrate state DB at /Users/yashsomani/.codex/state_5.sqlite: error returned from database: (code: 8) attempt to write a readonly database
-2026-07-18T17:20:27.356643Z  WARN codex_rollout::state_db: failed to initialize state runtime: failed to initialize state runtime at /Users/yashsomani/.codex: failed to migrate state DB at /Users/yashsomani/.codex/state_5.sqlite: error returned from database: (code: 8) attempt to write a readonly database: error returned from database: (code: 8) attempt to write a readonly database: (code: 8) attempt to write a readonly database
-Reading additional input from stdin...
-Error: failed to initialize in-process app-server client: Operation not permitted (os error 1)
+# Codex-only Council Final Plan
+
+The isolated CLI council was blocked because the sandbox could not use Codex state, and escalation was denied to prevent repository-context export through a separate authenticated process. Its output was rejected and never used.
+
+The authorized fallback used three independent in-session GPT-5.6 Sol repository planners, randomized anonymized plans, and an independent GPT-5.6 Sol judge. The valid artifacts are:
+
+- runs/20260718-native-codex-only-master-prompt/plan-1.md
+- runs/20260718-native-codex-only-master-prompt/plan-2.md
+- runs/20260718-native-codex-only-master-prompt/plan-3.md
+- runs/20260718-native-codex-only-master-prompt/judge.md
+- runs/20260718-native-codex-only-master-prompt/final-plan.md
+
+The copy-paste deliverable is ../CODEX_GPT_5_6_SOL_MASTER_PROMPT.md.

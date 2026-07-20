@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import {
   DarkTheme,
   DefaultTheme,
@@ -33,6 +33,7 @@ import type { ActivityRecoveryRoute } from '../../domain/activity/model';
 import type { ActivityId, ContactId } from '../../domain/shared/brand';
 import type { PlatformCapability } from '../../domain/shared/platform';
 import { AppText } from '../../design-system/components/AppText';
+import { FocusablePressable } from '../../design-system/components/Primitives';
 import { Icon, type IconName } from '../../design-system/components/Icon';
 import { RouteAccessibilityFocus } from '../../design-system/components/RouteAccessibilityFocus';
 import { minimumTargetSize, spacing } from '../../design-system/tokens/theme';
@@ -45,6 +46,7 @@ import {
 } from './LiveActivityScreen';
 import { LiveAttentionScreen } from './LiveAttentionScreen';
 import { LiveAutomationScreen } from './LiveAutomationScreen';
+import { LiveComposerReviewScreen } from './LiveComposerReviewScreen';
 import { LiveDiagnosticsScreen } from './LiveDiagnosticsScreen';
 import { LiveHomeScreen } from './LiveHomeScreen';
 import { LiveHelpLegalScreen } from './LiveHelpLegalScreen';
@@ -52,6 +54,7 @@ import { LiveMessageScreen } from './LiveMessageScreen';
 import { LivePeopleScreen } from './LivePeopleScreen';
 import { LivePersonDetailScreen } from './LivePersonDetailScreen';
 import { LivePrivacyScreen } from './LivePrivacyScreen';
+import { LiveScheduleScreen } from './LiveScheduleScreen';
 import { LiveSettingsScreen } from './LiveSettingsScreen';
 
 type LiveMainTabParamList = {
@@ -67,20 +70,24 @@ type LiveRootStackParamList = {
   ActivityDetail: Readonly<{ activityId: ActivityId }>;
   Attention: undefined;
   Automation: undefined;
+  ComposerReview: undefined;
   Diagnostics: undefined;
   HelpLegal: undefined;
   Message: undefined;
   Privacy: undefined;
+  Schedule: undefined;
 };
 
 type LiveRootLeaf =
   | 'Activity'
   | 'Attention'
   | 'Automation'
+  | 'ComposerReview'
   | 'Diagnostics'
   | 'HelpLegal'
   | 'Message'
-  | 'Privacy';
+  | 'Privacy'
+  | 'Schedule';
 type LiveRootNavigation = NavigationProp<LiveRootStackParamList>;
 
 const Tabs = createBottomTabNavigator<LiveMainTabParamList>();
@@ -90,7 +97,10 @@ type LiveNavigationDependencies = Readonly<{
   account: AccountProjection;
   capability: PlatformCapability;
   companionPort: LiveCompanionPort;
+  onContinueSetup: () => void;
   port: LiveAppPort;
+  productSetupRequired: boolean;
+  refreshBootstrap: () => Promise<unknown>;
 }>;
 
 const LiveNavigationContext = createContext<
@@ -192,11 +202,15 @@ function LiveRouteFrame({
 }
 
 function LiveHomeRoute() {
-  const { account, capability, companionPort, port } =
-    useLiveNavigationDependencies();
+  const {
+    capability,
+    companionPort,
+    onContinueSetup,
+    port,
+    productSetupRequired,
+  } = useLiveNavigationDependencies();
   const navigation = useRootNavigation();
   const { t } = useAppLocalization();
-  const sender = account.kind === 'connected' ? account.sender : undefined;
 
   return (
     <LiveRouteFrame announcement={t('tabs.home')} routeKey="tab:home">
@@ -208,10 +222,13 @@ function LiveHomeRoute() {
         onOpenAutomation={() =>
           navigateToLeafFromHome(navigation, 'Automation')
         }
-        onOpenMessage={() => navigateToLeafFromHome(navigation, 'Message')}
+        onOpenComposerReview={() =>
+          navigateToLeafFromHome(navigation, 'ComposerReview')
+        }
         onOpenPeople={() => navigateToTab(navigation, 'People')}
+        onContinueSetup={onContinueSetup}
         port={port}
-        sender={sender}
+        productSetupRequired={productSetupRequired}
       />
     </LiveRouteFrame>
   );
@@ -239,23 +256,20 @@ function LiveSettingsRoute() {
     <LiveRouteFrame announcement={t('tabs.settings')} routeKey="tab:settings">
       <LiveSettingsScreen
         capability={capability}
-        onOpenActivity={() =>
-          navigateToLeafFromTab(navigation, 'Settings', 'Activity')
-        }
-        onOpenAttention={() =>
-          navigateToLeafFromTab(navigation, 'Settings', 'Attention')
-        }
         onOpenAutomation={() =>
           navigateToLeafFromTab(navigation, 'Settings', 'Automation')
-        }
-        onOpenDiagnostics={() =>
-          navigateToLeafFromTab(navigation, 'Settings', 'Diagnostics')
         }
         onOpenHelpLegal={() =>
           navigateToLeafFromTab(navigation, 'Settings', 'HelpLegal')
         }
+        onOpenMessage={() =>
+          navigateToLeafFromTab(navigation, 'Settings', 'Message')
+        }
         onOpenPrivacy={() =>
           navigateToLeafFromTab(navigation, 'Settings', 'Privacy')
+        }
+        onOpenSchedule={() =>
+          navigateToLeafFromTab(navigation, 'Settings', 'Schedule')
         }
         port={port}
       />
@@ -287,16 +301,16 @@ function LivePersonRoute({
 function LiveActivityRoute({
   navigation,
 }: NativeStackScreenProps<LiveRootStackParamList, 'Activity'>) {
-  const { port } = useLiveNavigationDependencies();
+  const { capability, port } = useLiveNavigationDependencies();
   const { t } = useAppLocalization();
   return (
     <LiveRouteFrame announcement={t('live.activity.title')} routeKey="activity">
       <LiveActivityScreen
+        capability={capability}
         onBack={() => navigation.goBack()}
         onOpenDetail={record =>
           navigation.navigate('ActivityDetail', { activityId: record.id })
         }
-        onOpenRecovery={route => navigateToActivityRecovery(navigation, route)}
         port={port}
       />
     </LiveRouteFrame>
@@ -357,10 +371,36 @@ function LiveAutomationRoute({
   const { t } = useAppLocalization();
   return (
     <LiveRouteFrame
-      announcement={t('live.automation.title')}
+      announcement={t(
+        capability.platform === 'android'
+          ? 'live.automation.title'
+          : 'live.companion.activationTitle',
+      )}
       routeKey="automation"
     >
       <LiveAutomationScreen
+        capability={capability}
+        companionPort={companionPort}
+        onBack={() => navigation.goBack()}
+        onOpenMessage={() => navigation.navigate('Message')}
+        onOpenSchedule={() => navigation.navigate('Schedule')}
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
+
+function LiveComposerReviewRoute({
+  navigation,
+}: NativeStackScreenProps<LiveRootStackParamList, 'ComposerReview'>) {
+  const { capability, companionPort, port } = useLiveNavigationDependencies();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame
+      announcement={t('live.companion.composerTitle')}
+      routeKey="composer-review"
+    >
+      <LiveComposerReviewScreen
         capability={capability}
         companionPort={companionPort}
         onBack={() => navigation.goBack()}
@@ -394,6 +434,7 @@ function LiveHelpLegalRoute({
     <LiveRouteFrame announcement={t('live.help.title')} routeKey="help-legal">
       <LiveHelpLegalScreen
         onBack={() => navigation.goBack()}
+        onOpenDiagnostics={() => navigation.navigate('Diagnostics')}
         platform={capability.platform}
         port={port}
       />
@@ -416,12 +457,14 @@ function LiveMessageRoute({
 function LivePrivacyRoute({
   navigation,
 }: NativeStackScreenProps<LiveRootStackParamList, 'Privacy'>) {
-  const { capability, port } = useLiveNavigationDependencies();
+  const { capability, port, refreshBootstrap } =
+    useLiveNavigationDependencies();
   const { t } = useAppLocalization();
   return (
     <LiveRouteFrame announcement={t('live.privacy.title')} routeKey="privacy">
       <LivePrivacyScreen
         onBack={() => navigation.goBack()}
+        onLifecycleStateChange={refreshBootstrap}
         onOpenHelpLegal={() =>
           navigateToLeafFromTab(navigation, 'Settings', 'HelpLegal')
         }
@@ -432,7 +475,27 @@ function LivePrivacyRoute({
   );
 }
 
+function LiveScheduleRoute({
+  navigation,
+}: NativeStackScreenProps<LiveRootStackParamList, 'Schedule'>) {
+  const { capability, port } = useLiveNavigationDependencies();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame
+      announcement={t('live.settings.schedule')}
+      routeKey="schedule"
+    >
+      <LiveScheduleScreen
+        onBack={() => navigation.goBack()}
+        platform={capability.platform}
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
+
 function LiveTabButton({
+  disabled,
   icon,
   label,
   onLongPress,
@@ -440,6 +503,7 @@ function LiveTabButton({
   selected,
   testID,
 }: {
+  disabled: boolean;
   icon: IconName;
   label: string;
   onLongPress: () => void;
@@ -450,10 +514,11 @@ function LiveTabButton({
   const { colors } = useAppTheme();
   const color = selected ? colors.accent : colors.textMuted;
   return (
-    <Pressable
+    <FocusablePressable
       accessibilityRole="tab"
       accessibilityLabel={label}
-      accessibilityState={{ selected }}
+      accessibilityState={{ disabled, selected }}
+      disabled={disabled}
       onLongPress={onLongPress}
       onPress={onPress}
       testID={testID}
@@ -461,7 +526,7 @@ function LiveTabButton({
         styles.tab,
         {
           backgroundColor: selected ? colors.infoSurface : colors.surface,
-          opacity: pressed ? 0.72 : 1,
+          opacity: disabled ? 0.45 : pressed ? 0.72 : 1,
         },
       ]}
     >
@@ -469,7 +534,7 @@ function LiveTabButton({
       <AppText variant="caption" style={{ color }}>
         {label}
       </AppText>
-    </Pressable>
+    </FocusablePressable>
   );
 }
 
@@ -484,6 +549,7 @@ const tabPresentation = {
 
 function LiveTabBar({ navigation, state }: BottomTabBarProps) {
   const { colors } = useAppTheme();
+  const { productSetupRequired } = useLiveNavigationDependencies();
   const { t } = useAppLocalization();
   const labels: Record<keyof LiveMainTabParamList, string> = {
     Home: t('tabs.home'),
@@ -505,15 +571,19 @@ function LiveTabBar({ navigation, state }: BottomTabBarProps) {
         const name = route.name as keyof LiveMainTabParamList;
         const presentation = tabPresentation[name];
         const selected = state.index === index;
+        const disabled = productSetupRequired && name !== 'Home';
         return (
           <LiveTabButton
+            disabled={disabled}
             icon={presentation.icon}
             key={route.key}
             label={labels[name]}
             onLongPress={() => {
+              if (disabled) return;
               navigation.emit({ type: 'tabLongPress', target: route.key });
             }}
             onPress={() => {
+              if (disabled) return;
               const event = navigation.emit({
                 canPreventDefault: true,
                 target: route.key,
@@ -560,7 +630,10 @@ export function LiveAppShell({
   account,
   capability,
   companionPort,
+  onContinueSetup,
   port,
+  productSetupRequired,
+  refreshBootstrap,
 }: LiveNavigationDependencies) {
   const theme = useAppTheme();
   const { language } = useAppLocalization();
@@ -570,8 +643,24 @@ export function LiveAppShell({
   const routeQueryInFlightRef = useRef(false);
   const routeQueryQueuedRef = useRef(false);
   const dependencies = useMemo(
-    () => ({ account, capability, companionPort, port }),
-    [account, capability, companionPort, port],
+    () => ({
+      account,
+      capability,
+      companionPort,
+      onContinueSetup,
+      port,
+      productSetupRequired,
+      refreshBootstrap,
+    }),
+    [
+      account,
+      capability,
+      companionPort,
+      onContinueSetup,
+      port,
+      productSetupRequired,
+      refreshBootstrap,
+    ],
   );
   const navigationTheme = useMemo(
     () => ({
@@ -596,6 +685,11 @@ export function LiveAppShell({
   }, [navigationRef]);
 
   useEffect(() => {
+    if (productSetupRequired) {
+      pendingLeafRef.current = undefined;
+      routeQueryQueuedRef.current = false;
+      return undefined;
+    }
     let active = true;
     const queryPendingRoute = async () => {
       if (routeQueryInFlightRef.current) {
@@ -609,7 +703,7 @@ export function LiveAppShell({
           const result = await port.getPendingRoute();
           if (active && result.kind === 'ok') {
             if (result.envelope.value.kind === 'automation-review') {
-              pendingLeafRef.current = 'Automation';
+              pendingLeafRef.current = 'ComposerReview';
               flushPendingLeaf();
             } else if (result.envelope.value.kind === 'attention') {
               pendingLeafRef.current = 'Attention';
@@ -637,7 +731,7 @@ export function LiveAppShell({
       routeQueryInFlightRef.current = false;
       unsubscribe();
     };
-  }, [flushPendingLeaf, port]);
+  }, [flushPendingLeaf, port, productSetupRequired]);
 
   return (
     <View style={styles.shell} testID="live-app-shell">
@@ -665,10 +759,15 @@ export function LiveAppShell({
             />
             <Stack.Screen name="Attention" component={LiveAttentionRoute} />
             <Stack.Screen name="Automation" component={LiveAutomationRoute} />
+            <Stack.Screen
+              name="ComposerReview"
+              component={LiveComposerReviewRoute}
+            />
             <Stack.Screen name="Diagnostics" component={LiveDiagnosticsRoute} />
             <Stack.Screen name="HelpLegal" component={LiveHelpLegalRoute} />
             <Stack.Screen name="Message" component={LiveMessageRoute} />
             <Stack.Screen name="Privacy" component={LivePrivacyRoute} />
+            <Stack.Screen name="Schedule" component={LiveScheduleRoute} />
           </Stack.Navigator>
         </NavigationContainer>
       </LiveNavigationContext.Provider>

@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, StyleSheet, View } from 'react-native';
 
 import type { ApprovalBatchReview } from '../../domain/approvals/model';
 import type { ContactId, NativeRevision } from '../../domain/shared/brand';
@@ -35,8 +35,10 @@ import {
 import { useLiveProjection } from './useLiveProjection';
 
 type ReviewState = Readonly<{
+  batchIds: readonly ContactId[];
   review: ApprovalBatchReview;
   revision: NativeRevision;
+  sourceRevision: NativeRevision;
   requestedIds: readonly ContactId[];
   remainingIds: readonly ContactId[];
   processedCount: number;
@@ -74,13 +76,180 @@ export function LiveBatchApprovalScreen({
   const [message, setMessage] = useState<string>();
   const [review, setReview] = useState<ReviewState>();
   const [incompleteBatch, setIncompleteBatch] = useState<IncompleteBatch>();
+  const mountedRef = useRef(true);
+  const protectedWorkGenerationRef = useRef(0);
+  const protectedRequestPendingRef = useRef(false);
+  const protectedSourceRevisionRef = useRef<NativeRevision | undefined>(
+    undefined,
+  );
+  const protectedInvalidationRevisionsRef = useRef<Set<NativeRevision>>(
+    new Set(),
+  );
+  const protectedRefreshRevisionRef = useRef<NativeRevision | undefined>(
+    undefined,
+  );
+  const protectedSettlingRevisionRef = useRef<NativeRevision | undefined>(
+    undefined,
+  );
+  const candidateTruthRef = useRef<
+    Readonly<{
+      usable: boolean;
+      revision?: NativeRevision | undefined;
+    }>
+  >({ usable: false });
+  const reviewRef = useRef<ReviewState | undefined>(undefined);
+
+  const candidateUsable =
+    candidates.state.kind === 'ready' &&
+    !candidates.state.refreshing &&
+    !candidates.state.refreshProblem;
+  const candidateRevision =
+    candidates.state.kind === 'ready'
+      ? candidates.state.result.envelope.revision
+      : undefined;
+  candidateTruthRef.current = {
+    usable: candidateUsable,
+    revision: candidateRevision,
+  };
+  reviewRef.current = review;
+
+  const invalidateProtectedWork = useCallback(() => {
+    protectedWorkGenerationRef.current += 1;
+    protectedRequestPendingRef.current = false;
+    protectedSourceRevisionRef.current = undefined;
+    protectedInvalidationRevisionsRef.current.clear();
+    protectedRefreshRevisionRef.current = undefined;
+    protectedSettlingRevisionRef.current = undefined;
+    reviewRef.current = undefined;
+    if (!mountedRef.current) return;
+    setReview(undefined);
+    setPending(false);
+  }, []);
+
+  useEffect(() => {
+    const protectedInvalidationRevisions =
+      protectedInvalidationRevisionsRef.current;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      protectedWorkGenerationRef.current += 1;
+      protectedRequestPendingRef.current = false;
+      protectedSourceRevisionRef.current = undefined;
+      protectedInvalidationRevisions.clear();
+      protectedRefreshRevisionRef.current = undefined;
+      protectedSettlingRevisionRef.current = undefined;
+    };
+  }, []);
+
+  useEffect(
+    () =>
+      port.subscribeInvalidations(event => {
+        if (
+          event.areas.some(
+            area =>
+              area === 'contacts' ||
+              area === 'messages' ||
+              area === 'automation',
+          )
+        ) {
+          if (protectedRequestPendingRef.current) {
+            protectedInvalidationRevisionsRef.current.add(event.revision);
+            protectedRefreshRevisionRef.current = event.revision;
+            return;
+          }
+          if (
+            protectedSourceRevisionRef.current === event.revision &&
+            candidateTruthRef.current.revision === event.revision
+          ) {
+            // Native may publish the successful mutation before its promise
+            // resolves. Once that exact revision has been re-read, a late
+            // duplicate event is only a request to verify the same truth.
+            protectedRefreshRevisionRef.current = event.revision;
+            return;
+          }
+          invalidateProtectedWork();
+        }
+      }),
+    [invalidateProtectedWork, port],
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') invalidateProtectedWork();
+    });
+    return () => subscription.remove();
+  }, [invalidateProtectedWork]);
+
+  useEffect(() => {
+    const protectedSourceRevision = protectedSourceRevisionRef.current;
+    if (protectedSourceRevision === undefined) return;
+    if (protectedRequestPendingRef.current) return;
+    if (candidateUsable && candidateRevision === protectedSourceRevision) {
+      protectedRefreshRevisionRef.current = undefined;
+      protectedSettlingRevisionRef.current = undefined;
+      return;
+    }
+    const matchingRefreshInFlight =
+      candidates.state.kind === 'ready' &&
+      candidates.state.refreshing &&
+      !candidates.state.refreshProblem &&
+      candidateRevision === protectedSourceRevision &&
+      protectedRefreshRevisionRef.current === protectedSourceRevision;
+    const verifiedReloadSettling =
+      protectedSettlingRevisionRef.current === protectedSourceRevision &&
+      candidates.state.kind === 'ready' &&
+      !candidates.state.refreshProblem;
+    if (!matchingRefreshInFlight && !verifiedReloadSettling) {
+      invalidateProtectedWork();
+    }
+  }, [
+    candidateRevision,
+    candidateUsable,
+    candidates.state,
+    invalidateProtectedWork,
+  ]);
+
+  const beginProtectedWork = (sourceRevision: NativeRevision) => {
+    const generation = protectedWorkGenerationRef.current + 1;
+    protectedWorkGenerationRef.current = generation;
+    protectedRequestPendingRef.current = true;
+    protectedSourceRevisionRef.current = sourceRevision;
+    protectedInvalidationRevisionsRef.current.clear();
+    protectedRefreshRevisionRef.current = undefined;
+    protectedSettlingRevisionRef.current = undefined;
+    return generation;
+  };
+
+  const isProtectedWorkCurrent = (
+    generation: number,
+    sourceRevision: NativeRevision,
+  ) => {
+    const candidateTruth = candidateTruthRef.current;
+    return (
+      mountedRef.current &&
+      generation === protectedWorkGenerationRef.current &&
+      protectedSourceRevisionRef.current === sourceRevision &&
+      candidateTruth.usable &&
+      candidateTruth.revision === sourceRevision
+    );
+  };
+
+  const isProtectedRequestCurrent = (
+    generation: number,
+    sourceRevision: NativeRevision,
+  ) =>
+    mountedRef.current &&
+    generation === protectedWorkGenerationRef.current &&
+    protectedRequestPendingRef.current &&
+    protectedSourceRevisionRef.current === sourceRevision;
 
   const failBatch = async (
     nextProblem: NativeProblem,
     processedCount: number,
     totalCount: number,
   ) => {
-    setReview(undefined);
+    invalidateProtectedWork();
+    if (!mountedRef.current) return;
     setProblem(nextProblem);
     setIncompleteBatch(
       processedCount > 0 ? { processedCount, totalCount } : undefined,
@@ -88,21 +257,69 @@ export function LiveBatchApprovalScreen({
     if (nextProblem.kind === 'stale-revision' || processedCount > 0) {
       await candidates.reload();
     }
-    setPending(false);
   };
 
-  const verifyCompletedWork = async (
+  const reloadProtectedCandidates = async (
+    generation: number,
+    sourceRevision: NativeRevision,
+    expectedRevision: NativeRevision,
+  ) => {
+    if (!isProtectedRequestCurrent(generation, sourceRevision)) {
+      return { kind: 'retired' as const };
+    }
+    const refreshed = await candidates.reload();
+    if (!isProtectedRequestCurrent(generation, sourceRevision)) {
+      return { kind: 'retired' as const };
+    }
+    if (refreshed.kind === 'error') {
+      return { kind: 'error' as const, problem: refreshed.problem };
+    }
+    const conflictingInvalidation = [
+      ...protectedInvalidationRevisionsRef.current,
+    ].find(revision => revision !== expectedRevision);
+    if (conflictingInvalidation !== undefined) {
+      return {
+        kind: 'error' as const,
+        problem: {
+          kind: 'stale-revision' as const,
+          latestRevision: conflictingInvalidation,
+        },
+      };
+    }
+    if (refreshed.envelope.revision !== expectedRevision) {
+      return {
+        kind: 'error' as const,
+        problem: {
+          kind: 'stale-revision' as const,
+          latestRevision: refreshed.envelope.revision,
+        },
+      };
+    }
+
+    // This exact re-read is the new source of truth for the next protected
+    // operation. Rebase both the CAS source and the render-time truth ref before
+    // continuing; any later, different revision still retires the whole batch.
+    protectedSourceRevisionRef.current = expectedRevision;
+    protectedInvalidationRevisionsRef.current.clear();
+    protectedRefreshRevisionRef.current = undefined;
+    protectedSettlingRevisionRef.current = expectedRevision;
+    candidateTruthRef.current = {
+      usable: true,
+      revision: expectedRevision,
+    };
+    return {
+      kind: 'ok' as const,
+      contactIds: refreshed.envelope.value.contactIds,
+      revision: expectedRevision,
+    };
+  };
+
+  const verifyCompletedWork = (
     blockedCount: number,
     processedCount: number,
-    totalCount: number,
   ) => {
-    const refreshed = await candidates.reload();
-    if (refreshed.kind === 'error') {
-      setProblem(refreshed.problem);
-      setIncompleteBatch({ processedCount, totalCount });
-      setPending(false);
-      return;
-    }
+    invalidateProtectedWork();
+    if (!mountedRef.current) return;
     setIncompleteBatch(undefined);
     setMessage(
       blockedCount > 0
@@ -112,26 +329,32 @@ export function LiveBatchApprovalScreen({
           })
         : t('live.guidedSetup.approvalSaved'),
     );
-    setPending(false);
   };
 
   const prepareNext = async ({
     blockedCount,
+    batchIds,
     expectedRevision,
+    generation,
     processedCount,
     remainingIds,
+    sourceRevision,
     totalCount,
   }: {
     blockedCount: number;
+    batchIds: readonly ContactId[];
     expectedRevision: NativeRevision;
+    generation: number;
     processedCount: number;
     remainingIds: readonly ContactId[];
+    sourceRevision: NativeRevision;
     totalCount: number;
   }): Promise<void> => {
+    if (!isProtectedWorkCurrent(generation, sourceRevision)) return;
     const requestedIds = remainingIds.slice(0, PEOPLE_REVIEW_BATCH_SIZE);
     const followingIds = remainingIds.slice(PEOPLE_REVIEW_BATCH_SIZE);
     if (requestedIds.length === 0) {
-      await verifyCompletedWork(blockedCount, processedCount, totalCount);
+      verifyCompletedWork(blockedCount, processedCount);
       return;
     }
     let result: Awaited<ReturnType<LiveAppPort['prepareApprovals']>>;
@@ -143,6 +366,7 @@ export function LiveBatchApprovalScreen({
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
+    if (!isProtectedRequestCurrent(generation, sourceRevision)) return;
     if (result.kind === 'error') {
       await failBatch(result.problem, processedCount, totalCount);
       return;
@@ -164,36 +388,58 @@ export function LiveBatchApprovalScreen({
       return;
     }
 
+    const refreshed = await reloadProtectedCandidates(
+      generation,
+      sourceRevision,
+      result.envelope.revision,
+    );
+    if (refreshed.kind === 'retired') return;
+    if (refreshed.kind === 'error') {
+      await failBatch(refreshed.problem, processedCount, totalCount);
+      return;
+    }
+    const batchIdSet = new Set(batchIds);
+    const refreshedIdSet = new Set(refreshed.contactIds);
+    const candidatesStillMatchBatch =
+      refreshed.contactIds.every(id => batchIdSet.has(id)) &&
+      remainingIds.every(id => refreshedIdSet.has(id));
+    if (!candidatesStillMatchBatch) {
+      await failBatch(nativeBridgeProblem, processedCount, totalCount);
+      return;
+    }
+
     const nextBlockedCount = blockedCount + result.envelope.value.blockedCount;
     if (result.envelope.value.readyCount === 0) {
       const nextProcessedCount = processedCount + requestedIds.length;
       if (followingIds.length === 0) {
-        await verifyCompletedWork(
-          nextBlockedCount,
-          nextProcessedCount,
-          totalCount,
-        );
+        verifyCompletedWork(nextBlockedCount, nextProcessedCount);
         return;
       }
       await prepareNext({
         blockedCount: nextBlockedCount,
-        expectedRevision: result.envelope.revision,
+        batchIds,
+        expectedRevision: refreshed.revision,
+        generation,
         processedCount: nextProcessedCount,
         remainingIds: followingIds,
+        sourceRevision: refreshed.revision,
         totalCount,
       });
       return;
     }
 
     setReview({
+      batchIds,
       review: result.envelope.value,
       revision: result.envelope.revision,
+      sourceRevision: refreshed.revision,
       requestedIds,
       remainingIds: followingIds,
       processedCount,
       blockedCount,
       totalCount,
     });
+    protectedRequestPendingRef.current = false;
     setPending(false);
   };
 
@@ -201,7 +447,16 @@ export function LiveBatchApprovalScreen({
     contactIds: readonly ContactId[],
     revision: NativeRevision,
   ) => {
-    if (contactIds.length === 0) return;
+    const candidateTruth = candidateTruthRef.current;
+    if (
+      contactIds.length === 0 ||
+      protectedRequestPendingRef.current ||
+      !candidateTruth.usable ||
+      candidateTruth.revision !== revision
+    ) {
+      return;
+    }
+    const generation = beginProtectedWork(revision);
     setPending(true);
     setProblem(undefined);
     setMessage(undefined);
@@ -209,76 +464,136 @@ export function LiveBatchApprovalScreen({
     setIncompleteBatch(undefined);
     await prepareNext({
       blockedCount: 0,
+      batchIds: contactIds,
       expectedRevision: revision,
+      generation,
       processedCount: 0,
       remainingIds: contactIds,
+      sourceRevision: revision,
       totalCount: contactIds.length,
     });
   };
 
   const confirm = async () => {
-    if (!review) return;
+    const currentReview = reviewRef.current;
+    const candidateTruth = candidateTruthRef.current;
+    if (
+      !currentReview ||
+      protectedRequestPendingRef.current ||
+      !candidateTruth.usable ||
+      candidateTruth.revision !== currentReview.sourceRevision
+    ) {
+      invalidateProtectedWork();
+      return;
+    }
+    const generation = beginProtectedWork(currentReview.sourceRevision);
     setPending(true);
     setProblem(undefined);
     setMessage(undefined);
     let result: Awaited<ReturnType<LiveAppPort['confirmApprovals']>>;
     try {
       result = await port.confirmApprovals({
-        handle: review.review.handle,
-        expectedRevision: review.revision,
+        handle: currentReview.review.handle,
+        expectedRevision: currentReview.revision,
       });
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
+    if (!isProtectedRequestCurrent(generation, currentReview.sourceRevision)) {
+      return;
+    }
     if (result.kind === 'error') {
-      await failBatch(result.problem, review.processedCount, review.totalCount);
+      await failBatch(
+        result.problem,
+        currentReview.processedCount,
+        currentReview.totalCount,
+      );
       return;
     }
     if (result.envelope.value.platform !== capability.platform) {
-      setReview(undefined);
+      invalidateProtectedWork();
       await candidates.reload();
+      if (!mountedRef.current) return;
       setProblem(nativePlatformMismatchProblem);
       setIncompleteBatch(
-        review.processedCount > 0
+        currentReview.processedCount > 0
           ? {
-              processedCount: review.processedCount,
-              totalCount: review.totalCount,
+              processedCount: currentReview.processedCount,
+              totalCount: currentReview.totalCount,
             }
           : undefined,
       );
-      setPending(false);
       return;
     }
-    const processedCount = review.processedCount + review.requestedIds.length;
-    const blockedCount = review.blockedCount + review.review.blockedCount;
-    setReview(undefined);
-    if (review.remainingIds.length === 0) {
-      await verifyCompletedWork(
-        blockedCount,
-        processedCount,
-        review.totalCount,
+    const refreshed = await reloadProtectedCandidates(
+      generation,
+      currentReview.sourceRevision,
+      result.envelope.revision,
+    );
+    if (refreshed.kind === 'retired') return;
+    if (refreshed.kind === 'error') {
+      await failBatch(
+        refreshed.problem,
+        currentReview.processedCount,
+        currentReview.totalCount,
       );
+      return;
+    }
+    const batchIdSet = new Set(currentReview.batchIds);
+    const refreshedIdSet = new Set(refreshed.contactIds);
+    const approvedIdSet = new Set(
+      currentReview.review.items.map(item => item.contactId),
+    );
+    const candidatesStillMatchBatch =
+      refreshed.contactIds.every(id => batchIdSet.has(id)) &&
+      currentReview.remainingIds.every(id => refreshedIdSet.has(id)) &&
+      refreshed.contactIds.every(id => !approvedIdSet.has(id));
+    if (!candidatesStillMatchBatch) {
+      await failBatch(
+        nativeBridgeProblem,
+        currentReview.processedCount,
+        currentReview.totalCount,
+      );
+      return;
+    }
+    const processedCount =
+      currentReview.processedCount + currentReview.requestedIds.length;
+    const blockedCount =
+      currentReview.blockedCount + currentReview.review.blockedCount;
+    setReview(undefined);
+    reviewRef.current = undefined;
+    if (currentReview.remainingIds.length === 0) {
+      verifyCompletedWork(blockedCount, processedCount);
       return;
     }
     await prepareNext({
       blockedCount,
-      expectedRevision: result.envelope.revision,
+      batchIds: currentReview.batchIds,
+      expectedRevision: refreshed.revision,
+      generation,
       processedCount,
-      remainingIds: review.remainingIds,
-      totalCount: review.totalCount,
+      remainingIds: currentReview.remainingIds,
+      sourceRevision: refreshed.revision,
+      totalCount: currentReview.totalCount,
     });
   };
 
   const cancelReview = async () => {
-    if (!review) return;
-    const { processedCount, totalCount } = review;
-    setReview(undefined);
+    const currentReview = reviewRef.current;
+    if (!currentReview) return;
+    const { processedCount, totalCount } = currentReview;
+    invalidateProtectedWork();
     if (processedCount === 0) return;
-    setPending(true);
     setIncompleteBatch({ processedCount, totalCount });
+    const refreshGeneration = protectedWorkGenerationRef.current;
     const refreshed = await candidates.reload();
-    if (refreshed.kind === 'error') setProblem(refreshed.problem);
-    setPending(false);
+    if (
+      mountedRef.current &&
+      refreshGeneration === protectedWorkGenerationRef.current &&
+      refreshed.kind === 'error'
+    ) {
+      setProblem(refreshed.problem);
+    }
   };
 
   if (candidates.state.kind === 'loading') {
@@ -304,7 +619,10 @@ export function LiveBatchApprovalScreen({
         <LiveError
           title={t('live.guidedSetup.approvalUnavailable')}
           problem={candidates.state.problem}
-          onRetry={() => candidates.reload()}
+          onRetry={() => {
+            invalidateProtectedWork();
+            return candidates.reload();
+          }}
         />
       </Screen>
     );
@@ -312,6 +630,12 @@ export function LiveBatchApprovalScreen({
 
   const readyEnvelope = candidates.state.result.envelope;
   const pendingContactIds = readyEnvelope.value.contactIds;
+  const currentReview =
+    review &&
+    candidateUsable &&
+    review.sourceRevision === readyEnvelope.revision
+      ? review
+      : undefined;
   return (
     <Screen includeTopInset testID="live-batch-approval-screen">
       <Button label={t('live.common.back')} onPress={onBack} variant="ghost" />
@@ -334,7 +658,8 @@ export function LiveBatchApprovalScreen({
         />
       ) : null}
 
-      {!review &&
+      {!currentReview &&
+      candidateUsable &&
       pendingContactIds.length === 0 &&
       !problem &&
       !candidates.state.refreshProblem ? (
@@ -351,7 +676,7 @@ export function LiveBatchApprovalScreen({
         </Card>
       ) : null}
 
-      {!review && pendingContactIds.length > 0 ? (
+      {!currentReview && pendingContactIds.length > 0 ? (
         <Card>
           <StatusRow
             title={t('live.guidedSetup.approvalPending', {
@@ -365,25 +690,25 @@ export function LiveBatchApprovalScreen({
                 ? t('live.common.checking')
                 : t('live.guidedSetup.reviewExactMessages')
             }
-            disabled={pending}
+            disabled={pending || !candidateUsable}
             onPress={() => prepare(pendingContactIds, readyEnvelope.revision)}
             testID="live-batch-approval-prepare"
           />
         </Card>
       ) : null}
 
-      {review ? (
+      {currentReview ? (
         <>
           <ReadinessBanner
             title={t('live.guidedSetup.exactApprovalRequired')}
             detail={t('live.guidedSetup.exactApprovalBatchBody', {
-              count: review.review.items.length,
-              processed: review.processedCount,
-              total: review.totalCount,
+              count: currentReview.review.items.length,
+              processed: currentReview.processedCount,
+              total: currentReview.totalCount,
             })}
             tone="warning"
           />
-          {review.review.items.map(item => (
+          {currentReview.review.items.map(item => (
             <Card key={item.contactId}>
               <AppText variant="heading">{item.recipient}</AppText>
               <KeyValue
@@ -426,10 +751,10 @@ export function LiveBatchApprovalScreen({
               </AppText>
             </Card>
           ))}
-          {review.review.blockedCount > 0 ? (
+          {currentReview.review.blockedCount > 0 ? (
             <ReadinessBanner
               title={t('live.guidedSetup.approvalBlocked', {
-                count: review.review.blockedCount,
+                count: currentReview.review.blockedCount,
               })}
               detail={t('live.guidedSetup.approvalBlockedBody')}
               tone="warning"
@@ -437,7 +762,7 @@ export function LiveBatchApprovalScreen({
           ) : null}
           <Button
             label={t('live.guidedSetup.confirmExactMessages')}
-            disabled={pending}
+            disabled={pending || !candidateUsable}
             onPress={confirm}
             testID="live-batch-approval-confirm"
           />

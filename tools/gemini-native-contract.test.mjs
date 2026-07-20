@@ -366,7 +366,10 @@ test('iOS Gemini is fail-closed behind one bounded native Remote Config switch',
     `${liveMessage}\n${messageModel}`,
     /gemini_suggestions_enabled|FirebaseRemoteConfig|RemoteConfig\.remoteConfig/u,
   );
-  assert.match(liveMessage, /BUILT_IN_MESSAGE_TEMPLATES\.map/u);
+  assert.match(
+    liveMessage,
+    /BUILT_IN_MESSAGE_TEMPLATES\.filter\([\s\S]*?template\.draft\.language === language[\s\S]*?matchingBuiltIns\.map/u,
+  );
   assert.match(
     liveMessage,
     /suggestions\?\.kind === 'fallback'[\s\S]*?suggestionUnavailable/u,

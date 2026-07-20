@@ -9,6 +9,7 @@ import {
 } from '@testing-library/react-native';
 
 import { ThemeProvider } from '../../app/providers/ThemeProvider';
+import type { SafeSupportCode } from '../../domain/shared/brand';
 import { LocalizationProvider } from '../../localization/LocalizationProvider';
 import {
   LiveActionFeedback,
@@ -135,10 +136,9 @@ it('queues iOS loading and success announcements without repeating a stable rend
   await waitFor(() =>
     expect(
       AccessibilityInfo.announceForAccessibilityWithOptions,
-    ).toHaveBeenLastCalledWith(
-      'Protected service response. Status checked again',
-      { queue: true },
-    ),
+    ).toHaveBeenLastCalledWith('What happened. Status checked again', {
+      queue: true,
+    }),
   );
   expect(
     screen.getByTestId('live-action-feedback-success').props
@@ -163,6 +163,98 @@ it('queues iOS loading and success announcements without repeating a stable rend
     expect(
       AccessibilityInfo.announceForAccessibilityWithOptions,
     ).toHaveBeenCalledTimes(3),
+  );
+});
+
+it('hides problem references by default and reveals them only when requested', async () => {
+  const problem = {
+    kind: 'internal' as const,
+    supportCode: 'ATTENTION_PRIVATE_INTERNAL' as SafeSupportCode,
+  };
+  const view = await render(
+    <Providers>
+      <LiveError
+        onRetry={jest.fn()}
+        problem={problem}
+        title="Attention items are unavailable"
+      />
+    </Providers>,
+  );
+
+  await waitFor(() =>
+    expect(
+      AccessibilityInfo.announceForAccessibilityWithOptions,
+    ).toHaveBeenCalledTimes(1),
+  );
+  expect(
+    AccessibilityInfo.announceForAccessibilityWithOptions,
+  ).toHaveBeenLastCalledWith(
+    expect.not.stringMatching(/ATTENTION_PRIVATE_INTERNAL|Support reference/u),
+    { queue: false },
+  );
+  expect(
+    screen.queryByText(/ATTENTION_PRIVATE_INTERNAL|Support reference/u),
+  ).toBeNull();
+
+  await view.rerender(
+    <Providers>
+      <LiveActionFeedback problem={problem} />
+    </Providers>,
+  );
+  await waitFor(() =>
+    expect(
+      AccessibilityInfo.announceForAccessibilityWithOptions,
+    ).toHaveBeenCalledTimes(2),
+  );
+  expect(
+    AccessibilityInfo.announceForAccessibilityWithOptions,
+  ).toHaveBeenLastCalledWith(
+    expect.not.stringMatching(/ATTENTION_PRIVATE_INTERNAL|Support reference/u),
+    { queue: false },
+  );
+  expect(
+    screen.queryByText(/ATTENTION_PRIVATE_INTERNAL|Support reference/u),
+  ).toBeNull();
+
+  await view.rerender(
+    <Providers>
+      <LiveError
+        onRetry={jest.fn()}
+        problem={problem}
+        showSupportReference
+        title="Attention items are unavailable"
+      />
+    </Providers>,
+  );
+  await waitFor(() =>
+    expect(
+      AccessibilityInfo.announceForAccessibilityWithOptions,
+    ).toHaveBeenCalledTimes(3),
+  );
+  expect(screen.getByText(/ATTENTION_PRIVATE_INTERNAL/u)).toBeTruthy();
+  expect(
+    AccessibilityInfo.announceForAccessibilityWithOptions,
+  ).toHaveBeenLastCalledWith(
+    expect.stringMatching(/ATTENTION_PRIVATE_INTERNAL/u),
+    { queue: false },
+  );
+
+  await view.rerender(
+    <Providers>
+      <LiveActionFeedback problem={problem} showSupportReference />
+    </Providers>,
+  );
+  await waitFor(() =>
+    expect(
+      AccessibilityInfo.announceForAccessibilityWithOptions,
+    ).toHaveBeenCalledTimes(4),
+  );
+  expect(screen.getByText(/ATTENTION_PRIVATE_INTERNAL/u)).toBeTruthy();
+  expect(
+    AccessibilityInfo.announceForAccessibilityWithOptions,
+  ).toHaveBeenLastCalledWith(
+    expect.stringMatching(/ATTENTION_PRIVATE_INTERNAL/u),
+    { queue: false },
   );
 });
 

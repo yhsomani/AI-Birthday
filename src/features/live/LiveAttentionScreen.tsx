@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import type {
   AndroidGateName,
@@ -14,6 +15,7 @@ import {
   SectionHeading,
   StatusRow,
 } from '../../design-system/components/Primitives';
+import { spacing } from '../../design-system/tokens/theme';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
 import { safeReasonMessageKey } from '../../localization/reasonCopy';
 import type { TranslationKey } from '../../localization/resources';
@@ -24,18 +26,32 @@ import {
   LiveLoading,
   LiveRefreshProblem,
 } from './LiveProjectionState';
-import { nativeBridgeProblem } from './nativeProblem';
+import { nativeBridgeProblem, nativeProblemReference } from './nativeProblem';
 import { useLiveProjection } from './useLiveProjection';
-
-const gateKeys: Record<AndroidGateName | IosGateName, TranslationKey> = {
-  test: 'live.settings.gate.test',
-  activation: 'live.settings.gate.activation',
-  birthday: 'live.settings.gate.birthday',
-  composer: 'live.settings.gate.composer',
-};
 
 type AttentionCategory = 'account' | 'contacts' | 'approval' | 'platform';
 type AppRepairRoute = 'people' | 'message' | 'automation' | 'settings';
+
+const phoneStatePermissionCodes: ReadonlySet<ReadinessIssue['code']> = new Set([
+  'phone-state-permission-denied',
+  'phone-state-permission-permanently-denied',
+]);
+
+const automationPermissionCodes: ReadonlySet<ReadinessIssue['code']> = new Set([
+  'permission-denied',
+  'permission-permanently-denied',
+  'sms-permission-denied',
+  'sms-permission-permanently-denied',
+]);
+
+const retryOnlyIssueCodes: ReadonlySet<ReadinessIssue['code']> = new Set([
+  'coordination-unavailable',
+  'network-offline',
+  'scheduler-delayed',
+  'native-bridge-unavailable',
+  'stale-revision',
+  'unknown-native-value',
+]);
 
 const categoryFor = (issue: ReadinessIssue): AttentionCategory => {
   if (
@@ -50,7 +66,8 @@ const categoryFor = (issue: ReadinessIssue): AttentionCategory => {
   if (
     issue.code.startsWith('contacts-') ||
     issue.code.startsWith('birthday-') ||
-    issue.code.startsWith('phone-') ||
+    (issue.code.startsWith('phone-') &&
+      !phoneStatePermissionCodes.has(issue.code)) ||
     issue.code === 'duplicate-destination' ||
     issue.code === 'leap-policy-required' ||
     issue.code === 'safe-given-name-missing' ||
@@ -64,6 +81,7 @@ const categoryFor = (issue: ReadinessIssue): AttentionCategory => {
     issue.code.startsWith('template-') ||
     issue.code === 'invalid-window' ||
     issue.code === 'invalid-daily-cap' ||
+    issue.code === 'invalid-segment-cap' ||
     issue.code === 'window-capacity-conflict'
   ) {
     return 'approval';
@@ -76,11 +94,25 @@ const repairRouteFor = (issue: ReadinessIssue): AppRepairRoute | undefined => {
   if (category === 'contacts' || issue.code.startsWith('approval-')) {
     return 'people';
   }
-  if (issue.code.startsWith('template-')) return 'message';
-  if (category === 'approval' || issue.code.includes('sim')) {
+  if (
+    issue.code.startsWith('template-') ||
+    issue.code === 'invalid-segment-cap'
+  ) {
+    return 'message';
+  }
+  if (
+    category === 'approval' ||
+    phoneStatePermissionCodes.has(issue.code) ||
+    automationPermissionCodes.has(issue.code) ||
+    issue.code === 'no-active-sim' ||
+    issue.code === 'sim-changed' ||
+    issue.code === 'sim-invalid'
+  ) {
     return 'automation';
   }
-  if (category === 'account') return 'settings';
+  if (category === 'account' && !retryOnlyIssueCodes.has(issue.code)) {
+    return 'settings';
+  }
   return undefined;
 };
 
@@ -91,11 +123,42 @@ const categoryKeys: Record<AttentionCategory, TranslationKey> = {
   platform: 'live.attention.categoryPlatform',
 };
 
+const supportGateKeys: Record<AndroidGateName | IosGateName, TranslationKey> = {
+  test: 'live.settings.gate.test',
+  activation: 'live.settings.gate.activation',
+  birthday: 'live.settings.gate.birthday',
+  composer: 'live.settings.gate.composer',
+};
+
 const routeKeys: Record<AppRepairRoute, TranslationKey> = {
   people: 'live.attention.openPeople',
   message: 'live.attention.openMessage',
   automation: 'live.attention.openAutomation',
   settings: 'live.attention.openSettings',
+};
+
+const severityStateKeys: Record<ReadinessIssue['severity'], TranslationKey> = {
+  blocking: 'live.attention.stateBlocking',
+  warning: 'live.attention.stateWarning',
+  info: 'live.attention.stateInfo',
+};
+
+const consequenceKeys: Record<AndroidGateName | IosGateName, TranslationKey> = {
+  test: 'live.attention.consequenceTest',
+  activation: 'live.attention.consequenceActivation',
+  birthday: 'live.attention.consequenceBirthday',
+  composer: 'live.attention.consequenceComposer',
+};
+
+const toneFor = (severity: ReadinessIssue['severity']) => {
+  switch (severity) {
+    case 'blocking':
+      return 'critical' as const;
+    case 'warning':
+      return 'warning' as const;
+    case 'info':
+      return 'info' as const;
+  }
 };
 
 export function LiveAttentionScreen({
@@ -119,15 +182,33 @@ export function LiveAttentionScreen({
   const [pendingIssue, setPendingIssue] = useState<string>();
   const [problem, setProblem] = useState<NativeProblem>();
   const [message, setMessage] = useState<string>();
+  const [supportExpanded, setSupportExpanded] = useState(false);
   const visibleIssues =
     issues.state.kind === 'ready'
       ? issues.state.result.envelope.value
       : ([] as readonly ReadinessIssue[]);
+  const loadProblem =
+    issues.state.kind === 'error' ? issues.state.problem : undefined;
+  const supportAvailable =
+    visibleIssues.length > 0 ||
+    loadProblem !== undefined ||
+    problem !== undefined;
   const appRepairActions: Record<AppRepairRoute, () => void> = {
     people: onOpenPeople,
     message: onOpenMessage,
     automation: onOpenAutomation,
     settings: onOpenSettings,
+  };
+  const consequenceFor = (issue: ReadinessIssue) => {
+    const state = t(severityStateKeys[issue.severity]);
+    return issue.blocks.length > 0
+      ? t('live.attention.consequence', {
+          state,
+          actions: issue.blocks
+            .map(block => t(consequenceKeys[block]))
+            .join(', '),
+        })
+      : state;
   };
 
   const performIssueAction = async (issue: ReadinessIssue) => {
@@ -176,7 +257,11 @@ export function LiveAttentionScreen({
         {t('live.attention.title')}
       </AppText>
       <AppText color="muted">{t('live.attention.body')}</AppText>
-      <LiveActionFeedback problem={problem} message={message} />
+      <LiveActionFeedback
+        problem={problem}
+        message={message}
+        showSupportReference={false}
+      />
 
       {issues.state.kind === 'loading' ? (
         <LiveLoading label={t('live.attention.loading')} />
@@ -186,6 +271,7 @@ export function LiveAttentionScreen({
           title={t('live.attention.unavailable')}
           problem={issues.state.problem}
           onRetry={() => issues.reload()}
+          showSupportReference={false}
         />
       ) : null}
       {issues.state.kind === 'ready' ? (
@@ -204,33 +290,30 @@ export function LiveAttentionScreen({
               );
               if (grouped.length === 0) return null;
               return (
-                <React.Fragment key={category}>
+                <View
+                  key={category}
+                  style={styles.group}
+                  testID={`live-attention-category-${category}`}
+                >
                   <SectionHeading title={t(categoryKeys[category])} />
                   {grouped.map(issue => {
                     const repairRoute = repairRouteFor(issue);
                     return (
-                      <Card key={issue.id}>
+                      <Card
+                        key={issue.id}
+                        testID={`live-attention-issue-${issue.id}`}
+                      >
                         <StatusRow
                           title={t(safeReasonMessageKey(issue.code))}
-                          detail={t('live.common.blocks', {
-                            value: issue.blocks
-                              .map(block => t(gateKeys[block]))
-                              .join(', '),
-                          })}
-                          tone={
-                            issue.severity === 'blocking'
-                              ? 'critical'
-                              : 'warning'
-                          }
+                          detail={consequenceFor(issue)}
+                          tone={toneFor(issue.severity)}
+                          testID={`live-attention-status-${issue.id}`}
                         />
-                        <AppText color="muted" variant="caption">
-                          {t('live.common.code', { value: issue.code })}
-                        </AppText>
                         {issue.action ? (
                           <Button
                             label={
                               pendingIssue === issue.id
-                                ? t('live.settings.opening')
+                                ? t('live.attention.openingAction')
                                 : t('live.attention.openAction')
                             }
                             disabled={pendingIssue !== undefined}
@@ -247,29 +330,111 @@ export function LiveAttentionScreen({
                             testID={`live-attention-route-${issue.id}`}
                           />
                         ) : (
-                          <AppText color="muted">
-                            {t('live.attention.noAction')}
+                          <AppText
+                            color="muted"
+                            testID={`live-attention-no-action-${issue.id}`}
+                          >
+                            {t(
+                              retryOnlyIssueCodes.has(issue.code)
+                                ? 'live.attention.noActionRetry'
+                                : 'live.attention.noActionHelp',
+                            )}
                           </AppText>
                         )}
                       </Card>
                     );
                   })}
-                </React.Fragment>
+                </View>
               );
             })
           )}
           <Button
             label={
               issues.state.refreshing
-                ? t('live.common.refreshing')
-                : t('live.common.refresh')
+                ? t('live.attention.checkingAgain')
+                : t('live.attention.checkAgain')
             }
             disabled={issues.state.refreshing || pendingIssue !== undefined}
             onPress={() => issues.reload()}
             variant="secondary"
+            testID="live-attention-check-again"
           />
+        </>
+      ) : null}
+      {supportAvailable ? (
+        <>
+          <Button
+            label={t(
+              supportExpanded
+                ? 'live.attention.hideSupportDetails'
+                : 'live.attention.showSupportDetails',
+            )}
+            onPress={() => setSupportExpanded(expanded => !expanded)}
+            variant="secondary"
+            testID="live-attention-support-toggle"
+          />
+          {supportExpanded ? (
+            <View style={styles.group} testID="live-attention-support-details">
+              <AppText color="muted">
+                {t('live.attention.supportDetailsBody')}
+              </AppText>
+              {visibleIssues.map(issue => (
+                <Card
+                  key={issue.id}
+                  testID={`live-attention-support-${issue.id}`}
+                >
+                  <AppText variant="label">
+                    {t(safeReasonMessageKey(issue.code))}
+                  </AppText>
+                  <AppText color="muted" variant="caption">
+                    {t('live.common.code', { value: issue.code })}
+                  </AppText>
+                  {issue.blocks.length > 0 ? (
+                    <AppText color="muted" variant="caption">
+                      {t('live.common.blocks', {
+                        value: issue.blocks
+                          .map(block => t(supportGateKeys[block]))
+                          .join(', '),
+                      })}
+                    </AppText>
+                  ) : null}
+                  <AppText color="muted" variant="caption">
+                    {t('live.common.reference', { reference: issue.id })}
+                  </AppText>
+                </Card>
+              ))}
+              {loadProblem ? (
+                <Card testID="live-attention-support-load-error">
+                  <AppText variant="label">
+                    {t('live.attention.unavailable')}
+                  </AppText>
+                  <AppText color="muted" variant="caption">
+                    {t('live.common.reference', {
+                      reference: nativeProblemReference(loadProblem),
+                    })}
+                  </AppText>
+                </Card>
+              ) : null}
+              {problem ? (
+                <Card testID="live-attention-support-action-error">
+                  <AppText variant="label">
+                    {t('live.error.actionTitle')}
+                  </AppText>
+                  <AppText color="muted" variant="caption">
+                    {t('live.common.reference', {
+                      reference: nativeProblemReference(problem),
+                    })}
+                  </AppText>
+                </Card>
+              ) : null}
+            </View>
+          ) : null}
         </>
       ) : null}
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  group: { gap: spacing.md },
+});

@@ -83,6 +83,42 @@ const explicitDictionaryKeys = (
   return keys.sort();
 };
 
+const walkProductionTypeScript = (directory: string): readonly string[] =>
+  fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return walkProductionTypeScript(file);
+    }
+    return /\.(?:ts|tsx)$/u.test(entry.name) &&
+      !entry.name.includes('.test.') &&
+      entry.name !== 'liveResources.ts'
+      ? [file]
+      : [];
+  });
+
+const productionLocalizationLiterals = (): ReadonlySet<string> => {
+  const literals = new Set<string>();
+  walkProductionTypeScript(path.resolve(__dirname, '..')).forEach(file => {
+    const sourceFile = typescript.createSourceFile(
+      file,
+      fs.readFileSync(file, 'utf8'),
+      typescript.ScriptTarget.Latest,
+      true,
+      file.endsWith('.tsx')
+        ? typescript.ScriptKind.TSX
+        : typescript.ScriptKind.TS,
+    );
+    const visit = (node: import('typescript').Node) => {
+      if (typescript.isStringLiteralLike(node)) {
+        literals.add(node.text);
+      }
+      typescript.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+  });
+  return literals;
+};
+
 describe('production live localization', () => {
   it('keeps complete non-empty English and Hindi live dictionaries', () => {
     expect(Object.keys(liveHindi).sort()).toEqual(
@@ -106,6 +142,35 @@ describe('production live localization', () => {
     expect(explicitDictionaryKeys(source, 'liveHindi')).toEqual(
       explicitDictionaryKeys(source, 'liveEnglish'),
     );
+  });
+
+  it('keeps every live key reachable from production copy paths', () => {
+    const liveKeys = new Set(Object.keys(liveEnglish));
+    const literals = productionLocalizationLiterals();
+    const reachable = new Set(
+      [...literals].filter(literal => liveKeys.has(literal)),
+    );
+
+    // i18next selects these suffixes from a literal base-key call with count.
+    literals.forEach(literal => {
+      for (const suffix of ['_one', '_other'] as const) {
+        const pluralKey = `${literal}${suffix}`;
+        if (liveKeys.has(pluralKey)) {
+          reachable.add(pluralKey);
+        }
+      }
+    });
+
+    // These are the deliberately bounded template-literal key families.
+    for (const tone of ['warm', 'simple', 'cheerful'] as const) {
+      reachable.add(`live.message.${tone}`);
+      reachable.add(`live.message.${tone}Sample`);
+    }
+    for (const enrollment of ['off', 'enabled', 'excluded'] as const) {
+      reachable.add(`live.common.${enrollment}`);
+    }
+
+    expect([...liveKeys].filter(key => !reachable.has(key)).sort()).toEqual([]);
   });
 
   it('keeps non-Devanagari Hindi values limited to exact technical copy', () => {
@@ -135,25 +200,11 @@ describe('production live localization', () => {
     const cases = [
       ['live.common.countPeople', '1 person', '2 people', '1 व्यक्ति', '2 लोग'],
       [
-        'live.common.countChecks',
-        '1 blocking check',
-        '2 blocking checks',
-        '1 रुकावट',
-        '2 रुकावटें',
-      ],
-      [
         'live.setup.contactsVerified',
         '1 contact checked',
         '2 contacts checked',
         '1 संपर्क जाँचा गया',
         '2 संपर्क जाँचे गए',
-      ],
-      [
-        'live.settings.blockerCount',
-        '1 item needs attention',
-        '2 items need attention',
-        '1 चीज़ पर ध्यान चाहिए',
-        '2 चीज़ों पर ध्यान चाहिए',
       ],
       [
         'live.companion.scheduled',
@@ -218,6 +269,181 @@ describe('production live localization', () => {
     );
     expect(liveHindi['live.companion.editableWarning']).toMatch(
       /SMS या MMS पर कैरियर शुल्क लग सकता है/u,
+    );
+  });
+
+  it('keeps Android TEST submission, device send, and protected pass truth distinct', () => {
+    const englishSubmitted = liveEnglish['live.automation.test.submitted'];
+    const englishSent = liveEnglish['live.automation.test.sent'];
+    const englishPassed = liveEnglish['live.automation.test.passed'];
+    const hindiSubmitted = liveHindi['live.automation.test.submitted'];
+    const hindiSent = liveHindi['live.automation.test.sent'];
+    const hindiPassed = liveHindi['live.automation.test.passed'];
+
+    expect(new Set([englishSubmitted, englishSent, englishPassed]).size).toBe(
+      3,
+    );
+    expect(new Set([hindiSubmitted, hindiSent, hindiPassed]).size).toBe(3);
+    expect(englishSubmitted).toMatch(/submitted/u);
+    expect(englishSubmitted).toMatch(/delivery is not confirmed/u);
+    expect(englishSent).toMatch(/left this phone/u);
+    expect(englishSent).toMatch(/carrier delivery is not confirmed/u);
+    expect(englishPassed).toMatch(/passed/u);
+    expect(hindiSubmitted).toMatch(/जमा/u);
+    expect(hindiSent).toMatch(/फ़ोन से निकल/u);
+    expect(hindiPassed).toMatch(/पास/u);
+    expect(`${englishSubmitted}\n${englishSent}`).not.toMatch(
+      /delivered|delivery confirmed/u,
+    );
+  });
+
+  it('localizes compact platform actions and support disclosures in English and Hindi', () => {
+    const compactKeys = [
+      'live.privacy.showDataDetails',
+      'live.privacy.hideDataDetails',
+      'live.automation.testRequiredTitle',
+      'live.automation.testRequiredBody',
+      'live.automation.runAnotherTest',
+      'live.automation.checkTestStatus',
+      'live.automation.showSupportDetails',
+      'live.automation.hideSupportDetails',
+      'live.automation.supportDetailsBody',
+      'live.companion.checkReminderStatus',
+      'live.companion.showReminderDetails',
+      'live.companion.hideReminderDetails',
+      'live.companion.reminderDetailsBody',
+      'live.companion.checkPauseStatus',
+      'live.companion.pauseVerificationComplete',
+      'live.companion.pauseVerificationStillRequired',
+    ] as const;
+
+    compactKeys.forEach(key => {
+      expect(liveEnglish[key].trim().length).toBeGreaterThan(0);
+      expect(liveHindi[key]).toMatch(/[\u0900-\u097f]/u);
+      expect(liveHindi[key]).not.toBe(liveEnglish[key]);
+    });
+
+    const iosEnglish = [
+      liveEnglish['live.automation.iosBody'],
+      liveEnglish['live.companion.activationDisclosure'],
+      liveEnglish['live.companion.reminderDetailsBody'],
+    ].join('\n');
+    const iosHindi = [
+      liveHindi['live.automation.iosBody'],
+      liveHindi['live.companion.activationDisclosure'],
+      liveHindi['live.companion.reminderDetailsBody'],
+    ].join('\n');
+    expect(iosEnglish).toMatch(/never send|never sends/u);
+    expect(iosEnglish).not.toMatch(/messages? (?:are|is) sent automatically/u);
+    expect(iosHindi).toMatch(/(?:संदेश नहीं भेज|अपने-आप नहीं भेज)/u);
+    expect(iosHindi).not.toMatch(/अपने-आप संदेश भेज/u);
+  });
+
+  it('keeps message authoring optional, privacy-bounded, and honest about approval invalidation', () => {
+    const progressiveKeys = [
+      'live.message.currentTitle',
+      'live.message.showHelp',
+      'live.message.helpBody',
+      'live.message.showOptions',
+      'live.message.optionsBody',
+      'live.message.warmSample',
+      'live.message.simpleSample',
+      'live.message.cheerfulSample',
+      'live.message.validationPassed',
+      'live.message.approvalConsequenceTitle',
+      'live.message.approvalConsequenceBody',
+      'live.message.savedRecheckFailed',
+    ] as const;
+
+    progressiveKeys.forEach(key => {
+      expect(liveEnglish[key].trim().length).toBeGreaterThan(0);
+      expect(liveHindi[key]).toMatch(/[\u0900-\u097f]/u);
+      expect(liveHindi[key]).not.toBe(liveEnglish[key]);
+    });
+
+    expect(liveEnglish['live.message.showHelp']).toBe('Help me write');
+    expect(liveEnglish['live.message.showOptions']).toBe('Message options');
+    expect(liveEnglish['live.message.helpBody']).toMatch(
+      /work without Gemini/u,
+    );
+    expect(liveEnglish['live.message.geminiPrivacyBody']).toMatch(
+      /only the selected language, tone, name style and SMS-part limit/u,
+    );
+    expect(liveEnglish['live.message.geminiPrivacyBody']).toMatch(
+      /no contact names, phone numbers, birthdays/u,
+    );
+    expect(liveEnglish['live.message.geminiPrivacyBody']).toMatch(
+      /no.*current saved or draft message text/u,
+    );
+    expect(liveEnglish['live.message.save']).toBe('Save message');
+    expect(liveEnglish['live.message.approvalConsequenceBody']).toMatch(
+      /clears affected recipient approvals/u,
+    );
+    expect(liveEnglish['live.message.saved']).toMatch(/checked again/u);
+    expect(liveEnglish['live.message.savedRecheckFailed']).toMatch(
+      /saved.*could not be checked/u,
+    );
+    expect(liveEnglish['live.message.savedRecheckFailed']).not.toMatch(
+      /saved and checked again/u,
+    );
+
+    expect(
+      new Set([
+        liveEnglish['live.message.warmSample'],
+        liveEnglish['live.message.simpleSample'],
+        liveEnglish['live.message.cheerfulSample'],
+      ]).size,
+    ).toBe(3);
+  });
+
+  it('keeps Schedule progressive and platform-honest before saving', () => {
+    const scheduleKeys = [
+      'live.policy.currentTitle',
+      'live.policy.currentChecking',
+      'live.policy.currentUnverified',
+      'live.policy.notConfigured',
+      'live.policy.showOptions',
+      'live.policy.hideOptions',
+      'live.policy.reviewedWindow',
+      'live.policy.androidSaveConsequenceTitle',
+      'live.policy.androidSaveConsequenceBody',
+      'live.policy.iosSaveConsequenceTitle',
+      'live.policy.iosSaveConsequenceBody',
+      'live.policy.savedNeedsCheck',
+    ] as const;
+
+    scheduleKeys.forEach(key => {
+      expect(liveEnglish[key].trim().length).toBeGreaterThan(0);
+      expect(liveHindi[key]).toMatch(/[\u0900-\u097f]/u);
+      expect(liveHindi[key]).not.toBe(liveEnglish[key]);
+    });
+
+    expect(liveEnglish['live.policy.androidSafetySummary']).toMatch(
+      /local time.*selected or default SIM/u,
+    );
+    expect(liveEnglish['live.policy.androidSafetySummary']).toMatch(
+      /at least five minutes apart/u,
+    );
+    expect(liveEnglish['live.policy.androidSafetySummary']).toMatch(
+      /20 distinct greetings in a rolling 24 hours/u,
+    );
+    expect(liveEnglish['live.policy.androidSafetySummary']).toMatch(
+      /three explicit TEST messages.*separate rolling budget/u,
+    );
+    expect(liveEnglish['live.policy.androidSaveConsequenceBody']).toMatch(
+      /clears affected recipient approvals.*invalidates the bound SMS TEST receipt/u,
+    );
+    expect(liveEnglish['live.policy.iosSafetySummary']).toMatch(
+      /best effort.*never sends automatically/u,
+    );
+    expect(liveEnglish['live.policy.iosSaveConsequenceBody']).toMatch(
+      /invalidates affected birthday proposals.*rebuilds.*reminder plan/u,
+    );
+    expect(liveEnglish['live.policy.savedNeedsCheck']).toMatch(
+      /saved.*could not be checked/u,
+    );
+    expect(liveEnglish['live.policy.savedNeedsCheck']).not.toMatch(
+      /saved and checked again/u,
     );
   });
 
