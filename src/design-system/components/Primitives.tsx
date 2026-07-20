@@ -603,6 +603,17 @@ export function SearchField({
         style={[styles.searchInput, { color: colors.text }]}
         testID={testID}
       />
+      {value.length > 0 ? (
+        <Pressable
+          accessibilityLabel="Clear search"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => onChangeText('')}
+          style={styles.clearSearchButton}
+        >
+          <Icon name="clear" color={colors.textMuted} size={20} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -898,6 +909,9 @@ const styles = StyleSheet.create({
     fontSize: 17,
     minHeight: minimumTargetSize,
     paddingVertical: spacing.sm,
+  },
+  clearSearchButton: {
+    padding: spacing.xs,
   },
   settingRow: {
     minHeight: minimumTargetSize,
