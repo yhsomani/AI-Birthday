@@ -4,6 +4,7 @@ const english = {
   ...liveEnglish,
   'common.back': 'Back',
   'common.continue': 'Continue',
+  'common.clearSearch': 'Clear search',
   'common.close': 'Close preview',
   'common.fixtureNotice':
     'Interactive UI fixture • Synthetic data • No account, reminder, or message action is performed.',
@@ -186,6 +187,7 @@ const hindi: typeof english = {
   ...liveHindi,
   'common.back': 'वापस',
   'common.continue': 'आगे बढ़ें',
+  'common.clearSearch': 'Clear search',
   'common.close': 'पूर्वावलोकन बंद करें',
   'common.fixtureNotice':
     'इंटरैक्टिव UI नमूना • केवल काल्पनिक डेटा • कोई खाता, रिमाइंडर या संदेश कार्रवाई नहीं होती।',
