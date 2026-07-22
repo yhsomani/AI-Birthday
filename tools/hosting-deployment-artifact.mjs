@@ -627,8 +627,8 @@ const parseArgs = argv => {
           'manifest-output',
         ]
       : mode === 'extract'
-      ? ['mode', 'artifact', 'output-root']
-      : [];
+        ? ['mode', 'artifact', 'output-root']
+        : [];
   if (
     required.length === 0 ||
     values.size !== required.length ||

@@ -962,8 +962,8 @@ export function LivePeopleScreen({
     syncNotice?.kind === 'projection'
       ? syncNotice.projection
       : contactsStatus.state.kind === 'ready'
-      ? contactsStatus.state.result.envelope.value.contactsSync
-      : undefined;
+        ? contactsStatus.state.result.envelope.value.contactsSync
+        : undefined;
   const syncPresentation: SyncPresentation | undefined = (() => {
     if (syncNotice?.kind === 'unverified') {
       return {
@@ -1328,7 +1328,7 @@ export function LivePeopleScreen({
                   history: [
                     ...(current.key === queryKey ? current.history : [null]),
                     people.state.kind === 'ready'
-                      ? people.state.result.envelope.value.nextCursor ?? null
+                      ? (people.state.result.envelope.value.nextCursor ?? null)
                       : null,
                   ],
                 }))

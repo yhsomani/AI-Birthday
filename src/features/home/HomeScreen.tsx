@@ -51,8 +51,8 @@ export function HomeScreen({ navigation }: Props) {
   const statusTitle = attentionReviewed
     ? t('home.attentionResolved')
     : platform === 'android'
-    ? t('home.androidStatus')
-    : t('home.iosStatus');
+      ? t('home.androidStatus')
+      : t('home.iosStatus');
   const statusDetail =
     platform === 'android'
       ? t('home.androidStatusBody')

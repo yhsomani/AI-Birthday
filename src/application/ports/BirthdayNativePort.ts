@@ -11,7 +11,8 @@ import type { PrivacyPort } from './PrivacyPort';
 import type { PublicResourcesPort } from './PublicResourcesPort';
 
 export interface BirthdayNativePort
-  extends AppProjectionPort,
+  extends
+    AppProjectionPort,
     AppRoutePort,
     IdentityContactsPort,
     PeoplePort,

@@ -151,23 +151,23 @@ export function LiveProductSetupJourney({
   const nextRoute: JourneyRoute = !peopleReady
     ? { kind: 'people' }
     : !messageReady
-    ? { kind: 'message' }
-    : !policyReady
-    ? { kind: 'schedule', returnTo: 'overview' }
-    : !approvalReady
-    ? { kind: 'approvals' }
-    : { kind: 'automation' };
+      ? { kind: 'message' }
+      : !policyReady
+        ? { kind: 'schedule', returnTo: 'overview' }
+        : !approvalReady
+          ? { kind: 'approvals' }
+          : { kind: 'automation' };
   const nextAction = !peopleReady
     ? 'live.guidedSetup.choosePeople'
     : !messageReady
-    ? 'live.guidedSetup.writeMessage'
-    : !policyReady
-    ? 'live.guidedSetup.chooseWindow'
-    : !approvalReady
-    ? 'live.guidedSetup.reviewApprovals'
-    : capability.platform === 'android'
-    ? 'live.guidedSetup.testAndEnable'
-    : 'live.guidedSetup.enableReminders';
+      ? 'live.guidedSetup.writeMessage'
+      : !policyReady
+        ? 'live.guidedSetup.chooseWindow'
+        : !approvalReady
+          ? 'live.guidedSetup.reviewApprovals'
+          : capability.platform === 'android'
+            ? 'live.guidedSetup.testAndEnable'
+            : 'live.guidedSetup.enableReminders';
 
   const refreshProgress = useCallback(async () => {
     await Promise.all([
@@ -210,16 +210,16 @@ export function LiveProductSetupJourney({
     route.kind === 'overview'
       ? t('live.guidedSetup.title')
       : route.kind === 'people'
-      ? t('live.people.title')
-      : route.kind === 'person'
-      ? t('live.person.detailsTitle')
-      : route.kind === 'message'
-      ? t('live.message.title')
-      : route.kind === 'schedule'
-      ? t('live.settings.schedule')
-      : route.kind === 'approvals'
-      ? t('live.guidedSetup.approvalTitle')
-      : t('live.automation.title');
+        ? t('live.people.title')
+        : route.kind === 'person'
+          ? t('live.person.detailsTitle')
+          : route.kind === 'message'
+            ? t('live.message.title')
+            : route.kind === 'schedule'
+              ? t('live.settings.schedule')
+              : route.kind === 'approvals'
+                ? t('live.guidedSetup.approvalTitle')
+                : t('live.automation.title');
 
   let content: React.ReactNode;
   if (route.kind === 'people') {
@@ -318,8 +318,8 @@ export function LiveProductSetupJourney({
             step === 3
               ? 'live.guidedSetup.stepThreeBody'
               : capability.platform === 'android'
-              ? 'live.guidedSetup.androidStepFourBody'
-              : 'live.guidedSetup.iosStepFourBody',
+                ? 'live.guidedSetup.androidStepFourBody'
+                : 'live.guidedSetup.iosStepFourBody',
           )}
           tone="info"
           testID="live-product-setup-current-step"
@@ -341,15 +341,15 @@ export function LiveProductSetupJourney({
               currentTaskUnavailable
                 ? 'live.common.unavailable'
                 : currentTaskLoading
-                ? 'live.common.checkingState'
-                : nextAction,
+                  ? 'live.common.checkingState'
+                  : nextAction,
             )}
             tone={
               currentTaskUnavailable
                 ? 'critical'
                 : currentTaskLoading
-                ? 'info'
-                : 'warning'
+                  ? 'info'
+                  : 'warning'
             }
           />
         </Card>
@@ -364,21 +364,26 @@ export function LiveProductSetupJourney({
               home.state.kind === 'error'
                 ? home.state.problem
                 : home.state.kind === 'ready' && home.state.refreshProblem
-                ? home.state.refreshProblem
-                : message.state.kind === 'error'
-                ? message.state.problem
-                : message.state.kind === 'ready' && message.state.refreshProblem
-                ? message.state.refreshProblem
-                : policy.state.kind === 'error'
-                ? policy.state.problem
-                : policy.state.kind === 'ready' && policy.state.refreshProblem
-                ? policy.state.refreshProblem
-                : approvalCandidates.state.kind === 'error'
-                ? approvalCandidates.state.problem
-                : approvalCandidates.state.kind === 'ready' &&
-                  approvalCandidates.state.refreshProblem
-                ? approvalCandidates.state.refreshProblem
-                : { kind: 'conflict', code: 'unknown-native-value' }
+                  ? home.state.refreshProblem
+                  : message.state.kind === 'error'
+                    ? message.state.problem
+                    : message.state.kind === 'ready' &&
+                        message.state.refreshProblem
+                      ? message.state.refreshProblem
+                      : policy.state.kind === 'error'
+                        ? policy.state.problem
+                        : policy.state.kind === 'ready' &&
+                            policy.state.refreshProblem
+                          ? policy.state.refreshProblem
+                          : approvalCandidates.state.kind === 'error'
+                            ? approvalCandidates.state.problem
+                            : approvalCandidates.state.kind === 'ready' &&
+                                approvalCandidates.state.refreshProblem
+                              ? approvalCandidates.state.refreshProblem
+                              : {
+                                  kind: 'conflict',
+                                  code: 'unknown-native-value',
+                                }
             }
             onRetry={refreshProgress}
           />

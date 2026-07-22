@@ -704,8 +704,8 @@ export function LiveActivityScreen({
       result.envelope.value.kind === 'complete'
         ? t('live.privacy.operationComplete')
         : result.envelope.value.kind === 'failed'
-        ? t('live.privacy.operationFailed')
-        : t('live.privacy.operationPending'),
+          ? t('live.privacy.operationFailed')
+          : t('live.privacy.operationPending'),
     );
     if (operationComplete && cursorRef.current === null) {
       activityReloadRef.current().catch(() => undefined);
@@ -823,7 +823,7 @@ export function LiveActivityScreen({
                 setCursorHistory(current => [
                   ...current,
                   activity.state.kind === 'ready'
-                    ? activity.state.result.envelope.value.nextCursor ?? null
+                    ? (activity.state.result.envelope.value.nextCursor ?? null)
                     : null,
                 ]);
               }}

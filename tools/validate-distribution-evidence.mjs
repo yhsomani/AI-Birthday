@@ -824,7 +824,7 @@ const validateStructuredReleaseEvidence = (
     ['direct-apk', 'play-delivered-apk'].includes(
       expected.artifactMode ?? 'prepackage',
     )
-      ? expected.artifactSha256 ?? expected.apkSha256
+      ? (expected.artifactSha256 ?? expected.apkSha256)
       : undefined;
   for (const [referenceField, digestField, evidenceKind] of [
     [
