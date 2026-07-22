@@ -671,7 +671,7 @@ dependencies {
     // Match the OkHttp 4.12.0 runtime line already selected by the application graph.
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     // Android's framework org.json methods are stubs in local JVM tests.
-    testImplementation("org.json:json:20250517")
+    testImplementation("org.json:json:20260522")
 
     androidTestImplementation("androidx.test:core:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
