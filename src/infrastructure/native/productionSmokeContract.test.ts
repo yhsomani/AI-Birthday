@@ -58,7 +58,7 @@ const nativeModule = (platform: SmokePlatform): BirthdayNativeSpec =>
         : response('ok', payload);
     }),
     removeListeners: jest.fn(),
-  } as unknown as BirthdayNativeSpec);
+  }) as unknown as BirthdayNativeSpec;
 
 const valueOf = <Value>(result: NativeResult<Value>): Value => {
   expect(result.kind).toBe('ok');

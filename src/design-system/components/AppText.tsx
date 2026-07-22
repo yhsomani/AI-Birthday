@@ -40,10 +40,10 @@ export function AppText({
     color === 'muted'
       ? colors.textMuted
       : color === 'accent'
-      ? colors.accent
-      : color === 'critical'
-      ? colors.critical
-      : colors.text;
+        ? colors.accent
+        : color === 'critical'
+          ? colors.critical
+          : colors.text;
 
   return (
     <Text

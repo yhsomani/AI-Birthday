@@ -494,8 +494,8 @@ export function LiveSetupScreen({
         result.envelope.value.kind === 'complete'
           ? t('live.privacy.operationComplete')
           : result.envelope.value.kind === 'failed'
-          ? t('live.privacy.operationFailed')
-          : t('live.privacy.operationPending'),
+            ? t('live.privacy.operationFailed')
+            : t('live.privacy.operationPending'),
       );
     }
     await currentOperation.reload();
@@ -632,8 +632,8 @@ export function LiveSetupScreen({
     projection.account.operation !== 'repair'
       ? expectedCleanupActions[projection.account.operation]
       : connectedAndroidSenderDeleting
-      ? ['delete-account']
-      : [];
+        ? ['delete-account']
+        : [];
   const visibleLifecycleOperation =
     currentOperation.state.kind === 'ready' &&
     !currentOperation.state.refreshing &&
@@ -780,8 +780,8 @@ export function LiveSetupScreen({
                   issue.severity === 'blocking'
                     ? 'critical'
                     : issue.severity === 'warning'
-                    ? 'warning'
-                    : 'info'
+                      ? 'warning'
+                      : 'info'
                 }
                 testID={`live-setup-eligibility-issue-${index}`}
               />
@@ -866,8 +866,8 @@ export function LiveSetupScreen({
                   visibleLifecycleOperation.kind === 'complete'
                     ? t('live.privacy.operationComplete')
                     : visibleLifecycleOperation.kind === 'failed'
-                    ? t('live.privacy.operationFailed')
-                    : t('live.privacy.operationPending')
+                      ? t('live.privacy.operationFailed')
+                      : t('live.privacy.operationPending')
                 }
                 tone={
                   visibleLifecycleOperation.kind === 'failed'

@@ -119,10 +119,10 @@ export function createNativeSbom({
     kind === 'gradle'
       ? parseGradleLock(raw, { configuration })
       : kind === 'cocoapods'
-      ? parseCocoaPodsLock(raw)
-      : (() => {
-          throw new Error('kind must be gradle or cocoapods');
-        })();
+        ? parseCocoaPodsLock(raw)
+        : (() => {
+            throw new Error('kind must be gradle or cocoapods');
+          })();
   return {
     bomFormat: 'CycloneDX',
     specVersion: '1.6',

@@ -368,9 +368,9 @@ export function LivePrivacyScreen({
     stableDeletionReceipt?.kind === 'complete'
       ? stableDeletionReceipt
       : stableDeletionReceipt?.kind === 'none' &&
-        projectedOperation?.action === 'delete-account'
-      ? projectedOperation
-      : undefined;
+          projectedOperation?.action === 'delete-account'
+        ? projectedOperation
+        : undefined;
   const visibleNonDeletionOperation =
     deletionReceiptAllowsCurrentOperation &&
     projectedOperation?.action !== 'delete-account'
@@ -894,8 +894,8 @@ export function LivePrivacyScreen({
         status.kind === 'complete'
           ? t('live.privacy.deletionCompleteBody')
           : status.kind === 'remote-draining'
-          ? t('live.privacy.deletionStillRunning')
-          : t('live.privacy.deletionProofUnavailable'),
+            ? t('live.privacy.deletionStillRunning')
+            : t('live.privacy.deletionProofUnavailable'),
       );
     }
     finishOperationRequest();
@@ -946,20 +946,20 @@ export function LivePrivacyScreen({
     deletionReceipt.state.kind === 'error'
       ? deletionReceipt.state.problem
       : deletionReceiptAllowsCurrentOperation &&
-        currentOperation.state.kind === 'error'
-      ? currentOperation.state.problem
-      : undefined;
+          currentOperation.state.kind === 'error'
+        ? currentOperation.state.problem
+        : undefined;
   const operationRefreshProblem =
     deletionReceipt.state.kind === 'ready' &&
     deletionReceipt.state.refreshProblem
       ? deletionReceipt.state.refreshProblem
       : deletionReceiptAllowsCurrentOperation &&
-        currentOperation.state.kind === 'ready' &&
-        currentOperation.state.refreshProblem
-      ? currentOperation.state.refreshProblem
-      : account.state.kind === 'ready' && account.state.refreshProblem
-      ? account.state.refreshProblem
-      : undefined;
+          currentOperation.state.kind === 'ready' &&
+          currentOperation.state.refreshProblem
+        ? currentOperation.state.refreshProblem
+        : account.state.kind === 'ready' && account.state.refreshProblem
+          ? account.state.refreshProblem
+          : undefined;
 
   const renderAction = (
     kind: PrivacyScreenActionKind,
@@ -1031,10 +1031,10 @@ export function LivePrivacyScreen({
               visibleDeletionOperation.kind === 'remote-draining'
                 ? 'live.privacy.deletionDrainingTitle'
                 : visibleDeletionOperation.kind === 'remote-unknown'
-                ? 'live.privacy.deletionUnknownTitle'
-                : visibleDeletionOperation.kind === 'complete'
-                ? 'live.privacy.deletionCompleteTitle'
-                : 'live.privacy.deletionPendingTitle',
+                  ? 'live.privacy.deletionUnknownTitle'
+                  : visibleDeletionOperation.kind === 'complete'
+                    ? 'live.privacy.deletionCompleteTitle'
+                    : 'live.privacy.deletionPendingTitle',
             )}
           </AppText>
           <StatusRow
@@ -1046,8 +1046,8 @@ export function LivePrivacyScreen({
               visibleDeletionOperation.kind === 'failed'
                 ? 'critical'
                 : visibleDeletionOperation.kind === 'complete'
-                ? 'positive'
-                : 'warning'
+                  ? 'positive'
+                  : 'warning'
             }
           />
           {'reason' in visibleDeletionOperation ? (
@@ -1061,10 +1061,10 @@ export function LivePrivacyScreen({
               visibleDeletionOperation.kind === 'remote-draining'
                 ? 'live.privacy.deletionDrainingBody'
                 : visibleDeletionOperation.kind === 'remote-unknown'
-                ? 'live.privacy.deletionUnknownBody'
-                : visibleDeletionOperation.kind === 'complete'
-                ? 'live.privacy.deletionCompleteBody'
-                : 'live.privacy.deletionPendingBody',
+                  ? 'live.privacy.deletionUnknownBody'
+                  : visibleDeletionOperation.kind === 'complete'
+                    ? 'live.privacy.deletionCompleteBody'
+                    : 'live.privacy.deletionPendingBody',
             )}
           </AppText>
           {visibleDeletionOperation.kind === 'remote-unknown' ||
@@ -1302,8 +1302,8 @@ export function LivePrivacyScreen({
                 {visibleNonDeletionOperation.kind === 'complete'
                   ? t('live.privacy.operationComplete')
                   : visibleNonDeletionOperation.kind === 'failed'
-                  ? t('live.privacy.operationFailed')
-                  : t('live.privacy.operationPending')}
+                    ? t('live.privacy.operationFailed')
+                    : t('live.privacy.operationPending')}
               </AppText>
               {visibleNonDeletionOperation.kind !== 'complete' &&
               visibleNonDeletionOperation.kind !== 'failed' ? (

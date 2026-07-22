@@ -106,8 +106,8 @@ export function LivePolicyEditor({
             ? 'live.policy.summaryIosWithGrace'
             : 'live.policy.summaryIosWithoutGrace'
           : draft.latePolicy.kind === 'same-day-grace'
-          ? 'live.policy.summaryWithGrace'
-          : 'live.policy.summaryWithoutGrace',
+            ? 'live.policy.summaryWithGrace'
+            : 'live.policy.summaryWithoutGrace',
         {
           cap: draft.dailyCap,
           end: bidiIsolate(draft.primaryEnd),

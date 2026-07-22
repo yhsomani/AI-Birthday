@@ -428,8 +428,8 @@ export function LiveHomeScreen({
         choice === 'open-system-composer'
           ? 'live.home.todayComposerOpened'
           : choice === 'start-next-year'
-          ? 'live.home.todayNextYearAccepted'
-          : 'live.home.todayAccepted',
+            ? 'live.home.todayNextYearAccepted'
+            : 'live.home.todayAccepted',
       ),
     );
     setTodayPending(false);
@@ -445,8 +445,8 @@ export function LiveHomeScreen({
             currentAutomation.effective,
           )
         : currentAutomation?.platform === 'ios'
-        ? currentAutomation.desired === 'composer-reminders-on'
-        : false;
+          ? currentAutomation.desired === 'composer-reminders-on'
+          : false;
     if (
       !currentHome ||
       pauseReview?.sourceHomeRevision !== currentHome.revision ||
@@ -755,8 +755,8 @@ export function LiveHomeScreen({
               currentTodayReview.review.choice === 'send-through-normal-path'
                 ? 'live.home.todayNormalPath'
                 : currentTodayReview.review.choice === 'open-system-composer'
-                ? 'live.home.todaySystemComposer'
-                : 'live.home.todayNextYear',
+                  ? 'live.home.todaySystemComposer'
+                  : 'live.home.todayNextYear',
             )}
             tone="warning"
           />
@@ -766,8 +766,8 @@ export function LiveHomeScreen({
               currentTodayReview.review.choice === 'send-through-normal-path'
                 ? 'live.home.todayNormalDisclosure'
                 : currentTodayReview.review.choice === 'open-system-composer'
-                ? 'live.home.todayComposerDisclosure'
-                : 'live.home.todayNextYearDisclosure',
+                  ? 'live.home.todayComposerDisclosure'
+                  : 'live.home.todayNextYearDisclosure',
             )}
             tone="warning"
           />
@@ -776,8 +776,8 @@ export function LiveHomeScreen({
               currentTodayReview.review.choice === 'send-through-normal-path'
                 ? 'live.home.confirmNormalPath'
                 : currentTodayReview.review.choice === 'open-system-composer'
-                ? 'live.home.openSystemComposer'
-                : 'live.home.confirmNextYear',
+                  ? 'live.home.openSystemComposer'
+                  : 'live.home.confirmNextYear',
             )}
             disabled={todayPending}
             onPress={() => confirmToday(currentTodayReview.review.choice)}
@@ -840,8 +840,8 @@ export function LiveHomeScreen({
               capability.platform === 'ios'
                 ? t('live.home.reviewTodayIos')
                 : todayPending
-                ? t('live.home.preparingToday')
-                : t('live.home.reviewToday')
+                  ? t('live.home.preparingToday')
+                  : t('live.home.reviewToday')
             }
             disabled={todayPending}
             onPress={
@@ -972,8 +972,8 @@ export function LiveHomeScreen({
                     issue.code === 'active-sender-other-device'
                       ? t('live.home.iosManagedByAndroid')
                       : issue.code === 'coordination-unavailable'
-                      ? t('live.home.iosSafetyUnavailable')
-                      : t(safeReasonMessageKey(issue.code))
+                        ? t('live.home.iosSafetyUnavailable')
+                        : t(safeReasonMessageKey(issue.code))
                   }
                   detail={t('live.home.iosIssueAction')}
                   tone={issue.severity === 'blocking' ? 'critical' : 'warning'}

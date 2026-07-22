@@ -293,16 +293,16 @@ export function Button({
     variant === 'primary'
       ? colors.accent
       : variant === 'danger'
-      ? colors.critical
-      : variant === 'secondary'
-      ? colors.surface
-      : 'transparent';
+        ? colors.critical
+        : variant === 'secondary'
+          ? colors.surface
+          : 'transparent';
   const foregroundColor =
     variant === 'primary' || variant === 'danger'
       ? colors.onAccent
       : variant === 'ghost'
-      ? colors.accent
-      : colors.text;
+        ? colors.accent
+        : colors.text;
 
   return (
     <Pressable

@@ -484,19 +484,19 @@ export function LiveMessageScreen({
                 editor.state.refreshing
                   ? t('live.message.currentChecking')
                   : editor.state.refreshProblem
-                  ? t('live.message.currentUnverified')
-                  : editor.state.result.envelope.value.kind === 'configured'
-                  ? t('live.message.currentSaved')
-                  : t('live.message.notConfigured')
+                    ? t('live.message.currentUnverified')
+                    : editor.state.result.envelope.value.kind === 'configured'
+                      ? t('live.message.currentSaved')
+                      : t('live.message.notConfigured')
               }
               tone={
                 editor.state.refreshProblem
                   ? 'warning'
                   : editor.state.refreshing
-                  ? 'neutral'
-                  : editor.state.result.envelope.value.kind === 'configured'
-                  ? 'positive'
-                  : 'info'
+                    ? 'neutral'
+                    : editor.state.result.envelope.value.kind === 'configured'
+                      ? 'positive'
+                      : 'info'
               }
               testID="live-message-current-status"
             />

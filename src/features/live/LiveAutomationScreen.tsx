@@ -685,17 +685,17 @@ function LiveAndroidAutomation({
     account.state.result.envelope.revision === homeRevision;
   const accountPlatformMismatch = Boolean(
     account.state.kind === 'ready' &&
-      account.state.result.envelope.value.kind === 'connected' &&
-      account.state.result.envelope.value.sender.platform !== 'android',
+    account.state.result.envelope.value.kind === 'connected' &&
+    account.state.result.envelope.value.sender.platform !== 'android',
   );
   const androidAccountRecoveryVisible = Boolean(
     homeTrusted &&
-      (account.state.kind === 'error' ||
-        accountPlatformMismatch ||
-        (account.state.kind === 'ready' &&
-          (Boolean(account.state.refreshProblem) ||
-            (!account.state.refreshing &&
-              account.state.result.envelope.revision !== homeRevision)))),
+    (account.state.kind === 'error' ||
+      accountPlatformMismatch ||
+      (account.state.kind === 'ready' &&
+        (Boolean(account.state.refreshProblem) ||
+          (!account.state.refreshing &&
+            account.state.result.envelope.revision !== homeRevision)))),
   );
   const androidSender =
     accountProjectionTrusted &&
@@ -706,27 +706,27 @@ function LiveAndroidAutomation({
       : undefined;
   const androidSenderMatchesHome = Boolean(
     androidAutomation &&
-      androidSender &&
-      ((androidAutomation.effective === 'not-configured' &&
-        (androidSender.kind === 'test-only' ||
-          androidSender.kind === 'paused-repair')) ||
-        (androidAutomation.effective === 'test-only' &&
-          androidSender.kind === 'test-only') ||
-        (androidAutomation.effective === 'paused-repair' &&
-          androidSender.kind === 'paused-repair') ||
-        ((androidAutomation.effective === 'active' ||
-          androidAutomation.effective === 'action-required') &&
-          androidSender.kind === 'automation-active') ||
-        (androidAutomation.effective === 'standby' &&
-          androidSender.kind === 'standby') ||
-        (androidAutomation.effective === 'transfer-pending' &&
-          androidSender.kind === 'transfer-pending') ||
-        (androidAutomation.effective === 'deleting' &&
-          androidSender.kind === 'deleting')),
+    androidSender &&
+    ((androidAutomation.effective === 'not-configured' &&
+      (androidSender.kind === 'test-only' ||
+        androidSender.kind === 'paused-repair')) ||
+      (androidAutomation.effective === 'test-only' &&
+        androidSender.kind === 'test-only') ||
+      (androidAutomation.effective === 'paused-repair' &&
+        androidSender.kind === 'paused-repair') ||
+      ((androidAutomation.effective === 'active' ||
+        androidAutomation.effective === 'action-required') &&
+        androidSender.kind === 'automation-active') ||
+      (androidAutomation.effective === 'standby' &&
+        androidSender.kind === 'standby') ||
+      (androidAutomation.effective === 'transfer-pending' &&
+        androidSender.kind === 'transfer-pending') ||
+      (androidAutomation.effective === 'deleting' &&
+        androidSender.kind === 'deleting')),
   );
   const androidOwnershipRecoveryVisible = Boolean(
     androidAccountRecoveryVisible ||
-      (homeTrusted && accountProjectionTrusted && !androidSenderMatchesHome),
+    (homeTrusted && accountProjectionTrusted && !androidSenderMatchesHome),
   );
   const androidTestOwnerCurrent =
     androidSender?.kind === 'test-only' ||
@@ -736,15 +736,15 @@ function LiveAndroidAutomation({
   const androidPauseOwnerCurrent = androidSender?.kind === 'automation-active';
   const androidLocalOwnerCurrent = Boolean(
     androidSender &&
-      ['test-only', 'paused-repair', 'automation-active'].includes(
-        androidSender.kind,
-      ) &&
-      androidSenderMatchesHome,
+    ['test-only', 'paused-repair', 'automation-active'].includes(
+      androidSender.kind,
+    ) &&
+    androidSenderMatchesHome,
   );
   const androidSetupConfigurationOwnerCurrent = Boolean(
     androidAutomation?.effective === 'not-configured' &&
-      (androidSender?.kind === 'test-only' ||
-        androidSender?.kind === 'paused-repair'),
+    (androidSender?.kind === 'test-only' ||
+      androidSender?.kind === 'paused-repair'),
   );
   const messageConfigurationTrusted =
     messageConfiguration.state.kind === 'ready' &&
@@ -753,26 +753,25 @@ function LiveAndroidAutomation({
     messageConfiguration.state.result.envelope.revision === homeRevision;
   const messageConfigurationReady = Boolean(
     messageConfigurationTrusted &&
-      messageConfiguration.state.kind === 'ready' &&
-      messageConfiguration.state.result.envelope.value.kind === 'configured',
+    messageConfiguration.state.kind === 'ready' &&
+    messageConfiguration.state.result.envelope.value.kind === 'configured',
   );
   const androidMessageRepairVisible = Boolean(
     homeTrusted &&
-      androidSetupConfigurationOwnerCurrent &&
-      messageConfigurationTrusted &&
-      messageConfiguration.state.kind === 'ready' &&
-      messageConfiguration.state.result.envelope.value.kind ===
-        'not-configured',
+    androidSetupConfigurationOwnerCurrent &&
+    messageConfigurationTrusted &&
+    messageConfiguration.state.kind === 'ready' &&
+    messageConfiguration.state.result.envelope.value.kind === 'not-configured',
   );
   const androidMessageStatusRecoveryVisible = Boolean(
     homeTrusted &&
-      androidLocalOwnerCurrent &&
-      (messageConfiguration.state.kind === 'error' ||
-        (messageConfiguration.state.kind === 'ready' &&
-          (Boolean(messageConfiguration.state.refreshProblem) ||
-            (!messageConfiguration.state.refreshing &&
-              messageConfiguration.state.result.envelope.revision !==
-                homeRevision)))),
+    androidLocalOwnerCurrent &&
+    (messageConfiguration.state.kind === 'error' ||
+      (messageConfiguration.state.kind === 'ready' &&
+        (Boolean(messageConfiguration.state.refreshProblem) ||
+          (!messageConfiguration.state.refreshing &&
+            messageConfiguration.state.result.envelope.revision !==
+              homeRevision)))),
   );
   const policyConfigurationTrusted =
     policyConfiguration.state.kind === 'ready' &&
@@ -781,53 +780,53 @@ function LiveAndroidAutomation({
     policyConfiguration.state.result.envelope.revision === homeRevision;
   const androidPolicyStatusRecoveryVisible = Boolean(
     homeTrusted &&
-      androidLocalOwnerCurrent &&
-      (policyConfiguration.state.kind === 'error' ||
-        (policyConfiguration.state.kind === 'ready' &&
-          (Boolean(policyConfiguration.state.refreshProblem) ||
-            (!policyConfiguration.state.refreshing &&
-              policyConfiguration.state.result.envelope.revision !==
-                homeRevision)))),
+    androidLocalOwnerCurrent &&
+    (policyConfiguration.state.kind === 'error' ||
+      (policyConfiguration.state.kind === 'ready' &&
+        (Boolean(policyConfiguration.state.refreshProblem) ||
+          (!policyConfiguration.state.refreshing &&
+            policyConfiguration.state.result.envelope.revision !==
+              homeRevision)))),
   );
   const androidConfigurationStatusRecoveryVisible =
     androidMessageStatusRecoveryVisible ||
     androidPolicyStatusRecoveryVisible ||
     Boolean(
       homeTrusted &&
-        androidLocalOwnerCurrent &&
-        androidAutomation?.effective !== 'not-configured' &&
-        ((messageConfigurationTrusted &&
-          messageConfiguration.state.kind === 'ready' &&
-          messageConfiguration.state.result.envelope.value.kind ===
-            'not-configured') ||
-          (policyConfigurationTrusted &&
-            policyConfiguration.state.kind === 'ready' &&
-            policyConfiguration.state.result.envelope.value.kind ===
-              'not-configured')),
+      androidLocalOwnerCurrent &&
+      androidAutomation?.effective !== 'not-configured' &&
+      ((messageConfigurationTrusted &&
+        messageConfiguration.state.kind === 'ready' &&
+        messageConfiguration.state.result.envelope.value.kind ===
+          'not-configured') ||
+        (policyConfigurationTrusted &&
+          policyConfiguration.state.kind === 'ready' &&
+          policyConfiguration.state.result.envelope.value.kind ===
+            'not-configured')),
     );
   const androidConfigurationLoading = Boolean(
     homeTrusted &&
-      androidLocalOwnerCurrent &&
-      (messageConfiguration.state.kind === 'loading' ||
-        policyConfiguration.state.kind === 'loading' ||
-        (messageConfiguration.state.kind === 'ready' &&
-          messageConfiguration.state.refreshing) ||
-        (policyConfiguration.state.kind === 'ready' &&
-          policyConfiguration.state.refreshing)),
+    androidLocalOwnerCurrent &&
+    (messageConfiguration.state.kind === 'loading' ||
+      policyConfiguration.state.kind === 'loading' ||
+      (messageConfiguration.state.kind === 'ready' &&
+        messageConfiguration.state.refreshing) ||
+      (policyConfiguration.state.kind === 'ready' &&
+        policyConfiguration.state.refreshing)),
   );
   const testConfigurationReady = Boolean(
     messageConfigurationReady &&
-      policyConfigurationTrusted &&
-      policyConfiguration.state.kind === 'ready' &&
-      policyConfiguration.state.result.envelope.value.kind === 'configured',
+    policyConfigurationTrusted &&
+    policyConfiguration.state.kind === 'ready' &&
+    policyConfiguration.state.result.envelope.value.kind === 'configured',
   );
   const androidPolicyRepairRequired = Boolean(
     homeTrusted &&
-      androidSetupConfigurationOwnerCurrent &&
-      messageConfigurationReady &&
-      policyConfigurationTrusted &&
-      policyConfiguration.state.kind === 'ready' &&
-      policyConfiguration.state.result.envelope.value.kind === 'not-configured',
+    androidSetupConfigurationOwnerCurrent &&
+    messageConfigurationReady &&
+    policyConfigurationTrusted &&
+    policyConfiguration.state.kind === 'ready' &&
+    policyConfiguration.state.result.envelope.value.kind === 'not-configured',
   );
   const androidHomeRecoveryVisible =
     home.state.kind === 'ready' && Boolean(home.state.refreshProblem);
@@ -883,7 +882,7 @@ function LiveAndroidAutomation({
       : undefined;
   const latestTestReasonRepeatedAsReadinessIssue = Boolean(
     latestAndroidTest?.reason &&
-      readinessIssues.some(issue => issue.code === latestAndroidTest.reason),
+    readinessIssues.some(issue => issue.code === latestAndroidTest.reason),
   );
   const latestTestAbsent =
     latestTest.state.kind === 'error' &&
@@ -894,9 +893,9 @@ function LiveAndroidAutomation({
     latestTest.state.result.envelope.value.platform !== 'android';
   const latestTestRevisionMismatch = Boolean(
     latestTest.state.kind === 'ready' &&
-      !latestTest.state.refreshing &&
-      !latestTest.state.refreshProblem &&
-      latestTest.state.result.envelope.revision !== homeRevision,
+    !latestTest.state.refreshing &&
+    !latestTest.state.refreshProblem &&
+    latestTest.state.result.envelope.revision !== homeRevision,
   );
   const testInFlight = Boolean(
     latestAndroidTest && androidTestInFlightPhases.has(latestAndroidTest.phase),
@@ -909,9 +908,9 @@ function LiveAndroidAutomation({
   const latestTestSettled = latestTestAbsent || latestAndroidTest !== undefined;
   const latestTestStatusRecoveryVisible = Boolean(
     (latestTest.state.kind === 'error' && !latestTestAbsent) ||
-      latestTestPlatformMismatch ||
-      latestTestRevisionMismatch ||
-      (latestTest.state.kind === 'ready' && latestTest.state.refreshProblem),
+    latestTestPlatformMismatch ||
+    latestTestRevisionMismatch ||
+    (latestTest.state.kind === 'ready' && latestTest.state.refreshProblem),
   );
   const canStartTest =
     homeTrusted &&
@@ -927,32 +926,32 @@ function LiveAndroidAutomation({
   const actionReviewOpen = protectedReviewOpen;
   const readinessActionProjectionLoading = Boolean(
     account.state.kind === 'loading' ||
-      (account.state.kind === 'ready' && account.state.refreshing) ||
-      messageConfiguration.state.kind === 'loading' ||
-      (messageConfiguration.state.kind === 'ready' &&
-        messageConfiguration.state.refreshing) ||
-      policyConfiguration.state.kind === 'loading' ||
-      (policyConfiguration.state.kind === 'ready' &&
-        policyConfiguration.state.refreshing) ||
-      latestTest.state.kind === 'loading' ||
-      (latestTest.state.kind === 'ready' && latestTest.state.refreshing),
+    (account.state.kind === 'ready' && account.state.refreshing) ||
+    messageConfiguration.state.kind === 'loading' ||
+    (messageConfiguration.state.kind === 'ready' &&
+      messageConfiguration.state.refreshing) ||
+    policyConfiguration.state.kind === 'loading' ||
+    (policyConfiguration.state.kind === 'ready' &&
+      policyConfiguration.state.refreshing) ||
+    latestTest.state.kind === 'loading' ||
+    (latestTest.state.kind === 'ready' && latestTest.state.refreshing),
   );
   const canPerformReadinessAction = Boolean(
     actionableReadinessIssue?.action &&
-      homeTrusted &&
-      homeRevision !== undefined &&
-      accountProjectionTrusted &&
-      !protectedReviewOpen &&
-      !readinessActionProjectionLoading &&
-      !androidHomeRecoveryVisible &&
-      !androidOwnershipRecoveryVisible &&
-      !androidConfigurationLoading &&
-      !androidConfigurationStatusRecoveryVisible &&
-      !androidMessageRepairVisible &&
-      !androidPolicyRepairRequired &&
-      !latestTestStatusRecoveryVisible &&
-      !testInFlight &&
-      pending === undefined,
+    homeTrusted &&
+    homeRevision !== undefined &&
+    accountProjectionTrusted &&
+    !protectedReviewOpen &&
+    !readinessActionProjectionLoading &&
+    !androidHomeRecoveryVisible &&
+    !androidOwnershipRecoveryVisible &&
+    !androidConfigurationLoading &&
+    !androidConfigurationStatusRecoveryVisible &&
+    !androidMessageRepairVisible &&
+    !androidPolicyRepairRequired &&
+    !latestTestStatusRecoveryVisible &&
+    !testInFlight &&
+    pending === undefined,
   );
   const canReviewActivation =
     homeTrusted &&
@@ -1025,15 +1024,15 @@ function LiveAndroidAutomation({
       androidAutomation.effective === 'action-required');
   const hasPrimaryPlatformAction = Boolean(
     showTestForm ||
-      canReviewActivation ||
-      canReviewResume ||
-      androidHomeRecoveryVisible ||
-      androidMessageRepairVisible ||
-      androidPolicyRepairRequired ||
-      androidConfigurationStatusRecoveryVisible ||
-      androidOwnershipRecoveryVisible ||
-      latestTestStatusRecoveryVisible ||
-      actionableReadinessIssue,
+    canReviewActivation ||
+    canReviewResume ||
+    androidHomeRecoveryVisible ||
+    androidMessageRepairVisible ||
+    androidPolicyRepairRequired ||
+    androidConfigurationStatusRecoveryVisible ||
+    androidOwnershipRecoveryVisible ||
+    latestTestStatusRecoveryVisible ||
+    actionableReadinessIssue,
   );
   const supportAvailable = Boolean(
     latestAndroidTest?.reason || readinessSupportCodes.length > 0,
@@ -1211,9 +1210,9 @@ function LiveAndroidAutomation({
                   latestAndroidTest.phase === 'passed'
                     ? 'positive'
                     : latestAndroidTest.phase === 'submitted' ||
-                      latestAndroidTest.phase === 'sent-from-device'
-                    ? 'info'
-                    : 'warning'
+                        latestAndroidTest.phase === 'sent-from-device'
+                      ? 'info'
+                      : 'warning'
                 }
               />
             ) : null}
@@ -2153,14 +2152,14 @@ function LiveIosCompanion({
     setup.state.result.envelope.value.automation.platform === 'ios';
   const iosSetupRecoveryVisible = Boolean(
     homeTrusted &&
-      (setup.state.kind === 'error' ||
-        (setup.state.kind === 'ready' &&
-          (Boolean(setup.state.refreshProblem) ||
-            setup.state.result.envelope.value.automation.platform !== 'ios' ||
-            (!setup.state.refreshing &&
-              home.state.kind === 'ready' &&
-              setup.state.result.envelope.revision !==
-                home.state.result.envelope.revision)))),
+    (setup.state.kind === 'error' ||
+      (setup.state.kind === 'ready' &&
+        (Boolean(setup.state.refreshProblem) ||
+          setup.state.result.envelope.value.automation.platform !== 'ios' ||
+          (!setup.state.refreshing &&
+            home.state.kind === 'ready' &&
+            setup.state.result.envelope.revision !==
+              home.state.result.envelope.revision)))),
   );
   const initialActivationCompleted = setupTrusted
     ? setup.state.kind === 'ready'
@@ -2178,8 +2177,8 @@ function LiveIosCompanion({
     messageConfiguration.state.result.envelope.revision === iosHomeRevision;
   const iosMessageConfigurationReady = Boolean(
     iosMessageConfigurationTrusted &&
-      messageConfiguration.state.kind === 'ready' &&
-      messageConfiguration.state.result.envelope.value.kind === 'configured',
+    messageConfiguration.state.kind === 'ready' &&
+    messageConfiguration.state.result.envelope.value.kind === 'configured',
   );
   const iosPolicyConfigurationTrusted =
     policyConfiguration.state.kind === 'ready' &&
@@ -2188,61 +2187,59 @@ function LiveIosCompanion({
     policyConfiguration.state.result.envelope.revision === iosHomeRevision;
   const iosPolicyConfigurationReady = Boolean(
     iosPolicyConfigurationTrusted &&
-      policyConfiguration.state.kind === 'ready' &&
-      policyConfiguration.state.result.envelope.value.kind === 'configured',
+    policyConfiguration.state.kind === 'ready' &&
+    policyConfiguration.state.result.envelope.value.kind === 'configured',
   );
   const iosConfigurationReady =
     iosMessageConfigurationReady && iosPolicyConfigurationReady;
   const iosConfigurationLoading = Boolean(
     homeTrusted &&
-      (messageConfiguration.state.kind === 'loading' ||
-        policyConfiguration.state.kind === 'loading' ||
-        (messageConfiguration.state.kind === 'ready' &&
-          messageConfiguration.state.refreshing) ||
-        (policyConfiguration.state.kind === 'ready' &&
-          policyConfiguration.state.refreshing)),
+    (messageConfiguration.state.kind === 'loading' ||
+      policyConfiguration.state.kind === 'loading' ||
+      (messageConfiguration.state.kind === 'ready' &&
+        messageConfiguration.state.refreshing) ||
+      (policyConfiguration.state.kind === 'ready' &&
+        policyConfiguration.state.refreshing)),
   );
   const iosMessageRepairVisible = Boolean(
     homeTrusted &&
-      iosAutomation?.effective === 'not-configured' &&
-      iosMessageConfigurationTrusted &&
-      messageConfiguration.state.kind === 'ready' &&
-      messageConfiguration.state.result.envelope.value.kind ===
-        'not-configured',
+    iosAutomation?.effective === 'not-configured' &&
+    iosMessageConfigurationTrusted &&
+    messageConfiguration.state.kind === 'ready' &&
+    messageConfiguration.state.result.envelope.value.kind === 'not-configured',
   );
   const iosPolicyRepairRequired = Boolean(
     homeTrusted &&
-      iosAutomation?.effective === 'not-configured' &&
-      iosMessageConfigurationReady &&
-      iosPolicyConfigurationTrusted &&
-      policyConfiguration.state.kind === 'ready' &&
-      policyConfiguration.state.result.envelope.value.kind === 'not-configured',
+    iosAutomation?.effective === 'not-configured' &&
+    iosMessageConfigurationReady &&
+    iosPolicyConfigurationTrusted &&
+    policyConfiguration.state.kind === 'ready' &&
+    policyConfiguration.state.result.envelope.value.kind === 'not-configured',
   );
   const iosConfigurationStatusRecoveryVisible = Boolean(
     homeTrusted &&
-      (messageConfiguration.state.kind === 'error' ||
-        policyConfiguration.state.kind === 'error' ||
-        (messageConfiguration.state.kind === 'ready' &&
-          (Boolean(messageConfiguration.state.refreshProblem) ||
-            (!messageConfiguration.state.refreshing &&
-              messageConfiguration.state.result.envelope.revision !==
-                iosHomeRevision))) ||
-        (policyConfiguration.state.kind === 'ready' &&
-          (Boolean(policyConfiguration.state.refreshProblem) ||
-            (!policyConfiguration.state.refreshing &&
-              policyConfiguration.state.result.envelope.revision !==
-                iosHomeRevision))) ||
-        (iosAutomation?.effective !== 'not-configured' &&
-          ((iosMessageConfigurationTrusted &&
-            messageConfiguration.state.kind === 'ready' &&
-            messageConfiguration.state.result.envelope.value.kind ===
-              'not-configured') ||
-            (iosPolicyConfigurationTrusted &&
-              policyConfiguration.state.kind === 'ready' &&
-              policyConfiguration.state.result.envelope.value.kind ===
-                'not-configured'))) ||
-        (iosAutomation?.effective === 'not-configured' &&
-          iosConfigurationReady)),
+    (messageConfiguration.state.kind === 'error' ||
+      policyConfiguration.state.kind === 'error' ||
+      (messageConfiguration.state.kind === 'ready' &&
+        (Boolean(messageConfiguration.state.refreshProblem) ||
+          (!messageConfiguration.state.refreshing &&
+            messageConfiguration.state.result.envelope.revision !==
+              iosHomeRevision))) ||
+      (policyConfiguration.state.kind === 'ready' &&
+        (Boolean(policyConfiguration.state.refreshProblem) ||
+          (!policyConfiguration.state.refreshing &&
+            policyConfiguration.state.result.envelope.revision !==
+              iosHomeRevision))) ||
+      (iosAutomation?.effective !== 'not-configured' &&
+        ((iosMessageConfigurationTrusted &&
+          messageConfiguration.state.kind === 'ready' &&
+          messageConfiguration.state.result.envelope.value.kind ===
+            'not-configured') ||
+          (iosPolicyConfigurationTrusted &&
+            policyConfiguration.state.kind === 'ready' &&
+            policyConfiguration.state.result.envelope.value.kind ===
+              'not-configured'))) ||
+      (iosAutomation?.effective === 'not-configured' && iosConfigurationReady)),
   );
   const iosHomeRecoveryVisible =
     home.state.kind === 'ready' && Boolean(home.state.refreshProblem);
@@ -2250,14 +2247,14 @@ function LiveIosCompanion({
   const reminderTrusted = reminderReady?.kind === 'ok';
   const pausedReminderCancellationPending = Boolean(
     homeTrusted &&
-      iosAutomation?.desired === 'paused' &&
-      iosAutomation.effective === 'paused' &&
-      reminderReady?.kind === 'ok' &&
-      (reminderReady.scheduledCount > 0 ||
-        reminderReady.failedCount > 0 ||
-        reminderReady.earliestUnscheduledCivilDate ||
-        reminderReady.truncated ||
-        reminderReady.code),
+    iosAutomation?.desired === 'paused' &&
+    iosAutomation.effective === 'paused' &&
+    reminderReady?.kind === 'ok' &&
+    (reminderReady.scheduledCount > 0 ||
+      reminderReady.failedCount > 0 ||
+      reminderReady.earliestUnscheduledCivilDate ||
+      reminderReady.truncated ||
+      reminderReady.code),
   );
   const pauseVerificationVisible =
     pauseVerificationRequired || pausedReminderCancellationPending;
@@ -2294,43 +2291,43 @@ function LiveIosCompanion({
     reminderReady?.authorization === 'unknown';
   const reminderPrimaryRecoveryVisible = Boolean(
     reminderNeedsCheck ||
-      reminderReady?.authorization === 'not-determined' ||
-      reminderReady?.authorization === 'denied',
+    reminderReady?.authorization === 'not-determined' ||
+    reminderReady?.authorization === 'denied',
   );
   const composerAllowed = iosAutomation?.readiness.composer.kind === 'allowed';
   const activationReviewModeCurrent = Boolean(
     activationReview &&
-      activationReview.expiresAtMs > Date.now() &&
-      setupTrusted &&
-      iosConfigurationReady &&
-      !iosConfigurationLoading &&
-      !iosConfigurationStatusRecoveryVisible &&
-      activationReview.sourceRevision ===
-        (home.state.kind === 'ready'
-          ? home.state.result.envelope.revision
-          : undefined) &&
-      !accountDeletionInProgress &&
-      iosAutomation?.desired === 'paused' &&
-      iosAutomation.effective === 'paused' &&
-      (activationReview.kind === 'activate'
-        ? initialActivationCompleted === false
-        : initialActivationCompleted === true),
+    activationReview.expiresAtMs > Date.now() &&
+    setupTrusted &&
+    iosConfigurationReady &&
+    !iosConfigurationLoading &&
+    !iosConfigurationStatusRecoveryVisible &&
+    activationReview.sourceRevision ===
+      (home.state.kind === 'ready'
+        ? home.state.result.envelope.revision
+        : undefined) &&
+    !accountDeletionInProgress &&
+    iosAutomation?.desired === 'paused' &&
+    iosAutomation.effective === 'paused' &&
+    (activationReview.kind === 'activate'
+      ? initialActivationCompleted === false
+      : initialActivationCompleted === true),
   );
   const activationReviewCurrent =
     homeTrusted && activationReviewModeCurrent && composerAllowed;
   const pauseReviewCurrent = Boolean(
     homeTrusted &&
-      setupTrusted &&
-      !iosSetupRecoveryVisible &&
-      !iosConfigurationLoading &&
-      !iosConfigurationStatusRecoveryVisible &&
-      confirmPause ===
-        (home.state.kind === 'ready'
-          ? home.state.result.envelope.revision
-          : undefined) &&
-      iosAutomation?.desired === 'composer-reminders-on' &&
-      (iosAutomation.effective === 'ready' ||
-        iosAutomation.effective === 'action-required'),
+    setupTrusted &&
+    !iosSetupRecoveryVisible &&
+    !iosConfigurationLoading &&
+    !iosConfigurationStatusRecoveryVisible &&
+    confirmPause ===
+      (home.state.kind === 'ready'
+        ? home.state.result.envelope.revision
+        : undefined) &&
+    iosAutomation?.desired === 'composer-reminders-on' &&
+    (iosAutomation.effective === 'ready' ||
+      iosAutomation.effective === 'action-required'),
   );
   const protectedReviewOpen = Boolean(activationReview || confirmPause);
   const actionReviewOpen = protectedReviewOpen || pauseVerificationVisible;
@@ -2379,9 +2376,9 @@ function LiveIosCompanion({
     composerIssues.length > 0;
   const hasReminderWarnings = Boolean(
     reminderReady &&
-      (reminderReady.failedCount > 0 ||
-        reminderReady.earliestUnscheduledCivilDate ||
-        reminderReady.truncated),
+    (reminderReady.failedCount > 0 ||
+      reminderReady.earliestUnscheduledCivilDate ||
+      reminderReady.truncated),
   );
   useEffect(() => {
     if (!activationReview) return;

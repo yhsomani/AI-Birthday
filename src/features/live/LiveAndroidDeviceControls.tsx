@@ -200,8 +200,8 @@ export function LiveAndroidDeviceControls({
         result.envelope.value.kind === 'granted'
           ? t('live.device.notifications.grantedMessage')
           : result.envelope.value.kind === 'cancelled'
-          ? t('live.device.notifications.cancelledMessage')
-          : t('live.device.notifications.reviewSettingsMessage'),
+            ? t('live.device.notifications.cancelledMessage')
+            : t('live.device.notifications.reviewSettingsMessage'),
       );
       await notifications.reload();
     }
@@ -409,10 +409,10 @@ export function LiveAndroidDeviceControls({
       : undefined;
   const activeTransferModeCurrent = Boolean(
     activeTransfer &&
-      accountLifecycleEligible &&
-      (activeTransfer.kind === 'complete'
-        ? connected?.sender.kind === 'test-only'
-        : activeTransfer.kind === 'remote-draining'
+    accountLifecycleEligible &&
+    (activeTransfer.kind === 'complete'
+      ? connected?.sender.kind === 'test-only'
+      : activeTransfer.kind === 'remote-draining'
         ? accountTransferPending
         : Boolean(standby || accountTransferPending)),
   );
@@ -436,43 +436,43 @@ export function LiveAndroidDeviceControls({
     transfer.state.kind === 'ready' && transfer.state.refreshing;
   const transferApplicable = Boolean(
     applicableSender ||
-      review ||
-      activeTransfer ||
-      applicableFailedTransfer ||
-      applicableUnavailable,
+    review ||
+    activeTransfer ||
+    applicableFailedTransfer ||
+    applicableUnavailable,
   );
   const notificationSectionVisible = Boolean(
     showNotifications &&
-      accountProjectionStable &&
-      accountLifecycleEligible &&
-      !transferApplicable &&
-      (notifications.state.kind !== 'ready' ||
-        notifications.state.refreshing ||
-        notifications.state.refreshProblem ||
-        notifications.state.result.envelope.value.kind !== 'granted'),
+    accountProjectionStable &&
+    accountLifecycleEligible &&
+    !transferApplicable &&
+    (notifications.state.kind !== 'ready' ||
+      notifications.state.refreshing ||
+      notifications.state.refreshProblem ||
+      notifications.state.result.envelope.value.kind !== 'granted'),
   );
   const transferReviewCurrent = Boolean(
     review &&
-      review.expiresAtMs > Date.now() &&
-      standby &&
-      account?.revision === review.accountRevision &&
-      accountProjectionStable &&
-      transferProjectionStable &&
-      transferValue?.kind === 'none',
+    review.expiresAtMs > Date.now() &&
+    standby &&
+    account?.revision === review.accountRevision &&
+    accountProjectionStable &&
+    transferProjectionStable &&
+    transferValue?.kind === 'none',
   );
   const transferStatusCheckVisible = Boolean(
     transfer.state.kind === 'ready' &&
-      transferApplicable &&
-      !(transferValue?.kind === 'unavailable' && !review) &&
-      (!accountProjectionStable ||
-        !transferProjectionStable ||
-        !accountLifecycleEligible ||
-        transfer.state.refreshProblem ||
-        Boolean(activeTransfer && !activeTransferModeCurrent) ||
-        terminalTransferNeedsReconciliation ||
-        Boolean(applicableFailedTransfer && accountTransferPending) ||
-        (transferValue?.kind === 'none' && accountTransferPending && !review) ||
-        (review && transferValue?.kind !== 'none')),
+    transferApplicable &&
+    !(transferValue?.kind === 'unavailable' && !review) &&
+    (!accountProjectionStable ||
+      !transferProjectionStable ||
+      !accountLifecycleEligible ||
+      transfer.state.refreshProblem ||
+      Boolean(activeTransfer && !activeTransferModeCurrent) ||
+      terminalTransferNeedsReconciliation ||
+      Boolean(applicableFailedTransfer && accountTransferPending) ||
+      (transferValue?.kind === 'none' && accountTransferPending && !review) ||
+      (review && transferValue?.kind !== 'none')),
   );
   const accountStatusCheckVisible = Boolean(
     account && !accountProjectionStable && !transferApplicable,
@@ -563,18 +563,18 @@ export function LiveAndroidDeviceControls({
               notifications.state.refreshing
                 ? t('live.device.notifications.loading')
                 : notifications.state.result.envelope.value.kind === 'granted'
-                ? t('live.device.notifications.granted')
-                : notifications.state.result.envelope.value.kind ===
-                  'not-requested'
-                ? t('live.device.notifications.notRequested')
-                : t('live.device.notifications.settingsRequired')
+                  ? t('live.device.notifications.granted')
+                  : notifications.state.result.envelope.value.kind ===
+                      'not-requested'
+                    ? t('live.device.notifications.notRequested')
+                    : t('live.device.notifications.settingsRequired')
             }
             tone={
               notifications.state.refreshing
                 ? 'neutral'
                 : notifications.state.result.envelope.value.kind === 'granted'
-                ? 'positive'
-                : 'warning'
+                  ? 'positive'
+                  : 'warning'
             }
           />
           {notifications.state.result.envelope.value.kind === 'not-requested' &&
@@ -726,8 +726,8 @@ export function LiveAndroidDeviceControls({
               visibleTransfer.kind === 'complete'
                 ? 'positive'
                 : visibleTransfer.kind === 'failed'
-                ? 'critical'
-                : 'warning'
+                  ? 'critical'
+                  : 'warning'
             }
           />
           {'reason' in visibleTransfer ? (

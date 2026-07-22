@@ -1266,8 +1266,8 @@ test('cloud evidence CLI cannot replace trust, validation time, or source checko
         forbiddenOption === 'authority-pin'
           ? path.join(ROOT, 'tools/distribution-authority-pin.json')
           : forbiddenOption === 'source-root'
-          ? ROOT
-          : '2000-01-01T00:00:00Z',
+            ? ROOT
+            : '2000-01-01T00:00:00Z',
       ],
       { encoding: 'utf8' },
     );

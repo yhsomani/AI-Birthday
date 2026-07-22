@@ -696,8 +696,8 @@ export function LivePersonDetailScreen({
         kind === 'pause'
           ? await port.pauseRecipient(input)
           : kind === 'restore'
-          ? await port.restoreRecipient(input)
-          : await port.excludeRecipient(input);
+            ? await port.restoreRecipient(input)
+            : await port.excludeRecipient(input);
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
@@ -709,8 +709,8 @@ export function LivePersonDetailScreen({
         kind === 'pause'
           ? 'live.person.pauseAccepted'
           : kind === 'restore'
-          ? 'live.person.restoreAccepted'
-          : 'live.person.excludeAccepted',
+            ? 'live.person.restoreAccepted'
+            : 'live.person.excludeAccepted',
       ),
     );
   };
@@ -1089,8 +1089,8 @@ export function LivePersonDetailScreen({
     enrollment.kind === 'off' || enrollment.kind === 'excluded'
       ? 'set-up'
       : approval?.kind === 'valid' && !structuralRepairNeeded
-      ? 'view-approved'
-      : 'review-changes';
+        ? 'view-approved'
+        : 'review-changes';
   const canEnroll =
     projectionUsable &&
     enrollment.kind === 'off' &&
@@ -1105,20 +1105,20 @@ export function LivePersonDetailScreen({
   const approvalText = !approval
     ? t('live.person.approvalNone')
     : approval.kind === 'missing'
-    ? t('live.person.approvalMissing')
-    : approval.kind === 'valid'
-    ? t('live.person.approvalValid', {
-        time: formatLiveInstant(approval.approvedAt, language),
-      })
-    : t('live.person.approvalInvalid', {
-        reasons: [
-          ...new Set(
-            approval.reasons.map(reason =>
-              t(approvalInvalidationMessageKey(reason)),
-            ),
-          ),
-        ].join(' '),
-      });
+      ? t('live.person.approvalMissing')
+      : approval.kind === 'valid'
+        ? t('live.person.approvalValid', {
+            time: formatLiveInstant(approval.approvedAt, language),
+          })
+        : t('live.person.approvalInvalid', {
+            reasons: [
+              ...new Set(
+                approval.reasons.map(reason =>
+                  t(approvalInvalidationMessageKey(reason)),
+                ),
+              ),
+            ].join(' '),
+          });
   const enrollmentText =
     enrollment.kind === 'paused'
       ? t('live.people.statusPaused', {
@@ -1146,10 +1146,10 @@ export function LivePersonDetailScreen({
       : undefined;
   const reviewStateExists = Boolean(
     enrollmentReview ||
-      approvalReview ||
-      choiceReview ||
-      recipientReview ||
-      destinationReview,
+    approvalReview ||
+    choiceReview ||
+    recipientReview ||
+    destinationReview,
   );
   const protectedFlowActive =
     reviewStateExists || (pending && protectedBindingRef.current !== undefined);
@@ -1239,22 +1239,22 @@ export function LivePersonDetailScreen({
             job === 'set-up'
               ? 'live.person.jobSetupTitle'
               : job === 'review-changes'
-              ? 'live.person.jobReviewChangesTitle'
-              : 'live.person.jobApprovedTitle',
+                ? 'live.person.jobReviewChangesTitle'
+                : 'live.person.jobApprovedTitle',
           )}
           detail={t(
             job === 'set-up'
               ? 'live.person.jobSetupBody'
               : job === 'review-changes'
-              ? 'live.person.jobReviewChangesBody'
-              : 'live.person.jobApprovedBody',
+                ? 'live.person.jobReviewChangesBody'
+                : 'live.person.jobApprovedBody',
           )}
           tone={
             job === 'view-approved'
               ? 'positive'
               : job === 'review-changes'
-              ? 'warning'
-              : 'info'
+                ? 'warning'
+                : 'info'
           }
           testID={`live-person-job-${job}`}
         />
@@ -1583,10 +1583,10 @@ export function LivePersonDetailScreen({
                       choice.id === projection.selectedPhoneId
                         ? t('live.common.selected')
                         : choice.issue
-                        ? t(safeReasonMessageKey(choice.issue))
-                        : choice.selectable
-                        ? t('live.common.availableReview')
-                        : t('live.common.unavailable')
+                          ? t(safeReasonMessageKey(choice.issue))
+                          : choice.selectable
+                            ? t('live.common.availableReview')
+                            : t('live.common.unavailable')
                     }
                     tone={
                       choice.id === projection.selectedPhoneId
@@ -1636,12 +1636,12 @@ export function LivePersonDetailScreen({
                         selected && needsLeapPolicy
                           ? t(safeReasonMessageKey('leap-policy-required'))
                           : selected
-                          ? t('live.common.selected')
-                          : choice.issue
-                          ? t(safeReasonMessageKey(choice.issue))
-                          : choice.selectable
-                          ? t('live.common.availableReview')
-                          : t('live.common.unavailable')
+                            ? t('live.common.selected')
+                            : choice.issue
+                              ? t(safeReasonMessageKey(choice.issue))
+                              : choice.selectable
+                                ? t('live.common.availableReview')
+                                : t('live.common.unavailable')
                       }
                       tone={selected ? 'positive' : 'neutral'}
                     />

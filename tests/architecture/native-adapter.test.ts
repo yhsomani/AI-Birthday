@@ -155,20 +155,20 @@ describe('BirthdayNativeAdapter fail-closed behavior', () => {
               },
             }
           : area === 'privacy' && request.kind === 'public-resources'
-          ? {
-              kind: 'available',
-              buildLabel: 'Birthday Autopilot 0.1.0 (1)',
-              baseUrl: 'https://birthday-autopilot-prod.web.app',
-            }
-          : {
-              kind: 'remote-draining',
-              id: 'privacy_11111111111111111111111111111111',
-              action: 'delete-account',
-              updatedAt: '2026-07-12T08:30:00Z',
-              localDataErased: true,
-              remoteDeletionComplete: false,
-              externalSmsCopiesNotErased: true,
-            };
+            ? {
+                kind: 'available',
+                buildLabel: 'Birthday Autopilot 0.1.0 (1)',
+                baseUrl: 'https://birthday-autopilot-prod.web.app',
+              }
+            : {
+                kind: 'remote-draining',
+                id: 'privacy_11111111111111111111111111111111',
+                action: 'delete-account',
+                updatedAt: '2026-07-12T08:30:00Z',
+                localDataErased: true,
+                remoteDeletionComplete: false,
+                externalSmsCopiesNotErased: true,
+              };
       return {
         contractVersion: 1,
         revision: '11',
@@ -242,23 +242,23 @@ describe('BirthdayNativeAdapter fail-closed behavior', () => {
         intent === 'request-notification-permission'
           ? { kind: 'denied' }
           : intent === 'check-account-deletion-status'
-          ? {
-              kind: 'complete',
-              id: 'privacy_22222222222222222222222222222222',
-              action: 'delete-account',
-              completedAt: '2026-07-12T08:30:01Z',
-              localDataErased: true,
-              remoteDeletionComplete: true,
-              externalSmsCopiesNotErased: true,
-            }
-          : intent === 'repair-lifecycle-state'
-          ? {
-              kind: 'local-wiping',
-              id: 'privacy-operation-repair',
-              action: 'disconnect-contacts',
-              updatedAt: '2026-07-12T08:30:01Z',
-            }
-          : { kind: 'opened' },
+            ? {
+                kind: 'complete',
+                id: 'privacy_22222222222222222222222222222222',
+                action: 'delete-account',
+                completedAt: '2026-07-12T08:30:01Z',
+                localDataErased: true,
+                remoteDeletionComplete: true,
+                externalSmsCopiesNotErased: true,
+              }
+            : intent === 'repair-lifecycle-state'
+              ? {
+                  kind: 'local-wiping',
+                  id: 'privacy-operation-repair',
+                  action: 'disconnect-contacts',
+                  updatedAt: '2026-07-12T08:30:01Z',
+                }
+              : { kind: 'opened' },
       ),
     }));
     const nativeModule = {
