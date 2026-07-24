@@ -5,6 +5,7 @@ const english = {
   'common.back': 'Back',
   'common.continue': 'Continue',
   'common.close': 'Close preview',
+  'common.clearSearch': 'Clear search',
   'common.fixtureNotice':
     'Interactive UI fixture • Synthetic data • No account, reminder, or message action is performed.',
   'common.layoutFixture': 'Layout fixture',
@@ -187,6 +188,7 @@ const hindi: typeof english = {
   'common.back': 'वापस',
   'common.continue': 'आगे बढ़ें',
   'common.close': 'पूर्वावलोकन बंद करें',
+  'common.clearSearch': 'खोज साफ़ करें',
   'common.fixtureNotice':
     'इंटरैक्टिव UI नमूना • केवल काल्पनिक डेटा • कोई खाता, रिमाइंडर या संदेश कार्रवाई नहीं होती।',
   'common.layoutFixture': 'लेआउट नमूना',

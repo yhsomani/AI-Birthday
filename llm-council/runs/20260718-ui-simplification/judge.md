@@ -46,4 +46,3 @@ No plan is accepted wholesale. The final synthesis keeps work presentation-only 
 4. Use one contextual primary action per screen/state, with blocking facts visible and healthy support detail progressively disclosed.
 5. Preserve exact Android “Sending from this phone” / “Sent from this phone; delivery not confirmed” truth and iOS foreground MessageUI/unknown-final-payload truth.
 6. Validate every slice with focused static/component tests plus rendered Android and iOS inspection; unavailable physical, carrier, external-service, or release-gate evidence is recorded as unavailable, never inferred.
-
