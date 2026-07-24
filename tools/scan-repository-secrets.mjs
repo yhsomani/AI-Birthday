@@ -76,7 +76,9 @@ function isApprovedFirebaseClientConfig(relativePath) {
     ) ||
     /^ios\/Config\/(dev|staging|lab|prod)\/GoogleService-Info\.plist$/u.test(
       normalized,
-    )
+    ) ||
+    /^app\/google-services\.json$/u.test(normalized) ||
+    /^app\/src\/debug\/google-services\.json$/u.test(normalized)
   );
 }
 
