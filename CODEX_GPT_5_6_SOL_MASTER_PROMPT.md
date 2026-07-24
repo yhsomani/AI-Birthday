@@ -10,7 +10,7 @@ The repository currently has no AGENTS.md or AGENT.md. The prompt handles that a
 
 ## Copy-paste prompt
 
-```text
+~~~text
 $llm-council
 
 <role_and_terminal_objective>
@@ -405,4 +405,4 @@ Then report:
 
 Do not finish with generic advice or ask the user to perform routine local work. Continue safe implementation and repair until the completion contract is met or only genuine external-authority work remains.
 </required_final_report>
-```
+~~~
