@@ -1,0 +1,3 @@
+## 2026-07-27 - Defer Expensive List Filtering in React Native
+**Learning:** Using `useDeferredValue` before filtering a large list in a `useMemo` block delegates the expensive filter operation to a background task, preventing it from blocking the main UI thread when text input state updates rapidly (e.g. during a search). This improves search field responsiveness on React Native without needing complex debouncing logic.
+**Action:** Use `useDeferredValue` for rapidly updating query strings before passing them into synchronous array methods (`filter`, `map`) inside `useMemo` for large data sets.
