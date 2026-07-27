@@ -584,6 +584,7 @@ export function SearchField({
   testID?: string;
 }) {
   const { colors } = useAppTheme();
+  const { t } = useAppLocalization();
   return (
     <View
       style={[
@@ -603,6 +604,17 @@ export function SearchField({
         style={[styles.searchInput, { color: colors.text }]}
         testID={testID}
       />
+      {!!value && (
+        <Pressable
+          accessibilityLabel={t('common.clear')}
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => onChangeText('')}
+          style={styles.searchClear}
+        >
+          <Icon name="clear" color={colors.textMuted} size={16} />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -892,6 +904,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  searchClear: {
+    padding: spacing.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchInput: {
     flex: 1,
