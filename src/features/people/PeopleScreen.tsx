@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useDeferredValue, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -33,8 +33,12 @@ export function PeopleScreen({ navigation }: Props) {
   const { selectedPersonIds, repairedPersonIds } = useFixture();
   const { language, t } = useAppLocalization();
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   const [filter, setFilter] = useState<Filter>('all');
 
+  // We wrap the search query with useDeferredValue before passing it to the heavy
+  // filtering operation to ensure typing in the search bar remains snappy and doesn't
+  // block the main UI thread with synchronous list processing.
   const people = useMemo(
     () =>
       fixturePeople.filter(person => {
@@ -42,14 +46,14 @@ export function PeopleScreen({ navigation }: Props) {
         const status = isRepaired ? 'ready' : person.status;
         const matchesQuery = person.name
           .toLocaleLowerCase()
-          .includes(query.trim().toLocaleLowerCase());
+          .includes(deferredQuery.trim().toLocaleLowerCase());
         const matchesFilter =
           filter === 'all' ||
           (filter === 'enabled' && selectedPersonIds.includes(person.id)) ||
           filter === status;
         return matchesQuery && matchesFilter;
       }),
-    [filter, query, repairedPersonIds, selectedPersonIds],
+    [filter, deferredQuery, repairedPersonIds, selectedPersonIds],
   );
 
   const statusLabel = (personId: string, status: FixturePersonStatus) => {
