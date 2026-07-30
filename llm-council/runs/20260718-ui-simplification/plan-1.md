@@ -2,10 +2,10 @@
 
 Simplify the production app into a three-tab control center with focused task leaves:
 
-| Surface | Core user job | Focused leaves |
-|---|---|---|
-| Home | “Is Birthday Autopilot ready, and what happens next?” | Activity, Attention/Fix, iOS Review message, setup continuation |
-| People | Find someone and safely prepare their greeting | Person setup/detail, batch approval |
+| Surface  | Core user job                                          | Focused leaves                                                               |
+| -------- | ------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Home     | “Is Birthday Autopilot ready, and what happens next?”  | Activity, Attention/Fix, iOS Review message, setup continuation              |
+| People   | Find someone and safely prepare their greeting         | Person setup/detail, batch approval                                          |
 | Settings | Change the birthday plan, account/privacy, or get help | Message, schedule, Android sending/iOS reminders, Privacy, Help, Diagnostics |
 
 The redesign should remove duplicated dashboards and internal implementation language, not capabilities. Android unattended sending still requires enrollment, immutable recipient approval, a successful test, permissions/readiness, carrier/SIM/cost awareness, and final claim/arm checks. iOS remains a foreground, user-confirmed `MessageUI` flow whose final content, sender, transport, and delivery are outside the app’s control. Privacy operations, retention, recovery, duplicate prevention, accessibility, localization, and platform-specific suppression remain binding.
