@@ -378,10 +378,7 @@ export function LiveProductSetupJourney({
                 : approvalCandidates.state.kind === 'ready' &&
                   approvalCandidates.state.refreshProblem
                 ? approvalCandidates.state.refreshProblem
-                : {
-                    kind: 'conflict',
-                    code: 'unknown-native-value',
-                  }
+                : { kind: 'conflict', code: 'unknown-native-value' }
             }
             onRetry={refreshProgress}
           />
