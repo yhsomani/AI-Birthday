@@ -30,6 +30,7 @@ const path = require('path') as PathApi;
 const typescript = require('typescript') as typeof import('typescript');
 
 const technicalOnlyHindiValues = {
+  'live.common.clear': 'Clear',
   'live.common.sim': 'SIM',
   'live.error.actionBody': '{{message}} {{reference}}',
 } as const satisfies Readonly<Partial<typeof liveHindi>>;
