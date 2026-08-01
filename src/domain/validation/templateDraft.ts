@@ -65,7 +65,7 @@ const BIRTHDAY_INTENT_HI = /(?:जन्म\s*दिन|जन्मदिवस
 const URL_SCHEME_OR_WWW =
   /(?:\b(?:https?|ftp)\s*:\s*\/\s*\/|\b(?:mailto|tel|sms|smsto)\s*:|\bwww\.)\S+/iu;
 const URL_DOMAIN = unicodePattern(
-  '\\b(?:[\\p{L}\\p{N}](?:[\\p{L}\\p{N}-]{0,62}[\\p{L}\\p{N}])?\\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})(?:[/?:#]\\S*)?',
+  '\\b(?:[\\p{L}\\p{N}](?:[\\p{L}\\p{N}-]{0,62}[\\p{L}\\p{N}])?\\.){1,254}(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})(?:[/?:#]\\S{0,2000})?',
   'giu',
 );
 const URL_OBFUSCATED_DOMAIN = unicodePattern(
@@ -73,7 +73,7 @@ const URL_OBFUSCATED_DOMAIN = unicodePattern(
   'iu',
 );
 const IPV4 = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/u;
-const EMAIL = /\b[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\b/iu;
+const EMAIL = /\b[a-z0-9.!#$%&'*+/=?^_`{|}~-]{1,254}@[a-z0-9-]{1,63}(?:\.[a-z0-9-]{1,63}){1,10}\b/iu;
 const TRACKING_OR_AFFILIATE = unicodePattern(
   '(?:\\butm_[a-z0-9_]+\\s*=|\\b(?:gclid|fbclid|msclkid|ref|referrer|affiliate_id|aff_id)\\s*=|#[\\p{L}\\p{N}_]+|\\b(?:affiliate|referral|sponsored)\\s+(?:link|code|post)|\\buse\\s+(?:my|code)\\s+(?:affiliate\\s+)?code\\b|\\bearns?\\s+(?:a\\s+)?commission\\b|(?:रेफरल|एफिलिएट|संबद्ध)\\s*(?:लिंक|कोड)|(?:प्रायोजित|कमीशन))',
   'iu',
