@@ -1,0 +1,4 @@
+## 2026-08-01 - Bounded Quantifiers to Prevent ReDoS
+**Vulnerability:** The `URL_DOMAIN` and `EMAIL` regular expressions used in `templateDraft.ts` for parsing draft messages were susceptible to catastrophic backtracking (Regular Expression Denial of Service - ReDoS).
+**Learning:** The vulnerability existed because the regexes contained nested or overlapping indefinite quantifiers (like `+` and `*`) that allowed the evaluation engine to backtrack exponentially when matching against maliciously long string inputs, hanging the thread.
+**Prevention:** Always bound quantifiers explicitly (e.g., `{1,254}`) instead of using unbounded multipliers (`+` or `*`) when evaluating variable, untrusted input. Limit captures to reasonable real-world bounds, such as standard maximum limits for domain lengths and URLs.
