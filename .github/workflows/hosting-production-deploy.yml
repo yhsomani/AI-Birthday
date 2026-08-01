@@ -214,7 +214,7 @@ jobs:
 
     steps:
       - name: Download the exact build artifact from this run
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: ${{ runner.temp }}/hosting-build-handoff
@@ -437,7 +437,7 @@ jobs:
           [[ "$ADMISSION_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
 
       - name: Download exact build and admission artifacts from this run
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }},${{ needs.admission.outputs.artifact-id }}
           path: ${{ runner.temp }}/hosting-deploy-handoff
