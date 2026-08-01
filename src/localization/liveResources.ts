@@ -1,4 +1,5 @@
 export const liveEnglish = {
+  'live.common.clearSearch': 'Clear search',
   'live.common.androidEdition': 'Android Automation Edition',
   'live.common.iosEdition': 'iOS Companion Edition',
   'live.common.back': 'Back',
@@ -1477,6 +1478,7 @@ export const liveEnglish = {
 
 export const liveHindi: typeof liveEnglish = {
   ...liveEnglish,
+  'live.common.clearSearch': 'Clear search',
   'live.common.androidEdition': 'Android ऑटोमेशन संस्करण',
   'live.common.iosEdition': 'iOS कम्पैनियन संस्करण',
   'live.common.back': 'वापस',

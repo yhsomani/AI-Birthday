@@ -584,6 +584,7 @@ export function SearchField({
   testID?: string;
 }) {
   const { colors } = useAppTheme();
+  const { t } = useAppLocalization();
   return (
     <View
       style={[
@@ -603,6 +604,16 @@ export function SearchField({
         style={[styles.searchInput, { color: colors.text }]}
         testID={testID}
       />
+      {!!value && (
+        <Pressable
+          accessibilityLabel={t('live.common.clearSearch')}
+          accessibilityRole="button"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          onPress={() => onChangeText('')}
+        >
+          <Icon name="close" color={colors.textMuted} size={20} />
+        </Pressable>
+      )}
     </View>
   );
 }

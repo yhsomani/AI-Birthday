@@ -21,7 +21,8 @@ export type IconName =
   | 'lock'
   | 'chevron'
   | 'search'
-  | 'person';
+  | 'person'
+  | 'close';
 
 type IconProps = {
   name: IconName;
@@ -52,6 +53,8 @@ const paths: Readonly<Record<Exclude<IconName, 'info' | 'warning'>, string>> = {
     'M10.5 3a7.5 7.5 0 1 0 4.7 13.3L20.9 22l2.1-2.1-5.7-5.7A7.5 7.5 0 0 0 10.5 3Zm0 3a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Z',
   person:
     'M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 6v2h18v-2c0-3.5-4-6-9-6Z',
+  close:
+    'M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4Z',
 };
 
 export function Icon({ name, color, size = 24, mirrored = false }: IconProps) {
