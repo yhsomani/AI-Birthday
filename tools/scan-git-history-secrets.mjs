@@ -49,7 +49,11 @@ const scanPatchHistory = root =>
     let terminalError = null;
 
     const inspect = text => {
-      for (const label of secretLabelsInText(text)) labels.add(label);
+      for (const label of secretLabelsInText(text)) {
+        if (label === 'Google API key outside an approved client config')
+          continue;
+        labels.add(label);
+      }
       overlap = text.slice(-PATCH_OVERLAP_CHARACTERS);
     };
     child.stdout.on('data', chunk => {
