@@ -1123,6 +1123,7 @@ export function LivePeopleScreen({
         }}
         label={t('live.people.search')}
         hint={t('live.people.searchHint')}
+        clearA11yLabel={t('live.common.clear')}
         testID="live-people-search"
       />
       <View

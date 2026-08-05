@@ -575,12 +575,14 @@ export function SearchField({
   onChangeText,
   label,
   hint,
+  clearA11yLabel,
   testID,
 }: {
   value: string;
   onChangeText: (value: string) => void;
   label: string;
   hint: string;
+  clearA11yLabel?: string;
   testID?: string;
 }) {
   const { colors } = useAppTheme();
@@ -603,6 +605,17 @@ export function SearchField({
         style={[styles.searchInput, { color: colors.text }]}
         testID={testID}
       />
+      {!!value && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={clearA11yLabel ?? 'Clear'}
+          hitSlop={8}
+          onPress={() => onChangeText?.('')}
+          style={styles.searchClearButton}
+        >
+          <AppText style={{ color: colors.textMuted }}>×</AppText>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -898,6 +911,11 @@ const styles = StyleSheet.create({
     fontSize: 17,
     minHeight: minimumTargetSize,
     paddingVertical: spacing.sm,
+  },
+  searchClearButton: {
+    padding: spacing.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   settingRow: {
     minHeight: minimumTargetSize,
