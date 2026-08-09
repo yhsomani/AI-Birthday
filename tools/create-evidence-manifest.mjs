@@ -31,11 +31,24 @@ const SAFE_BUILDER_VALUE = /^[A-Za-z0-9][A-Za-z0-9 ._/@:#-]{0,511}$/u;
 const portablePath = value => value.split(path.sep).join('/');
 
 const checkedCommand = (binary, args, cwd) => {
-  const result = spawnSync(binary, args, {
-    cwd,
-    encoding: 'utf8',
-    maxBuffer: 1024 * 1024,
-  });
+  let result;
+  if (process.platform === 'win32') {
+    result = spawnSync(
+      process.env.ComSpec ?? 'cmd.exe',
+      ['/d', '/s', '/c', [binary, ...args].join(' ')],
+      {
+        cwd,
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024,
+      },
+    );
+  } else {
+    result = spawnSync(binary, args, {
+      cwd,
+      encoding: 'utf8',
+      maxBuffer: 1024 * 1024,
+    });
+  }
   if (result.status !== 0) {
     throw new Error(`cannot collect evidence provenance from ${binary}`);
   }

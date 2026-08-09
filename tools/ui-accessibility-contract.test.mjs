@@ -11,7 +11,7 @@ const walk = directory =>
   readdirSync(path.join(projectRoot, directory), {
     withFileTypes: true,
   }).flatMap(entry => {
-    const file = path.join(directory, entry.name);
+    const file = path.join(directory, entry.name).split(path.sep).join('/');
     return entry.isDirectory() ? walk(file) : [file];
   });
 

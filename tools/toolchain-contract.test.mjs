@@ -14,7 +14,8 @@ import test from 'node:test';
 
 import { TOOLCHAIN_VERSIONS } from './toolchain-versions.mjs';
 
-const read = file => readFileSync(file, 'utf8');
+const read = file =>
+  readFileSync(file, 'utf8').replace(/\r\n/gu, '\n');
 
 test('mobile Node and npm pins agree across install contracts', () => {
   const packageJson = JSON.parse(read('package.json'));

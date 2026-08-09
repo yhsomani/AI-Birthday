@@ -8,6 +8,8 @@ const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 const read = file => readFileSync(path.join(projectRoot, file), 'utf8');
 const exists = file => existsSync(path.join(projectRoot, file));
 
+const toPosix = file => file.split(path.sep).join('/');
+
 const resolveProductionImport = (sourceFile, specifier) => {
   const base = path.normalize(path.join(path.dirname(sourceFile), specifier));
   return [
@@ -32,7 +34,9 @@ const reachableProductionModules = root => {
     ].map(match => match[1]);
     for (const specifier of specifiers) {
       const dependency = resolveProductionImport(file, specifier);
-      if (dependency && !reachable.has(dependency)) pending.push(dependency);
+      if (dependency && !reachable.has(dependency)) {
+        pending.push(toPosix(dependency));
+      }
     }
   }
   return reachable;

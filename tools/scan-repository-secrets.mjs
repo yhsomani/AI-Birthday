@@ -139,7 +139,10 @@ async function inspectTextFile(root, absolutePath, findings) {
   if (metadata.size === 0 || metadata.size > maximumTextBytes) return;
   const buffer = await readFile(absolutePath);
   if (buffer.includes(0)) return;
-  const relativePath = path.relative(root, absolutePath);
+  const relativePath = path
+    .relative(root, absolutePath)
+    .split(path.sep)
+    .join('/');
   const content = buffer.toString('utf8');
   for (const label of secretLabelsInText(content, relativePath)) {
     findings.push(`${relativePath}: ${label}`);
@@ -162,7 +165,10 @@ export async function scanRepository(root) {
   const findings = [];
   const files = await collectFiles(root);
   for (const absolutePath of files) {
-    const relativePath = path.relative(root, absolutePath);
+    const relativePath = path
+      .relative(root, absolutePath)
+      .split(path.sep)
+      .join('/');
     if (isForbiddenCredentialPath(relativePath)) {
       if (await isApprovedTemplateDebugKeystore(root, absolutePath)) continue;
       findings.push(`${relativePath}: forbidden credential/config path`);

@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { extname, join } from 'node:path';
+import { extname, join, sep } from 'node:path';
 import test from 'node:test';
 
 const read = path => readFileSync(path, 'utf8');
 
+const toPosix = value => value.split(sep).join('/');
+
 const walk = directory =>
   readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const path = join(directory, entry.name);
-    return entry.isDirectory() ? walk(path) : [path];
+    return entry.isDirectory() ? walk(path) : [toPosix(path)];
   });
 
 test('only the injected typed platform adapter contains an SMS submission call', () => {
