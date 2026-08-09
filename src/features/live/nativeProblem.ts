@@ -1,3 +1,4 @@
+import type { NativeRevision } from '../../domain/shared/brand';
 import type { NativeProblem } from '../../domain/shared/result';
 import { safeReasonMessageKey } from '../../localization/reasonCopy';
 import type { TranslationKey } from '../../localization/resources';
@@ -13,6 +14,13 @@ export const nativeContractProblem: NativeProblem = {
   supportCode:
     'NATIVE_CONTRACT_INVALID' as import('../../domain/shared/brand').SafeSupportCode,
 };
+
+export const staleRevisionProblem = (
+  latestRevision: NativeRevision,
+): NativeProblem => ({
+  kind: 'stale-revision',
+  latestRevision,
+});
 
 export const nativePlatformMismatchProblem: NativeProblem = {
   kind: 'internal',

@@ -92,7 +92,6 @@ class SmokeBirthdayNativeModule(
       "privacy" -> when (request.optString("kind")) {
         "inventory" -> "privacy:inventory"
         "public-resources" -> "privacy:public-resources"
-        "latest-deletion-receipt" -> "privacy:latest-deletion-receipt"
         "current-operation" -> "privacy:current-operation"
         else -> null
       }

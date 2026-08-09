@@ -19,7 +19,6 @@ const EXPECTED_PROJECTION_KEYS = [
   'notifications',
   'privacy:current-operation',
   'privacy:inventory',
-  'privacy:latest-deletion-receipt',
   'privacy:public-resources',
   'readiness',
   'route',

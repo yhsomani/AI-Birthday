@@ -41,7 +41,7 @@ import {
   LiveRefreshProblem,
   LiveActionFeedback,
 } from './LiveProjectionState';
-import { nativeBridgeProblem } from './nativeProblem';
+import { nativeBridgeProblem, staleRevisionProblem } from './nativeProblem';
 import {
   isReadyOffContact,
   PEOPLE_PAGE_SIZE,
@@ -114,13 +114,6 @@ const peopleTruthUnavailableProblem: NativeProblem = {
   kind: 'internal',
   supportCode: 'PEOPLE_TRUTH_UNAVAILABLE' as SafeSupportCode,
 };
-
-const staleRevisionProblem = (
-  latestRevision: NativeRevision,
-): NativeProblem => ({
-  kind: 'stale-revision',
-  latestRevision,
-});
 
 const emptyMessageKey = (
   filter: PeopleFilter,

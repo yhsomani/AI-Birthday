@@ -78,7 +78,6 @@ test('shared smoke projections are content-free and fail every intent closed', (
     'notifications',
     'privacy:current-operation',
     'privacy:inventory',
-    'privacy:latest-deletion-receipt',
     'privacy:public-resources',
     'readiness',
     'route',

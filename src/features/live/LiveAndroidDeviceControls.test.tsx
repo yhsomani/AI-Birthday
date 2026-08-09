@@ -958,6 +958,30 @@ it.each([
   },
 );
 
+it('reloads the notification permission projection on a notifications invalidation', async () => {
+  const getNotificationPermission = jest.fn(async () =>
+    ok({ kind: 'granted' as const }),
+  );
+  const harness = createDeviceHarness({ getNotificationPermission });
+  await renderControls(
+    harness,
+    accountEnvelope(androidSender('automation-active')),
+    jest.fn(),
+    true,
+  );
+  await waitFor(() =>
+    expect(getNotificationPermission).toHaveBeenCalledTimes(1),
+  );
+
+  await act(async () => {
+    harness.emit({ revision: revision('12'), areas: ['notifications'] });
+    await Promise.resolve();
+  });
+  await waitFor(() =>
+    expect(getNotificationPermission).toHaveBeenCalledTimes(2),
+  );
+});
+
 it('offers an explicit status check when account transfer is pending but no operation is reported', async () => {
   const getSenderTransferOperation = jest
     .fn()

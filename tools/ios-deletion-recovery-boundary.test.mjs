@@ -468,23 +468,9 @@ test('ordinary identity retires prior completed deletion proof before any later 
   assert.match(ordinarySignIn, /signOutDeletionRecoverySession\(\)/u);
 });
 
-test('latest deletion receipt returns strict unavailable as a successful projection', () => {
-  const latest = bridge.slice(
-    bridge.indexOf('case "latest-deletion-receipt":'),
-    bridge.indexOf('case "public-resources":'),
-  );
-  assert.match(
-    latest,
-    /guard let receipt[\s\S]*?accountDeletionStateBlocksOrdinaryIdentity\(\)[\s\S]*?\.success\(\[[\s\S]*?"kind": "unavailable"/u,
-  );
-  assert.match(
-    latest,
-    /guard receipt\.localDataErased else \{[\s\S]*?\.success\(\[[\s\S]*?"kind": "unavailable"/u,
-  );
-  assert.doesNotMatch(
-    latest,
-    /\.failure\(Self\.temporarilyUnavailableProblem\("coordination-unavailable"\)\)/u,
-  );
+test('latest deletion receipt projection is removed from the bridge', () => {
+  assert.doesNotMatch(bridge, /case "latest-deletion-receipt"/u);
+  assert.doesNotMatch(bridge, /"latest-deletion-receipt"/u);
 });
 
 test('recovery source is compiled exactly once and private values never enter bridge payloads', () => {

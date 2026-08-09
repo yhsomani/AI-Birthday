@@ -85,7 +85,9 @@ export function LiveAndroidDeviceControls({
     () => port.getNotificationPermission(),
     [port],
   );
-  const notifications = useLiveProjection(loadNotifications, port, []);
+  const notifications = useLiveProjection(loadNotifications, port, [
+    'notifications',
+  ]);
   const loadTransfer = useCallback(
     () => port.getSenderTransferOperation(),
     [port],

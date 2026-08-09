@@ -29,6 +29,7 @@ export const PROJECTION_AREAS = [
   'activity',
   'privacy',
   'route',
+  'notifications',
 ] as const;
 
 export type ProjectionArea = (typeof PROJECTION_AREAS)[number];

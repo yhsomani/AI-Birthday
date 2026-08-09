@@ -38,7 +38,11 @@ import {
   LiveLoading,
   LiveRefreshProblem,
 } from './LiveProjectionState';
-import { nativeBridgeProblem } from './nativeProblem';
+import {
+  nativeBridgeProblem,
+  nativeContractProblem,
+  staleRevisionProblem,
+} from './nativeProblem';
 import { useLiveProjection } from './useLiveProjection';
 
 const activityTone = (record: ActivityRecord) => {
@@ -155,10 +159,6 @@ const activityDetailDisclosure = (
 };
 
 const ACTIVITY_SCAN_PAGE_LIMIT = 100;
-const activityContractProblem = {
-  kind: 'internal' as const,
-  supportCode: 'NATIVE_CONTRACT_INVALID' as SafeSupportCode,
-};
 
 const invalidClearActivityReviewProblem: NativeProblem = {
   kind: 'internal',
@@ -187,13 +187,6 @@ type ActivityTruth = Readonly<{
   usable: boolean;
   revision?: NativeRevision | undefined;
 }>;
-
-const staleRevisionProblem = (
-  latestRevision: NativeRevision,
-): NativeProblem => ({
-  kind: 'stale-revision',
-  latestRevision,
-});
 
 const loadFirstActivityPage = async (
   port: LiveAppPort,
@@ -250,13 +243,13 @@ const loadActivityById = async (
       };
     }
     if (seenCursors.has(nextCursor)) {
-      return { kind: 'error', problem: activityContractProblem };
+      return { kind: 'error', problem: nativeContractProblem };
     }
     seenCursors.add(nextCursor);
     cursor = nextCursor;
   }
 
-  return { kind: 'error', problem: activityContractProblem };
+  return { kind: 'error', problem: nativeContractProblem };
 };
 
 export function LiveActivityScreen({

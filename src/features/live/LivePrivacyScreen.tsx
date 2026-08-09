@@ -4,7 +4,6 @@ import { AppState } from 'react-native';
 import type { AccountProjection } from '../../domain/account/model';
 import type {
   CurrentPrivacyOperationProjection,
-  LatestDeletionReceiptProjection,
   PrivacyActionKind,
   PrivacyActionReview,
   PrivacyInventory,
@@ -179,7 +178,6 @@ type AuthoritativePrivacyTruth = Readonly<{
   revision: NativeRevision;
   account: AccountProjection;
   currentOperation: CurrentPrivacyOperationProjection;
-  deletionReceipt: LatestDeletionReceiptProjection;
   inventory: PrivacyInventory;
 }>;
 
@@ -225,13 +223,6 @@ const corroboratesOperation = (
   operation: PrivacyOperationProjection,
 ): boolean => {
   if (revision !== truth.revision) return false;
-  if (truth.deletionReceipt.kind !== 'none') {
-    return (
-      truth.deletionReceipt.kind !== 'unavailable' &&
-      operation.action === 'delete-account' &&
-      sameProjectionValue(operation, truth.deletionReceipt)
-    );
-  }
   return (
     truth.currentOperation.kind !== 'none' &&
     truth.currentOperation.kind !== 'unavailable' &&
@@ -260,14 +251,6 @@ export function LivePrivacyScreen({
   ]);
   const loadAccount = useCallback(() => port.getAccount(), [port]);
   const account = useLiveProjection(loadAccount, port, ['account', 'privacy']);
-  const loadDeletionReceipt = useCallback(
-    () => port.getLatestDeletionReceipt(),
-    [port],
-  );
-  const deletionReceipt = useLiveProjection(loadDeletionReceipt, port, [
-    'account',
-    'privacy',
-  ]);
   const loadCurrentOperation = useCallback(
     () => port.getCurrentOperation(),
     [port],
@@ -317,10 +300,6 @@ export function LivePrivacyScreen({
     currentOperation.state.kind === 'ready' &&
     !currentOperation.state.refreshing &&
     !currentOperation.state.refreshProblem;
-  const deletionReceiptUsable =
-    deletionReceipt.state.kind === 'ready' &&
-    !deletionReceipt.state.refreshing &&
-    !deletionReceipt.state.refreshProblem;
   const inventoryRevision =
     inventory.state.kind === 'ready'
       ? inventory.state.result.envelope.revision
@@ -333,26 +312,16 @@ export function LivePrivacyScreen({
     currentOperation.state.kind === 'ready'
       ? currentOperation.state.result.envelope.revision
       : undefined;
-  const deletionReceiptRevision =
-    deletionReceipt.state.kind === 'ready'
-      ? deletionReceipt.state.result.envelope.revision
-      : undefined;
   const truthUsable =
     inventoryUsable &&
     accountUsable &&
     currentOperationUsable &&
-    deletionReceiptUsable &&
     inventoryRevision !== undefined &&
     accountRevision === inventoryRevision &&
-    currentOperationRevision === inventoryRevision &&
-    deletionReceiptRevision === inventoryRevision;
+    currentOperationRevision === inventoryRevision;
   const stableCurrentOperation =
     currentOperationUsable && currentOperation.state.kind === 'ready'
       ? currentOperation.state.result.envelope.value
-      : undefined;
-  const stableDeletionReceipt =
-    deletionReceiptUsable && deletionReceipt.state.kind === 'ready'
-      ? deletionReceipt.state.result.envelope.value
       : undefined;
   const projectedOperation = currentOperationUsable
     ? stableCurrentOperation?.kind !== 'none' &&
@@ -360,19 +329,11 @@ export function LivePrivacyScreen({
       ? stableCurrentOperation
       : undefined
     : operation;
-  const deletionReceiptAllowsCurrentOperation =
-    stableDeletionReceipt?.kind === 'none';
   const visibleDeletionOperation: PrivacyOperationProjection | undefined =
-    stableDeletionReceipt?.kind === 'remote-draining' ||
-    stableDeletionReceipt?.kind === 'remote-unknown' ||
-    stableDeletionReceipt?.kind === 'complete'
-      ? stableDeletionReceipt
-      : stableDeletionReceipt?.kind === 'none' &&
-        projectedOperation?.action === 'delete-account'
+    projectedOperation?.action === 'delete-account'
       ? projectedOperation
       : undefined;
   const visibleNonDeletionOperation =
-    deletionReceiptAllowsCurrentOperation &&
     projectedOperation?.action !== 'delete-account'
       ? projectedOperation
       : undefined;
@@ -385,7 +346,7 @@ export function LivePrivacyScreen({
     operation === undefined ||
     operation.kind === 'complete' ||
     operation.kind === 'failed';
-  const deletionAllowsNewAction = stableDeletionReceipt?.kind === 'none';
+  const deletionAllowsNewAction = visibleDeletionOperation === undefined;
   const pendingDeletionNeedsLocalWipe =
     truthUsable &&
     !nativeContractInvalid &&
@@ -395,13 +356,12 @@ export function LivePrivacyScreen({
     !(
       visibleDeletionOperation.kind === 'remote-draining' &&
       'localDataErased' in visibleDeletionOperation
-    ) &&
-    stableDeletionReceipt?.kind === 'none';
+    );
   const sameAccountDeletionRetryAvailable =
     truthUsable &&
     !nativeContractInvalid &&
-    stableDeletionReceipt?.kind === 'remote-unknown' &&
-    stableDeletionReceipt.sameAccountRetryAvailable;
+    visibleDeletionOperation?.kind === 'remote-unknown' &&
+    visibleDeletionOperation.sameAccountRetryAvailable;
   const canStartNewAction =
     truthUsable &&
     !nativeContractInvalid &&
@@ -503,26 +463,19 @@ export function LivePrivacyScreen({
 
   const reloadAuthoritativeTruth =
     async (): Promise<AuthoritativeTruthReload> => {
-      const [
-        accountResult,
-        currentOperationResult,
-        deletionReceiptResult,
-        inventoryResult,
-      ] = await Promise.all([
-        account.reload(),
-        currentOperation.reload(),
-        deletionReceipt.reload(),
-        inventory.reload(),
-      ]);
+      const [accountResult, currentOperationResult, inventoryResult] =
+        await Promise.all([
+          account.reload(),
+          currentOperation.reload(),
+          inventory.reload(),
+        ]);
       if (accountResult.kind === 'error') return accountResult;
       if (currentOperationResult.kind === 'error')
         return currentOperationResult;
-      if (deletionReceiptResult.kind === 'error') return deletionReceiptResult;
       if (inventoryResult.kind === 'error') return inventoryResult;
       const revision = accountResult.envelope.revision;
       if (
         currentOperationResult.envelope.revision !== revision ||
-        deletionReceiptResult.envelope.revision !== revision ||
         inventoryResult.envelope.revision !== revision
       ) {
         return { kind: 'error', problem: nativeContractProblem };
@@ -536,7 +489,6 @@ export function LivePrivacyScreen({
           revision,
           account: accountResult.envelope.value,
           currentOperation: currentOperationResult.envelope.value,
-          deletionReceipt: deletionReceiptResult.envelope.value,
           inventory: inventoryResult.envelope.value,
         },
       };
@@ -863,44 +815,6 @@ export function LivePrivacyScreen({
     finishOperationRequest();
   };
 
-  const checkAccountDeletionStatus = async () => {
-    if (!beginOperationRequest()) return;
-    let result: Awaited<ReturnType<LiveAppPort['checkAccountDeletionStatus']>>;
-    try {
-      result = await port.checkAccountDeletionStatus();
-    } catch {
-      result = { kind: 'error', problem: nativeBridgeProblem };
-    }
-    if (result.kind === 'error') {
-      if (mountedRef.current) setProblem(result.problem);
-      finishOperationRequest();
-      return;
-    }
-    const authoritativeReload = await reloadAuthoritativeTruth();
-    if (!mountedRef.current) {
-      finishOperationRequest();
-      return;
-    }
-    const status = result.envelope.value;
-    if (authoritativeReload.kind === 'error') {
-      setProblem(authoritativeReload.problem);
-    } else if (
-      result.envelope.revision !== authoritativeReload.truth.revision ||
-      !sameProjectionValue(status, authoritativeReload.truth.deletionReceipt)
-    ) {
-      setProblem(nativeContractProblem);
-    } else {
-      setMessage(
-        status.kind === 'complete'
-          ? t('live.privacy.deletionCompleteBody')
-          : status.kind === 'remote-draining'
-          ? t('live.privacy.deletionStillRunning')
-          : t('live.privacy.deletionProofUnavailable'),
-      );
-    }
-    finishOperationRequest();
-  };
-
   const retryPendingDeletionWithGoogle = async () => {
     if (!sameAccountDeletionRetryAvailable || !beginOperationRequest()) return;
     let result: Awaited<ReturnType<LiveAppPort['continueWithGoogle']>>;
@@ -939,23 +853,14 @@ export function LivePrivacyScreen({
   };
 
   const deletionRecoveryUnavailable =
-    stableDeletionReceipt?.kind === 'unavailable' ||
-    (stableDeletionReceipt?.kind === 'none' &&
-      stableCurrentOperation?.kind === 'unavailable');
+    stableCurrentOperation?.kind === 'unavailable';
   const operationLoadProblem =
-    deletionReceipt.state.kind === 'error'
-      ? deletionReceipt.state.problem
-      : deletionReceiptAllowsCurrentOperation &&
-        currentOperation.state.kind === 'error'
+    currentOperation.state.kind === 'error'
       ? currentOperation.state.problem
       : undefined;
   const operationRefreshProblem =
-    deletionReceipt.state.kind === 'ready' &&
-    deletionReceipt.state.refreshProblem
-      ? deletionReceipt.state.refreshProblem
-      : deletionReceiptAllowsCurrentOperation &&
-        currentOperation.state.kind === 'ready' &&
-        currentOperation.state.refreshProblem
+    currentOperation.state.kind === 'ready' &&
+    currentOperation.state.refreshProblem
       ? currentOperation.state.refreshProblem
       : account.state.kind === 'ready' && account.state.refreshProblem
       ? account.state.refreshProblem
@@ -1071,18 +976,6 @@ export function LivePrivacyScreen({
           (visibleDeletionOperation.kind !== 'remote-draining' &&
             visibleDeletionOperation.kind !== 'complete') ? (
             <AppText color="muted">{t('live.privacy.external')}</AppText>
-          ) : null}
-          {visibleDeletionOperation.kind !== 'complete' ? (
-            <Button
-              label={
-                pending
-                  ? t('live.privacy.checkingDeletion')
-                  : t('live.privacy.checkDeletion')
-              }
-              disabled={pending}
-              onPress={checkAccountDeletionStatus}
-              testID="live-privacy-check-deletion"
-            />
           ) : null}
           {sameAccountDeletionRetryAvailable ? (
             <Button

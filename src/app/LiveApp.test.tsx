@@ -482,12 +482,6 @@ const createPort = (
         buildLabel: 'Birthday Autopilot 0.1.0 (1)',
       }),
     ),
-    getLatestDeletionReceipt: jest.fn(async () =>
-      ok({ kind: 'none' as const }),
-    ),
-    checkAccountDeletionStatus: jest.fn(async () =>
-      ok({ kind: 'none' as const }),
-    ),
     getCurrentOperation: jest.fn(async () => ok({ kind: 'none' as const })),
     getPendingRoute: jest.fn(async () => ok({ kind: 'none' as const })),
     getPolicyEditor: jest.fn(async () => ok(configuredPolicy)),
@@ -3030,10 +3024,6 @@ describe('production live projections', () => {
         .fn()
         .mockResolvedValueOnce(ok(pendingDeletionOperation))
         .mockResolvedValue(ok(confirmedDeletionOperation)),
-      getLatestDeletionReceipt: jest
-        .fn()
-        .mockResolvedValueOnce(ok({ kind: 'none' as const }))
-        .mockResolvedValue(ok(confirmedDeletionOperation)),
       prepareAction,
       confirmAction,
     });
@@ -3078,7 +3068,7 @@ describe('production live projections', () => {
 
   it('offers same-account replay after deletion proof is unavailable', async () => {
     const operationId = 'privacy-delete-recovery' as PrivacyOperationId;
-    const unknownReceipt = {
+    const retryableReceipt = {
       kind: 'remote-unknown' as const,
       id: operationId,
       action: 'delete-account' as const,
@@ -3086,16 +3076,12 @@ describe('production live projections', () => {
       updatedAt: generatedAt,
       localDataErased: true as const,
       remoteDeletionComplete: false as const,
-      sameAccountRetryAvailable: false,
+      sameAccountRetryAvailable: true,
       externalSmsCopiesNotErased: true as const,
     };
-    const retryableReceipt = {
-      ...unknownReceipt,
-      sameAccountRetryAvailable: true,
-    };
-    const retryAccount = {
-      kind: 'cleanup-pending' as const,
-      operation: 'delete' as const,
+    const retryAccount: AccountProjection = {
+      kind: 'cleanup-pending',
+      operation: 'delete',
       issue: {
         id: 'delete-replay' as IssueId,
         code: 'firebase-account-deleting' as const,
@@ -3108,14 +3094,8 @@ describe('production live projections', () => {
       getAccount: jest
         .fn()
         .mockResolvedValueOnce(ok(account))
-        .mockResolvedValueOnce(ok(account))
         .mockResolvedValue(ok(retryAccount)),
-      getCurrentOperation: jest.fn(async () => ok(unknownReceipt)),
-      getLatestDeletionReceipt: jest
-        .fn()
-        .mockResolvedValueOnce(ok(unknownReceipt))
-        .mockResolvedValue(ok(retryableReceipt)),
-      checkAccountDeletionStatus: jest.fn(async () => ok(retryableReceipt)),
+      getCurrentOperation: jest.fn(async () => ok(retryableReceipt)),
       continueWithGoogle,
     });
 
@@ -3123,25 +3103,20 @@ describe('production live projections', () => {
     await fireEvent.press(await screen.findByTestId('live-tab-settings'));
     await fireEvent.press(await screen.findByTestId('live-settings-privacy'));
     await fireEvent.press(
-      await screen.findByRole('button', { name: 'Check account deletion' }),
-    );
-    await fireEvent.press(
       await screen.findByTestId('live-privacy-retry-deletion-google'),
     );
 
     await waitFor(() => expect(continueWithGoogle).toHaveBeenCalledTimes(1));
-    expect(screen.getByText(/same-account recovery was checked/u)).toBeTruthy();
+    expect(
+      await screen.findByText(
+        'The same-account recovery was checked. Status will update when the account resolves.',
+      ),
+    ).toBeTruthy();
   });
 
   it('hides destructive controls when durable cleanup state is unreadable', async () => {
     const { port } = createPort({
       getCurrentOperation: jest.fn(async () =>
-        ok({
-          kind: 'unavailable' as const,
-          reason: 'coordination-unavailable' as const,
-        }),
-      ),
-      getLatestDeletionReceipt: jest.fn(async () =>
         ok({
           kind: 'unavailable' as const,
           reason: 'coordination-unavailable' as const,
@@ -3160,9 +3135,9 @@ describe('production live projections', () => {
     expect(screen.queryByTestId('live-privacy-disconnect-contacts')).toBeNull();
   });
 
-  it('fails closed when the deletion receipt cannot be loaded', async () => {
-    const getLatestDeletionReceipt = jest.fn(async () => internalError());
-    const { port } = createPort({ getLatestDeletionReceipt });
+  it('fails closed when the current privacy operation cannot be loaded', async () => {
+    const getCurrentOperation = jest.fn(async () => internalError());
+    const { port } = createPort({ getCurrentOperation });
 
     await renderLiveApp(port);
     await fireEvent.press(await screen.findByTestId('live-tab-settings'));
@@ -5048,16 +5023,7 @@ describe('production live projections', () => {
     );
   });
 
-  it('shows the durable deletion receipt without claiming external copies were erased', async () => {
-    const drainingReceipt = {
-      kind: 'remote-draining' as const,
-      id: 'privacy-operation-1' as PrivacyOperationId,
-      action: 'delete-account' as const,
-      updatedAt: generatedAt,
-      localDataErased: true as const,
-      remoteDeletionComplete: false as const,
-      externalSmsCopiesNotErased: true as const,
-    };
+  it('shows the completed deletion status without claiming external copies were erased', async () => {
     const completedReceipt = {
       kind: 'complete' as const,
       id: 'privacy-operation-1' as PrivacyOperationId,
@@ -5067,16 +5033,8 @@ describe('production live projections', () => {
       remoteDeletionComplete: true as const,
       externalSmsCopiesNotErased: true as const,
     };
-    const getLatestDeletionReceipt = jest
-      .fn()
-      .mockResolvedValueOnce(ok(drainingReceipt))
-      .mockResolvedValue(ok(completedReceipt));
-    const checkAccountDeletionStatus = jest.fn(async () =>
-      ok(completedReceipt),
-    );
     const { port } = createPort({
-      checkAccountDeletionStatus,
-      getLatestDeletionReceipt,
+      getCurrentOperation: jest.fn(async () => ok(completedReceipt)),
     });
 
     await renderLiveApp(port);
@@ -5090,52 +5048,72 @@ describe('production live projections', () => {
     expect(screen.getByText('contacts-v1')).toBeTruthy();
     expect(screen.getByText(/at most 30 days/u)).toBeTruthy();
     expect(screen.getByText(/up to 400 days/u)).toBeTruthy();
-    expect(await screen.findByText(/Local app data is erased/u)).toBeTruthy();
-    expect(screen.getByText(/iCloud or other backups/u)).toBeTruthy();
-    await fireEvent.press(
-      screen.getByRole('button', { name: 'Check account deletion' }),
-    );
+    expect(screen.getByText(/cannot erase carrier/u)).toBeTruthy();
     expect(
-      await screen.findByText(
-        'A deletion request from this device is complete',
-      ),
+      screen.getByText(/Cloud service metadata is content-free/u),
     ).toBeTruthy();
-    expect(checkAccountDeletionStatus).toHaveBeenCalledTimes(1);
-    expect(getLatestDeletionReceipt).toHaveBeenCalledTimes(2);
+    expect(
+      await screen.findByText('A deletion request from this device is complete'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/outside backup copies remain outside this app/u),
+    ).toBeTruthy();
   });
 
   it('keeps missing deletion completion proof distinct from in-progress proof', async () => {
+    const operationId = 'privacy-operation-1' as PrivacyOperationId;
     const drainingReceipt = {
       kind: 'remote-draining' as const,
-      id: 'privacy-operation-1' as PrivacyOperationId,
+      id: operationId,
       action: 'delete-account' as const,
       updatedAt: generatedAt,
       localDataErased: true as const,
       remoteDeletionComplete: false as const,
       externalSmsCopiesNotErased: true as const,
     };
-    const unavailableReceipt = {
-      kind: 'unavailable' as const,
+    const unknownReceipt = {
+      kind: 'remote-unknown' as const,
+      id: operationId,
+      action: 'delete-account' as const,
       reason: 'coordination-unavailable' as const,
+      updatedAt: generatedAt,
+      localDataErased: true as const,
+      remoteDeletionComplete: false as const,
+      sameAccountRetryAvailable: false,
+      externalSmsCopiesNotErased: true as const,
     };
-    const { port } = createPort({
-      getLatestDeletionReceipt: jest
-        .fn()
-        .mockResolvedValueOnce(ok(drainingReceipt))
-        .mockResolvedValue(ok(unavailableReceipt)),
-      checkAccountDeletionStatus: jest.fn(async () => ok(unavailableReceipt)),
-    });
+    const getCurrentOperation = jest
+      .fn()
+      .mockResolvedValueOnce(ok(drainingReceipt))
+      .mockResolvedValue(ok(unknownReceipt));
+    const { port, emit } = createPort({ getCurrentOperation });
 
     await renderLiveApp(port);
     await fireEvent.press(await screen.findByTestId('live-tab-settings'));
     await fireEvent.press(await screen.findByTestId('live-settings-privacy'));
-    await fireEvent.press(
-      await screen.findByRole('button', { name: 'Check account deletion' }),
-    );
 
     expect(
-      await screen.findByText(/Server completion proof is unavailable/u),
+      await screen.findByText(
+        'Local app data is erased; account deletion is still running',
+      ),
     ).toBeTruthy();
+    expect(
+      screen.queryByText(/online deletion is not confirmed/u),
+    ).toBeNull();
+
+    await act(async () => {
+      emit({ revision: revision('1'), areas: ['privacy'] });
+      await Promise.resolve();
+    });
+
+    expect(
+      await screen.findByText(
+        'Local app data is erased; online deletion is not confirmed',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(/account deletion is still running/u),
+    ).toBeNull();
   });
 
   it('gives a Setup lifecycle-repair state precedence over a complete Bootstrap account', async () => {
@@ -5416,7 +5394,7 @@ describe('production live projections', () => {
     );
   });
 
-  it('routes complete-bootstrap iOS deletion to authoritative deletion status', async () => {
+  it('routes complete-bootstrap iOS deletion to the neutral deletion stage', async () => {
     const deletingAccount: AccountProjection = {
       kind: 'cleanup-pending',
       operation: 'delete',
@@ -5450,14 +5428,7 @@ describe('production live projections', () => {
         readiness: iosReadiness,
       },
     };
-    const checkAccountDeletionStatus = jest.fn(async () =>
-      ok({
-        kind: 'unavailable' as const,
-        reason: 'coordination-unavailable' as const,
-      }),
-    );
     const { port } = createPort({
-      checkAccountDeletionStatus,
       getBootstrap: jest.fn(async () => ok(deletingBootstrap)),
       getSetup: jest.fn(async () => ok(deletingSetup)),
     });
@@ -5466,13 +5437,11 @@ describe('production live projections', () => {
 
     expect(await screen.findByTestId('live-setup-screen')).toBeTruthy();
     expect(screen.queryByTestId('live-app-shell')).toBeNull();
-    await fireEvent.press(
-      screen.getByRole('button', { name: 'Check account deletion' }),
-    );
-    await waitFor(() =>
-      expect(checkAccountDeletionStatus).toHaveBeenCalledTimes(1),
-    );
+    expect(
+      await screen.findByText('Account deletion cleanup needs attention'),
+    ).toBeTruthy();
     expect(screen.queryByTestId('live-setup-resume-cleanup')).toBeNull();
+    expect(screen.queryByTestId('live-setup-cleanup-unavailable')).toBeNull();
   });
 
   it('routes a complete-bootstrap connected Android sender deleting state to exact lifecycle recovery', async () => {
@@ -5570,19 +5539,7 @@ describe('production live projections', () => {
         readiness,
       },
     };
-    const checkAccountDeletionStatus = jest.fn(async () =>
-      ok({
-        kind: 'complete' as const,
-        id: 'privacy-operation-1' as PrivacyOperationId,
-        action: 'delete-account' as const,
-        completedAt: generatedAt,
-        localDataErased: true as const,
-        remoteDeletionComplete: true as const,
-        externalSmsCopiesNotErased: true as const,
-      }),
-    );
     const { port } = createPort({
-      checkAccountDeletionStatus,
       getBootstrap: jest.fn(async () => ok(deletingBootstrap)),
       getSetup: jest.fn(async () => ok(deletingSetup)),
     });
@@ -5592,19 +5549,12 @@ describe('production live projections', () => {
     expect(
       await screen.findByText(/Account deletion cleanup needs attention/u),
     ).toBeTruthy();
-    expect(screen.getByText(/no stage is inferred/u)).toBeTruthy();
-    expect(screen.queryByText(/Local app data is erased/u)).toBeNull();
-    await fireEvent.press(
-      screen.getByRole('button', { name: 'Check account deletion' }),
-    );
-    await waitFor(() =>
-      expect(checkAccountDeletionStatus).toHaveBeenCalledTimes(1),
-    );
     expect(
-      screen.getByText(
-        /server data associated with that request were verified deleted/u,
-      ),
+      screen.getByText(/does not infer which stage is active/u),
     ).toBeTruthy();
+    expect(screen.queryByText(/Local app data is erased/u)).toBeNull();
+    expect(screen.queryByTestId('live-setup-resume-cleanup')).toBeNull();
+    expect(screen.queryByTestId('live-setup-cleanup-unavailable')).toBeNull();
     let setupHardwareBack: (() => boolean | null | undefined) | undefined;
     const setupBackSpy = jest
       .spyOn(BackHandler, 'addEventListener')
@@ -5631,7 +5581,7 @@ describe('production live projections', () => {
     setupBackSpy.mockRestore();
   });
 
-  it('keeps exact-account deletion replay reachable after restart into blocked setup', async () => {
+  it('keeps a blocked setup deletion stage neutral after restart', async () => {
     const deletingAccount: AccountProjection = {
       kind: 'cleanup-pending',
       operation: 'delete',
@@ -5664,36 +5614,22 @@ describe('production live projections', () => {
         readiness,
       },
     };
-    const operationId = 'privacy-restart-recovery' as PrivacyOperationId;
-    const retryableUnknown = {
-      kind: 'remote-unknown' as const,
-      id: operationId,
-      action: 'delete-account' as const,
-      reason: 'coordination-unavailable' as const,
-      updatedAt: generatedAt,
-      localDataErased: true as const,
-      remoteDeletionComplete: false as const,
-      sameAccountRetryAvailable: true,
-      externalSmsCopiesNotErased: true as const,
-    };
     const continueWithGoogle = jest.fn(async () => ok(deletingAccount));
     const { port } = createPort({
-      checkAccountDeletionStatus: jest.fn(async () => ok(retryableUnknown)),
       continueWithGoogle,
       getBootstrap: jest.fn(async () => ok(deletingBootstrap)),
       getSetup: jest.fn(async () => ok(deletingSetup)),
     });
 
     await renderLiveApp(port);
-    await fireEvent.press(
-      await screen.findByRole('button', { name: 'Check account deletion' }),
-    );
-    await fireEvent.press(
-      await screen.findByTestId('live-setup-retry-deletion-google'),
-    );
 
-    await waitFor(() => expect(continueWithGoogle).toHaveBeenCalledTimes(1));
-    expect(screen.getByText(/same-account recovery was checked/u)).toBeTruthy();
+    expect(
+      await screen.findByText('Account deletion cleanup needs attention'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('live-setup-resume-cleanup')).toBeNull();
+    expect(screen.queryByTestId('live-setup-repair-reauth')).toBeNull();
+    expect(screen.queryByTestId('live-setup-retry-deletion-google')).toBeNull();
+    expect(continueWithGoogle).not.toHaveBeenCalled();
   });
 
   it('keeps exact-account lifecycle repair reachable from a complete bootstrap', async () => {

@@ -121,7 +121,6 @@ static NSString *BirthdaySmokeProjectionKey(NSString *area, NSDictionary *reques
     @"privacy" : @{
       @"inventory" : @"privacy:inventory",
       @"public-resources" : @"privacy:public-resources",
-      @"latest-deletion-receipt" : @"privacy:latest-deletion-receipt",
       @"current-operation" : @"privacy:current-operation",
     },
   };

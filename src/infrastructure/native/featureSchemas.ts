@@ -650,17 +650,6 @@ export const privacyOperationProjectionSchema = z.union([
   privacyOperationWithoutReceiptSchema,
 ]);
 
-export const latestDeletionReceiptProjectionSchema = z.union([
-  strictObject({ kind: z.literal('none') }),
-  strictObject({
-    kind: z.literal('unavailable'),
-    reason: z.literal('coordination-unavailable'),
-  }),
-  remoteUnknownDeletionReceiptSchema,
-  remoteDrainingDeletionReceiptSchema,
-  completedDeletionReceiptSchema,
-]);
-
 export const currentPrivacyOperationProjectionSchema = z.union([
   strictObject({ kind: z.literal('none') }),
   strictObject({

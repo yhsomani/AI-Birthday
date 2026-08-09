@@ -179,9 +179,6 @@
         "consentVersions": [],
         "externalSmsCopiesNotControlled": true
       },
-      "privacy:latest-deletion-receipt": {
-        "kind": "none"
-      },
       "privacy:public-resources": {
         "kind": "unavailable",
         "buildLabel": "Birthday Autopilot read-only smoke"
@@ -494,9 +491,6 @@
         "localStorageBytes": 0,
         "consentVersions": [],
         "externalSmsCopiesNotControlled": true
-      },
-      "privacy:latest-deletion-receipt": {
-        "kind": "none"
       },
       "privacy:public-resources": {
         "kind": "unavailable",

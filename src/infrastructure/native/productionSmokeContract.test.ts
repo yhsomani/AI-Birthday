@@ -93,7 +93,6 @@ describe.each<SmokePlatform>(['android', 'ios'])(
         adapter.listIssues(),
         adapter.getCurrentOperation(),
         adapter.getInventory(),
-        adapter.getLatestDeletionReceipt(),
         adapter.getPublicResources(),
       ]);
 

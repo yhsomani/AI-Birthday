@@ -20,7 +20,6 @@ import type { ProjectionInvalidation } from '../../application/ports/AppProjecti
 import type { AccountProjection } from '../../domain/account/model';
 import type {
   CurrentPrivacyOperationProjection,
-  LatestDeletionReceiptProjection,
   PrivacyActionKind,
   PrivacyActionReview,
   PrivacyInventory,
@@ -162,18 +161,6 @@ const unknownDeletion = (
   externalSmsCopiesNotErased: true,
 });
 
-const completeDeletionReceipt = (
-  id: PrivacyOperationId,
-): LatestDeletionReceiptProjection => ({
-  kind: 'complete',
-  id,
-  action: 'delete-account',
-  completedAt: generatedAt,
-  localDataErased: true,
-  remoteDeletionComplete: true,
-  externalSmsCopiesNotErased: true,
-});
-
 type HarnessState = {
   account: AccountProjection;
   accountProblem?: NativeProblem | undefined;
@@ -181,9 +168,6 @@ type HarnessState = {
   currentOperation: CurrentPrivacyOperationProjection;
   currentOperationProblem?: NativeProblem | undefined;
   currentOperationRevision?: NativeRevision | undefined;
-  deletionReceipt: LatestDeletionReceiptProjection;
-  deletionReceiptProblem?: NativeProblem | undefined;
-  deletionReceiptRevision?: NativeRevision | undefined;
   inventory: PrivacyInventory;
   inventoryProblem?: NativeProblem | undefined;
   inventoryRevision?: NativeRevision | undefined;
@@ -197,9 +181,6 @@ type PrivacyHarness = Readonly<{
   getAccount: jest.MockedFunction<LiveAppPort['getAccount']>;
   getCurrentOperation: jest.MockedFunction<LiveAppPort['getCurrentOperation']>;
   getInventory: jest.MockedFunction<LiveAppPort['getInventory']>;
-  getLatestDeletionReceipt: jest.MockedFunction<
-    LiveAppPort['getLatestDeletionReceipt']
-  >;
   port: LiveAppPort;
   prepareAction: jest.MockedFunction<LiveAppPort['prepareAction']>;
   state: HarnessState;
@@ -211,7 +192,6 @@ const createHarness = (
   const state: HarnessState = {
     account: connectedAccount,
     currentOperation: { kind: 'none' },
-    deletionReceipt: { kind: 'none' },
     inventory,
     revision: revision('1'),
     ...stateOverrides,
@@ -232,17 +212,6 @@ const createHarness = (
         : ok(
             state.currentOperation,
             state.currentOperationRevision ?? state.revision,
-          ),
-  );
-  const getLatestDeletionReceipt: jest.MockedFunction<
-    LiveAppPort['getLatestDeletionReceipt']
-  > = jest.fn(
-    async (): Promise<NativeResult<LatestDeletionReceiptProjection>> =>
-      state.deletionReceiptProblem
-        ? error(state.deletionReceiptProblem)
-        : ok(
-            state.deletionReceipt,
-            state.deletionReceiptRevision ?? state.revision,
           ),
   );
   const getInventory: jest.MockedFunction<LiveAppPort['getInventory']> =
@@ -271,15 +240,11 @@ const createHarness = (
       return () => listeners.delete(listener);
     };
   const port = {
-    checkAccountDeletionStatus: jest.fn(async () =>
-      ok(state.deletionReceipt, state.revision),
-    ),
     confirmAction,
     continueWithGoogle,
     getAccount,
     getCurrentOperation,
     getInventory,
-    getLatestDeletionReceipt,
     getOperation: jest.fn(async () => ({
       kind: 'error',
       problem: internalProblem('UNEXPECTED_PRIVACY_GET_OPERATION'),
@@ -303,7 +268,6 @@ const createHarness = (
     getAccount,
     getCurrentOperation,
     getInventory,
-    getLatestDeletionReceipt,
     port,
     prepareAction,
     state,
@@ -482,7 +446,7 @@ it('reveals and collapses the complete inventory and cloud boundary from one acc
   ).toMatchObject({ expanded: false });
 });
 
-it('reloads all four projections and locks destructive actions after a malformed prepared review', async () => {
+it('reloads all three projections and locks destructive actions after a malformed prepared review', async () => {
   const harness = createHarness();
   harness.prepareAction.mockResolvedValue(
     ok(
@@ -501,7 +465,6 @@ it('reloads all four projections and locks destructive actions after a malformed
   await waitFor(() => {
     expect(harness.getAccount).toHaveBeenCalledTimes(2);
     expect(harness.getCurrentOperation).toHaveBeenCalledTimes(2);
-    expect(harness.getLatestDeletionReceipt).toHaveBeenCalledTimes(2);
     expect(harness.getInventory).toHaveBeenCalledTimes(2);
   });
   for (const testID of actionGroupTestIDs) {
@@ -660,29 +623,10 @@ it.each(['reload error', 'revision mismatch', 'value mismatch'] as const)(
   },
 );
 
-it('gives a durable complete deletion receipt precedence over a stale current operation', async () => {
-  const harness = createHarness({
-    currentOperation: unknownDeletion(operationId('stale-delete'), true),
-    deletionReceipt: completeDeletionReceipt(operationId('durable-delete')),
-  });
-  await renderPrivacy(harness);
-
-  expect(
-    await screen.findByText('A deletion request from this device is complete'),
-  ).toBeTruthy();
-  for (const testID of actionGroupTestIDs) {
-    expect(screen.queryByTestId(testID)).toBeNull();
-  }
-  expect(screen.queryByTestId('live-privacy-pending-deletion-wipe')).toBeNull();
-  expect(screen.queryByTestId('live-privacy-retry-deletion-google')).toBeNull();
-  expect(screen.queryByTestId('live-privacy-check-deletion')).toBeNull();
-  expect(screen.queryByTestId('live-privacy-resume-operation')).toBeNull();
-});
-
-it('offers same-account deletion retry only after all four projections share a revision', async () => {
+it('offers same-account deletion retry only after all projections share a revision', async () => {
   const retryReceipt = unknownDeletion(operationId('retry-delete'), true);
   const harness = createHarness({
-    deletionReceipt: retryReceipt,
+    currentOperation: retryReceipt,
     inventoryRevision: revision('2'),
   });
   const { onLifecycleStateChange } = await renderPrivacy(harness);
@@ -706,7 +650,7 @@ it('offers same-account deletion retry only after all four projections share a r
 
   expect(
     await screen.findByText(
-      'The same-account recovery was checked. Refresh the deletion receipt for authoritative status.',
+      'The same-account recovery was checked. Status will update when the account resolves.',
     ),
   ).toBeTruthy();
   expect(harness.continueWithGoogle).toHaveBeenCalledTimes(1);

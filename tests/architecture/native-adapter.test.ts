@@ -140,7 +140,7 @@ describe('BirthdayNativeAdapter fail-closed behavior', () => {
     expect(getProjection).toHaveBeenCalledWith('route', JSON.stringify({}));
   });
 
-  it('uses strict native policy-editor and deletion-receipt projections', async () => {
+  it('uses strict native policy-editor and public-resources projections', async () => {
     const getProjection = jest.fn(async (area: string, requestJson: string) => {
       const request = JSON.parse(requestJson) as { kind?: string };
       const payload =
@@ -161,13 +161,7 @@ describe('BirthdayNativeAdapter fail-closed behavior', () => {
               baseUrl: 'https://birthday-autopilot-prod.web.app',
             }
           : {
-              kind: 'remote-draining',
-              id: 'privacy_11111111111111111111111111111111',
-              action: 'delete-account',
-              updatedAt: '2026-07-12T08:30:00Z',
-              localDataErased: true,
-              remoteDeletionComplete: false,
-              externalSmsCopiesNotErased: true,
+              kind: 'none',
             };
       return {
         contractVersion: 1,
@@ -189,17 +183,6 @@ describe('BirthdayNativeAdapter fail-closed behavior', () => {
       kind: 'ok',
       envelope: { value: { kind: 'configured' } },
     });
-    await expect(adapter.getLatestDeletionReceipt()).resolves.toMatchObject({
-      kind: 'ok',
-      envelope: {
-        value: {
-          kind: 'remote-draining',
-          localDataErased: true,
-          remoteDeletionComplete: false,
-          externalSmsCopiesNotErased: true,
-        },
-      },
-    });
     await expect(adapter.getPublicResources()).resolves.toMatchObject({
       kind: 'ok',
       envelope: {
@@ -212,10 +195,6 @@ describe('BirthdayNativeAdapter fail-closed behavior', () => {
     expect(getProjection).toHaveBeenCalledWith(
       'automation',
       JSON.stringify({ kind: 'policy-editor' }),
-    );
-    expect(getProjection).toHaveBeenCalledWith(
-      'privacy',
-      JSON.stringify({ kind: 'latest-deletion-receipt' }),
     );
     expect(getProjection).toHaveBeenCalledWith(
       'privacy',
@@ -241,16 +220,6 @@ describe('BirthdayNativeAdapter fail-closed behavior', () => {
       payloadJson: JSON.stringify(
         intent === 'request-notification-permission'
           ? { kind: 'denied' }
-          : intent === 'check-account-deletion-status'
-          ? {
-              kind: 'complete',
-              id: 'privacy_22222222222222222222222222222222',
-              action: 'delete-account',
-              completedAt: '2026-07-12T08:30:01Z',
-              localDataErased: true,
-              remoteDeletionComplete: true,
-              externalSmsCopiesNotErased: true,
-            }
           : intent === 'repair-lifecycle-state'
           ? {
               kind: 'local-wiping',
@@ -302,15 +271,6 @@ describe('BirthdayNativeAdapter fail-closed behavior', () => {
         },
       },
     });
-    await expect(adapter.checkAccountDeletionStatus()).resolves.toMatchObject({
-      kind: 'ok',
-      envelope: {
-        value: {
-          kind: 'complete',
-          remoteDeletionComplete: true,
-        },
-      },
-    });
 
     expect(getProjection).toHaveBeenCalledWith('notifications', '{}');
     expect(getProjection).toHaveBeenCalledWith(
@@ -335,11 +295,6 @@ describe('BirthdayNativeAdapter fail-closed behavior', () => {
       'repair-lifecycle-state',
       null,
       JSON.stringify({ kind: 'disconnect-contacts' }),
-    );
-    expect(executeUserIntent).toHaveBeenCalledWith(
-      'check-account-deletion-status',
-      null,
-      '{}',
     );
   });
 });

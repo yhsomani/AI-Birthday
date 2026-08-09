@@ -2,7 +2,6 @@ import type {
   PrivacyActionKind,
   PrivacyActionReview,
   PrivacyInventory,
-  LatestDeletionReceiptProjection,
   CurrentPrivacyOperationProjection,
   PrivacyOperationProjection,
 } from '../../domain/privacy/model';
@@ -15,12 +14,6 @@ import type { NativeResult } from '../../domain/shared/result';
 
 export interface PrivacyPort {
   getInventory(): Promise<NativeResult<PrivacyInventory>>;
-  getLatestDeletionReceipt(): Promise<
-    NativeResult<LatestDeletionReceiptProjection>
-  >;
-  checkAccountDeletionStatus(): Promise<
-    NativeResult<LatestDeletionReceiptProjection>
-  >;
   getCurrentOperation(): Promise<
     NativeResult<CurrentPrivacyOperationProjection>
   >;

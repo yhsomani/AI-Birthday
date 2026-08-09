@@ -141,10 +141,7 @@ test('signed-out deletion completion requires a strict App Check receipt proof',
     /if !receipt\.localDataErased[\s\S]*?finishLocalCleanup[\s\S]*?checkRemoteCompletion/u,
   );
   assert.match(cleanup, /markRemoteDeletionComplete/u);
-  assert.match(
-    bridge,
-    /intent == "check-account-deletion-status"[\s\S]*?payload\.isEmpty/u,
-  );
+  assert.doesNotMatch(bridge, /intent == "check-account-deletion-status"/u);
   assert.match(workflow, /if receipt\.remoteDeletionComplete/u);
   assert.match(workflow, /"remoteDeletionComplete": true/u);
 });
@@ -160,7 +157,7 @@ test('deletion remains remote-draining until completion proof and blocks ordinar
     bridge,
     /IOSAccountDeletionReceiptStore\.shared\.hasPendingOrUnreadableReceipt\(\)[\s\S]*?"kind": "cleanup-pending"[\s\S]*?"operation": "delete"/u,
   );
-  assert.match(bridge, /case "latest-deletion-receipt"/u);
+  assert.doesNotMatch(bridge, /case "latest-deletion-receipt"/u);
   assert.match(
     workflow,
     /action == "delete-account"[\s\S]*?workflow\.privacyOperations\.lastIndex/u,

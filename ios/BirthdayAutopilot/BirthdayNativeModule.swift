@@ -47,7 +47,6 @@ public final class BirthdayNativeService: NSObject {
     "block-recipient-destination",
     "choose-birthday",
     "choose-phone",
-    "check-account-deletion-status",
     "confirm-approvals",
     "confirm-enrollment",
     "confirm-privacy-action",
@@ -195,47 +194,6 @@ public final class BirthdayNativeService: NSObject {
                 "latestRevision": status.revision,
               ]
             ))
-          return
-        }
-
-        if intent == "check-account-deletion-status" {
-          guard payload.isEmpty, expectedRevision == nil else {
-            resolve(
-              self.response(
-                revision: status.revision,
-                kind: "error",
-                payload: Self.internalProblem("NATIVE_REQUEST_INVALID")
-              ))
-            return
-          }
-          IOSAccountDeletionLocalCleanupCoordinator.shared.checkRemoteCompletion {
-            [weak self] outcome in
-            guard let self else {
-              resolve(Self.fallbackInternalResponse(code: "NATIVE_BRIDGE_UNAVAILABLE"))
-              return
-            }
-            let value: BirthdayJSON
-            switch outcome {
-            case .inProgress(let receipt), .completed(let receipt):
-              value = IOSCompanionWorkflowEngine.accountDeletionReceiptPayload(receipt)
-            case .remoteUnknown(let receipt, let sameAccountRetryAvailable):
-              value = IOSCompanionWorkflowEngine.accountDeletionRecoveryUnknownPayload(
-                receipt,
-                sameAccountRetryAvailable: sameAccountRetryAvailable
-              )
-            case .unavailable:
-              value = [
-                "kind": "unavailable",
-                "reason": "coordination-unavailable",
-              ]
-            }
-            resolve(
-              self.response(
-                revision: status.revision,
-                kind: "ok",
-                payload: value
-              ))
-          }
           return
         }
 
@@ -1022,55 +980,6 @@ public final class BirthdayNativeService: NSObject {
         return .failure(Self.internalProblem("NATIVE_REQUEST_INVALID"))
       }
       return bridge(workflow.currentPrivacyOperationProjection(status: status))
-    case "latest-deletion-receipt":
-      guard request.keys.count == 1 else {
-        return .failure(Self.internalProblem("NATIVE_REQUEST_INVALID"))
-      }
-      guard let receipt = IOSAccountDeletionReceiptStore.shared.current() else {
-        return Self.accountDeletionStateBlocksOrdinaryIdentity()
-          ? .success([
-            "kind": "unavailable",
-            "reason": "coordination-unavailable",
-          ])
-          : .success(["kind": "none"])
-      }
-      guard receipt.localDataErased else {
-        return .success([
-          "kind": "unavailable",
-          "reason": "coordination-unavailable",
-        ])
-      }
-      if receipt.remoteDeletionComplete,
-        IOSAccountDeletionRecoveryStore.shared.hasPendingOrUnreadableJournal()
-      {
-        return .success([
-          "kind": "unavailable",
-          "reason": "coordination-unavailable",
-        ])
-      }
-      if !receipt.remoteDeletionComplete,
-        let recovery = IOSAccountDeletionRecoveryStore.shared.current(),
-        recovery.operationId == receipt.operationId
-      {
-        return recovery.remoteAcceptanceConfirmed
-          ? .success(
-            IOSCompanionWorkflowEngine.accountDeletionReceiptPayload(receipt)
-          )
-          : .success(
-            IOSCompanionWorkflowEngine.accountDeletionRecoveryUnknownPayload(
-              receipt,
-              sameAccountRetryAvailable: recovery.retryAuthorized
-            ))
-      }
-      if !receipt.remoteDeletionComplete,
-        IOSAccountDeletionRecoveryStore.shared.hasPendingOrUnreadableJournal()
-      {
-        return .success([
-          "kind": "unavailable",
-          "reason": "coordination-unavailable",
-        ])
-      }
-      return .success(IOSCompanionWorkflowEngine.accountDeletionReceiptPayload(receipt))
     case "public-resources":
       guard request.keys.count == 1 else {
         return .failure(Self.internalProblem("NATIVE_REQUEST_INVALID"))

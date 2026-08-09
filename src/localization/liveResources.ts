@@ -1384,14 +1384,14 @@ export const liveEnglish = {
   'live.privacy.deletionRetryWithGoogle': 'Retry with the same Google account',
   'live.privacy.deletionRetrying': 'Checking the Google account…',
   'live.privacy.deletionRetrySubmitted':
-    'The same-account recovery was checked. Refresh the deletion receipt for authoritative status.',
+    'The same-account recovery was checked. Status will update when the account resolves.',
   'live.privacy.repairTitle': 'Repair saved cleanup',
   'live.privacy.repairBody':
     'Choose only the cleanup you previously started. The app will require matching protected server proof before it repairs local state or erases anything.',
   'live.privacy.deletionPendingTitle':
     'Account deletion cleanup needs attention',
   'live.privacy.deletionPendingBody':
-    'Deletion may be pausing birthday work, waiting for account or network recovery, erasing local data, or deleting server data. Check status; no stage is inferred.',
+    'Deletion may be pausing birthday work, waiting for account or network recovery, erasing local data, or deleting server data. The app does not infer which stage is active.',
   'live.privacy.deletionDrainingTitle':
     'Local app data is erased; account deletion is still running',
   'live.privacy.deletionDrainingBody':
@@ -1399,13 +1399,7 @@ export const liveEnglish = {
   'live.privacy.deletionUnknownTitle':
     'Local app data is erased; online deletion is not confirmed',
   'live.privacy.deletionUnknownBody':
-    'The protected receipt is saved, but the server has not proved whether account deletion started or finished. Firebase identity and coordination records may remain. Check status before retrying with the original Google account.',
-  'live.privacy.checkDeletion': 'Check account deletion',
-  'live.privacy.checkingDeletion': 'Checking account deletion…',
-  'live.privacy.deletionStillRunning':
-    'Account deletion is still running. No server completion was inferred.',
-  'live.privacy.deletionProofUnavailable':
-    'Server completion proof is unavailable. The app remains blocked and does not infer that deletion finished; retry or use verified support.',
+    'The protected receipt is saved, but the server has not proved whether account deletion started or finished. Firebase identity and coordination records may remain. Retry only with the original Google account.',
   'live.privacy.deletionCompleteTitle':
     'A deletion request from this device is complete',
   'live.privacy.deletionCompleteBody':
@@ -2829,13 +2823,13 @@ export const liveHindi: typeof liveEnglish = {
   'live.privacy.deletionRetryWithGoogle': 'उसी Google खाते से फिर कोशिश करें',
   'live.privacy.deletionRetrying': 'Google खाता जाँचा जा रहा है…',
   'live.privacy.deletionRetrySubmitted':
-    'उसी खाते की रिकवरी जाँची गई। सही स्थिति के लिए मिटाने की रसीद ताज़ा करें।',
+    'उसी खाते की रिकवरी जाँची गई। खाता हल होते ही स्थिति अपडेट हो जाएगी।',
   'live.privacy.repairTitle': 'सहेजी सफ़ाई की मरम्मत करें',
   'live.privacy.repairBody':
     'केवल वही सफ़ाई चुनें जो आपने पहले शुरू की थी। स्थानीय स्थिति ठीक करने या कुछ मिटाने से पहले ऐप मेल खाता सुरक्षित सर्वर प्रमाण माँगेगा।',
   'live.privacy.deletionPendingTitle': 'खाता मिटाने की सफ़ाई पर ध्यान चाहिए',
   'live.privacy.deletionPendingBody':
-    'मिटाना जन्मदिन काम रोक रहा हो सकता है, खाते या नेटवर्क की वापसी की प्रतीक्षा कर रहा हो सकता है, स्थानीय डेटा मिटा रहा हो सकता है या सर्वर डेटा मिटा रहा हो सकता है। स्थिति जाँचें; किसी चरण का अनुमान नहीं लगाया जाता।',
+    'मिटाना जन्मदिन काम रोक रहा हो सकता है, खाते या नेटवर्क की वापसी की प्रतीक्षा कर रहा हो सकता है, स्थानीय डेटा मिटा रहा हो सकता है या सर्वर डेटा मिटा रहा हो सकता है। ऐप अनुमान नहीं लगाता कि कौन-सा चरण चालू है।',
   'live.privacy.deletionDrainingTitle':
     'स्थानीय ऐप डेटा मिट गया; खाता मिटाना अभी चल रहा है',
   'live.privacy.deletionDrainingBody':
@@ -2843,13 +2837,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.privacy.deletionUnknownTitle':
     'स्थानीय ऐप डेटा मिट गया; ऑनलाइन खाता मिटना पक्का नहीं है',
   'live.privacy.deletionUnknownBody':
-    'सुरक्षित रसीद सहेजी है, लेकिन सर्वर ने यह साबित नहीं किया कि खाता मिटना शुरू या पूरा हुआ। Firebase पहचान और समन्वय रिकॉर्ड रह सकते हैं। मूल Google खाते से फिर कोशिश करने से पहले स्थिति जाँचें।',
-  'live.privacy.checkDeletion': 'खाता मिटना जाँचें',
-  'live.privacy.checkingDeletion': 'खाता मिटना जाँचा जा रहा है…',
-  'live.privacy.deletionStillRunning':
-    'खाता मिटना अभी चल रहा है। सर्वर के पूरा होने का अनुमान नहीं लगाया गया।',
-  'live.privacy.deletionProofUnavailable':
-    'सर्वर के पूरा होने का प्रमाण उपलब्ध नहीं है। ऐप अवरुद्ध रहता है और मिटना पूरा होने का अनुमान नहीं लगाता; फिर कोशिश करें या सत्यापित सहायता लें।',
+    'सुरक्षित रसीद सहेजी है, लेकिन सर्वर ने यह साबित नहीं किया कि खाता मिटना शुरू या पूरा हुआ। Firebase पहचान और समन्वय रिकॉर्ड रह सकते हैं। केवल मूल Google खाते से ही फिर कोशिश करें।',
   'live.privacy.deletionCompleteTitle':
     'इस डिवाइस से किया गया मिटाने का अनुरोध पूरा हुआ',
   'live.privacy.deletionCompleteBody':

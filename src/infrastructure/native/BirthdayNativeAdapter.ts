@@ -42,7 +42,6 @@ import type {
 } from '../../domain/messages/model';
 import type {
   CurrentPrivacyOperationProjection,
-  LatestDeletionReceiptProjection,
   PrivacyActionReview,
   PrivacyInventory,
   PrivacyOperationProjection,
@@ -98,7 +97,6 @@ import {
   geminiSuggestionsProjectionSchema,
   homeProjectionSchema,
   iosComposerProposalProjectionSchema,
-  latestDeletionReceiptProjectionSchema,
   messageEditorProjectionSchema,
   messagePreviewSchema,
   nativeActionResultSchema,
@@ -158,7 +156,6 @@ const USER_INTENTS = {
   confirmTodayOccurrence: 'confirm-today-occurrence',
   beginSenderTransfer: 'begin-sender-transfer',
   blockRecipientDestination: 'block-recipient-destination',
-  checkAccountDeletionStatus: 'check-account-deletion-status',
   continueWithGoogle: 'continue-with-google',
   excludeRecipient: 'exclude-recipient',
   generateSuggestions: 'generate-suggestions',
@@ -642,27 +639,6 @@ export class BirthdayNativeAdapter
       'privacy',
       { kind: 'public-resources' },
       publicResourcesProjectionSchema,
-    );
-  }
-
-  public getLatestDeletionReceipt(): Promise<
-    NativeResult<LatestDeletionReceiptProjection>
-  > {
-    return this.read(
-      'privacy',
-      { kind: 'latest-deletion-receipt' },
-      latestDeletionReceiptProjectionSchema,
-    );
-  }
-
-  public checkAccountDeletionStatus(): Promise<
-    NativeResult<LatestDeletionReceiptProjection>
-  > {
-    return this.intent(
-      USER_INTENTS.checkAccountDeletionStatus,
-      null,
-      {},
-      latestDeletionReceiptProjectionSchema,
     );
   }
 

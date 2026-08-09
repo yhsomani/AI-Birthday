@@ -69,16 +69,6 @@ export type CompletedDeletionReceipt = Readonly<{
   externalSmsCopiesNotErased: true;
 }>;
 
-export type LatestDeletionReceiptProjection =
-  | Readonly<{ kind: 'none' }>
-  | Readonly<{
-      kind: 'unavailable';
-      reason: 'coordination-unavailable';
-    }>
-  | RemoteUnknownDeletionReceipt
-  | RemoteDrainingDeletionReceipt
-  | CompletedDeletionReceipt;
-
 export type CurrentPrivacyOperationProjection =
   | Readonly<{ kind: 'none' }>
   | Readonly<{

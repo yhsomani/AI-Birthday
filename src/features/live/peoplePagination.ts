@@ -1,16 +1,15 @@
 import type { PeoplePort } from '../../application/ports/PeoplePort';
 import type { ContactSummary, PeopleQuery } from '../../domain/contacts/model';
+import type { PageCursor, NativeRevision } from '../../domain/shared/brand';
 import type {
-  NativeRevision,
-  PageCursor,
-  SafeSupportCode,
-} from '../../domain/shared/brand';
-import type {
-  NativeProblem,
   NativeResult,
   ProjectionEnvelope,
 } from '../../domain/shared/result';
-import { nativeBridgeProblem } from './nativeProblem';
+import {
+  nativeBridgeProblem,
+  nativeContractProblem,
+  staleRevisionProblem,
+} from './nativeProblem';
 
 export const PEOPLE_PAGE_SIZE = 50;
 export const PEOPLE_REVIEW_BATCH_SIZE = 50;
@@ -20,11 +19,6 @@ export const PEOPLE_REVIEW_BATCH_SIZE = 50;
 // contact projections even if a future native contract is malformed.
 const PEOPLE_SCAN_CONTACT_LIMIT = 10_000;
 const PEOPLE_SCAN_PAGE_LIMIT = PEOPLE_SCAN_CONTACT_LIMIT / PEOPLE_PAGE_SIZE;
-
-const peoplePaginationContractProblem: NativeProblem = {
-  kind: 'internal',
-  supportCode: 'NATIVE_CONTRACT_INVALID' as SafeSupportCode,
-};
 
 export type PeopleScanQuery = Omit<PeopleQuery, 'cursor' | 'pageSize'>;
 
@@ -43,11 +37,6 @@ export const needsBatchApproval = (contact: ContactSummary): boolean =>
   (contact.enrollment.kind === 'enabled' ||
     contact.enrollment.kind === 'paused') &&
   contact.enrollment.approval.kind !== 'valid';
-
-const staleRevision = (latestRevision: NativeRevision): NativeProblem => ({
-  kind: 'stale-revision',
-  latestRevision,
-});
 
 /**
  * Reads one stable, bounded People result set and retains only contacts needed
@@ -88,14 +77,14 @@ export const scanPeoplePages = async (
     ) {
       return {
         kind: 'error',
-        problem: staleRevision(page.envelope.revision),
+        problem: staleRevisionProblem(page.envelope.revision),
       };
     }
     if (
       expectedTotal !== undefined &&
       page.envelope.value.totalCount !== expectedTotal
     ) {
-      return { kind: 'error', problem: peoplePaginationContractProblem };
+      return { kind: 'error', problem: nativeContractProblem };
     }
 
     firstEnvelope ??= page.envelope;
@@ -105,24 +94,24 @@ export const scanPeoplePages = async (
       expectedTotal > PEOPLE_SCAN_CONTACT_LIMIT ||
       page.envelope.value.items.length > PEOPLE_PAGE_SIZE
     ) {
-      return { kind: 'error', problem: peoplePaginationContractProblem };
+      return { kind: 'error', problem: nativeContractProblem };
     }
 
     for (const contact of page.envelope.value.items) {
       if (seenContactIds.has(contact.id)) {
-        return { kind: 'error', problem: peoplePaginationContractProblem };
+        return { kind: 'error', problem: nativeContractProblem };
       }
       seenContactIds.add(contact.id);
       if (include(contact)) selectedContactIds.push(contact.id);
     }
     if (seenContactIds.size > expectedTotal) {
-      return { kind: 'error', problem: peoplePaginationContractProblem };
+      return { kind: 'error', problem: nativeContractProblem };
     }
 
     const nextCursor = page.envelope.value.nextCursor;
     if (nextCursor === undefined) {
       if (seenContactIds.size !== expectedTotal) {
-        return { kind: 'error', problem: peoplePaginationContractProblem };
+        return { kind: 'error', problem: nativeContractProblem };
       }
       return {
         kind: 'ok',
@@ -137,11 +126,11 @@ export const scanPeoplePages = async (
       };
     }
     if (seenContactIds.size >= expectedTotal || seenCursors.has(nextCursor)) {
-      return { kind: 'error', problem: peoplePaginationContractProblem };
+      return { kind: 'error', problem: nativeContractProblem };
     }
     seenCursors.add(nextCursor);
     cursor = nextCursor;
   }
 
-  return { kind: 'error', problem: peoplePaginationContractProblem };
+  return { kind: 'error', problem: nativeContractProblem };
 };

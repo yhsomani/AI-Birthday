@@ -156,8 +156,6 @@ export function LiveSetupScreen({
   >();
   const [actionMessage, setActionMessage] = useState<string | undefined>();
   const [showHelpLegal, setShowHelpLegal] = useState(false);
-  const [deletionRecoveryRetryAvailable, setDeletionRecoveryRetryAvailable] =
-    useState(false);
   const [lifecycleRepairIdentityLease, setLifecycleRepairIdentityLease] =
     useState<LifecycleRepairIdentityLease | undefined>();
   const lifecycleRepairGenerationRef = useRef(0);
@@ -316,62 +314,6 @@ export function LiveSetupScreen({
     );
     setActionPending(false);
     await refreshBootstrap();
-  };
-
-  const checkAccountDeletionStatus = async () => {
-    setActionPending(true);
-    setActionProblem(undefined);
-    setActionMessage(undefined);
-    let result: Awaited<ReturnType<LiveAppPort['checkAccountDeletionStatus']>>;
-    try {
-      result = await port.checkAccountDeletionStatus();
-    } catch {
-      result = { kind: 'error', problem: nativeBridgeProblem };
-    }
-    if (result.kind === 'error') {
-      setActionProblem(result.problem);
-      setActionPending(false);
-      return;
-    }
-    const status = result.envelope.value;
-    if (status.kind === 'complete') {
-      setDeletionRecoveryRetryAvailable(false);
-      setActionMessage(t('live.privacy.deletionCompleteBody'));
-    } else if (status.kind === 'remote-draining') {
-      setDeletionRecoveryRetryAvailable(false);
-      setActionMessage(t('live.privacy.deletionStillRunning'));
-    } else if (status.kind === 'remote-unknown') {
-      setDeletionRecoveryRetryAvailable(status.sameAccountRetryAvailable);
-      setActionMessage(t('live.privacy.deletionProofUnavailable'));
-    } else {
-      setDeletionRecoveryRetryAvailable(false);
-      setActionMessage(t('live.privacy.deletionProofUnavailable'));
-    }
-    await setup.reload();
-    await refreshBootstrap();
-    setActionPending(false);
-  };
-
-  const retryPendingDeletionWithGoogle = async () => {
-    setActionPending(true);
-    setActionProblem(undefined);
-    setActionMessage(undefined);
-    let result: Awaited<ReturnType<LiveAppPort['continueWithGoogle']>>;
-    try {
-      result = await port.continueWithGoogle();
-    } catch {
-      result = { kind: 'error', problem: nativeBridgeProblem };
-    }
-    if (result.kind === 'error') {
-      setActionProblem(result.problem);
-      setActionPending(false);
-      return;
-    }
-    setDeletionRecoveryRetryAvailable(false);
-    setActionMessage(t('live.privacy.deletionRetrySubmitted'));
-    await setup.reload();
-    await refreshBootstrap();
-    setActionPending(false);
   };
 
   const prepareLifecycleRepairIdentity = async () => {
@@ -816,33 +758,11 @@ export function LiveSetupScreen({
         </Card>
       ) : null}
       {deletionCleanupPending ? (
-        <>
-          <ReadinessBanner
-            title={t('live.privacy.deletionPendingTitle')}
-            detail={t('live.privacy.deletionPendingBody')}
-            tone="warning"
-            actionLabel={
-              actionPending
-                ? t('live.privacy.checkingDeletion')
-                : t('live.privacy.checkDeletion')
-            }
-            actionDisabled={actionPending}
-            onAction={checkAccountDeletionStatus}
-          />
-          {deletionRecoveryRetryAvailable ? (
-            <Button
-              label={
-                actionPending
-                  ? t('live.privacy.deletionRetrying')
-                  : t('live.privacy.deletionRetryWithGoogle')
-              }
-              disabled={actionPending}
-              onPress={retryPendingDeletionWithGoogle}
-              variant="secondary"
-              testID="live-setup-retry-deletion-google"
-            />
-          ) : null}
-        </>
+        <ReadinessBanner
+          title={t('live.privacy.deletionPendingTitle')}
+          detail={t('live.privacy.deletionPendingBody')}
+          tone="warning"
+        />
       ) : null}
       {genericLifecycleCleanupPending || connectedAndroidSenderDeleting ? (
         <Card>

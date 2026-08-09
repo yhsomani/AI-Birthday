@@ -46,8 +46,6 @@ import com.yashsomani.birthdayautopilot.automation.workers.AutomationScheduler
 import com.yashsomani.birthdayautopilot.core.model.AccountMode
 import com.yashsomani.birthdayautopilot.lifecycle.AndroidLifecycleController
 import com.yashsomani.birthdayautopilot.lifecycle.DeletionReceiptLookup
-import com.yashsomani.birthdayautopilot.lifecycle.DeletionReceiptAccountPolicy
-import com.yashsomani.birthdayautopilot.lifecycle.DeletionReceiptRecoveryPolicy
 import com.yashsomani.birthdayautopilot.lifecycle.DurableDeletionReceipt
 import com.yashsomani.birthdayautopilot.lifecycle.PrivacyConfirmationOutcome
 import com.yashsomani.birthdayautopilot.lifecycle.PrivacyActionPlan
@@ -79,7 +77,6 @@ import android.os.SystemClock
 import android.provider.Settings
 import com.yashsomani.birthdayautopilot.coordination.SenderTransferOutcome
 import com.yashsomani.birthdayautopilot.coordination.AccountDeletionAcceptance
-import com.yashsomani.birthdayautopilot.coordination.AccountDeletionReceiptOutcome
 import com.yashsomani.birthdayautopilot.storage.database.InstallationRecordState
 import com.yashsomani.birthdayautopilot.storage.database.InstallationBindingEntity
 import com.yashsomani.birthdayautopilot.storage.database.CoordinationStateEntity
@@ -420,9 +417,6 @@ class BirthdayNativeModule(
         )
         "repair-lifecycle-state" -> promise.resolve(
           handleRepairLifecycleState(request),
-        )
-        "check-account-deletion-status" -> promise.resolve(
-          handleCheckAccountDeletionStatus(request),
         )
         "request-notification-permission" -> promise.resolve(
           handleRequestNotificationPermission(request),
@@ -906,11 +900,6 @@ class BirthdayNativeModule(
     } else {
       null
     }
-    "latest-deletion-receipt" -> if (request.keyNames() == setOf("kind")) {
-      lifecycleController.latestDeletionReceiptPayload()
-    } else {
-      null
-    }
     else -> null
   }
 
@@ -937,17 +926,14 @@ class BirthdayNativeModule(
       ForegroundActivityRegistry.currentNotificationPermissionLauncher()?.request()
         ?: NotificationPermissionResult.UNAVAILABLE
     }
-    return successResponse(
-      JSONObject().put(
-        "kind",
-        when (result) {
-          NotificationPermissionResult.GRANTED -> "granted"
-          NotificationPermissionResult.DENIED -> "denied"
-          NotificationPermissionResult.SETTINGS_REQUIRED -> "settings-required"
-          NotificationPermissionResult.UNAVAILABLE -> "cancelled"
-        },
-      ),
-    )
+    val kind = when (result) {
+      NotificationPermissionResult.GRANTED -> "granted"
+      NotificationPermissionResult.DENIED -> "denied"
+      NotificationPermissionResult.SETTINGS_REQUIRED -> "settings-required"
+      NotificationPermissionResult.UNAVAILABLE -> "cancelled"
+    }
+    emitInvalidation(listOf("notifications"))
+    return successResponse(JSONObject().put("kind", kind))
   }
 
   private fun handleOpenNotificationSettings(request: JSONObject): Any {
@@ -1714,100 +1700,6 @@ class BirthdayNativeModule(
     val account = runCatching { runBlocking { appGraph.peopleSyncDao.activeAccount() } }.getOrNull()
       ?: return false
     return appGraph.lifecycleRepairIdentitySessionMatches(account)
-  }
-
-  private fun handleCheckAccountDeletionStatus(request: JSONObject): Any {
-    if (request.keyNames().isNotEmpty()) return errorResponse("NATIVE_REQUEST_INVALID")
-    val receiptId = when (val lookup = lifecycleController.deletionReceiptLookup()) {
-      DeletionReceiptLookup.None -> {
-        val interruptedId = DeletionReceiptRecoveryPolicy.interruptedOperationId(
-          lookup,
-          lifecycleController.latestOperation(),
-        ) ?: return successResponse(lifecycleController.latestDeletionReceiptPayload())
-        handleResumeLifecycleOperation(JSONObject().put("operationId", interruptedId))
-        return when (lifecycleController.deletionReceiptLookup()) {
-          DeletionReceiptLookup.None -> successResponse(
-            JSONObject()
-              .put("kind", "unavailable")
-              .put("reason", "coordination-unavailable"),
-          )
-          else -> successResponse(lifecycleController.latestDeletionReceiptPayload())
-        }
-      }
-      DeletionReceiptLookup.Unavailable -> return successResponse(
-        JSONObject()
-          .put("kind", "unavailable")
-          .put("reason", "coordination-unavailable"),
-      )
-      is DeletionReceiptLookup.Present -> when (lookup.receipt.state) {
-        DurableDeletionReceipt.State.COMPLETED ->
-          return successResponse(lifecycleController.latestDeletionReceiptPayload())
-        DurableDeletionReceipt.State.PENDING -> lookup.receipt.receiptId
-      }
-    }
-    return when (val call = runBlocking {
-      appGraph.automationCoordinationPort.accountDeletionReceipt(receiptId)
-    }) {
-      is OrchestrationCall.Unavailable -> {
-        val recovery = lifecycleController.setDeletionRecoveryStatus(
-          retryAllowed = true,
-          inProgressObserved = false,
-        )
-        if (recovery != null) {
-          successResponse(lifecycleController.latestDeletionReceiptPayload())
-        } else {
-          successResponse(
-            JSONObject()
-              .put("kind", "unavailable")
-              .put("reason", "coordination-unavailable"),
-          )
-        }
-      }
-      is OrchestrationCall.Authoritative -> when (val outcome = call.value) {
-        AccountDeletionReceiptOutcome.NotFound -> {
-          val recovery = lifecycleController.setDeletionRecoveryStatus(
-            retryAllowed = true,
-            inProgressObserved = false,
-          )
-          if (recovery != null) {
-            successResponse(lifecycleController.latestDeletionReceiptPayload())
-          } else {
-            successResponse(
-              JSONObject()
-                .put("kind", "unavailable")
-                .put("reason", "coordination-unavailable"),
-            )
-          }
-        }
-        is AccountDeletionReceiptOutcome.InProgress -> {
-          val recovery = lifecycleController.setDeletionRecoveryStatus(
-            retryAllowed = false,
-            inProgressObserved = true,
-          )
-          if (recovery != null) {
-            successResponse(lifecycleController.latestDeletionReceiptPayload())
-          } else {
-            successResponse(
-              JSONObject()
-                .put("kind", "unavailable")
-                .put("reason", "coordination-unavailable"),
-            )
-          }
-        }
-        is AccountDeletionReceiptOutcome.Completed -> {
-          if (lifecycleController.completeAccountDeletionReceipt(
-            receiptId,
-            outcome.completedAtMillis,
-          ) == null) return successResponse(
-            JSONObject()
-              .put("kind", "unavailable")
-              .put("reason", "coordination-unavailable"),
-          )
-          emitInvalidation(listOf("bootstrap", "setup", "account", "privacy"))
-          successResponse(lifecycleController.latestDeletionReceiptPayload())
-        }
-      }
-    }
   }
 
   private fun handleConfirmPrivacyAction(
@@ -3514,7 +3406,6 @@ class BirthdayNativeModule(
       "complete-sender-transfer",
       "resume-lifecycle-operation",
       "repair-lifecycle-state",
-      "check-account-deletion-status",
     )
     val JOURNAL_UNREADABLE_ALLOWED_INTENTS = setOf(
       "continue-with-google",
@@ -3526,7 +3417,6 @@ class BirthdayNativeModule(
       "open-notification-settings",
       "share-diagnostics",
       "repair-lifecycle-state",
-      "check-account-deletion-status",
     )
     val LIFECYCLE_OPERATION_ALLOWED_INTENTS = setOf(
       "complete-sender-transfer",
@@ -3539,7 +3429,6 @@ class BirthdayNativeModule(
       "open-notification-settings",
       "resume-lifecycle-operation",
       "repair-lifecycle-state",
-      "check-account-deletion-status",
       "share-diagnostics",
     )
     val DELETION_RECEIPT_ALLOWED_INTENTS = setOf(
@@ -3552,7 +3441,6 @@ class BirthdayNativeModule(
       "open-notification-settings",
       "resume-lifecycle-operation",
       "repair-lifecycle-state",
-      "check-account-deletion-status",
       "share-diagnostics",
     )
     val DELETION_RECOVERY_IDENTITY_DEPENDENT_INTENTS = setOf(
@@ -3560,7 +3448,6 @@ class BirthdayNativeModule(
       "pause-all",
       "resume-lifecycle-operation",
       "repair-lifecycle-state",
-      "check-account-deletion-status",
     )
   }
 }
