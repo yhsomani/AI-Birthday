@@ -1,0 +1,4 @@
+## 2024-08-10 - Enhancing Search Field Usability with a Clear Button
+
+**Learning:** Search fields in this app lack a clear way to reset the query, forcing users to repeatedly press backspace. This is a common accessibility/usability issue in React Native where standard web inputs get 'clear' buttons built-in (e.g. `type="search"` in WebKit) but native inputs don't unless explicitly implemented.
+**Action:** Enhance the `SearchField` component to optionally render a trailing clear button when there's text input. This improves the UX significantly, particularly for users with mobility issues. Ensure the clear button has a clear `accessibilityLabel`, proper `accessibilityRole="button"`, and appropriate hit slop. I will also make sure to not break component purity and pass strings via props if needed, as per memory.
