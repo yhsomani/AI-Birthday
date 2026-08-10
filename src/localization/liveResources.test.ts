@@ -31,6 +31,7 @@ const typescript = require('typescript') as typeof import('typescript');
 
 const technicalOnlyHindiValues = {
   'live.common.sim': 'SIM',
+  'live.common.clearSearch': 'Clear search',
   'live.error.actionBody': '{{message}} {{reference}}',
 } as const satisfies Readonly<Partial<typeof liveHindi>>;
 
