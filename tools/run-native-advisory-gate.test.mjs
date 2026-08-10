@@ -16,6 +16,7 @@ import {
   parsePlatformArguments,
   runNativeAdvisoryGate,
 } from './run-native-advisory-gate.mjs';
+import { symlinksAvailable } from './test-capabilities.mjs';
 
 test('parses only an explicit supported native advisory platform', () => {
   assert.equal(parsePlatformArguments(['--platform', 'android']), 'android');
@@ -29,6 +30,10 @@ test('parses only an explicit supported native advisory platform', () => {
 });
 
 test('rejects symlinked workspace and evidence roots before scanning', t => {
+  if (!symlinksAvailable) {
+    t.skip('host cannot create symbolic links');
+    return;
+  }
   const parent = mkdtempSync(path.join(tmpdir(), 'native-advisory-root-test-'));
   t.after(() => rmSync(parent, { recursive: true, force: true }));
   const workspace = path.join(parent, 'workspace');

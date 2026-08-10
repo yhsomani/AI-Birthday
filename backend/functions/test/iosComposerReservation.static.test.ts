@@ -6,6 +6,9 @@ import { describe, expect, it } from 'vitest';
 
 const sourceRoot = fileURLToPath(new URL('../src/', import.meta.url));
 
+const readSource = (relative: string): string =>
+  readFileSync(join(sourceRoot, relative), 'utf8').replace(/\r\n/gu, '\n');
+
 function between(source: string, start: string, end: string): string {
   const startIndex = source.indexOf(start);
   const endIndex = source.indexOf(end, startIndex + start.length);
@@ -16,10 +19,7 @@ function between(source: string, start: string, end: string): string {
 
 describe('iOS composer reservation architecture', () => {
   it('makes every Android sender mutation contend on the same top-level document', () => {
-    const source = readFileSync(
-      join(sourceRoot, 'services/controlPlane.ts'),
-      'utf8',
-    );
+    const source = readSource('services/controlPlane.ts');
     const ranges = [
       [
         'public async requestContactDerivedReset',
@@ -50,10 +50,7 @@ describe('iOS composer reservation architecture', () => {
   });
 
   it('replays immutable destructive completion before refusing new Android mutations', () => {
-    const source = readFileSync(
-      join(sourceRoot, 'services/controlPlane.ts'),
-      'utf8',
-    );
+    const source = readSource('services/controlPlane.ts');
     for (const [start, end, decision] of [
       [
         'public async requestContactDerivedReset',
@@ -78,10 +75,7 @@ describe('iOS composer reservation architecture', () => {
   });
 
   it('lets deletion dominate in the same transaction and verifies absence', () => {
-    const source = readFileSync(
-      join(sourceRoot, 'services/controlPlane.ts'),
-      'utf8',
-    );
+    const source = readSource('services/controlPlane.ts');
     const deletion = between(
       source,
       'public async beginDeletion',
@@ -100,10 +94,7 @@ describe('iOS composer reservation architecture', () => {
   });
 
   it('uses authenticated replay-protected callables and content-free schemas', () => {
-    const functionsSource = readFileSync(
-      join(sourceRoot, 'functions/index.ts'),
-      'utf8',
-    );
+    const functionsSource = readSource('functions/index.ts');
     expect(functionsSource).toContain('enforceAppCheck: true');
     expect(functionsSource).toContain('consumeAppCheckToken: true');
     for (const [start, end] of [
@@ -127,7 +118,7 @@ describe('iOS composer reservation architecture', () => {
       expect(callable).not.toContain('requireRecentGoogleAuthentication');
     }
 
-    const model = readFileSync(join(sourceRoot, 'domain/model.ts'), 'utf8');
+    const model = readSource('domain/model.ts');
     const reservation = between(
       model,
       'export interface IOSComposerReservation',

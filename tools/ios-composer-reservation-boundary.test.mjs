@@ -5,8 +5,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
-const read = path =>
-  readFileSync(path, 'utf8').replace(/\r\n/gu, '\n');
+const read = path => readFileSync(path, 'utf8').replace(/\r\n/gu, '\n');
 const backendModel = read('backend/functions/src/domain/model.ts');
 const backendService = read('backend/functions/src/services/controlPlane.ts');
 const backendFunctions = read('backend/functions/src/functions/index.ts');

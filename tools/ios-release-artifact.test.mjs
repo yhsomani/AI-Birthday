@@ -14,6 +14,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { symlinksAvailable } from './test-capabilities.mjs';
 
 import {
   collectIOSReleaseReferenceDigests,
@@ -268,7 +269,7 @@ test('rejects template sentinels, stale or overlong approval, and approval beyon
   assert.match(errors, /outlives the .* provisioning profile/u);
 });
 
-test('collects the exact primary, scenario-raw, and performance-support inventory and rejects extras or links', () => {
+test('collects the exact primary, scenario-raw, and performance-support inventory and rejects extras or links', t => {
   const root = mkdtempSync(path.join(tmpdir(), 'birthday-ios-evidence-'));
   try {
     const refs = references();
@@ -315,11 +316,18 @@ test('collects the exact primary, scenario-raw, and performance-support inventor
       path.join(root, 'real-privacy.json'),
       referenceContent('privacyReview'),
     );
-    symlinkSync('real-privacy.json', path.join(root, refs.privacyReview.path));
-    assert.throws(
-      () => collectIOSReleaseReferenceDigests(root, refs),
-      /must not contain symbolic links/u,
-    );
+    if (symlinksAvailable) {
+      symlinkSync(
+        'real-privacy.json',
+        path.join(root, refs.privacyReview.path),
+      );
+      assert.throws(
+        () => collectIOSReleaseReferenceDigests(root, refs),
+        /must not contain symbolic links/u,
+      );
+    } else {
+      t.diagnostic('host cannot create symbolic links; symlink case skipped');
+    }
   } finally {
     rmSync(root, { force: true, recursive: true });
   }

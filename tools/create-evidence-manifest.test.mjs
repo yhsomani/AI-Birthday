@@ -22,6 +22,7 @@ import {
   resolveEvidenceManifestOutput,
   writeEvidenceManifest,
 } from './create-evidence-manifest.mjs';
+import { symlinksAvailable } from './test-capabilities.mjs';
 
 const PROVENANCE = Object.freeze({
   sourceRevision: 'ab'.repeat(20),
@@ -63,6 +64,8 @@ test('creates a deterministic complete manifest with stable relative paths', t =
   });
 
   assert.deepEqual(first, second);
+  const portableMode = file =>
+    lstatSync(file).mode.toString(8).slice(-4).padStart(4, '0');
   assert.deepEqual(
     first.entries.map(entry => [
       entry.kind,
@@ -71,8 +74,18 @@ test('creates a deterministic complete manifest with stable relative paths', t =
       entry.mode,
     ]),
     [
-      ['file', 'artifacts/a.txt', 5, '0644'],
-      ['file', 'artifacts/nested/b.txt', 4, '0755'],
+      [
+        'file',
+        'artifacts/a.txt',
+        5,
+        portableMode(path.join(root, 'artifacts', 'a.txt')),
+      ],
+      [
+        'file',
+        'artifacts/nested/b.txt',
+        4,
+        portableMode(path.join(root, 'artifacts', 'nested', 'b.txt')),
+      ],
     ],
   );
   assert.equal(first.schemaVersion, 3);
@@ -82,6 +95,10 @@ test('creates a deterministic complete manifest with stable relative paths', t =
 });
 
 test('records a safe in-base symlink without following it', t => {
+  if (!symlinksAvailable) {
+    t.skip('host cannot create symbolic links');
+    return;
+  }
   const root = fixture(t);
   symlinkSync('a.txt', path.join(root, 'artifacts', 'alias'));
   const manifest = createManifest({
@@ -144,6 +161,10 @@ test('rejects missing, empty, duplicate, and escaping inputs', t => {
 });
 
 test('rejects absolute and escaping symbolic-link targets', t => {
+  if (!symlinksAvailable) {
+    t.skip('host cannot create symbolic links');
+    return;
+  }
   const root = fixture(t);
   const outside = path.join(root, '..', 'outside-evidence-file');
   writeFileSync(outside, 'outside');
@@ -200,16 +221,24 @@ test('descriptor-backed hashing rejects stale files and type swaps', t => {
     /changed before it could be hashed/u,
   );
 
-  const current = lstatSync(file, { bigint: true });
-  unlinkSync(file);
-  symlinkSync('nested/b.txt', file);
-  assert.throws(
-    () => readStableRegularFile(file, current, 'artifacts/a.txt'),
-    /(?:ELOOP|changed before it could be hashed)/u,
-  );
+  if (symlinksAvailable) {
+    const current = lstatSync(file, { bigint: true });
+    unlinkSync(file);
+    symlinkSync('nested/b.txt', file);
+    assert.throws(
+      () => readStableRegularFile(file, current, 'artifacts/a.txt'),
+      /(?:ELOOP|changed before it could be hashed)/u,
+    );
+  } else {
+    t.diagnostic('host cannot create symbolic links; type-swap case skipped');
+  }
 });
 
 test('rejects an evidence input reached through a symbolic-link parent', t => {
+  if (!symlinksAvailable) {
+    t.skip('host cannot create symbolic links');
+    return;
+  }
   const root = fixture(t);
   symlinkSync('artifacts', path.join(root, 'linked-artifacts'));
   assert.throws(
@@ -224,6 +253,10 @@ test('rejects an evidence input reached through a symbolic-link parent', t => {
 });
 
 test('a symlinked CLI invocation executes and fails closed', t => {
+  if (!symlinksAvailable) {
+    t.skip('host cannot create symbolic links');
+    return;
+  }
   const root = fixture(t);
   const linkedCli = path.join(root, 'manifest-cli.mjs');
   symlinkSync(
@@ -293,13 +326,17 @@ test('manifest output stays in a real release-evidence directory', t => {
     /inside release-evidence/u,
   );
 
-  symlinkSync(outside, path.join(root, 'release-evidence', 'escape'));
-  assert.throws(
-    () =>
-      resolveEvidenceManifestOutput(
-        'release-evidence/escape/manifest.json',
-        root,
-      ),
-    /only real directories/u,
-  );
+  if (symlinksAvailable) {
+    symlinkSync(outside, path.join(root, 'release-evidence', 'escape'));
+    assert.throws(
+      () =>
+        resolveEvidenceManifestOutput(
+          'release-evidence/escape/manifest.json',
+          root,
+        ),
+      /only real directories/u,
+    );
+  } else {
+    t.diagnostic('host cannot create symbolic links; escape case skipped');
+  }
 });

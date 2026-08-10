@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { symlinksAvailable } from './test-capabilities.mjs';
 
 import {
   validatePerformanceEvidence,
@@ -172,7 +173,7 @@ test('hashes exactly the protocol and raw-result bytes below the evidence root',
   }
 });
 
-test('rejects extra files, symlinks, duplicate references, and escaping paths', () => {
+test('rejects extra files, symlinks, duplicate references, and escaping paths', t => {
   const root = mkdtempSync(join(tmpdir(), 'birthday-performance-'));
   const outside = join(tmpdir(), `birthday-performance-outside-${process.pid}`);
   try {
@@ -190,13 +191,17 @@ test('rejects extra files, symlinks, duplicate references, and escaping paths', 
     rmSync(join(root, 'extra.txt'));
     writeFileSync(outside, 'outside');
     rmSync(join(root, 'raw.txt'));
-    symlinkSync(outside, join(root, 'raw.txt'));
-    assert.match(
-      verifyPerformanceEvidenceReferences(evidence, root).errors.join('\n'),
-      /symlink/u,
-    );
+    if (symlinksAvailable) {
+      symlinkSync(outside, join(root, 'raw.txt'));
+      assert.match(
+        verifyPerformanceEvidenceReferences(evidence, root).errors.join('\n'),
+        /symlink/u,
+      );
+      rmSync(join(root, 'raw.txt'));
+    } else {
+      t.diagnostic('host cannot create symbolic links; symlink case skipped');
+    }
 
-    rmSync(join(root, 'raw.txt'));
     writeFileSync(join(root, 'raw.txt'), 'raw');
     evidence.references.rawResultsReference =
       evidence.references.protocolReference;

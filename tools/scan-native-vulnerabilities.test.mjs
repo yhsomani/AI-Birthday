@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { symlinksAvailable } from './test-capabilities.mjs';
 
 import { createNativeSbom } from './generate-native-sbom.mjs';
 import {
@@ -723,14 +724,20 @@ test('writes reports create-only under release-evidence and rejects escapes or s
   );
   const outside = path.join(root, 'outside');
   mkdirSync(outside);
-  symlinkSync(outside, path.join(root, 'release-evidence/link'));
-  assert.throws(
-    () =>
-      writeNativeAdvisoryReport(
-        'release-evidence/link/report.json',
-        report,
-        root,
-      ),
-    /symbolic links/u,
-  );
+  if (symlinksAvailable) {
+    symlinkSync(outside, path.join(root, 'release-evidence/link'));
+    assert.throws(
+      () =>
+        writeNativeAdvisoryReport(
+          'release-evidence/link/report.json',
+          report,
+          root,
+        ),
+      /symbolic links/u,
+    );
+  } else {
+    t.diagnostic(
+      'host cannot create symbolic links; link-segment case skipped',
+    );
+  }
 });

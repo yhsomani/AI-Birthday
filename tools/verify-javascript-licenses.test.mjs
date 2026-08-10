@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { symlinksAvailable } from './test-capabilities.mjs';
 
 import {
   buildJavaScriptLicenseEvidence,
@@ -271,15 +272,19 @@ test('output paths are repository-root based, reject symlinks, and never overwri
       error instanceof Error && 'code' in error && error.code === 'EEXIST',
   );
 
-  symlinkSync(outside, path.join(root, 'release-evidence', 'escape'));
-  assert.throws(
-    () =>
-      resolveJavaScriptLicenseOutput(
-        'release-evidence/escape/javascript-licenses.json',
-        root,
-      ),
-    /must not contain symbolic links/u,
-  );
+  if (symlinksAvailable) {
+    symlinkSync(outside, path.join(root, 'release-evidence', 'escape'));
+    assert.throws(
+      () =>
+        resolveJavaScriptLicenseOutput(
+          'release-evidence/escape/javascript-licenses.json',
+          root,
+        ),
+      /must not contain symbolic links/u,
+    );
+  } else {
+    t.diagnostic('host cannot create symbolic links; symlink case skipped');
+  }
   assert.throws(
     () => resolveJavaScriptLicenseOutput('../outside.json', root),
     /must be inside release-evidence/u,

@@ -12,7 +12,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { commandAvailable } from './test-capabilities.mjs';
 
+const zipAvailable = commandAvailable('zip');
+const bashAvailable = commandAvailable('bash');
 const verifier = resolve('tools/verify-android-apk.sh');
 
 const fakeApksignerSource = `#!/usr/bin/env bash
@@ -80,34 +83,53 @@ const classify = ({ state, jarSignature = false, signingBlock = false }) => {
   }
 };
 
-test('accepts only the pinned apksigner canonical unsigned state', () => {
-  const result = classify({ state: 'unsigned' });
-  assert.equal(result.status, 0, result.stderr);
-});
+test(
+  'accepts only the pinned apksigner canonical unsigned state',
+  { skip: !zipAvailable || !bashAvailable },
+  () => {
+    const result = classify({ state: 'unsigned' });
+    assert.equal(result.status, 0, result.stderr);
+  },
+);
 
-test('rejects a valid signature in unsigned-dev-release mode', () => {
-  const result = classify({ state: 'valid' });
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /unexpectedly has a valid signature/u);
-});
+test(
+  'rejects a valid signature in unsigned-dev-release mode',
+  { skip: !zipAvailable || !bashAvailable },
+  () => {
+    const result = classify({ state: 'valid' });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /unexpectedly has a valid signature/u);
+  },
+);
 
-test('rejects malformed or tampered signature verification failures', () => {
-  const result = classify({ state: 'invalid' });
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /malformed or unverifiable signature metadata/u);
-});
+test(
+  'rejects malformed or tampered signature verification failures',
+  { skip: !zipAvailable || !bashAvailable },
+  () => {
+    const result = classify({ state: 'invalid' });
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /malformed or unverifiable signature metadata/u,
+    );
+  },
+);
 
-test('rejects JAR and APK Signing Block metadata even after signature stripping', () => {
-  const jarSigned = classify({ state: 'unsigned', jarSignature: true });
-  assert.equal(jarSigned.status, 1);
-  assert.match(jarSigned.stderr, /contains JAR signature metadata/u);
+test(
+  'rejects JAR and APK Signing Block metadata even after signature stripping',
+  { skip: !zipAvailable || !bashAvailable },
+  () => {
+    const jarSigned = classify({ state: 'unsigned', jarSignature: true });
+    assert.equal(jarSigned.status, 1);
+    assert.match(jarSigned.stderr, /contains JAR signature metadata/u);
 
-  const blockSigned = classify({ state: 'unsigned', signingBlock: true });
-  assert.equal(blockSigned.status, 1);
-  assert.match(blockSigned.stderr, /contains an APK Signing Block/u);
-});
+    const blockSigned = classify({ state: 'unsigned', signingBlock: true });
+    assert.equal(blockSigned.status, 1);
+    assert.match(blockSigned.stderr, /contains an APK Signing Block/u);
+  },
+);
 
-test('restricted verifier separates direct and post-Play APK evidence and binds device bytes', () => {
+test('restricted verifier separates direct and post-Play APK evidence and binds device bytes', t => {
   const source = readFileSync(verifier, 'utf8');
   assert.match(source, /\$# -ne 8/u);
   assert.match(source, /\$# -ne 13/u);
@@ -138,6 +160,10 @@ test('restricted verifier separates direct and post-Play APK evidence and binds 
     /Play-delivered verification requires a physical Android device/u,
   );
 
+  if (!bashAvailable) {
+    t.diagnostic('host has no bash; legacy invocation skipped');
+    return;
+  }
   const legacy = spawnSync(
     'bash',
     [

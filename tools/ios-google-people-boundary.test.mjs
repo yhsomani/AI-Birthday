@@ -490,35 +490,41 @@ test(
   },
 );
 
-test('tier inventory rejects a Firebase project reused across iOS tiers', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'birthday-ios-tier-inventory-'));
-  const client = tier => `123456789-${tier}.apps.googleusercontent.com`;
-  for (const [tier, bundle] of Object.entries({
-    dev: 'com.yashsomani.birthdayautopilot.dev',
-    staging: 'com.yashsomani.birthdayautopilot.staging',
-  })) {
-    const target = join(directory, tier);
-    mkdirSync(target, { recursive: true });
-    const clientID = client(tier);
-    writeFileSync(
-      join(target, 'GoogleService-Info.plist'),
-      `<?xml version="1.0"?><plist version="1.0"><dict>
+test(
+  'tier inventory rejects a Firebase project reused across iOS tiers',
+  { skip: process.platform !== 'darwin' },
+  () => {
+    const directory = mkdtempSync(
+      join(tmpdir(), 'birthday-ios-tier-inventory-'),
+    );
+    const client = tier => `123456789-${tier}.apps.googleusercontent.com`;
+    for (const [tier, bundle] of Object.entries({
+      dev: 'com.yashsomani.birthdayautopilot.dev',
+      staging: 'com.yashsomani.birthdayautopilot.staging',
+    })) {
+      const target = join(directory, tier);
+      mkdirSync(target, { recursive: true });
+      const clientID = client(tier);
+      writeFileSync(
+        join(target, 'GoogleService-Info.plist'),
+        `<?xml version="1.0"?><plist version="1.0"><dict>
 <key>API_KEY</key><string>key-${tier}</string><key>BUNDLE_ID</key><string>${bundle}</string>
 <key>CLIENT_ID</key><string>${clientID}</string><key>GCM_SENDER_ID</key><string>123</string>
 <key>GOOGLE_APP_ID</key><string>app-${tier}</string><key>PROJECT_ID</key><string>shared-project</string>
 <key>REVERSED_CLIENT_ID</key><string>${clientID
-        .split('.')
-        .reverse()
-        .join('.')}</string>
+          .split('.')
+          .reverse()
+          .join('.')}</string>
 </dict></plist>`,
+      );
+    }
+    assert.ok(
+      validateIOSGoogleConfigInventory(directory).some(error =>
+        error.includes('PROJECT_ID is shared across tiers'),
+      ),
     );
-  }
-  assert.ok(
-    validateIOSGoogleConfigInventory(directory).some(error =>
-      error.includes('PROJECT_ID is shared across tiers'),
-    ),
-  );
-});
+  },
+);
 
 test('checked-in iOS tier inventory has no generic or cross-tier configuration', () => {
   assert.deepEqual(

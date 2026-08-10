@@ -12,6 +12,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { deflateSync } from 'node:zlib';
+import { symlinksAvailable } from './test-capabilities.mjs';
 import {
   calculateApprovalScopeSha256,
   calculateLocalizationSha256,
@@ -604,7 +605,11 @@ test('privacy answers, iOS truth, credentials, and evidence traversal fail close
   assert.match(messages, /normalized relative path/u);
 });
 
-test('evidence symlinks are rejected even when their target stays under the root', () => {
+test('evidence symlinks are rejected even when their target stays under the root', t => {
+  if (!symlinksAvailable) {
+    t.skip('host cannot create symbolic links');
+    return;
+  }
   const fixture = makeReleaseFixture();
   const target = fixture.document.evidenceReferences[0].path;
   symlinkSync(target, path.join(fixture.evidenceRoot, 'alias.txt'));

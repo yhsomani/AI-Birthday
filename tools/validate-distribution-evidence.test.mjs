@@ -18,6 +18,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { symlinksAvailable } from './test-capabilities.mjs';
 import test, { after } from 'node:test';
 
 import {
@@ -783,7 +784,7 @@ test('binds every reference to the exact dedicated evidence-root inventory', () 
   }
 });
 
-test('rejects escaping references, symlinks, and hard-linked evidence bytes', () => {
+test('rejects escaping references, symlinks, and hard-linked evidence bytes', t => {
   const escaping = validDocument();
   escaping.approvals[0].policyApprovalReference = '../outside-policy';
   assert.match(
@@ -801,17 +802,20 @@ test('rejects escaping references, symlinks, and hard-linked evidence bytes', ()
     writeFileSync(outside, 'policy approval\n');
 
     unlinkSync(policyFile);
-    symlinkSync(outside, policyFile);
-    assert.match(
-      validateDistributionEvidence(
-        validDocument(),
-        localExpected,
-        NOW,
-      ).errors.join('\n'),
-      /contains a symbolic link/u,
-    );
-
-    unlinkSync(policyFile);
+    if (symlinksAvailable) {
+      symlinkSync(outside, policyFile);
+      assert.match(
+        validateDistributionEvidence(
+          validDocument(),
+          localExpected,
+          NOW,
+        ).errors.join('\n'),
+        /contains a symbolic link/u,
+      );
+      unlinkSync(policyFile);
+    } else {
+      t.diagnostic('host cannot create symbolic links; symlink case skipped');
+    }
     linkSync(outside, policyFile);
     assert.match(
       validateDistributionEvidence(

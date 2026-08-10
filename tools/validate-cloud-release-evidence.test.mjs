@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { symlinksAvailable } from './test-capabilities.mjs';
 
 import {
   EXPECTED_CALLABLE_FUNCTIONS,
@@ -1182,7 +1183,11 @@ test('all seven approval roles require distinct people and matching expiring app
   assert.match(error, /must equal package validUntil/u);
 });
 
-test('evidence collection rejects symbolic links instead of following them', () => {
+test('evidence collection rejects symbolic links instead of following them', t => {
+  if (!symlinksAvailable) {
+    t.skip('host cannot create symbolic links');
+    return;
+  }
   const root = mkdtempSync(path.join(os.tmpdir(), 'birthday-cloud-evidence-'));
   const outside = path.join(root, '..', 'outside-cloud-evidence.txt');
   writeFileSync(outside, 'outside', 'utf8');

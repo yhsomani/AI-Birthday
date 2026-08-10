@@ -14,6 +14,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { parseReleaseConfig } from '../backend/hosting/tools/release-config.mjs';
+import { symlinksAvailable } from './test-capabilities.mjs';
 import {
   createHostingCurrentLiveObservation,
   verifyHostingCurrentLiveObservation,
@@ -573,17 +574,21 @@ test('current-live admission rejects unlocked, in-project, overlong, or noncanon
   );
 });
 
-test('stable input reader rejects symlinks and hard links', () => {
+test('stable input reader rejects symlinks and hard links', t => {
   const directory = mkdtempSync(path.join(tmpdir(), 'hosting-artifact-'));
   try {
     const regular = path.join(directory, 'regular.json');
     const symbolic = path.join(directory, 'symbolic.json');
     const hard = path.join(directory, 'hard.json');
     writeFileSync(regular, '{}\n');
-    symlinkSync(regular, symbolic);
     linkSync(regular, hard);
-    assert.throws(() => readStableRegularFile(symbolic), /non-linked/u);
     assert.throws(() => readStableRegularFile(regular), /non-linked/u);
+    if (symlinksAvailable) {
+      symlinkSync(regular, symbolic);
+      assert.throws(() => readStableRegularFile(symbolic), /non-linked/u);
+    } else {
+      t.diagnostic('host cannot create symbolic links; symlink case skipped');
+    }
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

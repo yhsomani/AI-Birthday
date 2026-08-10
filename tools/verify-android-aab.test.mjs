@@ -12,7 +12,9 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
+import { commandAvailable } from './test-capabilities.mjs';
 
+const bashAvailable = commandAvailable('bash');
 const verifier = resolve('tools/verify-android-aab.sh');
 const certificate = 'ab'.repeat(32).toUpperCase().match(/../gu).join(':');
 
@@ -145,52 +147,68 @@ printf '%s\\n' "$@" > '${validatorArguments}'`,
   }
 };
 
-test('AAB verifier binds exact bytes to the upload signer and Play evidence mode', () => {
-  const { result, validatorArguments } = runFixture();
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /AAB .*upload-signature=verified/u);
-  assert.match(validatorArguments, /--artifact-mode\nplay-aab/u);
-  assert.match(
-    validatorArguments,
-    /--artifact-signing-certificate\n(?:ab){32}/u,
-  );
-  assert.match(validatorArguments, /--artifact-file/u);
-  assert.match(validatorArguments, /--evidence-root\n.*supporting-evidence/u);
-  assert.match(result.stdout, /version=1 min=29 target=36/u);
-  assert.match(
-    result.stdout,
-    /PASS Android Firebase project=birthday-production number=123456789012 app-id=1:123456789012:android:abcdef1234567890 web-oauth-client=123456789012-release\.apps\.googleusercontent\.com/u,
-  );
-});
+test(
+  'AAB verifier binds exact bytes to the upload signer and Play evidence mode',
+  { skip: !bashAvailable },
+  () => {
+    const { result, validatorArguments } = runFixture();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /AAB .*upload-signature=verified/u);
+    assert.match(validatorArguments, /--artifact-mode\nplay-aab/u);
+    assert.match(
+      validatorArguments,
+      /--artifact-signing-certificate\n(?:ab){32}/u,
+    );
+    assert.match(validatorArguments, /--artifact-file/u);
+    assert.match(validatorArguments, /--evidence-root\n.*supporting-evidence/u);
+    assert.match(result.stdout, /version=1 min=29 target=36/u);
+    assert.match(
+      result.stdout,
+      /PASS Android Firebase project=birthday-production number=123456789012 app-id=1:123456789012:android:abcdef1234567890 web-oauth-client=123456789012-release\.apps\.googleusercontent\.com/u,
+    );
+  },
+);
 
-test('AAB verifier fails closed when compiled Firebase identity cannot be decoded', () => {
-  const rejected = runFixture({ firebaseState: 'rejected' });
-  assert.notEqual(rejected.result.status, 0);
-  assert.match(rejected.result.stderr, /Firebase resources are invalid/u);
-  assert.equal(rejected.validatorArguments, '');
-});
+test(
+  'AAB verifier fails closed when compiled Firebase identity cannot be decoded',
+  { skip: !bashAvailable },
+  () => {
+    const rejected = runFixture({ firebaseState: 'rejected' });
+    assert.notEqual(rejected.result.status, 0);
+    assert.match(rejected.result.stderr, /Firebase resources are invalid/u);
+    assert.equal(rejected.validatorArguments, '');
+  },
+);
 
-test('AAB verifier rejects an unsigned artifact and multiple signers', () => {
-  const unsigned = runFixture({ signatureState: 'unsigned' }).result;
-  assert.equal(unsigned.status, 1);
-  assert.match(unsigned.stderr, /signature does not verify/u);
+test(
+  'AAB verifier rejects an unsigned artifact and multiple signers',
+  { skip: !bashAvailable },
+  () => {
+    const unsigned = runFixture({ signatureState: 'unsigned' }).result;
+    assert.equal(unsigned.status, 1);
+    assert.match(unsigned.stderr, /signature does not verify/u);
 
-  const multiple = runFixture({ signerCount: 2 }).result;
-  assert.equal(multiple.status, 1);
-  assert.match(multiple.stderr, /exactly one signer/u);
-});
+    const multiple = runFixture({ signerCount: 2 }).result;
+    assert.equal(multiple.status, 1);
+    assert.match(multiple.stderr, /exactly one signer/u);
+  },
+);
 
-test('AAB verifier rejects wrong or policy-invalid decoded manifests before evidence acceptance', () => {
-  const wrong = runFixture({ manifestState: 'wrong-package' });
-  assert.equal(wrong.result.status, 1);
-  assert.match(wrong.result.stderr, /manifest summary is malformed/u);
-  assert.equal(wrong.validatorArguments, '');
+test(
+  'AAB verifier rejects wrong or policy-invalid decoded manifests before evidence acceptance',
+  { skip: !bashAvailable },
+  () => {
+    const wrong = runFixture({ manifestState: 'wrong-package' });
+    assert.equal(wrong.result.status, 1);
+    assert.match(wrong.result.stderr, /manifest summary is malformed/u);
+    assert.equal(wrong.validatorArguments, '');
 
-  const rejected = runFixture({ manifestState: 'rejected' });
-  assert.notEqual(rejected.result.status, 0);
-  assert.match(rejected.result.stderr, /manifest is not release-safe/u);
-  assert.equal(rejected.validatorArguments, '');
-});
+    const rejected = runFixture({ manifestState: 'rejected' });
+    assert.notEqual(rejected.result.status, 0);
+    assert.match(rejected.result.stderr, /manifest is not release-safe/u);
+    assert.equal(rejected.validatorArguments, '');
+  },
+);
 
 test('AAB verifier requires required bundle structure and arm64-only 16 KB ELF inputs', () => {
   const source = readFileSync(verifier, 'utf8');

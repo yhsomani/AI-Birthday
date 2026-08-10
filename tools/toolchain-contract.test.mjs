@@ -13,9 +13,11 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { TOOLCHAIN_VERSIONS } from './toolchain-versions.mjs';
+import { commandAvailable } from './test-capabilities.mjs';
 
-const read = file =>
-  readFileSync(file, 'utf8').replace(/\r\n/gu, '\n');
+const shAvailable = commandAvailable('sh');
+
+const read = file => readFileSync(file, 'utf8').replace(/\r\n/gu, '\n');
 
 test('mobile Node and npm pins agree across install contracts', () => {
   const packageJson = JSON.parse(read('package.json'));
@@ -220,55 +222,59 @@ test('Ruby, Bundler, and CocoaPods pins agree with the lockfile', () => {
   );
 });
 
-test('iOS bundle wrapper handles spaces and rejects a mismatched Node', () => {
-  const temporaryRoot = mkdtempSync(
-    path.join(os.tmpdir(), 'birthday-ios-toolchain-'),
-  );
-  const fixtureRoot = path.join(temporaryRoot, 'fixture with spaces');
-  const nodeBinary = path.join(fixtureRoot, 'node binary');
-  const reactNativeRoot = path.join(fixtureRoot, 'react native');
-  const reactNativeScript = path.join(
-    reactNativeRoot,
-    'scripts',
-    'react-native-xcode.sh',
-  );
-  mkdirSync(path.dirname(reactNativeScript), { recursive: true });
-
-  try {
-    writeFileSync(nodeBinary, `#!/bin/sh\nprintf '%s\\n' 'v24.18.0'\n`);
-    writeFileSync(
-      reactNativeScript,
-      `#!/bin/sh\nprintf '%s\\n' 'bundle-called'\n`,
+test(
+  'iOS bundle wrapper handles spaces and rejects a mismatched Node',
+  { skip: !shAvailable },
+  () => {
+    const temporaryRoot = mkdtempSync(
+      path.join(os.tmpdir(), 'birthday-ios-toolchain-'),
     );
-    chmodSync(nodeBinary, 0o755);
-    chmodSync(reactNativeScript, 0o755);
+    const fixtureRoot = path.join(temporaryRoot, 'fixture with spaces');
+    const nodeBinary = path.join(fixtureRoot, 'node binary');
+    const reactNativeRoot = path.join(fixtureRoot, 'react native');
+    const reactNativeScript = path.join(
+      reactNativeRoot,
+      'scripts',
+      'react-native-xcode.sh',
+    );
+    mkdirSync(path.dirname(reactNativeScript), { recursive: true });
 
-    const valid = spawnSync('sh', ['ios/scripts/bundle-react-native.sh'], {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        NODE_BINARY: nodeBinary,
-        REACT_NATIVE_PATH: reactNativeRoot,
-      },
-    });
-    assert.equal(valid.status, 0, valid.stderr);
-    assert.equal(valid.stdout.trim(), 'bundle-called');
+    try {
+      writeFileSync(nodeBinary, `#!/bin/sh\nprintf '%s\\n' 'v24.18.0'\n`);
+      writeFileSync(
+        reactNativeScript,
+        `#!/bin/sh\nprintf '%s\\n' 'bundle-called'\n`,
+      );
+      chmodSync(nodeBinary, 0o755);
+      chmodSync(reactNativeScript, 0o755);
 
-    writeFileSync(nodeBinary, `#!/bin/sh\nprintf '%s\\n' 'v20.19.6'\n`);
-    const invalid = spawnSync('sh', ['ios/scripts/bundle-react-native.sh'], {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        NODE_BINARY: nodeBinary,
-        REACT_NATIVE_PATH: reactNativeRoot,
-      },
-    });
-    assert.equal(invalid.status, 1);
-    assert.match(invalid.stderr, /requires Node v24\.18\.0/u);
-  } finally {
-    rmSync(temporaryRoot, { recursive: true, force: true });
-  }
-});
+      const valid = spawnSync('sh', ['ios/scripts/bundle-react-native.sh'], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          NODE_BINARY: nodeBinary,
+          REACT_NATIVE_PATH: reactNativeRoot,
+        },
+      });
+      assert.equal(valid.status, 0, valid.stderr);
+      assert.equal(valid.stdout.trim(), 'bundle-called');
+
+      writeFileSync(nodeBinary, `#!/bin/sh\nprintf '%s\\n' 'v20.19.6'\n`);
+      const invalid = spawnSync('sh', ['ios/scripts/bundle-react-native.sh'], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          NODE_BINARY: nodeBinary,
+          REACT_NATIVE_PATH: reactNativeRoot,
+        },
+      });
+      assert.equal(invalid.status, 1);
+      assert.match(invalid.stderr, /requires Node v24\.18\.0/u);
+    } finally {
+      rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+  },
+);
 
 test('iOS build and CI reject toolchain drift and build a real app target', () => {
   const workflow = read('.github/workflows/ci.yml');

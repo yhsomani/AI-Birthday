@@ -3,11 +3,14 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { commandAvailable } from './test-capabilities.mjs';
 
 import {
   verifyE2EMergedManifest,
   verifyProdMergedManifest,
 } from './verify-mobile-e2e-boundary.mjs';
+
+const shAvailable = commandAvailable('sh');
 
 const root = process.cwd();
 const read = relative => readFileSync(path.join(root, relative), 'utf8');
@@ -195,7 +198,7 @@ test('iOS signing entitlements remain configuration-specific', () => {
   assert.doesNotMatch(e2e, /appattest|data-protection/u);
 });
 
-test('Maestro installer is version and checksum pinned without pipe execution', () => {
+test('Maestro installer is version and checksum pinned without pipe execution', t => {
   const installer = read('tools/install-maestro.sh');
   const runner = read('tools/run-mobile-e2e.sh');
   assert.match(installer, /version='2\.6\.1'/u);
@@ -219,6 +222,10 @@ test('Maestro installer is version and checksum pinned without pipe execution', 
   assert.match(runner, /MAESTRO_BIN overrides are forbidden/u);
   assert.match(runner, /install-maestro\.sh/u);
 
+  if (!shAvailable) {
+    t.diagnostic('host has no POSIX shell; installer execution skipped');
+    return;
+  }
   const printed = execFileSync(
     'sh',
     ['tools/install-maestro.sh', '--print-config'],
