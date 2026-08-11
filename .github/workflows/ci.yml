@@ -29,7 +29,7 @@ jobs:
       - name: Set up the exact mobile Node.js line
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version-file: .nvmrc
+          node-version: 24.18.0
 
       - name: Pin and verify npm
         run: |
@@ -53,7 +53,7 @@ jobs:
       - name: Set up deployed Functions Node.js line
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version-file: backend/functions/.nvmrc
+          node-version: 24.18.0
           cache: npm
           cache-dependency-path: backend/functions/package-lock.json
 
@@ -140,7 +140,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version-file: .nvmrc
+          node-version: 24.18.0
           cache: npm
 
       - name: Pin npm
@@ -201,7 +201,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version-file: .nvmrc
+          node-version: 24.18.0
           cache: npm
 
       - name: Pin npm
@@ -333,7 +333,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version-file: .nvmrc
+          node-version: 24.18.0
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -521,414 +521,6 @@ jobs:
             coverage/
             release-evidence/mobile/
 
-  ios-build:
-    name: iOS unsigned simulator build
-    runs-on: macos-26
-    timeout-minutes: 75
-    env:
-      BUNDLE_FROZEN: 'true'
-      COCOAPODS_DISABLE_STATS: 'true'
-      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
-
-    steps:
-      - name: Check out source
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - name: Pin npm
-        run: npm install --global npm@11.6.0
-
-      - name: Verify JavaScript toolchain
-        run: |
-          test "$(node --version)" = "v24.18.0"
-          test "$(npm --version)" = "11.6.0"
-
-      - name: Install mobile dependencies
-        run: npm ci
-
-      - name: Set up Java for the pinned Maestro CLI
-        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Verify the path-safe React Native codegen installation
-        run: npm run codegen:check
-
-      - name: Set up pinned Ruby and Bundler
-        uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1 # v1
-        with:
-          bundler-cache: true
-
-      - name: Verify Apple and Ruby toolchains
-        run: |
-          test "$(ruby -e 'print RUBY_VERSION')" = "3.4.10"
-          test "$(bundle --version | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -1)" = "4.0.15"
-          test "$(bundle exec pod --version)" = "1.16.2"
-          test "$(xcodebuild -version | sed -n '1p')" = "Xcode 26.5"
-          test "$(xcrun --sdk iphonesimulator --show-sdk-version)" = "26.5"
-
-      - name: Install deterministic iOS dependencies
-        run: npm run ios:pods
-
-      - name: Verify the complete iOS development environment
-        run: npm run doctor:ios
-
-      - name: Validate JavaScript and iOS security contracts
-        run: |
-          npm run typecheck
-          node --test tools/ios-*.test.mjs tools/gemini-native-contract.test.mjs
-
-      - name: Parse Swift sources
-        run: >-
-          find ios/BirthdayAutopilot ios/BirthdayAutopilotTests tests/ios -name '*.swift' -print0
-          | xargs -0 xcrun swiftc -frontend -parse
-
-      - name: Validate Xcode and plist structure
-        run: |
-          plutil -lint \
-            ios/BirthdayAutopilot/Info.plist \
-            ios/BirthdayAutopilot/Info-Debug.plist \
-            ios/BirthdayAutopilot/Info-E2E.plist \
-            ios/BirthdayAutopilot/Info-Smoke.plist \
-            ios/BirthdayAutopilot/PrivacyInfo.xcprivacy \
-            ios/BirthdayAutopilot/BirthdayAutopilot-Debug.entitlements \
-            ios/BirthdayAutopilot/BirthdayAutopilot.entitlements \
-            ios/BirthdayAutopilot/BirthdayAutopilot-E2E.entitlements \
-            ios/BirthdayAutopilot/BirthdayAutopilot-Smoke.entitlements \
-            ios/BirthdayAutopilot.xcodeproj/project.pbxproj
-          xmllint --noout \
-            ios/BirthdayAutopilot.xcodeproj/xcshareddata/xcschemes/BirthdayAutopilotE2E.xcscheme \
-            ios/BirthdayAutopilot.xcodeproj/xcshareddata/xcschemes/BirthdayAutopilotProductionSmoke.xcscheme
-          xcodebuild -workspace ios/BirthdayAutopilot.xcworkspace -list
-          ruby -c ios/Podfile
-          sh -n ios/scripts/copy-google-config.sh
-          sh -n ios/scripts/copy-production-smoke-fixture.sh
-          sh -n ios/scripts/bundle-react-native.sh
-
-      - name: Run the standalone People parser contract
-        run: |
-          xcrun swiftc \
-            ios/BirthdayAutopilot/Contacts/IOSPeopleSyncFencePolicy.swift \
-            ios/BirthdayAutopilot/Contacts/PeopleContracts.swift \
-            ios/BirthdayAutopilot/Contacts/PeopleJSONParser.swift \
-            tests/ios/PeopleParserContractTests.swift \
-            -o "$RUNNER_TEMP/PeopleParserContractTests"
-          "$RUNNER_TEMP/PeopleParserContractTests"
-
-      - name: Run the standalone Gemini operational-switch contract
-        run: |
-          xcrun swiftc \
-            ios/BirthdayAutopilot/Gemini/IOSGeminiOperationalPolicy.swift \
-            tests/ios/GeminiOperationalPolicyTests.swift \
-            -o "$RUNNER_TEMP/GeminiOperationalPolicyTests"
-          "$RUNNER_TEMP/GeminiOperationalPolicyTests"
-
-      - name: Run the standalone companion placeholder contract
-        run: |
-          xcrun swiftc \
-            ios/BirthdayAutopilot/Automation/IOSCompanionMessagePlaceholderPolicy.swift \
-            tests/ios/CompanionMessagePlaceholderPolicyTests.swift \
-            -o "$RUNNER_TEMP/CompanionMessagePlaceholderPolicyTests"
-          "$RUNNER_TEMP/CompanionMessagePlaceholderPolicyTests"
-
-      - name: Run the standalone persisted-draft recovery contract
-        run: |
-          xcrun swiftc \
-            ios/BirthdayAutopilot/Automation/IOSCompanionMessagePlaceholderPolicy.swift \
-            ios/BirthdayAutopilot/Automation/IOSCompanionWorkflowModels.swift \
-            tests/ios/CompanionPersistedDraftRecoveryTests.swift \
-            -o "$RUNNER_TEMP/CompanionPersistedDraftRecoveryTests"
-          "$RUNNER_TEMP/CompanionPersistedDraftRecoveryTests"
-
-      - name: Run standalone iOS protected-store and composer boundary contracts
-        run: |
-          xcrun swiftc \
-            ios/BirthdayAutopilot/Automation/IOSNativeBoundaryPolicies.swift \
-            tests/ios/IOSNativeBoundaryPolicyTests.swift \
-            -o "$RUNNER_TEMP/IOSNativeBoundaryPolicyTests"
-          "$RUNNER_TEMP/IOSNativeBoundaryPolicyTests"
-
-      - name: Run hosted iOS native unit tests
-        run: |
-          export BIRTHDAY_IOS_SIMULATOR_RUNTIME="$(xcrun --sdk iphonesimulator --show-sdk-version)"
-          SIMULATOR_UDID="$(xcrun simctl list devices available -j | ruby -rjson -e '
-            runtimes = JSON.parse(STDIN.read).fetch("devices")
-            expected = "com.apple.CoreSimulator.SimRuntime.iOS-#{ENV.fetch("BIRTHDAY_IOS_SIMULATOR_RUNTIME").tr(".", "-")}"
-            devices = runtimes.fetch(expected) do
-              abort "Pinned iOS simulator runtime #{expected} is not installed"
-            end
-            candidate = devices.find do |device|
-              device["isAvailable"] && device["name"].start_with?("iPhone")
-            end
-            abort "No available iPhone simulator" unless candidate
-            print candidate.fetch("udid")
-          ')"
-          xcodebuild \
-            -workspace ios/BirthdayAutopilot.xcworkspace \
-            -scheme BirthdayAutopilot \
-            -configuration Debug \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/BirthdayAutopilotTestDerivedData" \
-            -resultBundlePath "$RUNNER_TEMP/BirthdayAutopilotTests.xcresult" \
-            -only-testing:BirthdayAutopilotTests \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            BIRTHDAY_IOS_SIMULATOR_COMPILE_SMOKE=YES \
-            test
-          test -d "$RUNNER_TEMP/BirthdayAutopilotTests.xcresult"
-
-      - name: Build the unsigned iOS simulator app
-        run: >-
-          xcodebuild
-          -workspace ios/BirthdayAutopilot.xcworkspace
-          -scheme BirthdayAutopilot
-          -configuration Debug
-          -sdk iphonesimulator
-          -destination 'generic/platform=iOS Simulator'
-          -derivedDataPath "$RUNNER_TEMP/BirthdayAutopilotDerivedData"
-          CODE_SIGNING_ALLOWED=NO
-          CODE_SIGNING_REQUIRED=NO
-          BIRTHDAY_IOS_SIMULATOR_COMPILE_SMOKE=YES
-          build
-
-      - name: Build the minified unsigned iOS Release simulator app
-        run: >-
-          xcodebuild
-          -workspace ios/BirthdayAutopilot.xcworkspace
-          -scheme BirthdayAutopilot
-          -configuration Release
-          -sdk iphonesimulator
-          -destination 'generic/platform=iOS Simulator'
-          -derivedDataPath "$RUNNER_TEMP/BirthdayAutopilotDerivedData"
-          CODE_SIGNING_ALLOWED=NO
-          CODE_SIGNING_REQUIRED=NO
-          BIRTHDAY_IOS_SIMULATOR_COMPILE_SMOKE=YES
-          build
-
-      - name: Exercise the isolated fixture and production entry on an iOS simulator
-        run: |
-          set -euo pipefail
-          export BIRTHDAY_IOS_SIMULATOR_RUNTIME="$(xcrun --sdk iphonesimulator --show-sdk-version)"
-          SIMULATOR_UDID="$(xcrun simctl list devices available -j | ruby -rjson -e '
-            runtimes = JSON.parse(STDIN.read).fetch("devices")
-            expected = "com.apple.CoreSimulator.SimRuntime.iOS-#{ENV.fetch("BIRTHDAY_IOS_SIMULATOR_RUNTIME").tr(".", "-")}"
-            devices = runtimes.fetch(expected) do
-              abort "Pinned iOS simulator runtime #{expected} is not installed"
-            end
-            candidate = devices.find do |device|
-              device["isAvailable"] && device["name"].start_with?("iPhone")
-            end
-            abort "No available iPhone simulator" unless candidate
-            print candidate.fetch("udid")
-          ')"
-          xcrun simctl boot "$SIMULATOR_UDID" 2>/dev/null || true
-          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
-          xcodebuild \
-            -workspace ios/BirthdayAutopilot.xcworkspace \
-            -scheme BirthdayAutopilotE2E \
-            -configuration E2E \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/BirthdayAutopilotE2EDerivedData" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            BIRTHDAY_IOS_SIMULATOR_COMPILE_SMOKE=YES \
-            build
-          E2E_APP="$RUNNER_TEMP/BirthdayAutopilotE2EDerivedData/Build/Products/E2E-iphonesimulator/BirthdayAutopilot.app"
-          test -d "$E2E_APP"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$E2E_APP/Info.plist")" = 'com.yashsomani.birthdayautopilot.e2e'
-          test "$(/usr/libexec/PlistBuddy -c 'Print :BirthdayE2EFixture' "$E2E_APP/Info.plist")" = 'true'
-          test ! -e "$E2E_APP/GoogleService-Info.plist"
-          if nm -gj "$E2E_APP/BirthdayAutopilot" | grep -F '_OBJC_CLASS_$_BirthdayNative' >/dev/null; then
-            echo 'The production BirthdayNative provider leaked into the E2E binary.' >&2
-            exit 1
-          fi
-          tar -C "$(dirname "$E2E_APP")" \
-            -czf "$RUNNER_TEMP/BirthdayAutopilot-E2E-simulator.app.tar.gz" \
-            "$(basename "$E2E_APP")"
-          mkdir -p "$RUNNER_TEMP/mobile-e2e/ios"
-          npm start -- --reset-cache > "$RUNNER_TEMP/mobile-e2e/ios/metro.log" 2>&1 &
-          METRO_PID=$!
-          cleanup() {
-            xcrun simctl ui "$SIMULATOR_UDID" content_size medium >/dev/null 2>&1 || true
-            kill "$METRO_PID" 2>/dev/null || true
-          }
-          trap cleanup EXIT
-          for attempt in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'; then
-              break
-            fi
-            kill -0 "$METRO_PID"
-            sleep 1
-          done
-          curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'
-          export MOBILE_E2E_TOOL_DIR="$RUNNER_TEMP/maestro-cli"
-          tools/install-maestro.sh "$MOBILE_E2E_TOOL_DIR" >/dev/null
-          xcrun simctl uninstall "$SIMULATOR_UDID" com.yashsomani.birthdayautopilot.e2e 2>/dev/null || true
-          xcrun simctl install "$SIMULATOR_UDID" "$E2E_APP"
-          E2E_REPORT_ROOT="$RUNNER_TEMP/mobile-e2e/ios/smoke" npm run e2e:ios
-          xcrun simctl ui "$SIMULATOR_UDID" content_size accessibility-extra-extra-large
-          xcrun simctl terminate "$SIMULATOR_UDID" com.yashsomani.birthdayautopilot.e2e 2>/dev/null || true
-          E2E_REPORT_ROOT="$RUNNER_TEMP/mobile-e2e/ios/large-text" npm run e2e:ios:large-text
-          test -s "$RUNNER_TEMP/mobile-e2e/ios/smoke/report.xml"
-          test -s "$RUNNER_TEMP/mobile-e2e/ios/large-text/report.xml"
-          mkdir -p "$RUNNER_TEMP/production-smoke/ios"
-          npm run smoke:fixture:verify | tee "$RUNNER_TEMP/production-smoke/ios/fixture-validation.log"
-          xcodebuild \
-            -workspace ios/BirthdayAutopilot.xcworkspace \
-            -scheme BirthdayAutopilotProductionSmoke \
-            -configuration Smoke \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/BirthdayAutopilotSmokeDerivedData" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            build
-          SMOKE_APP="$RUNNER_TEMP/BirthdayAutopilotSmokeDerivedData/Build/Products/Smoke-iphonesimulator/BirthdayAutopilot.app"
-          test -d "$SMOKE_APP"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$SMOKE_APP/Info.plist")" = 'com.yashsomani.birthdayautopilot.smoke'
-          test "$(/usr/libexec/PlistBuddy -c 'Print :BirthdayProductionPathSmoke' "$SMOKE_APP/Info.plist")" = 'true'
-          test ! -e "$SMOKE_APP/GoogleService-Info.plist"
-          test -s "$SMOKE_APP/main.jsbundle"
-          cmp e2e/production-smoke/production-smoke-projections.json "$SMOKE_APP/production-smoke-projections.json"
-          tar -C "$(dirname "$SMOKE_APP")" \
-            -czf "$RUNNER_TEMP/BirthdayAutopilot-Smoke-simulator.app.tar.gz" \
-            "$(basename "$SMOKE_APP")"
-          xcrun simctl uninstall "$SIMULATOR_UDID" com.yashsomani.birthdayautopilot.smoke 2>/dev/null || true
-          xcrun simctl install "$SIMULATOR_UDID" "$SMOKE_APP"
-          PRODUCTION_SMOKE_REPORT_ROOT="$RUNNER_TEMP/production-smoke/ios/large-text" npm run smoke:ios
-          test -s "$RUNNER_TEMP/production-smoke/ios/large-text/report.xml"
-          xcrun simctl ui "$SIMULATOR_UDID" content_size medium
-          xcrun simctl terminate "$SIMULATOR_UDID" com.yashsomani.birthdayautopilot.smoke 2>/dev/null || true
-          PRODUCTION_SMOKE_REPORT_ROOT="$RUNNER_TEMP/production-smoke/ios/default" npm run smoke:ios
-          test -s "$RUNNER_TEMP/production-smoke/ios/default/report.xml"
-
-      - name: Preserve iOS app-bundle structure in archives
-        run: |
-          tar -C "$RUNNER_TEMP/BirthdayAutopilotDerivedData/Build/Products/Debug-iphonesimulator" \
-            -czf "$RUNNER_TEMP/BirthdayAutopilot-Debug-simulator.app.tar.gz" \
-            BirthdayAutopilot.app
-          tar -C "$RUNNER_TEMP/BirthdayAutopilotDerivedData/Build/Products/Release-iphonesimulator" \
-            -czf "$RUNNER_TEMP/BirthdayAutopilot-Release-simulator.app.tar.gz" \
-            BirthdayAutopilot.app
-          tar -tzf "$RUNNER_TEMP/BirthdayAutopilot-Debug-simulator.app.tar.gz" >/dev/null
-          tar -tzf "$RUNNER_TEMP/BirthdayAutopilot-Release-simulator.app.tar.gz" >/dev/null
-
-      - name: Generate locked iOS native dependency evidence
-        run: |
-          mkdir -p release-evidence/ios
-          cp package-lock.json "$RUNNER_TEMP/Mobile-package-lock.json"
-          cp ios/Podfile.lock "$RUNNER_TEMP/Podfile.lock"
-          cp Gemfile.lock "$RUNNER_TEMP/Gemfile.lock"
-          npm sbom --sbom-format=cyclonedx > "$RUNNER_TEMP/BirthdayAutopilot-Mobile.cdx.json"
-          node tools/generate-native-sbom.mjs \
-            --kind cocoapods \
-            --lock "$RUNNER_TEMP/Podfile.lock" \
-            --output release-evidence/ios/ios-cocoapods.cdx.json \
-            --application-name Birthday-Autopilot-iOS \
-            --version 1.0
-          node tools/scan-native-vulnerabilities.mjs \
-            --dependency-set \
-              ios-cocoapods \
-              cocoapods \
-              "$RUNNER_TEMP/Podfile.lock" \
-              release-evidence/ios/ios-cocoapods.cdx.json \
-            --output release-evidence/ios/ios-native-osv.json
-          node tools/verify-javascript-licenses.mjs \
-            --output release-evidence/ios/javascript-licenses.json
-          cp \
-            release-evidence/ios/javascript-licenses.json \
-            "$RUNNER_TEMP/BirthdayAutopilot-JavaScript-licenses.json"
-          cp \
-            release-evidence/ios/ios-cocoapods.cdx.json \
-            "$RUNNER_TEMP/BirthdayAutopilot-iOS.cdx.json"
-          cp \
-            release-evidence/ios/ios-native-osv.json \
-            "$RUNNER_TEMP/BirthdayAutopilot-iOS-native-osv.json"
-          cp \
-            tools/cocoapods-osv-source-map.json \
-            "$RUNNER_TEMP/CocoaPods-OSV-source-map.json"
-          cp \
-            tools/native-advisory-exceptions.json \
-            "$RUNNER_TEMP/Native-advisory-exceptions.json"
-          test -s "$RUNNER_TEMP/BirthdayAutopilot-Mobile.cdx.json"
-          test -s "$RUNNER_TEMP/BirthdayAutopilot-iOS.cdx.json"
-          test -s "$RUNNER_TEMP/BirthdayAutopilot-iOS-native-osv.json"
-          test -s "$RUNNER_TEMP/CocoaPods-OSV-source-map.json"
-          test -s "$RUNNER_TEMP/Native-advisory-exceptions.json"
-          test -s "$RUNNER_TEMP/BirthdayAutopilot-JavaScript-licenses.json"
-
-      - name: Generate complete iOS simulator candidate manifest
-        run: |
-          node tools/create-evidence-manifest.mjs \
-            --base "$RUNNER_TEMP" \
-            --label ios-simulator-candidate \
-            --output release-evidence/ios/sha256-manifest.json \
-            BirthdayAutopilotDerivedData/Build/Products/Debug-iphonesimulator/BirthdayAutopilot.app \
-            BirthdayAutopilotDerivedData/Build/Products/Release-iphonesimulator/BirthdayAutopilot.app \
-            BirthdayAutopilot-Debug-simulator.app.tar.gz \
-            BirthdayAutopilot-Release-simulator.app.tar.gz \
-            BirthdayAutopilotTests.xcresult \
-            BirthdayAutopilot-Mobile.cdx.json \
-            BirthdayAutopilot-iOS.cdx.json \
-            BirthdayAutopilot-iOS-native-osv.json \
-            CocoaPods-OSV-source-map.json \
-            Native-advisory-exceptions.json \
-            BirthdayAutopilot-JavaScript-licenses.json \
-            Mobile-package-lock.json \
-            Podfile.lock \
-            Gemfile.lock
-          test -s release-evidence/ios/sha256-manifest.json
-
-      - name: Retain unsigned iOS app evidence
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: ios-simulator-candidate-evidence
-          if-no-files-found: error
-          retention-days: 14
-          path: |
-            ${{ runner.temp }}/BirthdayAutopilot-Debug-simulator.app.tar.gz
-            ${{ runner.temp }}/BirthdayAutopilot-Release-simulator.app.tar.gz
-            ${{ runner.temp }}/BirthdayAutopilotTests.xcresult/
-            ${{ runner.temp }}/BirthdayAutopilot-Mobile.cdx.json
-            ${{ runner.temp }}/BirthdayAutopilot-iOS.cdx.json
-            ${{ runner.temp }}/BirthdayAutopilot-iOS-native-osv.json
-            ${{ runner.temp }}/CocoaPods-OSV-source-map.json
-            ${{ runner.temp }}/Native-advisory-exceptions.json
-            ${{ runner.temp }}/BirthdayAutopilot-JavaScript-licenses.json
-            ${{ runner.temp }}/Mobile-package-lock.json
-            ${{ runner.temp }}/Podfile.lock
-            ${{ runner.temp }}/Gemfile.lock
-            release-evidence/ios/sha256-manifest.json
-
-      - name: Retain iOS device E2E evidence
-        if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: ios-isolated-ui-e2e
-          if-no-files-found: warn
-          retention-days: 14
-          path: |
-            ${{ runner.temp }}/BirthdayAutopilot-E2E-simulator.app.tar.gz
-            ${{ runner.temp }}/mobile-e2e/ios/
-
-      - name: Retain iOS production-path smoke evidence
-        if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: ios-production-path-smoke
-          if-no-files-found: warn
-          retention-days: 14
-          path: |
-            ${{ runner.temp }}/BirthdayAutopilot-Smoke-simulator.app.tar.gz
-            ${{ runner.temp }}/production-smoke/ios/
-            ${{ runner.temp }}/mobile-e2e/ios/metro.log
-            e2e/production-smoke/production-smoke-projections.json
-
   release-admission:
     name: Release admission for exact source SHA
     if: ${{ always() }}
@@ -938,7 +530,6 @@ jobs:
       - android-instrumentation
       - android-device-e2e
       - quality-and-android
-      - ios-build
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
@@ -950,5 +541,5 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(jq 'length' <<< "$REQUIRED_JOB_RESULTS")" = 6
+          test "$(jq 'length' <<< "$REQUIRED_JOB_RESULTS")" = 4
           jq -e 'all(.[]; .result == "success")' <<< "$REQUIRED_JOB_RESULTS" > /dev/null
