@@ -392,6 +392,7 @@ export function StatusRow({
   detail?: string;
   tone?: StatusTone;
   testID?: string;
+  clearA11yLabel?: string;
 }) {
   const { colors } = useAppTheme();
   const status = toneValues(tone, colors);
@@ -576,12 +577,14 @@ export function SearchField({
   label,
   hint,
   testID,
+  clearA11yLabel,
 }: {
   value: string;
   onChangeText: (value: string) => void;
   label: string;
   hint: string;
   testID?: string;
+  clearA11yLabel?: string;
 }) {
   const { colors } = useAppTheme();
   return (
@@ -603,6 +606,18 @@ export function SearchField({
         style={[styles.searchInput, { color: colors.text }]}
         testID={testID}
       />
+      {!!value && clearA11yLabel ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={clearA11yLabel}
+          hitSlop={spacing.sm}
+          onPress={() => onChangeText('')}
+          style={styles.clearButton}
+          testID={testID ? `${testID}-clear` : undefined}
+        >
+          <Icon name="clear" color={colors.textMuted} size={20} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -892,6 +907,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  clearButton: {
+    padding: spacing.xs,
   },
   searchInput: {
     flex: 1,

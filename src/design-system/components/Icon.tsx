@@ -21,6 +21,7 @@ export type IconName =
   | 'lock'
   | 'chevron'
   | 'search'
+  | 'clear'
   | 'person';
 
 type IconProps = {
@@ -48,6 +49,8 @@ const paths: Readonly<Record<Exclude<IconName, 'info' | 'warning'>, string>> = {
   bell: 'M12 22a2.5 2.5 0 0 0 2.4-2h-4.8a2.5 2.5 0 0 0 2.4 2Zm7-5H5l2-2.5V10a5 5 0 0 1 4-4.9V3h2v2.1A5 5 0 0 1 17 10v4.5l2 2.5Z',
   lock: 'M6 10V7a6 6 0 0 1 12 0v3h2v12H4V10h2Zm3 0h6V7a3 3 0 0 0-6 0v3Z',
   chevron: 'm9 5 7 7-7 7-2-2 5-5-5-5 2-2Z',
+  clear:
+    'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
   search:
     'M10.5 3a7.5 7.5 0 1 0 4.7 13.3L20.9 22l2.1-2.1-5.7-5.7A7.5 7.5 0 0 0 10.5 3Zm0 3a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Z',
   person:

@@ -1117,6 +1117,7 @@ export function LivePeopleScreen({
         label={t('live.people.search')}
         hint={t('live.people.searchHint')}
         testID="live-people-search"
+        clearA11yLabel={t('live.people.clearSearch')}
       />
       <View
         accessibilityLabel={t('live.people.filters')}
