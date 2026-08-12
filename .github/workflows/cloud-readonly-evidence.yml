@@ -251,7 +251,7 @@ jobs:
       - name: Set up the repository Node.js line
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version-file: .nvmrc
+          node-version: 24.18.0
           cache: npm
 
       - name: Pin npm and install the locked Firebase inspection CLI
