@@ -174,7 +174,7 @@ jobs:
 
       - name: Upload immutable canonical build handoff
         id: upload-build
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hosting-production-build-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
@@ -382,7 +382,7 @@ jobs:
 
       - name: Upload immutable admission PASS handoff
         id: upload-admission
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hosting-production-admission-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
@@ -596,7 +596,7 @@ jobs:
             --output "$evidence/hosting-deployment-provenance.json"
 
       - name: Retain immutable deployment and provider provenance
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hosting-production-deployment-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
