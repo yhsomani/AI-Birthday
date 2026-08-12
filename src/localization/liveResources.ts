@@ -424,6 +424,7 @@ export const liveEnglish = {
   'live.people.body':
     'Phone numbers stay hidden. A person stays off until you review and confirm.',
   'live.people.search': 'Search people',
+  'live.people.clearSearch': 'Clear search',
   'live.people.searchHint': 'Search protected contacts on this phone',
   'live.people.filters': 'Filter people',
   'live.people.filterAll': 'All',
@@ -1885,6 +1886,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.people.body':
     'फ़ोन नंबर छिपे रहते हैं। समीक्षा और पुष्टि तक व्यक्ति बंद रहता है।',
   'live.people.search': 'लोग खोजें',
+  'live.people.clearSearch': 'Clear search',
   'live.people.searchHint': 'इस फ़ोन के सुरक्षित संपर्क खोजें',
   'live.people.filters': 'लोगों को फ़िल्टर करें',
   'live.people.filterAll': 'सभी',
