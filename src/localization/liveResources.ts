@@ -442,6 +442,7 @@ export const liveEnglish = {
     'No one is ready to set up. Check Needs attention for required fixes.',
   'live.people.emptyNeedsAttention': 'No one needs attention.',
   'live.people.emptyExcluded': 'No one is excluded.',
+  'live.people.clearSearch': 'Clear search',
   'live.people.approvalApproved': 'Approved',
   'live.people.approvalNeedsReview': 'Review changes',
   'live.people.contactsNeverSyncedTitle': 'Contacts have not synced',
@@ -1904,6 +1905,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.people.emptyNeedsAttention':
     'किसी व्यक्ति पर ध्यान देने की ज़रूरत नहीं है।',
   'live.people.emptyExcluded': 'कोई व्यक्ति बाहर नहीं रखा गया है।',
+  'live.people.clearSearch': 'खोज साफ़ करें',
   'live.people.approvalApproved': 'स्वीकृत',
   'live.people.approvalNeedsReview': 'बदलावों की समीक्षा करें',
   'live.people.contactsNeverSyncedTitle': 'संपर्क अभी सिंक नहीं हुए हैं',

@@ -76,6 +76,7 @@ export function PeopleScreen({ navigation }: Props) {
         onChangeText={setQuery}
         label={t('people.search')}
         hint={t('people.searchHint')}
+        clearA11yLabel={t('people.clearSearch')}
       />
       <View accessibilityRole="radiogroup" style={styles.filters}>
         <ChoiceChip
