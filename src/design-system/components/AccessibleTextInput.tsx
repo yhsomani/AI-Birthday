@@ -27,10 +27,16 @@ export const AccessibleTextInput = forwardRef<
     );
   }
 
+  const isEditable = inputProps.editable !== false;
+
   return (
     <TextInput
       {...inputProps}
       accessibilityLabel={normalizedLabel}
+      accessibilityState={{
+        disabled: !isEditable,
+        ...inputProps.accessibilityState,
+      }}
       allowFontScaling
       maxFontSizeMultiplier={2}
       onBlur={event => {
