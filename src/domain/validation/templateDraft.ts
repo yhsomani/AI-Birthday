@@ -65,7 +65,7 @@ const BIRTHDAY_INTENT_HI = /(?:जन्म\s*दिन|जन्मदिवस
 const URL_SCHEME_OR_WWW =
   /(?:\b(?:https?|ftp)\s*:\s*\/\s*\/|\b(?:mailto|tel|sms|smsto)\s*:|\bwww\.)\S+/iu;
 const URL_DOMAIN = unicodePattern(
-  '\\b(?:[\\p{L}\\p{N}](?:[\\p{L}\\p{N}-]{0,62}[\\p{L}\\p{N}])?\\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})(?:[/?:#]\\S*)?',
+  '\\b(?:[\\p{L}\\p{N}](?:[\\p{L}\\p{N}-]{0,62}[\\p{L}\\p{N}])?\\.){1,254}(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})(?:[/?:#]\\S*)?',
   'giu',
 );
 const URL_OBFUSCATED_DOMAIN = unicodePattern(
