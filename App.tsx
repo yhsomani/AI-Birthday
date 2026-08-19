@@ -5,7 +5,6 @@ import { BirthdayAutopilotApp } from './src/app/AppRoot';
 import { BirthdayNativeAdapter } from './src/infrastructure/native/BirthdayNativeAdapter';
 import type { NativeInvalidationSource } from './src/infrastructure/native/NativeInvalidationSource';
 import type { NativeRouteSource } from './src/infrastructure/native/NativeRouteSource';
-import { createCompanionNativeGateway } from './src/infrastructure/native/ios/CompanionNativeGateway';
 import BirthdayNative from './specs/native/NativeBirthday';
 
 const invalidationSource: NativeInvalidationSource = {
@@ -41,13 +40,7 @@ const nativeProjectionPort = new BirthdayNativeAdapter(
   invalidationSource,
   routeSource,
 );
-const companionPort = createCompanionNativeGateway();
 
 export default function App() {
-  return (
-    <BirthdayAutopilotApp
-      companionPort={companionPort}
-      nativeProjectionPort={nativeProjectionPort}
-    />
-  );
+  return <BirthdayAutopilotApp nativeProjectionPort={nativeProjectionPort} />;
 }

@@ -267,22 +267,6 @@ export interface CoordinationPresence {
   readonly updatedAtMs: number;
 }
 
-/**
- * Content-free, account-global exclusion between iOS MessageUI and the Android
- * sender. The document lives outside accounts/{uid}, because sender release
- * deletes that complete tree. `reservationKey` is a domain-separated SHA-256
- * digest of the authenticated UID and an app-minted random UUID.
- */
-export interface IOSComposerReservation {
-  readonly schemaVersion: typeof SCHEMA_VERSION;
-  readonly reservationKey: string;
-  readonly phase: 'PREPARED' | 'COMMITTED';
-  readonly ledgerGeneration: string;
-  readonly createdAtMs: number;
-  readonly updatedAtMs: number;
-  readonly expiresAtMs: number;
-  readonly cleanupAtMs: number;
-}
 
 /**
  * A short-lived, account-global mutation fence. It intentionally lives outside
@@ -365,27 +349,10 @@ export type SuppressionReason =
   | 'RESET_SUPPRESSED'
   | 'MISSING_FENCE'
   | 'MISSING_CLAIM'
-  | 'UNKNOWN_HISTORY'
-  | 'IOS_COMPOSER_RESERVED';
-
-export type CompanionStatus =
-  | {
-      readonly composerAllowed: true;
-      readonly state: 'NO_ANDROID_STATE';
-      readonly serverNowMs: number;
-      readonly ledgerGeneration: string;
-    }
-  | {
-      readonly composerAllowed: false;
-      readonly state:
-        | 'MANAGED_BY_ANDROID'
-        | 'DELETING'
-        | 'SAFETY_STATUS_UNAVAILABLE';
-      readonly serverNowMs: number;
-      readonly ledgerGeneration?: string;
-    };
+  | 'UNKNOWN_HISTORY';
 
 export interface KeyRingEntry {
+
   readonly version: string;
   readonly key: Uint8Array;
 }

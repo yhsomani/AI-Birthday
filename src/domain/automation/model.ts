@@ -39,14 +39,6 @@ export const ANDROID_BIRTHDAY_JOB_PHASES = [
   'cancelled',
 ] as const;
 
-export const IOS_BIRTHDAY_JOB_PHASES = [
-  'reminder-planned',
-  'composer-ready',
-  'composer-opened',
-  'dismissed',
-  'expired',
-] as const;
-
 export const ANDROID_TEST_PHASES = [
   'prepared',
   'cloud-claimed',
@@ -68,109 +60,60 @@ export const ANDROID_TEST_PHASES = [
 
 export type AndroidBirthdayJobPhase =
   (typeof ANDROID_BIRTHDAY_JOB_PHASES)[number];
-export type IosBirthdayJobPhase = (typeof IOS_BIRTHDAY_JOB_PHASES)[number];
 export type AndroidTestPhase = (typeof ANDROID_TEST_PHASES)[number];
 
-export type BirthdayJobProjection =
-  | Readonly<{
-      platform: 'android';
-      occurrenceId: OccurrenceId;
-      occurrenceDate: LocalDate;
-      phase: AndroidBirthdayJobPhase;
-      updatedAt: UtcInstant;
-      attempt: 1 | 2;
-    }>
-  | Readonly<{
-      platform: 'ios';
-      occurrenceId: OccurrenceId;
-      occurrenceDate: LocalDate;
-      phase: IosBirthdayJobPhase;
-      updatedAt: UtcInstant;
-    }>;
+export type BirthdayJobProjection = Readonly<{
+  platform: 'android';
+  occurrenceId: OccurrenceId;
+  occurrenceDate: LocalDate;
+  phase: AndroidBirthdayJobPhase;
+  updatedAt: UtcInstant;
+  attempt: 1 | 2;
+}>;
 
-export type TestProjection =
-  | Readonly<{
-      platform: 'android';
-      phase: AndroidTestPhase;
-      updatedAt: UtcInstant;
-      reason?: SafeReasonCode | undefined;
-    }>
-  | Readonly<{
-      platform: 'ios';
-      kind: 'unavailable';
-      reason: 'platform-composer-only';
-    }>;
+export type TestProjection = Readonly<{
+  platform: 'android';
+  phase: AndroidTestPhase;
+  updatedAt: UtcInstant;
+  reason?: SafeReasonCode | undefined;
+}>;
 
-export type AutomationProjection =
-  | Readonly<{
-      platform: 'android';
-      desired: 'on' | 'paused';
-      effective:
-        | 'not-configured'
-        | 'test-only'
-        | 'paused-repair'
-        | 'active'
-        | 'action-required'
-        | 'standby'
-        | 'transfer-pending'
-        | 'deleting';
-      readiness: ReadinessProjection & { platform: 'android' };
-    }>
-  | Readonly<{
-      platform: 'ios';
-      desired: 'composer-reminders-on' | 'paused';
-      effective: 'not-configured' | 'ready' | 'action-required' | 'paused';
-      readiness: ReadinessProjection & { platform: 'ios' };
-    }>;
+export type AutomationProjection = Readonly<{
+  platform: 'android';
+  desired: 'on' | 'paused';
+  effective:
+    | 'not-configured'
+    | 'test-only'
+    | 'paused-repair'
+    | 'active'
+    | 'action-required'
+    | 'standby'
+    | 'transfer-pending'
+    | 'deleting';
+  readiness: ReadinessProjection & { platform: 'android' };
+}>;
 
-export type TestReview =
-  | Readonly<{
-      platform: 'android';
-      handle: TestReviewHandle;
-      maskedDestination: string;
-      exactText: PrivateMessageText;
-      simLabel: string;
-      segmentCount: number;
-      chargeDisclosure: string;
-    }>
-  | Readonly<{
-      platform: 'ios';
-      kind: 'unavailable';
-      reason: 'platform-composer-only';
-    }>;
+export type TestReview = Readonly<{
+  platform: 'android';
+  handle: TestReviewHandle;
+  maskedDestination: string;
+  exactText: PrivateMessageText;
+  simLabel: string;
+  segmentCount: number;
+  chargeDisclosure: string;
+}>;
 
-export type ActivationReview =
-  | Readonly<{
-      platform: 'android';
-      handle: ActivationReviewHandle;
-      enabledRecipientCount: number;
-      attentionCount: number;
-      templatePreview: PrivateMessageText;
-      windowLabel: string;
-      simLabel: string;
-      dailyCap: number;
-      limitationsDisclosure: string;
-    }>
-  | Readonly<{
-      platform: 'ios';
-      handle: ActivationReviewHandle;
-      reminderRecipientCount: number;
-      plannedReminderCount: number;
-      reminderWindowLabel: string;
-      reminderHorizon: 'denied' | 'full' | 'not-built' | 'partial';
-      coexistence:
-        | 'clear'
-        | 'deleting'
-        | 'managed'
-        | 'stale-or-unknown'
-        | 'unavailable';
-      contactsReady: boolean;
-      messageUiReady: boolean;
-      protectedStorageReady: boolean;
-      readiness: ReadinessProjection & { platform: 'ios' };
-      deliveryMode: 'user-controlled-composer';
-      limitationsDisclosure: string;
-    }>;
+export type ActivationReview = Readonly<{
+  platform: 'android';
+  handle: ActivationReviewHandle;
+  enabledRecipientCount: number;
+  attentionCount: number;
+  templatePreview: PrivateMessageText;
+  windowLabel: string;
+  simLabel: string;
+  dailyCap: number;
+  limitationsDisclosure: string;
+}>;
 
 export type UpcomingGreeting = Readonly<{
   occurrenceId: OccurrenceId;

@@ -6,8 +6,8 @@ import {
   decideBeginDeletion,
   decideBeginTransfer,
   decideClaim,
-  decideCompanionStatus,
   decideCompleteTransfer,
+
   decideRegistration,
   decideSafeRetry,
   decideTestReport,
@@ -677,18 +677,19 @@ describe('transfer, deletion, and iOS coexistence', () => {
     }
   });
 
-  it('creates the same no-new-child deletion fence for iOS-only and Android accounts', () => {
-    const iosOnly = decideBeginDeletion(
+  it('creates the same no-new-child deletion fence for fresh and registered Android accounts', () => {
+    const freshAccount = decideBeginDeletion(
       null,
       null,
       TOMBSTONE.requestKey,
       NOW_MS,
     );
-    expect(iosOnly.kind).toBe('STARTED');
-    if (iosOnly.kind === 'STARTED') {
-      expect(iosOnly.fence).toBeNull();
-      expect(iosOnly.tombstone.stage).toBe('DRAINING');
+    expect(freshAccount.kind).toBe('STARTED');
+    if (freshAccount.kind === 'STARTED') {
+      expect(freshAccount.fence).toBeNull();
+      expect(freshAccount.tombstone.stage).toBe('DRAINING');
     }
+
     const android = decideBeginDeletion(
       null,
       fence({ latestIssuedSubmitNotAfterMs: NOW_MS + 60_000 }),
@@ -729,73 +730,5 @@ describe('transfer, deletion, and iOS coexistence', () => {
       ).toEqual({ kind: 'REFUSED', reason: 'REQUEST_MISMATCH' });
     }
   });
-
-  it('suppresses iOS globally for every Android mode, deletion, orphan, or unknown continuity', () => {
-    for (const mode of [
-      'TEST_ONLY',
-      'PAUSED_REPAIR',
-      'AUTOMATION_ACTIVE',
-      'TRANSFER_PENDING',
-      'DELETING',
-    ] as const) {
-      expect(
-        decideCompanionStatus(
-          globalControl(),
-          'ledger-generation-1',
-          null,
-          fence({ mode }),
-          false,
-          NOW_MS,
-        ).composerAllowed,
-      ).toBe(false);
-    }
-    expect(
-      decideCompanionStatus(
-        globalControl(),
-        'ledger-generation-1',
-        TOMBSTONE,
-        null,
-        false,
-        NOW_MS,
-      ).state,
-    ).toBe('DELETING');
-    expect(
-      decideCompanionStatus(
-        globalControl(),
-        'ledger-generation-1',
-        null,
-        null,
-        true,
-        NOW_MS,
-      ).state,
-    ).toBe('SAFETY_STATUS_UNAVAILABLE');
-    expect(
-      decideCompanionStatus(
-        null,
-        'ledger-generation-1',
-        null,
-        null,
-        false,
-        NOW_MS,
-      ).state,
-    ).toBe('SAFETY_STATUS_UNAVAILABLE');
-  });
-
-  it('allows the iOS composer only after fresh proof of globally absent Android state', () => {
-    expect(
-      decideCompanionStatus(
-        globalControl(),
-        'ledger-generation-1',
-        null,
-        null,
-        false,
-        NOW_MS,
-      ),
-    ).toEqual({
-      composerAllowed: true,
-      state: 'NO_ANDROID_STATE',
-      serverNowMs: NOW_MS,
-      ledgerGeneration: 'ledger-generation-1',
-    });
-  });
 });
+

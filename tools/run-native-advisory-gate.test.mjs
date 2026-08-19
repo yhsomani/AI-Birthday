@@ -20,9 +20,9 @@ import { symlinksAvailable } from './test-capabilities.mjs';
 
 test('parses only an explicit supported native advisory platform', () => {
   assert.equal(parsePlatformArguments(['--platform', 'android']), 'android');
-  assert.equal(parsePlatformArguments(['--platform', 'ios']), 'ios');
   assert.equal(parsePlatformArguments(['--platform', 'all']), 'all');
   assert.throws(() => parsePlatformArguments([]), /usage/u);
+  assert.throws(() => parsePlatformArguments(['--platform', 'ios']), /usage/u);
   assert.throws(
     () => parsePlatformArguments(['--platform', 'windows']),
     /usage/u,

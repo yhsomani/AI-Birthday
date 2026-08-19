@@ -32,46 +32,6 @@ test('Android destination blocking is a configuration CAS with persistent final 
   assert.match(ledger, /activeDestinationBlockCount[\s\S]*?return null/u);
 });
 
-test('iOS destination blocking stays in protected native state and removes proposals', () => {
-  const models = read(
-    'ios/BirthdayAutopilot/Automation/IOSCompanionWorkflowModels.swift',
-  );
-  const store = read('ios/BirthdayAutopilot/CompanionProtectedStore.swift');
-  const workflow = read(
-    'ios/BirthdayAutopilot/Automation/IOSCompanionWorkflowEngine.swift',
-  );
-
-  assert.match(models, /var blockedDestinations: \[String\]\?/u);
-  assert.match(models, /pattern: "\^\\\\\+\[1-9\]\[0-9\]\{1,14\}\$"/u);
-  assert.match(store, /IOSCompanionDestinationBlocklistPolicy\.normalized/u);
-  assert.match(
-    workflow,
-    /case "block-recipient-destination", "unblock-recipient-destination"/u,
-  );
-  const blockMutation =
-    workflow.match(
-      /private func mutateSelectedDestinationBlock[\s\S]*?private func previewMessage/u,
-    )?.[0] ?? '';
-  assert.match(blockMutation, /Self\.bumpConfiguration/u);
-  assert.match(
-    store,
-    /private static func validateWorkflow[\s\S]*?workflow\.occurrences\.isEmpty/u,
-  );
-  assert.match(
-    store,
-    /private static func invalidateStalePlanArtifacts[\s\S]*?snapshot\.proposals\.removeAll\(\)[\s\S]*?snapshot\.planningIndex = nil/u,
-  );
-  assert.match(workflow, /!blockedDestinations\.contains\(destination\)/u);
-  assert.match(
-    workflow,
-    /"selectedDestinationBlocked": contact\.selectedDestinationBlocked/u,
-  );
-  assert.match(
-    store,
-    /func clearContactDerivedState[\s\S]*?workflow\.blockedDestinations = \[\]/u,
-  );
-});
-
 test('React Native sends only opaque contact and revision for a reviewed block action', () => {
   const port = read('src/application/ports/PeoplePort.ts');
   const adapter = read('src/infrastructure/native/BirthdayNativeAdapter.ts');

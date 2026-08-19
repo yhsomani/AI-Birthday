@@ -32,57 +32,34 @@ export type ApprovalProjection =
       reasons: readonly ApprovalInvalidationReason[];
     }>;
 
-export type ApprovalReview =
-  | Readonly<{
-      platform: 'android';
-      handle: ApprovalReviewHandle;
-      contactId: ContactId;
-      recipient: PrivateDisplayName;
-      maskedPhone: string;
-      birthdayLabel: string;
-      exactText: PrivateMessageText;
-      windowLabel: string;
-      simLabel: string;
-      segmentCount: number;
-      chargeDisclosure: string;
-      consentDisclosure: string;
-    }>
-  | Readonly<{
-      platform: 'ios';
-      handle: ApprovalReviewHandle;
-      contactId: ContactId;
-      recipient: PrivateDisplayName;
-      maskedPhone: string;
-      birthdayLabel: string;
-      exactText: PrivateMessageText;
-      deliveryMode: 'user-controlled-composer';
-      consentDisclosure: string;
-    }>;
+export type ApprovalReview = Readonly<{
+  platform: 'android';
+  handle: ApprovalReviewHandle;
+  contactId: ContactId;
+  recipient: PrivateDisplayName;
+  maskedPhone: string;
+  birthdayLabel: string;
+  exactText: PrivateMessageText;
+  windowLabel: string;
+  simLabel: string;
+  segmentCount: number;
+  chargeDisclosure: string;
+  consentDisclosure: string;
+}>;
 
-export type ApprovalReviewItem =
-  | Readonly<{
-      platform: 'android';
-      contactId: ContactId;
-      recipient: PrivateDisplayName;
-      maskedPhone: string;
-      birthdayLabel: string;
-      exactText: PrivateMessageText;
-      windowLabel: string;
-      simLabel: string;
-      segmentCount: number;
-      chargeDisclosure: string;
-      consentDisclosure: string;
-    }>
-  | Readonly<{
-      platform: 'ios';
-      contactId: ContactId;
-      recipient: PrivateDisplayName;
-      maskedPhone: string;
-      birthdayLabel: string;
-      exactText: PrivateMessageText;
-      deliveryMode: 'user-controlled-composer';
-      consentDisclosure: string;
-    }>;
+export type ApprovalReviewItem = Readonly<{
+  platform: 'android';
+  contactId: ContactId;
+  recipient: PrivateDisplayName;
+  maskedPhone: string;
+  birthdayLabel: string;
+  exactText: PrivateMessageText;
+  windowLabel: string;
+  simLabel: string;
+  segmentCount: number;
+  chargeDisclosure: string;
+  consentDisclosure: string;
+}>;
 
 export type ApprovalBatchReview = Readonly<{
   handle: ApprovalReviewHandle;

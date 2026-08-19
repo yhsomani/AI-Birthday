@@ -43,7 +43,6 @@ test('every production tab and live leaf is registered in the native hierarchy',
     'ActivityDetail',
     'Attention',
     'Automation',
-    'ComposerReview',
     'Diagnostics',
     'HelpLegal',
     'Message',
@@ -66,7 +65,6 @@ test('every production tab and live leaf is registered in the native hierarchy',
     source,
     /navigation\.navigate\('ActivityDetail', \{ activityId: record\.id \}\)/u,
   );
-  assert.match(source, /ComposerReview: undefined/u);
 });
 
 test('live navigation retains system back, accessibility, theme, and native-route contracts', () => {
@@ -88,12 +86,7 @@ test('live navigation retains system back, accessibility, theme, and native-rout
     source.indexOf('function LiveHelpLegalRoute'),
     source.indexOf('function LiveMessageRoute'),
   );
-  for (const leaf of [
-    'Activity',
-    'Attention',
-    'Automation',
-    'ComposerReview',
-  ]) {
+  for (const leaf of ['Activity', 'Attention', 'Automation']) {
     assert.match(
       homeRoute,
       new RegExp(`navigateToLeafFromHome\\(navigation, '${leaf}'\\)`, 'u'),
@@ -121,12 +114,7 @@ test('live navigation retains system back, accessibility, theme, and native-rout
       `Settings must remain the visible origin for ${leaf}`,
     );
   }
-  for (const removedLeaf of [
-    'Activity',
-    'Attention',
-    'ComposerReview',
-    'Diagnostics',
-  ]) {
+  for (const removedLeaf of ['Activity', 'Attention', 'Diagnostics']) {
     assert.doesNotMatch(
       settingsRoute,
       new RegExp(`['"]${removedLeaf}['"]`, 'u'),
@@ -149,16 +137,7 @@ test('live navigation retains system back, accessibility, theme, and native-rout
   assert.match(source, /direction=\{language === 'ar-XB' \? 'rtl' : 'ltr'\}/u);
   assert.match(source, /port\.subscribeRouteAvailable/u);
   assert.match(source, /port\.getPendingRoute/u);
-  assert.match(
-    source,
-    /value\.kind === 'automation-review'[\s\S]*?pendingLeafRef\.current = 'ComposerReview'/u,
-  );
   assert.match(source, /value\.kind === 'attention'/u);
-  assert.doesNotMatch(
-    source,
-    /ComposerReview:\s*Readonly|navigate\(['"]ComposerReview['"],\s*\{/u,
-    'native route IDs and private message material must not enter navigation params',
-  );
   assert.match(source, /onReady=\{flushPendingLeaf\}/u);
 });
 
@@ -171,7 +150,6 @@ test('every live stack leaf uses the same native-stack back destination as syste
     'ActivityDetail',
     'Attention',
     'Automation',
-    'ComposerReview',
     'Diagnostics',
     'HelpLegal',
     'Message',

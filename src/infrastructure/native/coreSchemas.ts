@@ -23,30 +23,22 @@ const boundedLabel = boundedUiTextSchema(512);
 const boundedShortLabel = boundedUiTextSchema(128);
 const boundedCount = z.number().int().nonnegative().max(1_000_000);
 
-export const platformCapabilitySchema = z.discriminatedUnion('platform', [
-  strictObject({
-    platform: z.literal('android'),
-    deliveryMode: z.literal('unattended-device-sms'),
-    minimumApiLevel: z.literal(29),
-    unattendedSms: z.literal('release-gated'),
-    userComposer: z.literal('available-as-explicit-alternative'),
-  }),
-  strictObject({
-    platform: z.literal('ios'),
-    deliveryMode: z.literal('user-controlled-composer'),
-    unattendedSms: z.literal('unavailable'),
-    userComposer: z.literal('required'),
-  }),
-]);
+export const platformCapabilitySchema = strictObject({
+  platform: z.literal('android'),
+  deliveryMode: z.literal('unattended-device-sms'),
+  minimumApiLevel: z.literal(29),
+  unattendedSms: z.literal('release-gated'),
+  userComposer: z.literal('available-as-explicit-alternative'),
+});
 
 export const readinessIssueSchema = strictObject({
   id: issueIdSchema,
   code: safeReasonCodeSchema,
   severity: z.enum(['info', 'warning', 'blocking']),
   blocks: z
-    .array(z.enum(['test', 'activation', 'birthday', 'composer']))
+    .array(z.enum(['test', 'activation', 'birthday']))
     .min(1)
-    .max(4),
+    .max(3),
   action: strictObject({
     kind: z.literal('native-action'),
     handle: actionHandleSchema,
@@ -71,20 +63,7 @@ export const androidReadinessProjectionSchema = strictObject({
   lastCheckedAt: utcInstantSchema,
 });
 
-export const iosReadinessProjectionSchema = strictObject({
-  platform: z.literal('ios'),
-  composer: gateDecisionSchema,
-  unattendedAutomation: strictObject({
-    kind: z.literal('unavailable'),
-    reason: z.literal('platform-composer-only'),
-  }),
-  lastCheckedAt: utcInstantSchema,
-});
-
-export const readinessProjectionSchema = z.discriminatedUnion('platform', [
-  androidReadinessProjectionSchema,
-  iosReadinessProjectionSchema,
-]);
+export const readinessProjectionSchema = androidReadinessProjectionSchema;
 
 const eligibilityIssueSet = {
   primaryIssue: readinessIssueSchema,
@@ -147,12 +126,6 @@ export const senderProjectionSchema = z.union([
     preissuedPermitMayFinish: z.boolean(),
     drainUntil: utcInstantSchema.optional(),
   }),
-  strictObject({
-    platform: z.literal('ios'),
-    kind: z.literal('companion'),
-    unattendedAutomation: z.literal('unavailable'),
-    composer: z.literal('available'),
-  }),
 ]);
 
 export const accountProjectionSchema = z.discriminatedUnion('kind', [
@@ -189,7 +162,7 @@ export const approvalProjectionSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
-const androidApprovalReviewSchema = strictObject({
+export const androidApprovalReviewSchema = strictObject({
   platform: z.literal('android'),
   handle: approvalReviewHandleSchema,
   contactId: contactIdSchema,
@@ -204,40 +177,17 @@ const androidApprovalReviewSchema = strictObject({
   consentDisclosure: boundedLabel,
 });
 
-const iosApprovalReviewSchema = strictObject({
-  platform: z.literal('ios'),
-  handle: approvalReviewHandleSchema,
-  contactId: contactIdSchema,
-  recipient: privateDisplayNameSchema,
-  maskedPhone: maskedPhoneSchema,
-  birthdayLabel: boundedShortLabel,
-  exactText: privateMessageTextSchema,
-  deliveryMode: z.literal('user-controlled-composer'),
-  consentDisclosure: boundedLabel,
-});
+export const androidApprovalReviewItemSchema = androidApprovalReviewSchema.omit(
+  {
+    handle: true,
+  },
+);
 
-const androidApprovalReviewItemSchema = androidApprovalReviewSchema.omit({
-  handle: true,
-});
-const iosApprovalReviewItemSchema = iosApprovalReviewSchema.omit({
-  handle: true,
-});
-
-export const approvalReviewSchema = z.discriminatedUnion('platform', [
-  androidApprovalReviewSchema,
-  iosApprovalReviewSchema,
-]);
+export const approvalReviewSchema = androidApprovalReviewSchema;
 
 export const approvalBatchReviewSchema = strictObject({
   handle: approvalReviewHandleSchema,
-  items: z
-    .array(
-      z.discriminatedUnion('platform', [
-        androidApprovalReviewItemSchema,
-        iosApprovalReviewItemSchema,
-      ]),
-    )
-    .max(50),
+  items: z.array(androidApprovalReviewItemSchema).max(50),
   readyCount: boundedCount.max(50),
   blockedCount: boundedCount.max(50),
   explicitConfirmationRequired: z.literal(true),

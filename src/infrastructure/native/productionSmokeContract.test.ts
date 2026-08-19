@@ -4,7 +4,7 @@ import type { ContactId, NativeRevision } from '../../domain/shared/brand';
 import type { NativeResult } from '../../domain/shared/result';
 import { BirthdayNativeAdapter } from './BirthdayNativeAdapter';
 
-type SmokePlatform = 'android' | 'ios';
+type SmokePlatform = 'android';
 type Fixture = Readonly<{
   generatedAt: string;
   intentProblem: Readonly<{ code: string; kind: 'unsupported' }>;
@@ -68,7 +68,7 @@ const valueOf = <Value>(result: NativeResult<Value>): Value => {
   return result.envelope.value;
 };
 
-describe.each<SmokePlatform>(['android', 'ios'])(
+describe.each<SmokePlatform>(['android'])(
   '%s production-path native smoke projections',
   platform => {
     it('decodes every allowlisted projection through the production adapter', async () => {
@@ -84,7 +84,6 @@ describe.each<SmokePlatform>(['android', 'ios'])(
         adapter.getSetup(),
         adapter.listPeople({ filter: 'all', pageSize: 20 }),
         adapter.getMessageEditor(),
-        adapter.getNextComposerProposal(),
         adapter.getApproval('smoke-contact' as ContactId),
         adapter.getLatestTest(),
         adapter.getPolicyEditor(),
@@ -96,7 +95,10 @@ describe.each<SmokePlatform>(['android', 'ios'])(
         adapter.getPublicResources(),
       ]);
 
-      results.forEach(result => expect(result.kind).toBe('ok'));
+      results.forEach((result: NativeResult<unknown>) =>
+        expect(result.kind).toBe('ok'),
+      );
+
       const people = valueOf(
         await adapter.listPeople({ filter: 'all', pageSize: 20 }),
       );

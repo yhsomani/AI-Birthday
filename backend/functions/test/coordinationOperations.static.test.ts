@@ -33,8 +33,7 @@ describe('coordination-operation security architecture', () => {
       ['public async reportTestOutcome', 'public async beginTransfer'],
       ['public async beginTransfer', 'public async completeTransfer'],
       ['public async completeTransfer', 'public async beginDeletion'],
-      ['public async beginDeletion', 'public async companionStatus'],
-      ['public async companionStatus', 'public async advanceDeletion'],
+      ['public async beginDeletion', 'public async advanceDeletion'],
     ] as const;
     for (const [start, end] of statefulRanges) {
       expect(between(source, start, end)).toContain('paths.operation');
@@ -50,7 +49,10 @@ describe('coordination-operation security architecture', () => {
         'export const resetContactDerivedState',
         'export const releaseAndroidSender',
       ],
-      ['export const releaseAndroidSender', 'export const companionStatus'],
+      [
+        'export const releaseAndroidSender',
+        'export const coordinationLifecycleStatus',
+      ],
     ] as const) {
       const callable = between(source, start, end);
       expect(callable).toContain('onCall(commonOptions');
@@ -63,8 +65,9 @@ describe('coordination-operation security architecture', () => {
     const callable = between(
       source,
       'export const coordinationLifecycleStatus',
-      'export const companionStatus',
+      'export const sweepDeletionDrains',
     );
+
     expect(callable).toContain('onCall(');
     expect(callable).toContain('commonOptions');
     expect(callable).toContain('coordinationLifecycleStatusSchema');

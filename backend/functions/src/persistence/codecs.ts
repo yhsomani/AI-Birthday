@@ -16,9 +16,9 @@ import {
   type DestinationGuard,
   type GlobalControl,
   type Installation,
-  type IOSComposerReservation,
   type OccurrenceKey,
 } from '../domain/model.js';
+
 
 const time = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const version = z.number().int().positive();
@@ -271,27 +271,6 @@ const presenceSchema: z.ZodType<CoordinationPresence> = z.object({
   updatedAtMs: time,
 });
 
-const iosComposerReservationSchema: z.ZodType<IOSComposerReservation> = z
-  .object({
-    schemaVersion,
-    reservationKey: z.string().regex(/^[a-f0-9]{64}$/u),
-    phase: z.enum(['PREPARED', 'COMMITTED']),
-    ledgerGeneration: opaque,
-    createdAtMs: time,
-    updatedAtMs: time,
-    expiresAtMs: time,
-    cleanupAtMs: time,
-    cleanupAt: z.instanceof(Timestamp).optional(),
-  })
-  .strict()
-  .refine(
-    value =>
-      value.createdAtMs <= value.updatedAtMs &&
-      value.updatedAtMs < value.expiresAtMs &&
-      value.expiresAtMs === value.cleanupAtMs,
-    { message: 'iOS composer reservation timestamps are out of order' },
-  )
-  .transform(withoutTtlTimestamp);
 
 const operationCommon = {
   schemaVersion,
@@ -448,10 +427,8 @@ export const decodeAccountDeletionReceipt = (
 ): AccountDeletionReceipt | null => decode(deletionReceiptSchema, value);
 export const decodePresence = (value: unknown): CoordinationPresence | null =>
   decode(presenceSchema, value);
-export const decodeIOSComposerReservation = (
-  value: unknown,
-): IOSComposerReservation | null => decode(iosComposerReservationSchema, value);
 export const decodeCoordinationOperation = (
+
   value: unknown,
 ): CoordinationOperation | null => decode(operationSchema, value);
 export const decodeCoordinationOperationReceipt = (

@@ -11,48 +11,13 @@ const projectRoot = path.resolve(
 const read = relativePath =>
   readFileSync(path.join(projectRoot, relativePath), 'utf8');
 
-test('package and CI expose fail-closed native advisory gates for distinct scopes', () => {
+test('package exposes fail-closed native advisory gate for Android', () => {
   const packageDocument = JSON.parse(read('package.json'));
   assert.equal(
     packageDocument.scripts['security:native:android'],
     'node tools/run-native-advisory-gate.mjs --platform android',
   );
-  assert.equal(
-    packageDocument.scripts['security:native:ios'],
-    'node tools/run-native-advisory-gate.mjs --platform ios',
-  );
-
-  const workflow = read('.github/workflows/ci.yml');
-  for (const required of [
-    '--configuration prodReleaseRuntimeClasspath',
-    'android-complete-graph',
-    'android-prod-runtime',
-    'android-build-plugins',
-    'android-native-osv.json',
-    'ios-cocoapods',
-    'BirthdayAutopilot-iOS-native-osv.json',
-    'CocoaPods-OSV-source-map.json',
-    'Native-advisory-exceptions.json',
-  ]) {
-    assert.ok(workflow.includes(required), `CI is missing ${required}`);
-  }
-  assert.doesNotMatch(workflow, /android-native\.cdx\.json/u);
-});
-
-test('the signed iOS candidate retains the exact advisory mapping and policy inputs', () => {
-  const workflow = read('.github/workflows/ios-release-evidence.yml');
-  for (const required of [
-    'node tools/scan-native-vulnerabilities.mjs',
-    'ios-cocoapods',
-    'ios-native-osv.json',
-    'cocoapods-osv-source-map.json',
-    'native-advisory-exceptions.json',
-  ]) {
-    assert.ok(
-      workflow.includes(required),
-      `signed iOS evidence is missing ${required}`,
-    );
-  }
+  assert.equal(packageDocument.scripts['security:native:ios'], undefined);
 });
 
 test('Android secure transitive selections remain explicit and evidence-locked', () => {
@@ -97,7 +62,6 @@ test('native release and incident documentation states the zero-result limitatio
   const readme = read('README.md');
   const operations = read('docs/OPERATIONS_RUNBOOK.md');
   const android = read('docs/ANDROID_RESTRICTED_RELEASE_EVIDENCE.md');
-  const ios = read('docs/IOS_RELEASE_EVIDENCE.md');
   assert.match(
     gate,
     /not proof[\s\S]{0,40}free of[\s\S]{0,20}vulnerabilities/u,
@@ -110,5 +74,4 @@ test('native release and incident documentation states the zero-result limitatio
     /Native dependency advisory or scan-service incident/u,
   );
   assert.match(android, /prodReleaseRuntimeClasspath/u);
-  assert.match(ios, /OSV has no direct CocoaPods package mapping/u);
 });

@@ -36,10 +36,10 @@ import type {
 } from '../../domain/navigation/model';
 import type {
   GeminiSuggestionsProjection,
-  IosComposerProposalProjection,
   MessagePreview,
   MessageEditorProjection,
 } from '../../domain/messages/model';
+
 import type {
   CurrentPrivacyOperationProjection,
   PrivacyActionReview,
@@ -96,7 +96,6 @@ import {
   enrollmentReviewSchema,
   geminiSuggestionsProjectionSchema,
   homeProjectionSchema,
-  iosComposerProposalProjectionSchema,
   messageEditorProjectionSchema,
   messagePreviewSchema,
   nativeActionResultSchema,
@@ -350,16 +349,6 @@ export class BirthdayNativeAdapter
       'messages',
       { kind: 'editor' },
       messageEditorProjectionSchema,
-    );
-  }
-
-  public getNextComposerProposal(): Promise<
-    NativeResult<IosComposerProposalProjection>
-  > {
-    return this.read(
-      'messages',
-      { kind: 'next-composer-proposal' },
-      iosComposerProposalProjectionSchema,
     );
   }
 

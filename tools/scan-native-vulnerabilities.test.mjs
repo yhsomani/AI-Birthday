@@ -531,42 +531,6 @@ test('preserves and validates an exact Gradle production-runtime configuration s
   );
 });
 
-test('the checked-in CocoaPods source map exactly covers all trunk pods and local npm owners', t => {
-  const root = createFixtureRoot(t);
-  const lockBytes = readFileSync(path.join(projectRoot, 'ios/Podfile.lock'));
-  const sbom = createNativeSbom({
-    kind: 'cocoapods',
-    lockBytes,
-    applicationName: 'Birthday-Autopilot-iOS',
-    version: '1.0',
-  });
-  const sbomPath = path.join(root, 'ios-native.cdx.json');
-  writeFileSync(sbomPath, `${JSON.stringify(sbom)}\n`);
-  const [target] = prepareNativeTargets([
-    {
-      label: 'ios-cocoapods',
-      kind: 'cocoapods',
-      lockPath: path.join(projectRoot, 'ios/Podfile.lock'),
-      sbomPath,
-    },
-  ]);
-  assert.equal(target.componentCount, 107);
-  assert.equal(target.componentMappings.length, 107);
-  assert.equal(
-    target.componentMappings.filter(
-      mapping => mapping.mappingKind === 'checksum-bound-trunk-source',
-    ).length,
-    28,
-  );
-  assert.equal(
-    target.componentMappings.filter(
-      mapping => mapping.mappingKind === 'lock-bound-local-npm-owner',
-    ).length,
-    79,
-  );
-  assert.match(target.sourceMapSha256, /^[0-9a-f]{64}$/u);
-});
-
 test('verifies exact CocoaPods CDN bytes, identity, repository, and tag before an iOS scan', async () => {
   const podspecBytes = Buffer.from(
     JSON.stringify({

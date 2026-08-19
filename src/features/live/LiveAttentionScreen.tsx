@@ -3,9 +3,9 @@ import { StyleSheet, View } from 'react-native';
 
 import type {
   AndroidGateName,
-  IosGateName,
   ReadinessIssue,
 } from '../../domain/readiness/model';
+
 import type { NativeProblem } from '../../domain/shared/result';
 import { AppText } from '../../design-system/components/AppText';
 import {
@@ -123,11 +123,10 @@ const categoryKeys: Record<AttentionCategory, TranslationKey> = {
   platform: 'live.attention.categoryPlatform',
 };
 
-const supportGateKeys: Record<AndroidGateName | IosGateName, TranslationKey> = {
+const supportGateKeys: Record<AndroidGateName, TranslationKey> = {
   test: 'live.settings.gate.test',
   activation: 'live.settings.gate.activation',
   birthday: 'live.settings.gate.birthday',
-  composer: 'live.settings.gate.composer',
 };
 
 const routeKeys: Record<AppRepairRoute, TranslationKey> = {
@@ -143,11 +142,10 @@ const severityStateKeys: Record<ReadinessIssue['severity'], TranslationKey> = {
   info: 'live.attention.stateInfo',
 };
 
-const consequenceKeys: Record<AndroidGateName | IosGateName, TranslationKey> = {
+const consequenceKeys: Record<AndroidGateName, TranslationKey> = {
   test: 'live.attention.consequenceTest',
   activation: 'live.attention.consequenceActivation',
   birthday: 'live.attention.consequenceBirthday',
-  composer: 'live.attention.consequenceComposer',
 };
 
 const toneFor = (severity: ReadinessIssue['severity']) => {
@@ -205,7 +203,9 @@ export function LiveAttentionScreen({
       ? t('live.attention.consequence', {
           state,
           actions: issue.blocks
-            .map(block => t(consequenceKeys[block]))
+            .map(block =>
+              t(consequenceKeys[block] ?? 'live.attention.consequenceBirthday'),
+            )
             .join(', '),
         })
       : state;
@@ -393,11 +393,17 @@ export function LiveAttentionScreen({
                     <AppText color="muted" variant="caption">
                       {t('live.common.blocks', {
                         value: issue.blocks
-                          .map(block => t(supportGateKeys[block]))
+                          .map(block =>
+                            t(
+                              supportGateKeys[block] ??
+                                'live.settings.gate.birthday',
+                            ),
+                          )
                           .join(', '),
                       })}
                     </AppText>
                   ) : null}
+
                   <AppText color="muted" variant="caption">
                     {t('live.common.reference', { reference: issue.id })}
                   </AppText>

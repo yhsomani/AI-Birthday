@@ -1,7 +1,6 @@
 import type {
   GeminiRequest,
   GeminiSuggestionsProjection,
-  IosComposerProposalProjection,
   MessageDraft,
   MessageEditorProjection,
   MessagePreview,
@@ -20,9 +19,6 @@ export type SavedMessageProjection = Readonly<{
 
 export interface MessagePort {
   getMessageEditor(): Promise<NativeResult<MessageEditorProjection>>;
-  getNextComposerProposal(): Promise<
-    NativeResult<IosComposerProposalProjection>
-  >;
   previewMessage(input: {
     draft: MessageDraft;
     expectedRevision: NativeRevision;

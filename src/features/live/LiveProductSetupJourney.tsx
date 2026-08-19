@@ -13,7 +13,7 @@ import {
 } from '../../design-system/components/Primitives';
 import { RouteAccessibilityFocus } from '../../design-system/components/RouteAccessibilityFocus';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
-import type { LiveAppPort, LiveCompanionPort } from './LiveAppPort';
+import type { LiveAppPort } from './LiveAppPort';
 import { LiveAutomationScreen } from './LiveAutomationScreen';
 import { LiveBatchApprovalScreen } from './LiveBatchApprovalScreen';
 import { LiveError, LiveLoading } from './LiveProjectionState';
@@ -38,13 +38,11 @@ const routeKey = (route: JourneyRoute): string =>
 
 export function LiveProductSetupJourney({
   capability,
-  companionPort,
   onDefer,
   onRefreshSetup,
   port,
 }: {
   capability: PlatformCapability;
-  companionPort: LiveCompanionPort;
   onDefer: () => void;
   onRefreshSetup: () => Promise<unknown>;
   port: LiveAppPort;
@@ -267,7 +265,6 @@ export function LiveProductSetupJourney({
     content = (
       <LiveAutomationScreen
         capability={capability}
-        companionPort={companionPort}
         onBack={returnToOverview}
         onOpenMessage={() => setRoute({ kind: 'message' })}
         onOpenSchedule={() =>

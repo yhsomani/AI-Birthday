@@ -40,37 +40,6 @@ describe('BirthdayNativeAdapter fail-closed behavior', () => {
     ]);
   });
 
-  it('requests only opaque metadata for the next iOS composer proposal', async () => {
-    const getProjection = jest.fn().mockResolvedValue({
-      contractVersion: 1,
-      revision: '9',
-      generatedAt: '2026-07-12T08:30:00Z',
-      kind: 'ok',
-      payloadJson: JSON.stringify({
-        kind: 'ready',
-        proposalId: 'proposal-1',
-        occurrenceId: 'occurrence-1',
-        occurrenceDate: '2026-07-18',
-        recipient: 'Private name',
-      }),
-    });
-    const nativeModule = {
-      addListener: jest.fn(),
-      executeUserIntent: jest.fn(),
-      getProjection,
-      removeListeners: jest.fn(),
-    } as ConstructorParameters<typeof BirthdayNativeAdapter>[0];
-    const adapter = new BirthdayNativeAdapter(nativeModule);
-
-    const result = await adapter.getNextComposerProposal();
-
-    expect(result.kind).toBe('ok');
-    expect(getProjection).toHaveBeenCalledWith(
-      'messages',
-      JSON.stringify({ kind: 'next-composer-proposal' }),
-    );
-  });
-
   it('strictly consumes cold and warm native routes without exposing request ids', async () => {
     let emitRoute: ((event: unknown) => void) | undefined;
     const routeSource: NativeRouteSource = {

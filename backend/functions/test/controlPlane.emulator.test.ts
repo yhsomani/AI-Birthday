@@ -315,264 +315,8 @@ describe('Firestore transaction adapter', () => {
     expect(completed.get('cleanupAt')).toBeDefined();
   });
 
-  it('keeps account-global iOS status fail-closed through Android and deletion state', async () => {
-    const uid = 'emulator-companion';
-    expect(
-      await service.companionStatus(uid, {
-        contractVersion: 1,
-        ledgerGeneration: 'ledger-generation-1',
-      }),
-    ).toMatchObject({ composerAllowed: true, state: 'NO_ANDROID_STATE' });
-    await service.registerAndroidInstallation(
-      uid,
-      registration(INSTALLATION_ID),
-    );
-    expect(
-      await service.companionStatus(uid, {
-        contractVersion: 1,
-        ledgerGeneration: 'ledger-generation-1',
-      }),
-    ).toMatchObject({ composerAllowed: false, state: 'MANAGED_BY_ANDROID' });
-    await service.beginDeletion(uid, {
-      contractVersion: 1,
-      requestId: '00000000-0000-4000-8000-000000000401',
-    });
-    expect(
-      await service.companionStatus(uid, {
-        contractVersion: 1,
-        ledgerGeneration: 'ledger-generation-1',
-      }),
-    ).toMatchObject({ composerAllowed: false, state: 'DELETING' });
-  });
-
-  it('atomically fences Android behind an exact sticky iOS composer reservation', async () => {
-    const uid = 'emulator-ios-composer-reservation';
-    const request = {
-      contractVersion: 1 as const,
-      ledgerGeneration: 'ledger-generation-1',
-      reservationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa801',
-    };
-    const reserved = await service.acquireIOSComposerReservation(uid, request);
-    expect(reserved).toMatchObject({
-      kind: 'RESERVED',
-      earlyReleaseAllowed: true,
-      serverNowMs: nowMs,
-    });
-    expect(Object.keys(reserved).sort()).toEqual([
-      'earlyReleaseAllowed',
-      'kind',
-      'reservationExpiresAtMs',
-      'serverNowMs',
-    ]);
-    const stored = await db
-      .collection('iosComposerReservations')
-      .doc(uid)
-      .get();
-    expect(stored.exists).toBe(true);
-    expect(Object.keys(stored.data() ?? {}).sort()).toEqual([
-      'cleanupAt',
-      'cleanupAtMs',
-      'createdAtMs',
-      'expiresAtMs',
-      'ledgerGeneration',
-      'phase',
-      'reservationKey',
-      'schemaVersion',
-      'updatedAtMs',
-    ]);
-    expect(
-      await service.registerAndroidInstallation(
-        uid,
-        registration(INSTALLATION_ID),
-      ),
-    ).toEqual({ kind: 'SUPPRESSED', reason: 'IOS_COMPOSER_RESERVED' });
-    expect(
-      await service.acquireIOSComposerReservation(uid, {
-        ...request,
-        reservationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbb802',
-      }),
-    ).toMatchObject({ kind: 'REFUSED', reason: 'RESERVATION_HELD' });
-
-    expect(
-      await service.commitIOSComposerReservation(uid, request),
-    ).toMatchObject({ kind: 'COMMITTED' });
-    expect(
-      await service.releaseIOSComposerReservation(uid, {
-        contractVersion: 1,
-        reservationId: request.reservationId,
-      }),
-    ).toMatchObject({ kind: 'REFUSED', reason: 'STICKY_UNTIL_EXPIRY' });
-
-    expect(
-      await service.beginDeletion(uid, {
-        contractVersion: 1,
-        requestId: 'cccccccc-cccc-4ccc-8ccc-ccccccccc803',
-      }),
-    ).toMatchObject({ kind: 'STARTED' });
-    expect(
-      (await db.collection('iosComposerReservations').doc(uid).get()).exists,
-    ).toBe(false);
-  });
-
-  it('serializes both composer-versus-registration orders and authorizes after logical expiry', async () => {
-    const androidFirstUid = 'emulator-ios-composer-android-first';
-    expect(
-      await service.registerAndroidInstallation(
-        androidFirstUid,
-        registration(INSTALLATION_ID),
-      ),
-    ).toMatchObject({ kind: 'REGISTERED_ACTIVE' });
-    expect(
-      await service.acquireIOSComposerReservation(androidFirstUid, {
-        contractVersion: 1,
-        ledgerGeneration: 'ledger-generation-1',
-        reservationId: 'dddddddd-dddd-4ddd-8ddd-ddddddddd804',
-      }),
-    ).toMatchObject({ kind: 'REFUSED', reason: 'MANAGED_BY_ANDROID' });
-
-    const expiryUid = 'emulator-ios-composer-expiry';
-    await service.acquireIOSComposerReservation(expiryUid, {
-      contractVersion: 1,
-      ledgerGeneration: 'ledger-generation-1',
-      reservationId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeee805',
-    });
-    const afterExpiry = new ControlPlaneService(
-      db,
-      keyRing,
-      () => nowMs + 72 * 60 * 60_000 + 1,
-    );
-    expect(
-      await afterExpiry.registerAndroidInstallation(
-        expiryUid,
-        registration(INSTALLATION_ID),
-      ),
-    ).toMatchObject({ kind: 'REGISTERED_ACTIVE' });
-  });
-
-  it('blocks every Android sender mutation while the iOS reservation is live', async () => {
-    const uid = 'emulator-ios-composer-all-mutations';
-    await service.acquireIOSComposerReservation(uid, {
-      contractVersion: 1,
-      ledgerGeneration: 'ledger-generation-1',
-      reservationId: 'ffffffff-ffff-4fff-8fff-fffffffff806',
-    });
-    const bound = {
-      contractVersion: 1 as const,
-      ledgerGeneration: 'ledger-generation-1',
-      installationId: INSTALLATION_ID,
-      senderEpoch: 1,
-      resetGeneration: 1,
-      appBuildNumber: 100,
-      policyVersion: 7,
-      distributionChannel: 'PLAY' as const,
-    };
-    expect(
-      await service.renewLease(uid, { ...bound, purpose: 'TEST' }),
-    ).toEqual({ kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' });
-    expect(
-      await service.changeAccountMode(uid, {
-        ...bound,
-        action: 'PAUSE_FOR_REPAIR',
-      }),
-    ).toEqual({ kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' });
-    expect(
-      await service.claimTest(uid, {
-        ...bound,
-        purpose: 'TEST',
-        testRequestId: '00000000-0000-4000-8000-000000000807',
-        testConfigurationPrehash: '12'.repeat(32),
-        testDestinationPrehash: '34'.repeat(32),
-      }),
-    ).toEqual({ kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' });
-    const arm = {
-      ...bound,
-      purpose: 'TEST' as const,
-      claimId: 'v1.missing-test',
-      armRequestId: '00000000-0000-4000-8000-000000000808',
-      attempt: 1 as const,
-    };
-    expect(await service.armAttempt(uid, arm)).toEqual({
-      kind: 'SUPPRESSED',
-      reason: 'IOS_COMPOSER_RESERVED',
-    });
-    expect(await service.getArmStatus(uid, arm)).toEqual({
-      kind: 'SUPPRESSED',
-      reason: 'IOS_COMPOSER_RESERVED',
-    });
-    expect(
-      await service.authorizeSafeRetry(uid, {
-        ...bound,
-        purpose: 'BIRTHDAY',
-        claimId: 'v1.missing-birthday',
-        retryRequestId: '00000000-0000-4000-8000-000000000809',
-        proof: 'ALL_PARTS_NO_SERVICE',
-      }),
-    ).toEqual({ kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' });
-    expect(
-      await service.reportTestOutcome(uid, {
-        ...bound,
-        purpose: 'TEST',
-        testClaimId: 'v1.missing-test',
-        armRequestId: arm.armRequestId,
-        result: 'CLEANUP_CANCELLED',
-      }),
-    ).toEqual({ kind: 'SUPPRESSED', reason: 'IOS_COMPOSER_RESERVED' });
-    const transfer = {
-      ...bound,
-      targetInstallationId: SECOND_INSTALLATION_ID,
-    };
-    expect(await service.beginTransfer(uid, transfer)).toEqual({
-      kind: 'REFUSED',
-      reason: 'IOS_COMPOSER_RESERVED',
-    });
-    expect(await service.completeTransfer(uid, transfer)).toEqual({
-      kind: 'REFUSED',
-      reason: 'IOS_COMPOSER_RESERVED',
-    });
-    expect(
-      await service.requestContactDerivedReset(uid, {
-        contractVersion: 1,
-        requestId: '11111111-1111-4111-8111-111111111810',
-      }),
-    ).toEqual({ kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' });
-    expect(
-      await service.requestSenderRelease(uid, {
-        contractVersion: 1,
-        requestId: '22222222-2222-4222-8222-222222222811',
-        installationId: INSTALLATION_ID,
-        senderEpoch: 1,
-        resetGeneration: 1,
-      }),
-    ).toEqual({ kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' });
-  });
-
-  it('lets exactly one platform win a concurrent first-registration race', async () => {
-    const uid = 'emulator-ios-composer-concurrent-registration';
-    const [composer, android] = await Promise.all([
-      service.acquireIOSComposerReservation(uid, {
-        contractVersion: 1,
-        ledgerGeneration: 'ledger-generation-1',
-        reservationId: '33333333-3333-4333-8333-333333333812',
-      }),
-      service.registerAndroidInstallation(uid, registration(INSTALLATION_ID)),
-    ]);
-    const composerWon = composer.kind === 'RESERVED';
-    const androidWon = android.kind === 'REGISTERED_ACTIVE';
-    expect(Number(composerWon) + Number(androidWon)).toBe(1);
-    if (composerWon) {
-      expect(android).toEqual({
-        kind: 'SUPPRESSED',
-        reason: 'IOS_COMPOSER_RESERVED',
-      });
-    } else {
-      expect(composer).toMatchObject({
-        kind: 'REFUSED',
-        reason: 'MANAGED_BY_ANDROID',
-      });
-    }
-  });
-
   it('refuses destructive coordination on orphaned or stale-ledger presence', async () => {
+
     const orphanedUid = 'emulator-reset-orphaned-presence';
     await db.collection('coordinationPresence').doc(orphanedUid).set({
       schemaVersion: SCHEMA_VERSION,
@@ -624,9 +368,10 @@ describe('Firestore transaction adapter', () => {
     ).toEqual({ kind: 'REFUSED', reason: 'CONTINUITY_UNAVAILABLE' });
   });
 
-  it('cleans an iOS-only reset without creating Android sender state', async () => {
-    const uid = 'emulator-ios-only-contact-reset';
+  it('cleans a fresh account reset without creating Android sender state', async () => {
+    const uid = 'emulator-fresh-account-contact-reset';
     const completed = await service.requestContactDerivedReset(uid, {
+
       contractVersion: 1,
       requestId: '00000000-0000-4000-8000-000000000754',
     });
@@ -1048,16 +793,8 @@ describe('Firestore transaction adapter', () => {
       reason: 'RESET_SUPPRESSED',
     });
     expect(
-      await releaseService.companionStatus(uid, {
-        contractVersion: 1,
-        ledgerGeneration: 'ledger-generation-1',
-      }),
-    ).toMatchObject({
-      composerAllowed: false,
-      state: 'SAFETY_STATUS_UNAVAILABLE',
-    });
-    expect(
       (await db.collection('accounts').doc(uid).collection('armOutcomes').get())
+
         .empty,
     ).toBe(true);
     expect(
@@ -1096,40 +833,18 @@ describe('Firestore transaction adapter', () => {
       (await db.collection('coordinationPresence').doc(uid).get()).exists,
     ).toBe(false);
 
-    const composerReservation = {
-      contractVersion: 1 as const,
-      ledgerGeneration: 'ledger-generation-1',
-      reservationId: '99999999-9999-4999-8999-999999999907',
-    };
-    expect(
-      await releaseService.acquireIOSComposerReservation(
-        uid,
-        composerReservation,
-      ),
-    ).toMatchObject({ kind: 'RESERVED', earlyReleaseAllowed: true });
     expect(await releaseService.requestSenderRelease(uid, request)).toEqual(
       completed,
     );
     expect(
       await releaseService.requestSenderRelease(uid, {
         ...request,
-        requestId: '99999999-9999-4999-8999-999999999908',
-      }),
-    ).toEqual({ kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' });
-    expect(
-      await releaseService.requestSenderRelease(uid, {
-        ...request,
         senderEpoch: request.senderEpoch + 1,
       }),
     ).toEqual({ kind: 'REFUSED', reason: 'REQUEST_MISMATCH' });
-    expect(
-      await releaseService.releaseIOSComposerReservation(uid, {
-        contractVersion: 1,
-        reservationId: composerReservation.reservationId,
-      }),
-    ).toMatchObject({ kind: 'RELEASED' });
 
     const replacement = await releaseService.registerAndroidInstallation(
+
       uid,
       registration(SECOND_INSTALLATION_ID),
     );

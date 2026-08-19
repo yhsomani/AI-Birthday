@@ -6,9 +6,9 @@ suite=${2:-smoke}
 
 case "$platform" in
   android) expected_app_id='com.yashsomani.birthdayautopilot.e2e' ;;
-  ios) expected_app_id='com.yashsomani.birthdayautopilot.e2e' ;;
-  *) echo 'usage: tools/run-mobile-e2e.sh <android|ios> [smoke|large-text]' >&2; exit 64 ;;
+  *) echo 'usage: tools/run-mobile-e2e.sh android [smoke|large-text]' >&2; exit 64 ;;
 esac
+
 
 case "$suite" in
   smoke|large-text) ;;

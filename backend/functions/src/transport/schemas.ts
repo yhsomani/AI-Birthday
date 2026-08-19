@@ -180,31 +180,6 @@ export const senderReleaseSchema = z
   })
   .strict();
 
-export const companionStatusSchema = z
-  .object({
-    contractVersion,
-    ledgerGeneration,
-  })
-  .strict();
-
-const iosComposerReservationBody = {
-  contractVersion,
-  ledgerGeneration,
-  reservationId: canonicalLowercaseUUID,
-} as const;
-
-export const acquireIOSComposerReservationSchema = z
-  .object(iosComposerReservationBody)
-  .strict();
-
-export const commitIOSComposerReservationSchema = z
-  .object(iosComposerReservationBody)
-  .strict();
-
-export const releaseIOSComposerReservationSchema = z
-  .object({ contractVersion, reservationId: canonicalLowercaseUUID })
-  .strict();
-
 export const coordinationLifecycleStatusSchema = z
   .object({
     contractVersion,
@@ -226,16 +201,7 @@ export type ContactDerivedResetRequest = z.infer<
   typeof contactDerivedResetSchema
 >;
 export type SenderReleaseRequest = z.infer<typeof senderReleaseSchema>;
-export type CompanionStatusRequest = z.infer<typeof companionStatusSchema>;
-export type AcquireIOSComposerReservationRequest = z.infer<
-  typeof acquireIOSComposerReservationSchema
->;
-export type CommitIOSComposerReservationRequest = z.infer<
-  typeof commitIOSComposerReservationSchema
->;
-export type ReleaseIOSComposerReservationRequest = z.infer<
-  typeof releaseIOSComposerReservationSchema
->;
 export type CoordinationLifecycleStatusRequest = z.infer<
   typeof coordinationLifecycleStatusSchema
 >;
+

@@ -66,31 +66,10 @@ test('Android launcher artwork is opaque and complete at every density', () => {
   assert.match(manifest, /android:roundIcon="@mipmap\/ic_launcher_round"/u);
 });
 
-test('iOS catalog files match every declared idiom size without alpha', () => {
-  const catalogRoot =
-    'ios/BirthdayAutopilot/Images.xcassets/AppIcon.appiconset';
-  const catalog = JSON.parse(
-    read(`${catalogRoot}/Contents.json`).toString('utf8'),
-  );
-  assert.equal(catalog.images.length, 9);
-  assert.equal(
-    catalog.images.filter(image => image.idiom === 'ios-marketing').length,
-    1,
-  );
-  for (const image of catalog.images) {
-    assert.ok(['iphone', 'ios-marketing'].includes(image.idiom));
-    assert.match(image.filename, /^AppIcon-[0-9]+(?:@[23]x)?\.png$/u);
-    const logicalSize = Number(image.size.split('x')[0]);
-    const scale = Number(image.scale.slice(0, -1));
-    assertOpaqueSquare(`${catalogRoot}/${image.filename}`, logicalSize * scale);
-  }
-});
-
-test('the 1024 artwork is identical across the reviewed source and platforms', () => {
+test('the 1024 artwork is identical across the reviewed source and android assets', () => {
   const identities = [
     'assets/branding/app-icon-1024.png',
     'android/app/src/main/res/drawable-nodpi/app_icon.png',
-    'ios/BirthdayAutopilot/Images.xcassets/AppIcon.appiconset/AppIcon-1024.png',
   ].map(relative => createHash('sha256').update(read(relative)).digest('hex'));
   assert.equal(new Set(identities).size, 1);
 });

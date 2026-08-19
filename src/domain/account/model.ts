@@ -36,14 +36,7 @@ export type AndroidSenderProjection =
       drainUntil?: UtcInstant | undefined;
     }>;
 
-export type IosSenderProjection = Readonly<{
-  platform: 'ios';
-  kind: 'companion';
-  unattendedAutomation: 'unavailable';
-  composer: 'available';
-}>;
-
-export type SenderProjection = AndroidSenderProjection | IosSenderProjection;
+export type SenderProjection = AndroidSenderProjection;
 
 export type AccountProjection =
   | Readonly<{

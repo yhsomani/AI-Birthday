@@ -2,8 +2,8 @@ import {
   Timestamp,
   type DocumentReference,
   type DocumentSnapshot,
-  type Query,
   type Firestore,
+  type Query,
   type Transaction,
 } from 'firebase-admin/firestore';
 
@@ -15,6 +15,7 @@ import {
   makeCoordinationOperationReceipt,
   type OperationRefusalReason,
 } from '../domain/coordinationOperations.js';
+
 import {
   completedDeletionReceipt,
   deletionReceiptResponse,
@@ -23,26 +24,18 @@ import {
   type AccountDeletionReceiptResponse,
 } from '../domain/deletionReceipt.js';
 import {
-  decideAcquireIOSComposerReservation,
-  decideCommitIOSComposerReservation,
-  decideReleaseIOSComposerReservation,
-  deriveIOSComposerReservationKey,
-  isLiveIOSComposerReservation,
-  type IOSComposerReservationRefusal,
-} from '../domain/iosComposerReservation.js';
-
-import {
   decideAdvanceDeletionDrain,
   decideArm,
   decideArmStatus,
   decideBeginDeletion,
   decideBeginTransfer,
   decideClaim,
-  decideCompanionStatus,
+
   decideCompleteTransfer,
   decideRegistration,
   decideSafeRetry,
   decideTestReport,
+
   type ArmDecision,
   type ArmInput,
   type ArmSnapshot,
@@ -86,7 +79,6 @@ import {
   decodeDestinationGuard,
   decodeGlobalControl,
   decodeInstallation,
-  decodeIOSComposerReservation,
   decodeOccurrenceKey,
   decodeOutcome,
   decodePresence,
@@ -100,18 +92,14 @@ import {
 } from '../persistence/paths.js';
 import type {
   AccountModeRequest,
-  AcquireIOSComposerReservationRequest,
   ArmRequest,
   BirthdayClaimRequest,
-  CompanionStatusRequest,
-  CommitIOSComposerReservationRequest,
   ContactDerivedResetRequest,
   CoordinationLifecycleStatusRequest,
   DeletionRequest,
   DeletionReceiptRequest,
   LeaseRequest,
   RegistrationRequest,
-  ReleaseIOSComposerReservationRequest,
   RetryRequest,
   SenderReleaseRequest,
   TestClaimRequest,
@@ -168,16 +156,6 @@ function isPresenceConsistent(
     presence !== null &&
     control !== null &&
     presence.ledgerGeneration === control.ledgerGeneration
-  );
-}
-
-function iosComposerBlocksSenderMutation(
-  snapshot: DocumentSnapshot,
-  nowMs: number,
-): boolean {
-  return isLiveIOSComposerReservation(
-    decoded(snapshot, decodeIOSComposerReservation),
-    nowMs,
   );
 }
 
@@ -270,24 +248,6 @@ export type CoordinationLifecycleStatusResponse =
       readonly serverNowMs: number;
     };
 
-export type IOSComposerReservationResponse =
-  | {
-      readonly kind: 'RESERVED';
-      readonly serverNowMs: number;
-      readonly reservationExpiresAtMs: number;
-      readonly earlyReleaseAllowed: boolean;
-    }
-  | {
-      readonly kind: 'COMMITTED';
-      readonly serverNowMs: number;
-      readonly reservationExpiresAtMs: number;
-    }
-  | { readonly kind: 'RELEASED'; readonly serverNowMs: number }
-  | {
-      readonly kind: 'REFUSED';
-      readonly reason: IOSComposerReservationRefusal;
-      readonly serverNowMs: number;
-    };
 
 interface OptionalOperationResultFields {
   readonly senderEpochAfter?: number | undefined;
@@ -458,9 +418,6 @@ export class ControlPlaneService {
       const tombstoneSnapshot = await transaction.get(paths.tombstone);
       const fenceSnapshot = await transaction.get(paths.account);
       const presenceSnapshot = await transaction.get(paths.presence);
-      const iosComposerReservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
       const control = decoded(globalSnapshot, decodeGlobalControl);
       let receipt = decoded(
         receiptSnapshot,
@@ -497,11 +454,6 @@ export class ControlPlaneService {
           identity,
           nowMs,
         );
-      }
-      if (
-        iosComposerBlocksSenderMutation(iosComposerReservationSnapshot, nowMs)
-      ) {
-        return { kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' } as const;
       }
       if (
         existingOperation === null &&
@@ -568,9 +520,6 @@ export class ControlPlaneService {
       const tombstoneSnapshot = await transaction.get(paths.tombstone);
       const fenceSnapshot = await transaction.get(paths.account);
       const presenceSnapshot = await transaction.get(paths.presence);
-      const iosComposerReservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
       const control = decoded(globalSnapshot, decodeGlobalControl);
       let receipt = decoded(
         receiptSnapshot,
@@ -606,11 +555,6 @@ export class ControlPlaneService {
           identity,
           nowMs,
         );
-      }
-      if (
-        iosComposerBlocksSenderMutation(iosComposerReservationSnapshot, nowMs)
-      ) {
-        return { kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' } as const;
       }
       if (
         existingOperation === null &&
@@ -950,9 +894,6 @@ export class ControlPlaneService {
       const operationSnapshot = await transaction.get(paths.operation);
       const fenceSnapshot = await transaction.get(paths.account);
       const presenceSnapshot = await transaction.get(paths.presence);
-      const iosComposerReservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
       const installationReference = paths.installation(request.installationId);
       const installationSnapshot = await transaction.get(installationReference);
 
@@ -962,15 +903,6 @@ export class ControlPlaneService {
       const fence = decoded(fenceSnapshot, decodeAccountFence);
       const presence = decoded(presenceSnapshot, decodePresence);
       const installation = decoded(installationSnapshot, decodeInstallation);
-
-      if (
-        iosComposerBlocksSenderMutation(iosComposerReservationSnapshot, nowMs)
-      ) {
-        return {
-          kind: 'SUPPRESSED',
-          reason: 'IOS_COMPOSER_RESERVED',
-        } as const;
-      }
 
       if (isCoordinationMutationBlocked(operation)) {
         return { kind: 'SUPPRESSED', reason: 'RESET_SUPPRESSED' } as const;
@@ -1029,9 +961,6 @@ export class ControlPlaneService {
       const operationSnapshot = await transaction.get(paths.operation);
       const fenceSnapshot = await transaction.get(paths.account);
       const presenceSnapshot = await transaction.get(paths.presence);
-      const iosComposerReservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
       const installationReference = paths.installation(request.installationId);
       const installationSnapshot = await transaction.get(installationReference);
       const control = decoded(globalSnapshot, decodeGlobalControl);
@@ -1040,12 +969,6 @@ export class ControlPlaneService {
       const fence = decoded(fenceSnapshot, decodeAccountFence);
       const presence = decoded(presenceSnapshot, decodePresence);
       const installation = decoded(installationSnapshot, decodeInstallation);
-
-      if (
-        iosComposerBlocksSenderMutation(iosComposerReservationSnapshot, nowMs)
-      ) {
-        return { kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' } as const;
-      }
 
       if (isCoordinationMutationBlocked(operation)) {
         return { kind: 'REFUSED', reason: 'RESET_SUPPRESSED' } as const;
@@ -1111,9 +1034,6 @@ export class ControlPlaneService {
       const operationSnapshot = await transaction.get(paths.operation);
       const fenceSnapshot = await transaction.get(paths.account);
       const presenceSnapshot = await transaction.get(paths.presence);
-      const iosComposerReservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
       const installationSnapshot = await transaction.get(
         paths.installation(request.installationId),
       );
@@ -1127,11 +1047,6 @@ export class ControlPlaneService {
       const fence = decoded(fenceSnapshot, decodeAccountFence);
       const presence = decoded(presenceSnapshot, decodePresence);
       const installation = decoded(installationSnapshot, decodeInstallation);
-      if (
-        iosComposerBlocksSenderMutation(iosComposerReservationSnapshot, nowMs)
-      ) {
-        return { kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' } as const;
-      }
       if (isCoordinationMutationBlocked(operation)) {
         return { kind: 'REFUSED', reason: 'RESET_SUPPRESSED' } as const;
       }
@@ -1281,22 +1196,11 @@ export class ControlPlaneService {
       const globalSnapshot = await transaction.get(globalControlPath(this.db));
       const tombstoneSnapshot = await transaction.get(paths.tombstone);
       const operationSnapshot = await transaction.get(paths.operation);
-      const iosComposerReservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
       const fenceSnapshot = await transaction.get(paths.account);
       const presenceSnapshot = await transaction.get(paths.presence);
       const installationSnapshot = await transaction.get(
         paths.installation(input.installationId),
       );
-      if (
-        iosComposerBlocksSenderMutation(iosComposerReservationSnapshot, nowMs)
-      ) {
-        return {
-          kind: 'REFUSED',
-          reason: 'IOS_COMPOSER_RESERVED',
-        } as const;
-      }
       if (
         isCoordinationMutationBlocked(
           decoded(operationSnapshot, decodeCoordinationOperation),
@@ -1426,9 +1330,6 @@ export class ControlPlaneService {
       const outcomeSnapshot = await transaction.get(outcomeReference);
       const tombstoneSnapshot = await transaction.get(paths.tombstone);
       const operationSnapshot = await transaction.get(paths.operation);
-      const iosComposerReservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
       const fenceSnapshot = await transaction.get(paths.account);
       const presenceSnapshot = await transaction.get(paths.presence);
       const globalSnapshot = await transaction.get(globalControlPath(this.db));
@@ -1442,14 +1343,6 @@ export class ControlPlaneService {
 
       const outcome = decoded(outcomeSnapshot, decodeOutcome);
       const claim = decoded(claimSnapshot, decodeClaim);
-      if (
-        iosComposerBlocksSenderMutation(iosComposerReservationSnapshot, nowMs)
-      ) {
-        return {
-          kind: 'SUPPRESSED',
-          reason: 'IOS_COMPOSER_RESERVED',
-        } as const;
-      }
       if (
         isCoordinationMutationBlocked(
           decoded(operationSnapshot, decodeCoordinationOperation),
@@ -1597,9 +1490,6 @@ export class ControlPlaneService {
       const globalSnapshot = await transaction.get(globalControlPath(this.db));
       const tombstoneSnapshot = await transaction.get(paths.tombstone);
       const operationSnapshot = await transaction.get(paths.operation);
-      const iosComposerReservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
       const fenceSnapshot = await transaction.get(paths.account);
       const presenceSnapshot = await transaction.get(paths.presence);
       const installationSnapshot = await transaction.get(
@@ -1613,11 +1503,6 @@ export class ControlPlaneService {
       const installation = decoded(installationSnapshot, decodeInstallation);
       const claim = decoded(claimSnapshot, decodeClaim);
       const tombstone = decoded(tombstoneSnapshot, decodeTombstone);
-      if (
-        iosComposerBlocksSenderMutation(iosComposerReservationSnapshot, nowMs)
-      ) {
-        return { kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' } as const;
-      }
       if (
         isCoordinationMutationBlocked(
           decoded(operationSnapshot, decodeCoordinationOperation),
@@ -1673,9 +1558,6 @@ export class ControlPlaneService {
     return this.db.runTransaction(async transaction => {
       const tombstoneSnapshot = await transaction.get(paths.tombstone);
       const operationSnapshot = await transaction.get(paths.operation);
-      const iosComposerReservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
       const fenceSnapshot = await transaction.get(paths.account);
       const presenceSnapshot = await transaction.get(paths.presence);
       const installationSnapshot = await transaction.get(
@@ -1685,14 +1567,6 @@ export class ControlPlaneService {
       const claimSnapshot = await transaction.get(claimReference);
       const outcomeSnapshot = await transaction.get(paths.outcome(outcomeKey));
       const presence = decoded(presenceSnapshot, decodePresence);
-      if (
-        iosComposerBlocksSenderMutation(iosComposerReservationSnapshot, nowMs)
-      ) {
-        return {
-          kind: 'SUPPRESSED',
-          reason: 'IOS_COMPOSER_RESERVED',
-        } as const;
-      }
       if (
         isCoordinationMutationBlocked(
           decoded(operationSnapshot, decodeCoordinationOperation),
@@ -1728,9 +1602,6 @@ export class ControlPlaneService {
     return this.db.runTransaction(async transaction => {
       const tombstoneSnapshot = await transaction.get(paths.tombstone);
       const operationSnapshot = await transaction.get(paths.operation);
-      const iosComposerReservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
       const fenceSnapshot = await transaction.get(paths.account);
       const presenceSnapshot = await transaction.get(paths.presence);
       const activeSnapshot = await transaction.get(
@@ -1742,11 +1613,6 @@ export class ControlPlaneService {
       const fence = decoded(fenceSnapshot, decodeAccountFence);
       const presence = decoded(presenceSnapshot, decodePresence);
       const active = decoded(activeSnapshot, decodeInstallation);
-      if (
-        iosComposerBlocksSenderMutation(iosComposerReservationSnapshot, nowMs)
-      ) {
-        return { kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' } as const;
-      }
       if (
         isCoordinationMutationBlocked(
           decoded(operationSnapshot, decodeCoordinationOperation),
@@ -1789,9 +1655,6 @@ export class ControlPlaneService {
     return this.db.runTransaction(async transaction => {
       const tombstoneSnapshot = await transaction.get(paths.tombstone);
       const operationSnapshot = await transaction.get(paths.operation);
-      const iosComposerReservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
       const fenceSnapshot = await transaction.get(paths.account);
       const presenceSnapshot = await transaction.get(paths.presence);
       const activeReference = paths.installation(request.installationId);
@@ -1800,11 +1663,6 @@ export class ControlPlaneService {
       const targetSnapshot = await transaction.get(targetReference);
       const fence = decoded(fenceSnapshot, decodeAccountFence);
       const presence = decoded(presenceSnapshot, decodePresence);
-      if (
-        iosComposerBlocksSenderMutation(iosComposerReservationSnapshot, nowMs)
-      ) {
-        return { kind: 'REFUSED', reason: 'IOS_COMPOSER_RESERVED' } as const;
-      }
       if (
         isCoordinationMutationBlocked(
           decoded(operationSnapshot, decodeCoordinationOperation),
@@ -1848,7 +1706,6 @@ export class ControlPlaneService {
       const operationSnapshot = await transaction.get(paths.operation);
       const fenceSnapshot = await transaction.get(paths.account);
       await transaction.get(paths.presence);
-      await transaction.get(paths.iosComposerReservation);
       const tombstone = decoded(tombstoneSnapshot, decodeTombstone);
       const receiptReference = deletionReceiptPath(this.db, requestKey);
       const receiptSnapshot = await transaction.get(receiptReference);
@@ -1867,7 +1724,8 @@ export class ControlPlaneService {
         throw new LedgerCorruptError();
       }
       if (
-        tombstone?.requestKey === requestKey &&
+        tombstone !== null &&
+        tombstone.requestKey === requestKey &&
         receipt !== null &&
         (receipt.outcome !== 'IN_PROGRESS' ||
           receipt.requestedAtMs !== tombstone.createdAtMs)
@@ -1883,10 +1741,8 @@ export class ControlPlaneService {
           inProgressDeletionReceipt(decision.tombstone.createdAtMs, nowMs),
         );
         if (decision.kind === 'STARTED') {
-          // Account deletion dominates an iOS composer reservation. This write
-          // contends with reservation acquisition and every Android sender
-          // mutation on the same top-level document.
-          transaction.delete(paths.iosComposerReservation);
+          // Account deletion fences and terminates any active Android sender state.
+
           setDocument(transaction, paths.tombstone, decision.tombstone);
           setDocument(
             transaction,
@@ -2039,184 +1895,10 @@ export class ControlPlaneService {
     }
   }
 
-  public async companionStatus(
-    uid: string,
-    request: CompanionStatusRequest,
-  ): Promise<ReturnType<typeof decideCompanionStatus>> {
-    const nowMs = this.clock();
-    const paths = accountPaths(this.db, uid);
-    try {
-      return await this.db.runTransaction(async transaction => {
-        const globalSnapshot = await transaction.get(
-          globalControlPath(this.db),
-        );
-        const tombstoneSnapshot = await transaction.get(paths.tombstone);
-        const operationSnapshot = await transaction.get(paths.operation);
-        const fenceSnapshot = await transaction.get(paths.account);
-        const presenceSnapshot = await transaction.get(paths.presence);
-        const presence = decoded(presenceSnapshot, decodePresence);
-        if (
-          isCoordinationMutationBlocked(
-            decoded(operationSnapshot, decodeCoordinationOperation),
-          )
-        ) {
-          return {
-            composerAllowed: false,
-            state: 'SAFETY_STATUS_UNAVAILABLE',
-            serverNowMs: nowMs,
-          } as const;
-        }
-        return decideCompanionStatus(
-          decoded(globalSnapshot, decodeGlobalControl),
-          request.ledgerGeneration,
-          decoded(tombstoneSnapshot, decodeTombstone),
-          decoded(fenceSnapshot, decodeAccountFence),
-          presence !== null,
-          nowMs,
-        );
-      });
-    } catch (error) {
-      if (error instanceof LedgerCorruptError) {
-        return {
-          composerAllowed: false,
-          state: 'SAFETY_STATUS_UNAVAILABLE',
-          serverNowMs: nowMs,
-        };
-      }
-      throw error;
-    }
-  }
-
-  public async acquireIOSComposerReservation(
-    uid: string,
-    request: AcquireIOSComposerReservationRequest,
-  ): Promise<IOSComposerReservationResponse> {
-    const nowMs = this.clock();
-    const paths = accountPaths(this.db, uid);
-    const reservationKey = deriveIOSComposerReservationKey(
-      uid,
-      request.reservationId,
-    );
-    const decision = await this.db.runTransaction(async transaction => {
-      const globalSnapshot = await transaction.get(globalControlPath(this.db));
-      const tombstoneSnapshot = await transaction.get(paths.tombstone);
-      const operationSnapshot = await transaction.get(paths.operation);
-      const fenceSnapshot = await transaction.get(paths.account);
-      const presenceSnapshot = await transaction.get(paths.presence);
-      const reservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
-      const decision = decideAcquireIOSComposerReservation(
-        {
-          control: decoded(globalSnapshot, decodeGlobalControl),
-          expectedLedgerGeneration: request.ledgerGeneration,
-          tombstone: decoded(tombstoneSnapshot, decodeTombstone),
-          operation: decoded(operationSnapshot, decodeCoordinationOperation),
-          fence: decoded(fenceSnapshot, decodeAccountFence),
-          hasPresence: presenceSnapshot.exists,
-        },
-        decoded(reservationSnapshot, decodeIOSComposerReservation),
-        reservationKey,
-        nowMs,
-      );
-      if (decision.kind === 'RESERVED') {
-        setDocument(
-          transaction,
-          paths.iosComposerReservation,
-          decision.reservation,
-        );
-      }
-      return decision;
-    });
-    return decision.kind === 'RESERVED'
-      ? {
-          kind: 'RESERVED',
-          serverNowMs: decision.serverNowMs,
-          reservationExpiresAtMs: decision.reservation.expiresAtMs,
-          earlyReleaseAllowed: decision.earlyReleaseAllowed,
-        }
-      : decision;
-  }
-
-  public async commitIOSComposerReservation(
-    uid: string,
-    request: CommitIOSComposerReservationRequest,
-  ): Promise<IOSComposerReservationResponse> {
-    const nowMs = this.clock();
-    const paths = accountPaths(this.db, uid);
-    const reservationKey = deriveIOSComposerReservationKey(
-      uid,
-      request.reservationId,
-    );
-    const decision = await this.db.runTransaction(async transaction => {
-      const globalSnapshot = await transaction.get(globalControlPath(this.db));
-      const tombstoneSnapshot = await transaction.get(paths.tombstone);
-      const operationSnapshot = await transaction.get(paths.operation);
-      const fenceSnapshot = await transaction.get(paths.account);
-      const presenceSnapshot = await transaction.get(paths.presence);
-      const reservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
-      const decision = decideCommitIOSComposerReservation(
-        {
-          control: decoded(globalSnapshot, decodeGlobalControl),
-          expectedLedgerGeneration: request.ledgerGeneration,
-          tombstone: decoded(tombstoneSnapshot, decodeTombstone),
-          operation: decoded(operationSnapshot, decodeCoordinationOperation),
-          fence: decoded(fenceSnapshot, decodeAccountFence),
-          hasPresence: presenceSnapshot.exists,
-        },
-        decoded(reservationSnapshot, decodeIOSComposerReservation),
-        reservationKey,
-        nowMs,
-      );
-      if (decision.kind === 'COMMITTED') {
-        setDocument(
-          transaction,
-          paths.iosComposerReservation,
-          decision.reservation,
-        );
-      }
-      return decision;
-    });
-    return decision.kind === 'COMMITTED'
-      ? {
-          kind: 'COMMITTED',
-          serverNowMs: decision.serverNowMs,
-          reservationExpiresAtMs: decision.reservation.expiresAtMs,
-        }
-      : decision;
-  }
-
-  public async releaseIOSComposerReservation(
-    uid: string,
-    request: ReleaseIOSComposerReservationRequest,
-  ): Promise<IOSComposerReservationResponse> {
-    const nowMs = this.clock();
-    const paths = accountPaths(this.db, uid);
-    const reservationKey = deriveIOSComposerReservationKey(
-      uid,
-      request.reservationId,
-    );
-    return this.db.runTransaction(async transaction => {
-      const tombstoneSnapshot = await transaction.get(paths.tombstone);
-      const reservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
-      const decision = decideReleaseIOSComposerReservation(
-        decoded(tombstoneSnapshot, decodeTombstone),
-        decoded(reservationSnapshot, decodeIOSComposerReservation),
-        reservationKey,
-        nowMs,
-      );
-      if (decision.kind === 'RELEASED') {
-        transaction.delete(paths.iosComposerReservation);
-      }
-      return decision;
-    });
-  }
-
   public async advanceDeletion(uid: string): Promise<'WAIT' | 'ADVANCED'> {
+
+
+
     const nowMs = this.clock();
     const paths = accountPaths(this.db, uid);
     const decision = await this.db.runTransaction(async transaction => {
@@ -2373,9 +2055,6 @@ export class ControlPlaneService {
       const tombstoneSnapshot = await transaction.get(paths.tombstone);
       const accountSnapshot = await transaction.get(paths.account);
       const presenceSnapshot = await transaction.get(paths.presence);
-      const iosComposerReservationSnapshot = await transaction.get(
-        paths.iosComposerReservation,
-      );
       const tombstone = decoded(tombstoneSnapshot, decodeTombstone);
       if (tombstone === null) {
         return false;
@@ -2394,9 +2073,7 @@ export class ControlPlaneService {
         tombstone.cleanupAtMs === undefined ||
         tombstone.cleanupAtMs > nowMs ||
         accountSnapshot.exists ||
-        presenceSnapshot.exists ||
-        iosComposerReservationSnapshot.exists ||
-        existingReceipt?.outcome === 'COMPLETED' ||
+        presenceSnapshot.exists ||        existingReceipt?.outcome === 'COMPLETED' ||
         (existingReceipt !== null &&
           existingReceipt.requestedAtMs !== tombstone.createdAtMs)
       ) {

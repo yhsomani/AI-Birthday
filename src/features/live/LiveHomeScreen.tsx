@@ -28,8 +28,6 @@ import { useAppLocalization } from '../../localization/LocalizationProvider';
 import { safeReasonMessageKey } from '../../localization/reasonCopy';
 import type { TranslationKey } from '../../localization/resources';
 import type { LiveAppPort } from './LiveAppPort';
-import type { LiveCompanionPort } from './LiveAppPort';
-import type { CompanionReminderState } from '../../infrastructure/native/ios/CompanionNativeGateway';
 import {
   LiveActionFeedback,
   LiveError,
@@ -49,34 +47,6 @@ const automationStatus = (
   detail: TranslationKey;
   tone: StatusTone;
 }> => {
-  if (automation.platform === 'ios') {
-    switch (automation.effective) {
-      case 'ready':
-        return {
-          title: 'live.home.iosReady',
-          detail: 'live.home.iosReadyBody',
-          tone: 'positive',
-        };
-      case 'paused':
-        return {
-          title: 'live.home.iosPaused',
-          detail: 'live.home.iosPausedBody',
-          tone: 'warning',
-        };
-      case 'action-required':
-        return {
-          title: 'live.home.iosAttention',
-          detail: 'live.home.iosAttentionBody',
-          tone: 'critical',
-        };
-      case 'not-configured':
-        return {
-          title: 'live.home.iosNotConfigured',
-          detail: 'live.home.iosNotConfiguredBody',
-          tone: 'warning',
-        };
-    }
-  }
   switch (automation.effective) {
     case 'active':
       return {
@@ -137,44 +107,20 @@ type PauseReviewState = Readonly<{
   sourceTrustGeneration: number;
 }>;
 
-type IosCompanionHomeState =
-  | Readonly<{ kind: 'loading' }>
-  | Readonly<{ kind: 'error' }>
-  | Readonly<{
-      kind: 'ready';
-      canOpenComposer: boolean;
-      reminder: CompanionReminderState;
-    }>;
-
-const companionPermissionKeys: Readonly<
-  Record<CompanionReminderState['authorization'], TranslationKey>
-> = {
-  authorized: 'live.companion.permission.authorized',
-  denied: 'live.companion.permission.denied',
-  ephemeral: 'live.companion.permission.ephemeral',
-  'not-determined': 'live.companion.permission.notDetermined',
-  provisional: 'live.companion.permission.provisional',
-  unknown: 'live.companion.permission.unknown',
-};
-
 export function LiveHomeScreen({
   capability,
-  companionPort,
   onOpenActivity,
   onOpenAttention,
   onOpenAutomation,
-  onOpenComposerReview,
   onContinueSetup,
   onOpenPeople,
   port,
   productSetupRequired,
 }: {
   capability: PlatformCapability;
-  companionPort: LiveCompanionPort;
   onOpenActivity: () => void;
   onOpenAttention: () => void;
   onOpenAutomation: () => void;
-  onOpenComposerReview: () => void;
   onContinueSetup: () => void;
   onOpenPeople: () => void;
   port: LiveAppPort;
@@ -197,44 +143,11 @@ export function LiveHomeScreen({
   const [pauseReview, setPauseReview] = useState<PauseReviewState>();
   const [expandedApprovedOccurrenceId, setExpandedApprovedOccurrenceId] =
     useState<string>();
-  const [iosCompanionState, setIosCompanionState] =
-    useState<IosCompanionHomeState>({ kind: 'loading' });
-  const iosCompanionRequestSequence = useRef(0);
   const homeActionSequence = useRef(0);
   const homeTrustGeneration = useRef(0);
   const trustedHomeEnvelopeRef = useRef(trustedHomeEnvelope);
   trustedHomeEnvelopeRef.current = trustedHomeEnvelope;
   const renderTrustGeneration = homeTrustGeneration.current;
-
-  const loadIosCompanionState = useCallback(async () => {
-    if (productSetupRequired || capability.platform !== 'ios') return;
-    const request = iosCompanionRequestSequence.current + 1;
-    iosCompanionRequestSequence.current = request;
-    setIosCompanionState({ kind: 'loading' });
-    try {
-      const [reminder, canOpenComposer] = await Promise.all([
-        companionPort.getReminderStatus(),
-        companionPort.canOpenComposer(),
-      ]);
-      if (iosCompanionRequestSequence.current !== request) return;
-      setIosCompanionState(
-        reminder.kind === 'ok'
-          ? { kind: 'ready', reminder: reminder.value, canOpenComposer }
-          : { kind: 'error' },
-      );
-    } catch {
-      if (iosCompanionRequestSequence.current === request) {
-        setIosCompanionState({ kind: 'error' });
-      }
-    }
-  }, [capability.platform, companionPort, productSetupRequired]);
-
-  useEffect(() => {
-    loadIosCompanionState().catch(() => undefined);
-    return () => {
-      iosCompanionRequestSequence.current += 1;
-    };
-  }, [loadIosCompanionState]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
@@ -247,20 +160,20 @@ export function LiveHomeScreen({
         setTodayPending(false);
         setTodayProblem(undefined);
         setTodayMessage(undefined);
-        if (capability.platform === 'ios') {
-          loadIosCompanionState().catch(() => undefined);
-        }
       }
     });
     return () => subscription.remove();
-  }, [capability.platform, loadIosCompanionState]);
+  }, []);
 
   useEffect(
     () =>
       port.subscribeInvalidations(event => {
         if (
           event.areas.includes('home') ||
-          event.areas.includes('automation')
+          event.areas.includes('account') ||
+          event.areas.includes('automation') ||
+          event.areas.includes('contacts') ||
+          event.areas.includes('setup')
         ) {
           homeActionSequence.current += 1;
           homeTrustGeneration.current += 1;
@@ -270,10 +183,9 @@ export function LiveHomeScreen({
           setTodayPending(false);
           setTodayProblem(undefined);
           setTodayMessage(undefined);
-          loadIosCompanionState().catch(() => undefined);
         }
       }),
-    [loadIosCompanionState, port],
+    [port],
   );
 
   useEffect(
@@ -311,17 +223,18 @@ export function LiveHomeScreen({
   ]);
 
   const prepareToday = async () => {
-    const envelope = trustedHomeEnvelope;
-    const next = envelope?.value.next;
+    const currentHome = trustedHomeEnvelope;
     if (
-      capability.platform !== 'android' ||
-      !envelope ||
-      envelope.value.counts.today <= 0 ||
-      !next
+      !currentHome ||
+      renderTrustGeneration !== homeTrustGeneration.current ||
+      currentHome.value.automation.platform !== 'android' ||
+      currentHome.value.counts.today <= 0 ||
+      currentHome.value.next === undefined
     ) {
+      setTodayReview(undefined);
       return;
     }
-    if (renderTrustGeneration !== homeTrustGeneration.current) return;
+    const sourceOccurrenceId = currentHome.value.next.occurrenceId;
     const request = homeActionSequence.current + 1;
     homeActionSequence.current = request;
     setTodayPending(true);
@@ -330,53 +243,49 @@ export function LiveHomeScreen({
     let result: Awaited<ReturnType<LiveAppPort['prepareTodayOccurrence']>>;
     try {
       result = await port.prepareTodayOccurrence({
-        occurrenceId: next.occurrenceId,
-        expectedRevision: envelope.revision,
+        occurrenceId: sourceOccurrenceId,
+        expectedRevision: currentHome.revision,
       });
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
-    const latestHome = trustedHomeEnvelopeRef.current;
-    if (
-      homeActionSequence.current !== request ||
-      latestHome?.revision !== envelope.revision ||
-      latestHome.value.next?.occurrenceId !== next.occurrenceId ||
-      latestHome.value.counts.today <= 0
-    ) {
-      if (homeActionSequence.current === request) setTodayPending(false);
-      return;
-    }
+    if (homeActionSequence.current !== request) return;
     if (result.kind === 'error') {
       if (result.problem.kind === 'stale-revision') {
         await home.reload();
         if (homeActionSequence.current !== request) return;
       }
       setTodayProblem(result.problem);
-      setTodayReview(undefined);
+      setTodayPending(false);
+      return;
+    }
+    const reviewEnvelope = result.envelope;
+    if (reviewEnvelope.revision !== currentHome.revision) {
+      await home.reload();
+      if (homeActionSequence.current !== request) return;
+      setTodayProblem(nativeBridgeProblem);
       setTodayPending(false);
       return;
     }
     setTodayReview({
-      review: result.envelope.value,
-      reviewRevision: result.envelope.revision,
-      sourceHomeRevision: envelope.revision,
-      sourceOccurrenceId: next.occurrenceId,
+      review: reviewEnvelope.value,
+      reviewRevision: reviewEnvelope.revision,
+      sourceHomeRevision: currentHome.revision,
+      sourceOccurrenceId,
       sourceTrustGeneration: homeTrustGeneration.current,
     });
-    setExpandedApprovedOccurrenceId(undefined);
     setTodayPending(false);
   };
 
   const confirmToday = async (choice: TodayOccurrenceChoice) => {
     const currentHome = trustedHomeEnvelope;
     if (
-      !todayReview ||
       !currentHome ||
-      todayReview.sourceHomeRevision !== currentHome.revision ||
+      todayReview?.sourceHomeRevision !== currentHome.revision ||
+      todayReview?.reviewRevision !== currentHome.revision ||
       todayReview.sourceOccurrenceId !== currentHome.value.next?.occurrenceId ||
       todayReview.sourceTrustGeneration !== homeTrustGeneration.current ||
-      renderTrustGeneration !== homeTrustGeneration.current ||
-      currentHome.value.counts.today <= 0
+      renderTrustGeneration !== homeTrustGeneration.current
     ) {
       setTodayReview(undefined);
       return;
@@ -390,25 +299,18 @@ export function LiveHomeScreen({
     try {
       result = await port.confirmTodayOccurrence({
         handle: todayReview.review.handle,
-        choice,
         expectedRevision: todayReview.reviewRevision,
+        choice,
       });
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
+
     if (homeActionSequence.current !== request) return;
     if (result.kind === 'error') {
-      const composerResultRequiresReload =
-        result.problem.kind === 'conflict' &&
-        (result.problem.code === 'system-composer-unavailable' ||
-          result.problem.code === 'system-composer-outcome-unknown');
-      if (
-        result.problem.kind === 'stale-revision' ||
-        composerResultRequiresReload
-      ) {
+      if (result.problem.kind === 'stale-revision') {
         await home.reload();
         if (homeActionSequence.current !== request) return;
-        setTodayReview(undefined);
       }
       setTodayProblem(result.problem);
       setTodayPending(false);
@@ -416,7 +318,6 @@ export function LiveHomeScreen({
     }
     if (result.envelope.value.platform !== capability.platform) {
       setTodayProblem(nativePlatformMismatchProblem);
-      setTodayReview(undefined);
       setTodayPending(false);
       return;
     }
@@ -426,7 +327,7 @@ export function LiveHomeScreen({
     setTodayMessage(
       t(
         choice === 'open-system-composer'
-          ? 'live.home.todayComposerOpened'
+          ? 'live.home.todayComposerAccepted'
           : choice === 'start-next-year'
           ? 'live.home.todayNextYearAccepted'
           : 'live.home.todayAccepted',
@@ -439,14 +340,11 @@ export function LiveHomeScreen({
     const currentHome = trustedHomeEnvelope;
     const currentAutomation = currentHome?.value.automation;
     const stillPausable =
-      currentAutomation?.platform === 'android'
-        ? currentAutomation.desired === 'on' &&
-          !['standby', 'transfer-pending', 'deleting'].includes(
-            currentAutomation.effective,
-          )
-        : currentAutomation?.platform === 'ios'
-        ? currentAutomation.desired === 'composer-reminders-on'
-        : false;
+      currentAutomation?.platform === 'android' &&
+      currentAutomation.desired === 'on' &&
+      !['standby', 'transfer-pending', 'deleting'].includes(
+        currentAutomation.effective,
+      );
     if (
       !currentHome ||
       pauseReview?.sourceHomeRevision !== currentHome.revision ||
@@ -486,7 +384,7 @@ export function LiveHomeScreen({
       return;
     }
     setPauseReview(undefined);
-    await Promise.all([home.reload(), loadIosCompanionState()]);
+    await home.reload();
     if (homeActionSequence.current !== request) return;
     setTodayMessage(t('live.home.pauseAccepted'));
     setTodayPending(false);
@@ -564,25 +462,18 @@ export function LiveHomeScreen({
   const homeRevision = home.state.result.envelope.revision;
   const status = automationStatus(projection.automation);
   const canPause =
-    homeStable && projection.automation.platform === 'android'
-      ? projection.automation.desired === 'on' &&
-        !['standby', 'transfer-pending', 'deleting'].includes(
-          projection.automation.effective,
-        )
-      : homeStable &&
-        projection.automation.platform === 'ios' &&
-        projection.automation.desired === 'composer-reminders-on';
+    homeStable &&
+    projection.automation.platform === 'android' &&
+    projection.automation.desired === 'on' &&
+    !['standby', 'transfer-pending', 'deleting'].includes(
+      projection.automation.effective,
+    );
   const needsRepair =
     projection.counts.needsAttention > 0 ||
     projection.contactsSync.kind !== 'fresh' ||
     projection.automation.effective === 'action-required' ||
     projection.automation.effective === 'paused-repair' ||
     projection.automation.effective === 'transfer-pending';
-  const iosComposerIssues =
-    projection.automation.platform === 'ios' &&
-    projection.automation.readiness.composer.kind === 'blocked'
-      ? projection.automation.readiness.composer.issues
-      : [];
   const currentTodayReview =
     homeStable &&
     todayReview?.sourceHomeRevision === homeRevision &&
@@ -598,15 +489,10 @@ export function LiveHomeScreen({
     canPause;
   const isInlineReviewOpen = Boolean(currentTodayReview || currentPauseReview);
   const todayReviewCapabilityReady =
-    projection.automation.platform === 'android'
-      ? projection.automation.desired === 'on' &&
-        projection.automation.effective === 'active' &&
-        projection.automation.readiness.birthday.kind === 'allowed'
-      : capability.platform === 'ios' &&
-        projection.automation.readiness.composer.kind === 'allowed' &&
-        iosCompanionState.kind === 'ready' &&
-        iosCompanionState.reminder.kind === 'ok' &&
-        iosCompanionState.canOpenComposer;
+    projection.automation.platform === 'android' &&
+    projection.automation.desired === 'on' &&
+    projection.automation.effective === 'active' &&
+    projection.automation.readiness.birthday.kind === 'allowed';
   const hasTodayReview =
     homeStable &&
     todayReviewCapabilityReady &&
@@ -620,15 +506,6 @@ export function LiveHomeScreen({
   const showPlanAction = homeStable && (needsPlanSetup || planIsPaused);
   const approvedMessageVisible =
     projection.next?.occurrenceId === expandedApprovedOccurrenceId;
-  const iosCompanionHasWarnings =
-    iosCompanionState.kind !== 'ready' ||
-    iosCompanionState.reminder.kind === 'error' ||
-    iosCompanionState.reminder.authorization !== 'authorized' ||
-    iosCompanionState.reminder.failedCount > 0 ||
-    iosCompanionState.reminder.truncated ||
-    iosCompanionState.reminder.earliestUnscheduledCivilDate !== undefined ||
-    !iosCompanionState.canOpenComposer ||
-    iosComposerIssues.length > 0;
   const contactsLabel = (sync: SyncProjection) => {
     switch (sync.kind) {
       case 'fresh':
@@ -657,13 +534,7 @@ export function LiveHomeScreen({
         <AppText variant="title" accessibilityRole="header">
           {t('home.title')}
         </AppText>
-        <AppText color="muted">
-          {t(
-            capability.platform === 'android'
-              ? 'live.common.androidEdition'
-              : 'live.common.iosEdition',
-          )}
-        </AppText>
+        <AppText color="muted">{t('live.common.androidEdition')}</AppText>
       </View>
       <ReadinessBanner
         title={t(status.title)}
@@ -738,13 +609,9 @@ export function LiveHomeScreen({
         </Card>
       )}
 
-      {capability.platform === 'android' && currentTodayReview ? (
+      {currentTodayReview ? (
         <Card>
           <AppText variant="heading">{t('live.home.todayReviewTitle')}</AppText>
-          <KeyValue
-            label={t('live.companion.recipient')}
-            value={currentTodayReview.review.recipient}
-          />
           <KeyValue
             label={t('live.home.phone')}
             value={currentTodayReview.review.maskedDestination}
@@ -837,18 +704,12 @@ export function LiveHomeScreen({
         ) : hasTodayReview ? (
           <Button
             label={
-              capability.platform === 'ios'
-                ? t('live.home.reviewTodayIos')
-                : todayPending
+              todayPending
                 ? t('live.home.preparingToday')
                 : t('live.home.reviewToday')
             }
             disabled={todayPending}
-            onPress={
-              capability.platform === 'android'
-                ? prepareToday
-                : onOpenComposerReview
-            }
+            onPress={prepareToday}
             testID="live-home-review-today"
           />
         ) : showPlanAction ? (
@@ -890,99 +751,6 @@ export function LiveHomeScreen({
             tone="warning"
           />
         </Card>
-      ) : null}
-
-      {capability.platform === 'ios' && iosCompanionHasWarnings ? (
-        <>
-          <SectionHeading title={t('live.home.iosCompanionStatus')} />
-          {iosCompanionState.kind === 'loading' ? (
-            <LiveLoading label={t('live.home.iosStatusChecking')} />
-          ) : iosCompanionState.kind === 'error' ? (
-            <Card>
-              <StatusRow
-                title={t('live.home.iosSafetyUnavailable')}
-                detail={t('live.home.iosSafetyUnavailableBody')}
-                tone="warning"
-              />
-            </Card>
-          ) : iosCompanionState.reminder.kind === 'error' ||
-            iosCompanionState.reminder.authorization !== 'authorized' ||
-            iosCompanionState.reminder.failedCount > 0 ||
-            iosCompanionState.reminder.truncated ||
-            iosCompanionState.reminder.earliestUnscheduledCivilDate ||
-            !iosCompanionState.canOpenComposer ? (
-            <Card>
-              {iosCompanionState.reminder.kind === 'error' ? (
-                <StatusRow
-                  title={t('live.home.reminderPlanProblem')}
-                  detail={t('live.home.reminderPlanProblemBody')}
-                  tone="warning"
-                />
-              ) : null}
-              {iosCompanionState.reminder.authorization !== 'authorized' ? (
-                <StatusRow
-                  title={t('live.home.notificationVisibility')}
-                  detail={t(
-                    companionPermissionKeys[
-                      iosCompanionState.reminder.authorization
-                    ],
-                  )}
-                  tone="warning"
-                />
-              ) : null}
-              {iosCompanionState.reminder.failedCount > 0 ? (
-                <StatusRow
-                  title={t('live.companion.failedReminderCount', {
-                    count: iosCompanionState.reminder.failedCount,
-                  })}
-                  tone="warning"
-                />
-              ) : null}
-              {iosCompanionState.reminder.truncated ? (
-                <StatusRow
-                  title={t('live.companion.truncated')}
-                  tone="warning"
-                />
-              ) : null}
-              {iosCompanionState.reminder.earliestUnscheduledCivilDate ? (
-                <StatusRow
-                  title={t('live.companion.earliestUnscheduled')}
-                  detail={formatLiveDate(
-                    iosCompanionState.reminder.earliestUnscheduledCivilDate,
-                    language,
-                  )}
-                  tone="warning"
-                />
-              ) : null}
-              {!iosCompanionState.canOpenComposer ? (
-                <StatusRow
-                  title={t('live.home.messageUiCapability')}
-                  detail={t('live.home.messageUiUnavailable')}
-                  tone="warning"
-                />
-              ) : null}
-            </Card>
-          ) : null}
-          {iosComposerIssues.length > 0 ? (
-            <Card>
-              {iosComposerIssues.map(issue => (
-                <StatusRow
-                  key={issue.id}
-                  title={
-                    issue.code === 'active-sender-other-device'
-                      ? t('live.home.iosManagedByAndroid')
-                      : issue.code === 'coordination-unavailable'
-                      ? t('live.home.iosSafetyUnavailable')
-                      : t(safeReasonMessageKey(issue.code))
-                  }
-                  detail={t('live.home.iosIssueAction')}
-                  tone={issue.severity === 'blocking' ? 'critical' : 'warning'}
-                  testID={`live-home-ios-issue-${issue.code}`}
-                />
-              ))}
-            </Card>
-          ) : null}
-        </>
       ) : null}
 
       <Card>

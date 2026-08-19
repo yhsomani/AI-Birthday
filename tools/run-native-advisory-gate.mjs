@@ -48,24 +48,15 @@ const PLANS = Object.freeze({
       applicationName: 'Birthday-Autopilot-Android-Build-Plugins',
     }),
   ]),
-  ios: Object.freeze([
-    Object.freeze({
-      label: 'ios-cocoapods',
-      kind: 'cocoapods',
-      lock: 'ios/Podfile.lock',
-      configuration: null,
-      applicationName: 'Birthday-Autopilot-iOS',
-    }),
-  ]),
 });
 
 export function parsePlatformArguments(args) {
   if (
     args.length !== 2 ||
     args[0] !== '--platform' ||
-    !['android', 'ios', 'all'].includes(args[1])
+    !['android', 'all'].includes(args[1])
   ) {
-    throw new Error('usage: --platform <android|ios|all>');
+    throw new Error('usage: --platform <android|all>');
   }
   return args[1];
 }
@@ -88,7 +79,7 @@ const readProjectVersion = root => {
 };
 
 const planFor = platform =>
-  platform === 'all' ? [...PLANS.android, ...PLANS.ios] : [...PLANS[platform]];
+  platform === 'all' ? [...PLANS.android] : [...PLANS[platform]];
 
 export function ensureNativeEvidenceRoot(root) {
   if (typeof root !== 'string' || !path.isAbsolute(root)) {

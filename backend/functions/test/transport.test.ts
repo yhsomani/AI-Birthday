@@ -1,19 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  acquireIOSComposerReservationSchema,
   birthdayClaimSchema,
-  companionStatusSchema,
-  commitIOSComposerReservationSchema,
   contactDerivedResetSchema,
   coordinationLifecycleStatusSchema,
   deletionReceiptSchema,
   deletionSchema,
   retrySchema,
-  releaseIOSComposerReservationSchema,
   senderReleaseSchema,
   testClaimSchema,
 } from '../src/transport/schemas.js';
+
 import { INSTALLATION_ID } from './fixtures.js';
 
 const binding = {
@@ -65,53 +62,6 @@ describe('strict content-minimized callable schemas', () => {
       testClaimSchema.safeParse({
         ...valid,
         recipientPrehashAliases: ['ab'.repeat(32)],
-      }).success,
-    ).toBe(false);
-  });
-
-  it('makes companion status account-global and content-free', () => {
-    const valid = {
-      contractVersion: 1,
-      ledgerGeneration: 'ledger-generation-1',
-    };
-    expect(companionStatusSchema.safeParse(valid).success).toBe(true);
-    expect(
-      companionStatusSchema.safeParse({ ...valid, contactId: 'forbidden' })
-        .success,
-    ).toBe(false);
-  });
-
-  it('accepts only an exact content-free iOS reservation capability', () => {
-    const valid = {
-      contractVersion: 1,
-      ledgerGeneration: 'ledger-generation-1',
-      reservationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa801',
-    } as const;
-    expect(acquireIOSComposerReservationSchema.safeParse(valid).success).toBe(
-      true,
-    );
-    expect(commitIOSComposerReservationSchema.safeParse(valid).success).toBe(
-      true,
-    );
-    expect(
-      releaseIOSComposerReservationSchema.safeParse({
-        contractVersion: 1,
-        reservationId: valid.reservationId,
-      }).success,
-    ).toBe(true);
-    for (const forbidden of ['contactId', 'civilDate', 'destination', 'body']) {
-      expect(
-        acquireIOSComposerReservationSchema.safeParse({
-          ...valid,
-          [forbidden]: 'forbidden',
-        }).success,
-      ).toBe(false);
-    }
-    expect(
-      releaseIOSComposerReservationSchema.safeParse({
-        contractVersion: 1,
-        ledgerGeneration: valid.ledgerGeneration,
-        reservationId: valid.reservationId,
       }).success,
     ).toBe(false);
   });

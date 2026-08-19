@@ -9,7 +9,6 @@ export const liveEnglish = {
   'live.common.checking': 'Checking…',
   'live.common.saving': 'Saving…',
   'live.common.checkingState': 'Checking',
-  'live.common.allowed': 'Allowed',
   'live.common.selected': 'Selected',
   'live.common.availableReview': 'Available for review',
   'live.common.unavailable': 'Unavailable',
@@ -329,17 +328,6 @@ export const liveEnglish = {
   'live.home.androidNotConfigured': 'Automation is not set up',
   'live.home.androidNotConfiguredBody':
     'No automatic SMS is active. Finish setup, approval and testing first.',
-  'live.home.iosReady': 'Birthday reminders are ready',
-  'live.home.iosReadyBody':
-    'A reminder may appear. You still open an editable Messages screen and tap Send.',
-  'live.home.iosPaused': 'Birthday reminders are paused',
-  'live.home.iosPausedBody': 'iPhone never sends birthday messages by itself.',
-  'live.home.iosAttention': 'Reminders need attention',
-  'live.home.iosAttentionBody':
-    'A phone setting is blocking reminders or Messages.',
-  'live.home.iosNotConfigured': 'Reminders are not set up',
-  'live.home.iosNotConfiguredBody':
-    'No reminder or Messages handoff is active.',
   'live.home.upcoming': 'Upcoming',
   'live.home.birthday': 'Birthday',
   'live.home.window': 'Time window',
@@ -352,7 +340,6 @@ export const liveEnglish = {
   'live.home.viewApprovedMessage': 'View approved message',
   'live.home.hideApprovedMessage': 'Hide approved message',
   'live.home.reviewToday': 'Review today’s birthday decision',
-  'live.home.reviewTodayIos': 'Review today’s Messages proposal',
   'live.home.preparingToday': 'Preparing today’s review…',
   'live.home.todayReviewTitle': 'Confirm what should happen today?',
   'live.home.todayNormalPath':
@@ -374,8 +361,6 @@ export const liveEnglish = {
   'live.home.keepTodaySchedule': 'Keep today’s protected schedule',
   'live.home.todayAccepted':
     'Your decision was accepted and Home was checked again. No delivery is claimed.',
-  'live.home.todayComposerOpened':
-    'Android’s message composer was opened. Today’s unattended occurrence is retired; you control Send or Cancel, and no delivery is claimed.',
   'live.home.todayNextYearAccepted':
     'Today’s occurrence was retired and planning will continue next year. Nothing was sent.',
   'live.home.noUpcoming': 'No upcoming birthday is reported.',
@@ -405,21 +390,6 @@ export const liveEnglish = {
     'Pausing stops new unattended sends or reminders. It does not delete people, messages, approvals, or existing external SMS copies.',
   'live.home.pauseConfirm': 'Pause now',
   'live.home.pauseAccepted': 'Birthday actions are paused.',
-  'live.home.iosCompanionStatus': 'iPhone reminder and Messages readiness',
-  'live.home.iosStatusChecking': 'Checking iPhone reminder status',
-  'live.home.iosSafetyUnavailable': 'iPhone safety status is unavailable',
-  'live.home.iosSafetyUnavailableBody':
-    'Reminder and Messages readiness could not be verified. Do not assume a draft can open.',
-  'live.home.reminderPlanProblem': 'The reminder plan needs attention',
-  'live.home.reminderPlanProblemBody':
-    'iPhone reported that the current reminder plan could not be fully verified. Review Birthday reminders before relying on it.',
-  'live.home.notificationVisibility': 'Notification visibility',
-  'live.home.messageUiCapability': 'Messages screen',
-  'live.home.messageUiAvailable': 'Available for your review',
-  'live.home.messageUiUnavailable': 'Unavailable on this device',
-  'live.home.iosManagedByAndroid': 'Managed by an active Android sender',
-  'live.home.iosIssueAction':
-    'Open Birthday reminders to review the current safety state.',
   'live.people.title': 'People',
   'live.people.body':
     'Phone numbers stay hidden. A person stays off until you review and confirm.',
@@ -679,7 +649,6 @@ export const liveEnglish = {
   'live.settings.gate.test': 'Android test',
   'live.settings.gate.activation': 'automation activation',
   'live.settings.gate.birthday': 'birthday jobs',
-  'live.settings.gate.composer': 'Messages review',
   'live.settings.googleAccount': 'Google account',
   'live.settings.privacyUnavailable': 'Privacy actions are unavailable',
   'live.settings.localContacts': 'Local contacts',
@@ -890,7 +859,6 @@ export const liveEnglish = {
   'live.attention.consequenceTest': 'the required SMS test',
   'live.attention.consequenceActivation': 'turning on Android automation',
   'live.attention.consequenceBirthday': 'scheduled birthday messages',
-  'live.attention.consequenceComposer': 'opening a birthday draft in Messages',
   'live.attention.checkAgain': 'Check again',
   'live.attention.checkingAgain': 'Checking…',
   'live.attention.showSupportDetails': 'Show support details',
@@ -1033,10 +1001,6 @@ export const liveEnglish = {
     '{{start}}–{{end}} · grace to {{grace}} · daily cap {{cap}}',
   'live.policy.summaryWithoutGrace':
     '{{start}}–{{end}} · no grace · daily cap {{cap}}',
-  'live.policy.summaryIosWithGrace':
-    '{{start}}–{{end}} · reminder grace to {{grace}}',
-  'live.policy.summaryIosWithoutGrace':
-    '{{start}}–{{end}} · no late reminder window',
   'live.policy.reviewedWindow': 'Window being saved',
   'live.policy.maximumDaily': 'Maximum jobs in one day',
   'live.policy.maximumRolling': 'Maximum jobs in a rolling window',
@@ -1066,8 +1030,6 @@ export const liveEnglish = {
   'live.automation.title': 'Automation and reminders',
   'live.automation.androidBody':
     'Testing and activation use protected reviews. Nothing starts from this screen alone.',
-  'live.automation.iosBody':
-    'iPhone reminders never send a message. You always use the Messages screen yourself.',
   'live.automation.loading': 'Loading automation status',
   'live.automation.unavailable': 'Automation status is unavailable',
   'live.automation.current': 'Current status',
@@ -1141,155 +1103,7 @@ export const liveEnglish = {
   'live.automation.resume': 'Confirm resume',
   'live.automation.resumeAccepted':
     'Resume was accepted and status was checked again.',
-  'live.companion.reminderTitle': 'iPhone reminder status',
-  'live.companion.state.notConfigured': 'Not set up',
-  'live.companion.state.ready': 'Reminders on',
-  'live.companion.state.actionRequired': 'Needs attention',
-  'live.companion.state.paused': 'Paused',
-  'live.companion.currentState': 'Reminder plan',
-  'live.companion.managedByAndroid': 'Managed by an Android sender',
-  'live.companion.managedByAndroidBody':
-    'This account is currently managed by an active Android sender. iPhone proposals stay suppressed to prevent conflicting birthday actions.',
-  'live.companion.safetyUnavailable': 'Safety status is unavailable',
-  'live.companion.safetyUnavailableBody':
-    'The account safety state cannot be verified, so the app will not prepare or open a Messages draft.',
-  'live.companion.activationTitle': 'iPhone reminders',
-  'live.companion.reviewActivation': 'Review reminder activation',
-  'live.companion.reviewResume': 'Review reminder resume',
-  'live.companion.pause': 'Pause birthday reminders',
-  'live.companion.activationReview': 'Turn on iPhone reminders?',
-  'live.companion.resumeReview': 'Resume iPhone reminders?',
-  'live.companion.reminderRecipients': 'People eligible for reminders',
-  'live.companion.plannedReminderCount': 'Birthday dates in this plan',
-  'live.companion.horizonTitle': 'Reminder horizon',
-  'live.companion.horizon.denied':
-    'Notifications are denied; in-app planning remains available',
-  'live.companion.horizon.full': 'Current reminder horizon is fully reconciled',
-  'live.companion.horizon.notBuilt':
-    'The reminder horizon will be built and checked when reminders are enabled',
-  'live.companion.horizon.partial':
-    'Only part of the current reminder horizon is scheduled',
-  'live.companion.contactsSnapshot': 'Contacts readiness',
-  'live.companion.protectedStorage': 'Protected storage',
-  'live.companion.coexistenceTitle': 'Android coexistence safety',
-  'live.companion.coexistence.clear':
-    'No Android sender is managing this account',
-  'live.companion.coexistence.deleting': 'Account deletion is running',
-  'live.companion.coexistence.managed': 'Managed by an Android sender',
-  'live.companion.coexistence.unverified':
-    'Android coexistence status is stale or unknown',
-  'live.companion.coexistence.unavailable':
-    'Android coexistence status is unavailable',
-  'live.companion.activationDisclosure':
-    'This enables reminders only. iPhone never sends automatically; you review an editable system Messages screen and tap Send yourself. SMS or MMS carrier charges may apply, and iOS/Messages controls the available sender line and transport.',
-  'live.companion.activationSnapshotUnavailable':
-    'Final reminder activation cannot continue safely',
-  'live.companion.activationSnapshotUnavailableBody':
-    'Birthday Autopilot could not check notification access, reminder coverage, Contacts, the Messages handoff, protected storage and Android coexistence together. Reminders stay off until every item can be checked.',
-  'live.companion.activate': 'Confirm and turn on reminders',
-  'live.companion.resume': 'Confirm and resume reminders',
-  'live.companion.pauseReview': 'Pause iPhone reminders?',
-  'live.companion.pauseBody':
-    'New birthday reminders and Messages proposals will stay paused until you resume.',
-  'live.companion.pauseConfirm': 'Confirm reminder pause',
-  'live.companion.activationAccepted':
-    'Reminder activation was accepted and the live state was checked again.',
-  'live.companion.resumeAccepted':
-    'Reminder resume was accepted and the live state was checked again.',
-  'live.companion.pauseAccepted':
-    'Reminder pause was accepted and the live state was checked again.',
-  'live.companion.pauseVerificationTitle':
-    'Reminder cancellation needs another check',
-  'live.companion.pauseVerificationBody':
-    'Paused status and reminder cancellation do not yet agree. Keep reminders treated as uncertain until a fresh check reports Paused with no pending reminder problem.',
-  'live.companion.checkPauseStatus': 'Check that reminders are paused',
-  'live.companion.pauseVerificationComplete':
-    'Paused status and reminder cancellation were checked successfully.',
-  'live.companion.pauseVerificationStillRequired':
-    'Pause is still uncertain. Check again before changing reminder settings.',
-  'live.companion.reminderLoading': 'Loading reminder status',
-  'live.companion.reminderUnavailable': 'Reminder status is unavailable',
-  'live.companion.checkReminderStatus': 'Check reminder status',
-  'live.companion.showReminderDetails': 'Show reminder details',
-  'live.companion.hideReminderDetails': 'Hide reminder details',
-  'live.companion.reminderDetailsBody':
-    'Technical reminder coverage and safety details are shown here for support. Reminder timing remains best effort.',
-  'live.companion.permission.authorized': 'Allowed',
-  'live.companion.permission.denied': 'Not allowed',
-  'live.companion.permission.ephemeral': 'Temporarily allowed',
-  'live.companion.permission.notDetermined': 'Not chosen yet',
-  'live.companion.permission.provisional': 'Quiet notifications allowed',
-  'live.companion.permission.unknown': 'Unknown',
-  'live.companion.scheduled': '{{count}} reminders scheduled',
-  'live.companion.scheduled_one': '{{count}} reminder scheduled',
-  'live.companion.scheduled_other': '{{count}} reminders scheduled',
-  'live.companion.planned': '{{count}} birthday dates planned',
-  'live.companion.planned_one': '{{count}} birthday date planned',
-  'live.companion.planned_other': '{{count}} birthday dates planned',
-  'live.companion.truncated':
-    'Some dates could not fit in iPhone’s reminder limit.',
-  'live.companion.failedReminderCount':
-    '{{count}} reminders could not be scheduled',
-  'live.companion.failedReminderCount_one':
-    '{{count}} reminder could not be scheduled',
-  'live.companion.failedReminderCount_other':
-    '{{count}} reminders could not be scheduled',
-  'live.companion.earliestUnscheduled': 'Earliest unscheduled birthday',
-  'live.companion.requestPermission': 'Allow birthday reminders',
-  'live.companion.openNotificationSettings': 'Open notification settings',
-  'live.companion.settingsOpened':
-    'Notification settings opened. Return here after making a choice.',
-  'live.companion.permissionResult':
-    'Notification permission was checked again.',
-  'live.companion.composerTitle': 'Review next Messages draft',
-  'live.companion.composerScreenBody':
-    'Review a protected birthday draft, then decide whether to open Messages. The app never taps Send.',
-  'live.companion.noProposal': 'No Messages draft is ready.',
-  'live.companion.proposalUnavailable': 'Messages draft is unavailable',
-  'live.companion.prepareReview': 'Review Messages draft',
-  'live.companion.reviewing': 'Loading protected draft…',
-  'live.companion.reviewTitle': 'Ready to review message?',
-  'live.companion.recipient': 'Person',
-  'live.companion.date': 'Birthday',
-  'live.companion.destination': 'Phone',
-  'live.companion.editableWarning':
-    'Review the final phone and text, then decide whether to tap Send. Tapping Review message commits an account-wide safety hold before presentation. It can pause Android birthday sending for up to 72 hours—even after Cancel, presentation failure, or an unknown result—so Android birthdays may be missed. SMS or MMS carrier charges may apply. Messages and iOS control the available sender line and final transport; this app cannot select or guarantee either.',
-  'live.companion.openComposer': 'Review message',
-  'live.companion.cancelled':
-    'Messages was closed. No message was sent by the app.',
-  'live.companion.failed': 'Messages could not finish. No send is confirmed.',
-  'live.companion.reportedSent':
-    'Messages reported sent; delivery not confirmed. Birthday Autopilot cannot see the final edited recipient or text, sender line, transport, carrier acceptance, or delivery.',
-  'live.companion.unknown':
-    'The Messages result is unknown. Do not assume it sent.',
-  'live.companion.postComposerSafety':
-    'The account-wide safety hold remains until its server expiry, including after Cancel, failure, or an unknown result. Check Messages before any manual retry. Birthday Autopilot will not retry automatically.',
-  'live.companion.error': 'Messages review could not continue.',
-  'live.companion.composerBlocked':
-    'Messages review is blocked until every safety check passes.',
-  'live.companion.contactsReconnectRequired':
-    'Reconnect Google Contacts, then review this Messages draft again.',
-  'live.companion.contactsFreshnessUnavailable':
-    'Contacts could not be safely refreshed. Check your connection and try the review again.',
-  'live.companion.reconnectContacts': 'Reconnect Google Contacts',
-  'live.companion.contactsRepairAccepted':
-    'Contacts access was checked again. Review the Messages draft once more.',
-  'live.companion.accountDeleting':
-    'Account deletion is running. Messages review stays blocked, and this app did not send anything.',
-  'live.companion.managedByAndroidComposer':
-    'An Android phone manages sending for this account. Use that phone or complete a protected sender release before reviewing Messages on iPhone.',
-  'live.companion.reservationHeld':
-    'Another iPhone or an earlier protected review owns this account’s Messages safety window. Finish that review if possible, or wait for the window to expire.',
-  'live.companion.reservationStale':
-    'The protected Messages review window changed or expired. Close this review and start it again; no message was sent by this action.',
-  'live.companion.reviewRetry':
-    'This protected review is no longer current or available. Close it, refresh, and review the draft again before opening Messages.',
-  'live.companion.coexistenceUnverified':
-    'The app could not verify that Android sending is safely paused. Check your connection and try the Messages review again.',
-  'live.companion.accountUnavailable':
-    'The signed-in Google account changed or is unavailable. Reconnect the intended account before reviewing this Messages draft.',
-  'live.companion.genericRecovery':
-    'The Messages result could not be confirmed. Check Messages before trying again. Birthday Autopilot will not retry automatically.',
+
   'live.privacy.title': 'Privacy controls',
   'live.privacy.body': 'Review exactly what will happen before confirming.',
   'live.privacy.screenCaptureTitle': 'Screen privacy',
@@ -1482,7 +1296,6 @@ export const liveHindi: typeof liveEnglish = {
   'live.common.checking': 'जाँच हो रही है…',
   'live.common.saving': 'सहेजा जा रहा है…',
   'live.common.checkingState': 'जाँच हो रही है',
-  'live.common.allowed': 'अनुमति है',
   'live.common.selected': 'चुना गया',
   'live.common.availableReview': 'समीक्षा के लिए उपलब्ध',
   'live.common.unavailable': 'उपलब्ध नहीं',
@@ -1794,16 +1607,6 @@ export const liveHindi: typeof liveEnglish = {
   'live.home.androidNotConfigured': 'ऑटोमेशन सेट नहीं है',
   'live.home.androidNotConfiguredBody':
     'कोई स्वचालित SMS सक्रिय नहीं है। पहले सेटअप, स्वीकृति और टेस्ट पूरा करें।',
-  'live.home.iosReady': 'जन्मदिन रिमाइंडर तैयार हैं',
-  'live.home.iosReadyBody':
-    'रिमाइंडर आ सकता है। Messages खोलकर Send आप दबाएँगे।',
-  'live.home.iosPaused': 'जन्मदिन रिमाइंडर रुके हैं',
-  'live.home.iosPausedBody': 'iPhone खुद जन्मदिन संदेश नहीं भेजता।',
-  'live.home.iosAttention': 'रिमाइंडर पर ध्यान चाहिए',
-  'live.home.iosAttentionBody': 'फ़ोन सेटिंग रिमाइंडर या Messages रोक रही है।',
-  'live.home.iosNotConfigured': 'रिमाइंडर सेट नहीं हैं',
-  'live.home.iosNotConfiguredBody':
-    'कोई रिमाइंडर या Messages हैंडऑफ़ सक्रिय नहीं है।',
   'live.home.upcoming': 'आने वाला',
   'live.home.birthday': 'जन्मदिन',
   'live.home.window': 'समय सीमा',
@@ -1815,7 +1618,6 @@ export const liveHindi: typeof liveEnglish = {
   'live.home.viewApprovedMessage': 'मंज़ूर संदेश देखें',
   'live.home.hideApprovedMessage': 'मंज़ूर संदेश छिपाएँ',
   'live.home.reviewToday': 'आज के जन्मदिन का निर्णय देखें',
-  'live.home.reviewTodayIos': 'आज का Messages प्रस्ताव देखें',
   'live.home.preparingToday': 'आज की समीक्षा तैयार हो रही है…',
   'live.home.todayReviewTitle': 'आज क्या होना चाहिए, पक्का करें?',
   'live.home.todayNormalPath':
@@ -1837,8 +1639,6 @@ export const liveHindi: typeof liveEnglish = {
   'live.home.keepTodaySchedule': 'आज का सुरक्षित शेड्यूल रखें',
   'live.home.todayAccepted':
     'आपका निर्णय स्वीकार हुआ और होम फिर जाँचा गया। डिलीवरी का दावा नहीं है।',
-  'live.home.todayComposerOpened':
-    'Android संदेश कंपोज़र खुला। आज की अनअटेंडेड योजना बंद है; Send या Cancel आपके नियंत्रण में है और डिलीवरी का दावा नहीं है।',
   'live.home.todayNextYearAccepted':
     'आज की योजना बंद हुई और योजना अगले वर्ष जारी रहेगी। कुछ भी नहीं भेजा गया।',
   'live.home.noUpcoming': 'कोई आने वाला जन्मदिन रिपोर्ट नहीं हुआ।',
@@ -1867,21 +1667,6 @@ export const liveHindi: typeof liveEnglish = {
     'रोकने से नए अपने-आप भेजे जाने वाले संदेश या रिमाइंडर बंद होते हैं। लोग, संदेश, मंज़ूरियाँ या बाहर मौजूद SMS प्रतियाँ नहीं मिटतीं।',
   'live.home.pauseConfirm': 'अभी रोकें',
   'live.home.pauseAccepted': 'जन्मदिन कार्रवाइयाँ रोकी गई हैं।',
-  'live.home.iosCompanionStatus': 'iPhone रिमाइंडर और Messages तैयारी',
-  'live.home.iosStatusChecking': 'iPhone रिमाइंडर स्थिति जाँची जा रही है',
-  'live.home.iosSafetyUnavailable': 'iPhone सुरक्षा स्थिति उपलब्ध नहीं है',
-  'live.home.iosSafetyUnavailableBody':
-    'रिमाइंडर और Messages की तैयारी सत्यापित नहीं हुई। ड्राफ़्ट खुलने का अनुमान न लगाएँ।',
-  'live.home.reminderPlanProblem': 'रिमाइंडर योजना पर ध्यान चाहिए',
-  'live.home.reminderPlanProblemBody':
-    'iPhone ने बताया कि मौजूदा रिमाइंडर योजना पूरी तरह सत्यापित नहीं हुई। इस पर भरोसा करने से पहले जन्मदिन रिमाइंडर देखें।',
-  'live.home.notificationVisibility': 'सूचना दिखाई देने की स्थिति',
-  'live.home.messageUiCapability': 'Messages स्क्रीन',
-  'live.home.messageUiAvailable': 'आपकी समीक्षा के लिए उपलब्ध',
-  'live.home.messageUiUnavailable': 'इस डिवाइस पर उपलब्ध नहीं',
-  'live.home.iosManagedByAndroid': 'सक्रिय Android सेंडर द्वारा प्रबंधित',
-  'live.home.iosIssueAction':
-    'मौजूदा सुरक्षा स्थिति देखने के लिए जन्मदिन रिमाइंडर खोलें।',
   'live.people.title': 'लोग',
   'live.people.body':
     'फ़ोन नंबर छिपे रहते हैं। समीक्षा और पुष्टि तक व्यक्ति बंद रहता है।',
@@ -2134,7 +1919,6 @@ export const liveHindi: typeof liveEnglish = {
   'live.settings.gate.test': 'Android टेस्ट',
   'live.settings.gate.activation': 'ऑटोमेशन सक्रिय करना',
   'live.settings.gate.birthday': 'जन्मदिन काम',
-  'live.settings.gate.composer': 'Messages समीक्षा',
   'live.settings.googleAccount': 'Google खाता',
   'live.settings.privacyUnavailable': 'गोपनीयता कार्रवाई उपलब्ध नहीं है',
   'live.settings.localContacts': 'स्थानीय संपर्क',
@@ -2343,7 +2127,6 @@ export const liveHindi: typeof liveEnglish = {
   'live.attention.consequenceTest': 'ज़रूरी SMS टेस्ट',
   'live.attention.consequenceActivation': 'Android ऑटोमेशन चालू करना',
   'live.attention.consequenceBirthday': 'तय समय पर जन्मदिन संदेश',
-  'live.attention.consequenceComposer': 'Messages में जन्मदिन ड्राफ़्ट खोलना',
   'live.attention.checkAgain': 'फिर जाँचें',
   'live.attention.checkingAgain': 'जाँच हो रही है…',
   'live.attention.showSupportDetails': 'सहायता विवरण दिखाएँ',
@@ -2482,10 +2265,6 @@ export const liveHindi: typeof liveEnglish = {
     '{{start}}–{{end}} · {{grace}} तक ग्रेस · दैनिक सीमा {{cap}}',
   'live.policy.summaryWithoutGrace':
     '{{start}}–{{end}} · कोई ग्रेस नहीं · दैनिक सीमा {{cap}}',
-  'live.policy.summaryIosWithGrace':
-    '{{start}}–{{end}} · {{grace}} तक रिमाइंडर ग्रेस',
-  'live.policy.summaryIosWithoutGrace':
-    '{{start}}–{{end}} · देर का कोई रिमाइंडर समय नहीं',
   'live.policy.reviewedWindow': 'सहेजी जाने वाली समय-सीमा',
   'live.policy.maximumDaily': 'एक दिन में अधिकतम काम',
   'live.policy.maximumRolling': 'लगातार अवधि में अधिकतम काम',
@@ -2516,8 +2295,6 @@ export const liveHindi: typeof liveEnglish = {
   'live.automation.title': 'ऑटोमेशन और रिमाइंडर',
   'live.automation.androidBody':
     'टेस्ट और सक्रिय करने में सुरक्षित समीक्षा होती है। इस स्क्रीन से खुद कुछ शुरू नहीं होता।',
-  'live.automation.iosBody':
-    'iPhone रिमाइंडर संदेश नहीं भेजते। Messages आप खुद इस्तेमाल करते हैं।',
   'live.automation.loading': 'ऑटोमेशन स्थिति लोड हो रही है',
   'live.automation.unavailable': 'ऑटोमेशन स्थिति उपलब्ध नहीं है',
   'live.automation.current': 'मौजूदा स्थिति',
@@ -2587,150 +2364,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.automation.resume': 'फिर शुरू करने की पुष्टि करें',
   'live.automation.resumeAccepted':
     'फिर शुरू करना स्वीकार हुआ और स्थिति फिर जाँची गई।',
-  'live.companion.reminderTitle': 'iPhone रिमाइंडर स्थिति',
-  'live.companion.state.notConfigured': 'सेट नहीं है',
-  'live.companion.state.ready': 'रिमाइंडर चालू',
-  'live.companion.state.actionRequired': 'ध्यान चाहिए',
-  'live.companion.state.paused': 'रुका है',
-  'live.companion.currentState': 'रिमाइंडर योजना',
-  'live.companion.managedByAndroid': 'Android सेंडर द्वारा प्रबंधित',
-  'live.companion.managedByAndroidBody':
-    'यह खाता अभी सक्रिय Android सेंडर द्वारा प्रबंधित है। टकराव रोकने के लिए iPhone प्रस्ताव दबे रहते हैं।',
-  'live.companion.safetyUnavailable': 'सुरक्षा स्थिति उपलब्ध नहीं है',
-  'live.companion.safetyUnavailableBody':
-    'खाता सुरक्षा सत्यापित नहीं है, इसलिए ऐप Messages ड्राफ़्ट तैयार या खोल नहीं सकता।',
-  'live.companion.activationTitle': 'iPhone रिमाइंडर',
-  'live.companion.reviewActivation': 'रिमाइंडर चालू करना देखें',
-  'live.companion.reviewResume': 'रिमाइंडर फिर शुरू करना देखें',
-  'live.companion.pause': 'जन्मदिन रिमाइंडर रोकें',
-  'live.companion.activationReview': 'iPhone रिमाइंडर चालू करें?',
-  'live.companion.resumeReview': 'iPhone रिमाइंडर फिर शुरू करें?',
-  'live.companion.reminderRecipients': 'रिमाइंडर योग्य लोग',
-  'live.companion.plannedReminderCount': 'इस योजना में जन्मदिन तारीखें',
-  'live.companion.horizonTitle': 'रिमाइंडर सीमा',
-  'live.companion.horizon.denied':
-    'सूचनाएँ बंद हैं; ऐप में योजना फिर भी उपलब्ध है',
-  'live.companion.horizon.full': 'मौजूदा रिमाइंडर सीमा पूरी तरह जाँची गई है',
-  'live.companion.horizon.notBuilt':
-    'रिमाइंडर चालू होने पर सीमा बनाई और जाँची जाएगी',
-  'live.companion.horizon.partial':
-    'मौजूदा रिमाइंडर सीमा का केवल कुछ हिस्सा तय है',
-  'live.companion.contactsSnapshot': 'Contacts की तैयारी',
-  'live.companion.protectedStorage': 'सुरक्षित स्टोरेज',
-  'live.companion.coexistenceTitle': 'Android सह-अस्तित्व सुरक्षा',
-  'live.companion.coexistence.clear':
-    'कोई Android सेंडर इस खाते को प्रबंधित नहीं कर रहा',
-  'live.companion.coexistence.deleting': 'खाता मिटाया जा रहा है',
-  'live.companion.coexistence.managed': 'Android सेंडर द्वारा प्रबंधित',
-  'live.companion.coexistence.unverified':
-    'Android सह-अस्तित्व स्थिति पुरानी या अज्ञात है',
-  'live.companion.coexistence.unavailable':
-    'Android सह-अस्तित्व स्थिति उपलब्ध नहीं है',
-  'live.companion.activationDisclosure':
-    'यह केवल रिमाइंडर चालू करता है। iPhone अपने-आप नहीं भेजता; आप बदली जा सकने वाली Messages स्क्रीन देखते और Send खुद दबाते हैं। SMS या MMS पर कैरियर शुल्क लग सकता है, और उपलब्ध भेजने वाली लाइन व ट्रांसपोर्ट को iOS/Messages नियंत्रित करते हैं।',
-  'live.companion.activationSnapshotUnavailable':
-    'अंतिम रिमाइंडर सक्रियण सुरक्षित रूप से आगे नहीं बढ़ सकता',
-  'live.companion.activationSnapshotUnavailableBody':
-    'Birthday Autopilot सूचना पहुँच, रिमाइंडर कवरेज, Contacts, Messages खोलने की तैयारी, सुरक्षित स्टोरेज और Android सह-अस्तित्व को साथ नहीं जाँच सका। हर चीज़ जाँचे जाने तक रिमाइंडर बंद रहेंगे।',
-  'live.companion.activate': 'पुष्टि करके रिमाइंडर चालू करें',
-  'live.companion.resume': 'पुष्टि करके रिमाइंडर फिर शुरू करें',
-  'live.companion.pauseReview': 'iPhone रिमाइंडर रोकें?',
-  'live.companion.pauseBody':
-    'फिर शुरू करने तक नए जन्मदिन रिमाइंडर और Messages प्रस्ताव रुके रहेंगे।',
-  'live.companion.pauseConfirm': 'रिमाइंडर रोकना पक्का करें',
-  'live.companion.activationAccepted':
-    'रिमाइंडर चालू करना स्वीकार हुआ और लाइव स्थिति फिर जाँची गई।',
-  'live.companion.resumeAccepted':
-    'रिमाइंडर फिर शुरू करना स्वीकार हुआ और लाइव स्थिति फिर जाँची गई।',
-  'live.companion.pauseAccepted':
-    'रिमाइंडर रोकना स्वीकार हुआ और लाइव स्थिति फिर जाँची गई।',
-  'live.companion.pauseVerificationTitle': 'रिमाइंडर रद्द होना फिर जाँचना होगा',
-  'live.companion.pauseVerificationBody':
-    'रुकी स्थिति और रिमाइंडर रद्द होना अभी मेल नहीं खाते। जब तक नई जाँच रुकी स्थिति और कोई लंबित रिमाइंडर समस्या न बताए, स्थिति को अनिश्चित मानें।',
-  'live.companion.checkPauseStatus': 'जाँचें कि रिमाइंडर रुके हैं',
-  'live.companion.pauseVerificationComplete':
-    'रुकी स्थिति और रिमाइंडर रद्द होना सफलतापूर्वक जाँचा गया।',
-  'live.companion.pauseVerificationStillRequired':
-    'रोकने की स्थिति अभी अनिश्चित है। रिमाइंडर सेटिंग बदलने से पहले फिर जाँचें।',
-  'live.companion.reminderLoading': 'रिमाइंडर स्थिति लोड हो रही है',
-  'live.companion.reminderUnavailable': 'रिमाइंडर स्थिति उपलब्ध नहीं है',
-  'live.companion.checkReminderStatus': 'रिमाइंडर स्थिति जाँचें',
-  'live.companion.showReminderDetails': 'रिमाइंडर विवरण दिखाएँ',
-  'live.companion.hideReminderDetails': 'रिमाइंडर विवरण छिपाएँ',
-  'live.companion.reminderDetailsBody':
-    'सहायता के लिए तकनीकी रिमाइंडर कवरेज और सुरक्षा विवरण यहाँ दिखते हैं। रिमाइंडर समय सर्वोत्तम प्रयास ही रहता है।',
-  'live.companion.permission.authorized': 'अनुमति है',
-  'live.companion.permission.denied': 'अनुमति नहीं है',
-  'live.companion.permission.ephemeral': 'कुछ समय की अनुमति',
-  'live.companion.permission.notDetermined': 'अभी चुना नहीं',
-  'live.companion.permission.provisional': 'शांत सूचना की अनुमति',
-  'live.companion.permission.unknown': 'अज्ञात',
-  'live.companion.scheduled': '{{count}} रिमाइंडर तय हैं',
-  'live.companion.scheduled_one': '{{count}} रिमाइंडर तय है',
-  'live.companion.scheduled_other': '{{count}} रिमाइंडर तय हैं',
-  'live.companion.planned': '{{count}} जन्मदिन तारीखें नियोजित हैं',
-  'live.companion.planned_one': '{{count}} जन्मदिन तारीख नियोजित है',
-  'live.companion.planned_other': '{{count}} जन्मदिन तारीखें नियोजित हैं',
-  'live.companion.truncated':
-    'कुछ तारीखें iPhone की रिमाइंडर सीमा में नहीं आईं।',
-  'live.companion.failedReminderCount': '{{count}} रिमाइंडर तय नहीं हो सके',
-  'live.companion.failedReminderCount_one': '{{count}} रिमाइंडर तय नहीं हो सका',
-  'live.companion.failedReminderCount_other':
-    '{{count}} रिमाइंडर तय नहीं हो सके',
-  'live.companion.earliestUnscheduled': 'सबसे पहला छूटा जन्मदिन',
-  'live.companion.requestPermission': 'जन्मदिन रिमाइंडर की अनुमति दें',
-  'live.companion.openNotificationSettings': 'सूचना सेटिंग खोलें',
-  'live.companion.settingsOpened':
-    'सूचना सेटिंग खुली। चुनाव के बाद यहाँ लौटें।',
-  'live.companion.permissionResult': 'सूचना अनुमति फिर जाँची गई।',
-  'live.companion.composerTitle': 'अगला Messages ड्राफ़्ट देखें',
-  'live.companion.composerScreenBody':
-    'सुरक्षित जन्मदिन ड्राफ़्ट देखें, फिर तय करें कि Messages खोलना है या नहीं। ऐप कभी Send नहीं दबाता।',
-  'live.companion.noProposal': 'कोई Messages ड्राफ़्ट तैयार नहीं है।',
-  'live.companion.proposalUnavailable': 'Messages ड्राफ़्ट उपलब्ध नहीं है',
-  'live.companion.prepareReview': 'Messages ड्राफ़्ट देखें',
-  'live.companion.reviewing': 'सुरक्षित ड्राफ़्ट लोड हो रहा है…',
-  'live.companion.reviewTitle': 'संदेश की समीक्षा के लिए तैयार?',
-  'live.companion.recipient': 'व्यक्ति',
-  'live.companion.date': 'जन्मदिन',
-  'live.companion.destination': 'फ़ोन',
-  'live.companion.editableWarning':
-    'अंतिम फ़ोन और टेक्स्ट की समीक्षा करके तय करें कि Send दबाना है या नहीं। संदेश की समीक्षा दबाते ही प्रस्तुति से पहले पूरे खाते की सुरक्षा रोक लागू होती है। यह Cancel, प्रस्तुति विफलता या अज्ञात परिणाम के बाद भी Android से जन्मदिन संदेश 72 घंटे तक रोक सकती है; इसलिए Android पर जन्मदिन संदेश छूट सकते हैं। SMS या MMS पर कैरियर शुल्क लग सकता है। उपलब्ध भेजने वाली लाइन और अंतिम ट्रांसपोर्ट को Messages व iOS नियंत्रित करते हैं; यह ऐप किसी को चुन या पक्का नहीं कर सकता।',
-  'live.companion.openComposer': 'संदेश की समीक्षा करें',
-  'live.companion.cancelled': 'Messages बंद हुआ। ऐप ने कोई संदेश नहीं भेजा।',
-  'live.companion.failed': 'Messages पूरा नहीं हुआ। भेजना पक्का नहीं है।',
-  'live.companion.reportedSent':
-    'Messages ने भेजा बताया; डिलीवरी पक्की नहीं। Birthday Autopilot अंतिम बदला व्यक्ति या संदेश, भेजने वाली लाइन, माध्यम, कैरियर स्वीकृति या डिलीवरी नहीं देख सकता।',
-  'live.companion.unknown':
-    'Messages परिणाम अज्ञात है। भेजे जाने का अनुमान न लगाएँ।',
-  'live.companion.postComposerSafety':
-    'पूरे खाते की सुरक्षा रोक सर्वर पर समाप्त होने तक रहती है, जिसमें Cancel, विफलता या अज्ञात परिणाम भी शामिल हैं। खुद दोबारा कोशिश करने से पहले Messages जाँचें। Birthday Autopilot अपने-आप दोबारा कोशिश नहीं करेगा।',
-  'live.companion.error': 'Messages समीक्षा आगे नहीं बढ़ सकी।',
-  'live.companion.composerBlocked':
-    'हर सुरक्षा जाँच पास होने तक Messages समीक्षा रुकी है।',
-  'live.companion.contactsReconnectRequired':
-    'Google Contacts फिर जोड़ें और फिर इस Messages ड्राफ़्ट की समीक्षा करें।',
-  'live.companion.contactsFreshnessUnavailable':
-    'Contacts को सुरक्षित रूप से ताज़ा नहीं किया जा सका। इंटरनेट कनेक्शन जाँचकर समीक्षा फिर करें।',
-  'live.companion.reconnectContacts': 'Google Contacts फिर जोड़ें',
-  'live.companion.contactsRepairAccepted':
-    'Contacts पहुँच फिर जाँची गई। Messages ड्राफ़्ट की समीक्षा दोबारा करें।',
-  'live.companion.accountDeleting':
-    'खाता मिटाना चल रहा है। Messages समीक्षा रुकी रहेगी और इस ऐप ने कुछ नहीं भेजा।',
-  'live.companion.managedByAndroidComposer':
-    'इस खाते का भेजना एक Android फ़ोन संभालता है। iPhone पर Messages समीक्षा से पहले उस फ़ोन का उपयोग करें या सुरक्षित सेंडर रिलीज़ पूरा करें।',
-  'live.companion.reservationHeld':
-    'इस खाते की Messages सुरक्षा अवधि किसी दूसरे iPhone या पिछली सुरक्षित समीक्षा के पास है। हो सके तो वह समीक्षा पूरी करें, या अवधि समाप्त होने दें।',
-  'live.companion.reservationStale':
-    'सुरक्षित Messages समीक्षा अवधि बदल गई या समाप्त हो गई। यह समीक्षा बंद करके फिर शुरू करें; इस कार्रवाई से कोई संदेश नहीं भेजा गया।',
-  'live.companion.reviewRetry':
-    'यह सुरक्षित समीक्षा अब मौजूदा या उपलब्ध नहीं है। इसे बंद करें, ताज़ा करें और संदेश की समीक्षा फिर करें।',
-  'live.companion.coexistenceUnverified':
-    'ऐप यह सत्यापित नहीं कर सका कि Android भेजना सुरक्षित रूप से रुका है। कनेक्शन जाँचकर Messages समीक्षा फिर करें।',
-  'live.companion.accountUnavailable':
-    'साइन-इन Google खाता बदल गया या उपलब्ध नहीं है। इस Messages ड्राफ़्ट की समीक्षा से पहले सही खाता फिर जोड़ें।',
-  'live.companion.genericRecovery':
-    'Messages का परिणाम पक्का नहीं हो सका। फिर कोशिश करने से पहले Messages जाँचें। Birthday Autopilot अपने-आप दोबारा कोशिश नहीं करेगा।',
+
   'live.privacy.title': 'गोपनीयता नियंत्रण',
   'live.privacy.body': 'पुष्टि से पहले सटीक परिणाम देखें।',
   'live.privacy.screenCaptureTitle': 'स्क्रीन गोपनीयता',

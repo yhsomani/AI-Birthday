@@ -101,11 +101,7 @@ export function LivePolicyEditor({
   const localizedDraftSummary = useCallback(
     (draft: WindowDraft) =>
       t(
-        platform === 'ios'
-          ? draft.latePolicy.kind === 'same-day-grace'
-            ? 'live.policy.summaryIosWithGrace'
-            : 'live.policy.summaryIosWithoutGrace'
-          : draft.latePolicy.kind === 'same-day-grace'
+        draft.latePolicy.kind === 'same-day-grace'
           ? 'live.policy.summaryWithGrace'
           : 'live.policy.summaryWithoutGrace',
         {
@@ -118,7 +114,7 @@ export function LivePolicyEditor({
           start: bidiIsolate(draft.primaryStart),
         },
       ),
-    [platform, t],
+    [t],
   );
 
   useEffect(() => {

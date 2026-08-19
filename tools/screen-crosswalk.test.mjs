@@ -132,8 +132,6 @@ test('high-risk Stitch owners contain their real production state and route anch
   const privacy = read('src/features/live/LivePrivacyScreen.tsx');
   const activity = read('src/features/live/LiveActivityScreen.tsx');
   const automation = read('src/features/live/LiveAutomationScreen.tsx');
-  const composerReview = read('src/features/live/LiveComposerReviewScreen.tsx');
-  const activationModel = read('src/domain/automation/model.ts');
   const shell = read('src/features/live/LiveAppShell.tsx');
 
   assert.deepEqual(entry('A06')?.implementation, [
@@ -161,39 +159,13 @@ test('high-risk Stitch owners contain their real production state and route anch
   assert.match(shell, /name="Privacy" component=\{LivePrivacyRoute\}/u);
 
   assert.match(activity, /activityDetailDisclosure/u);
-  assert.match(activity, /composer-reported-sent/u);
-  assert.match(activity, /composer-outcome-unknown/u);
-  assert.match(activity, /live-activity-detail-ios-visibility/u);
-
-  for (const field of [
-    'plannedReminderCount',
-    'reminderWindowLabel',
-    'reminderHorizon',
-    'coexistence',
-    'contactsReady',
-    'messageUiReady',
-    'protectedStorageReady',
-    'readiness',
-  ]) {
-    assert.match(activationModel, new RegExp(`\\b${field}\\b`, 'u'));
-    assert.match(automation, new RegExp(`review\\.${field}`, 'u'));
-  }
-  assert.match(automation, /iosActivationSnapshotComplete/u);
-  assert.match(automation, /live-ios-activation-snapshot-blocked/u);
   assert.doesNotMatch(automation, /live-open-composer/u);
-  assert.match(composerReview, /live-open-composer/u);
 
   assert.deepEqual(entry('H03')?.implementation, [
-    'src/features/live/LiveComposerReviewScreen.tsx',
     'src/features/live/LiveHomeScreen.tsx',
     'src/features/live/LiveMessageScreen.tsx',
   ]);
   assert.deepEqual(entry('H06')?.implementation, [
-    'src/features/live/LiveComposerReviewScreen.tsx',
     'src/features/live/LiveHomeScreen.tsx',
   ]);
-  assert.match(
-    shell,
-    /<Stack\.Screen[\s\S]{0,120}?name="ComposerReview"[\s\S]{0,120}?component=\{LiveComposerReviewRoute\}/u,
-  );
 });

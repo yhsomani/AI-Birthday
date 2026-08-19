@@ -77,12 +77,13 @@ describe('contact-derived reset decisions', () => {
     });
   });
 
-  it('supports iOS-only cleanup without inventing an Android sender binding', () => {
+  it('supports fresh account cleanup without inventing an Android sender binding', () => {
     const identity = deriveOperationIdentity(
-      'uid-ios-only',
+      'uid-fresh-account',
       'CONTACT_DERIVED_RESET',
       RESET_REQUEST_ID,
     );
+
     const decision = decideBeginContactDerivedReset(
       null,
       null,

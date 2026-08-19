@@ -37,14 +37,11 @@ test('mobile Node and npm pins agree across install contracts', () => {
     'node tools/patch-react-native-codegen.mjs --check',
   );
   assert.equal(
-    packageJson.scripts['ios:pods'],
-    'cd ios && bundle exec pod install --deployment',
-  );
-  assert.equal(
     packageJson.scripts['check:portable'],
     'npm run check && npm run backend:check && npm run hosting:check',
   );
   assert.equal(packageJson.scripts['check:all'], undefined);
+
   assert.match(
     read('android/gradle/wrapper/gradle-wrapper.properties'),
     /distributionSha256Sum=b266d5ff6b90eada6dc3b20cb090e3731302e553a27c5d3e4df1f0d76beaff06/u,
@@ -179,148 +176,6 @@ test('Functions compile and run against the deployed Node 22 runtime line', () =
   assert.match(workflow, /npm run backend:test:emulator/u);
 });
 
-test('Ruby, Bundler, and CocoaPods pins agree with the lockfile', () => {
-  const gemfile = read('Gemfile');
-  const lockfile = read('Gemfile.lock');
-  const podLockfile = read('ios/Podfile.lock');
-
-  assert.equal(read('.ruby-version').trim(), TOOLCHAIN_VERSIONS.ruby);
-  assert.match(
-    gemfile,
-    new RegExp(
-      `^ruby '${TOOLCHAIN_VERSIONS.ruby.replaceAll('.', '\\.')}'$`,
-      'mu',
-    ),
-  );
-  assert.match(
-    gemfile,
-    new RegExp(
-      `gem 'cocoapods', '${TOOLCHAIN_VERSIONS.cocoaPods.replaceAll(
-        '.',
-        '\\.',
-      )}'`,
-    ),
-  );
-  assert.match(
-    lockfile,
-    new RegExp(
-      `RUBY VERSION\\n  ruby ${TOOLCHAIN_VERSIONS.ruby.replaceAll('.', '\\.')}`,
-    ),
-  );
-  assert.match(
-    lockfile,
-    new RegExp(
-      `BUNDLED WITH\\n  ${TOOLCHAIN_VERSIONS.bundler.replaceAll('.', '\\.')}`,
-    ),
-  );
-  assert.match(
-    podLockfile,
-    new RegExp(
-      `COCOAPODS: ${TOOLCHAIN_VERSIONS.cocoaPods.replaceAll('.', '\\.')}$`,
-      'mu',
-    ),
-  );
-});
-
-test(
-  'iOS bundle wrapper handles spaces and rejects a mismatched Node',
-  { skip: !shAvailable },
-  () => {
-    const temporaryRoot = mkdtempSync(
-      path.join(os.tmpdir(), 'birthday-ios-toolchain-'),
-    );
-    const fixtureRoot = path.join(temporaryRoot, 'fixture with spaces');
-    const nodeBinary = path.join(fixtureRoot, 'node binary');
-    const reactNativeRoot = path.join(fixtureRoot, 'react native');
-    const reactNativeScript = path.join(
-      reactNativeRoot,
-      'scripts',
-      'react-native-xcode.sh',
-    );
-    mkdirSync(path.dirname(reactNativeScript), { recursive: true });
-
-    try {
-      writeFileSync(nodeBinary, `#!/bin/sh\nprintf '%s\\n' 'v24.18.0'\n`);
-      writeFileSync(
-        reactNativeScript,
-        `#!/bin/sh\nprintf '%s\\n' 'bundle-called'\n`,
-      );
-      chmodSync(nodeBinary, 0o755);
-      chmodSync(reactNativeScript, 0o755);
-
-      const valid = spawnSync('sh', ['ios/scripts/bundle-react-native.sh'], {
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          NODE_BINARY: nodeBinary,
-          REACT_NATIVE_PATH: reactNativeRoot,
-        },
-      });
-      assert.equal(valid.status, 0, valid.stderr);
-      assert.equal(valid.stdout.trim(), 'bundle-called');
-
-      writeFileSync(nodeBinary, `#!/bin/sh\nprintf '%s\\n' 'v20.19.6'\n`);
-      const invalid = spawnSync('sh', ['ios/scripts/bundle-react-native.sh'], {
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          NODE_BINARY: nodeBinary,
-          REACT_NATIVE_PATH: reactNativeRoot,
-        },
-      });
-      assert.equal(invalid.status, 1);
-      assert.match(invalid.stderr, /requires Node v24\.18\.0/u);
-    } finally {
-      rmSync(temporaryRoot, { recursive: true, force: true });
-    }
-  },
-);
-
-test('iOS build and CI reject toolchain drift and build a real app target', () => {
-  const workflow = read('.github/workflows/ci.yml');
-  const bundleScript = read('ios/scripts/bundle-react-native.sh');
-  const project = read('ios/BirthdayAutopilot.xcodeproj/project.pbxproj');
-  const scheme = read(
-    'ios/BirthdayAutopilot.xcodeproj/xcshareddata/xcschemes/BirthdayAutopilot.xcscheme',
-  );
-
-  assert.match(workflow, /runs-on: macos-26/u);
-  assert.match(
-    workflow,
-    new RegExp(`Xcode_${TOOLCHAIN_VERSIONS.xcode.replaceAll('.', '\\.')}`),
-  );
-  assert.match(workflow, /ruby\/setup-ruby@[a-f0-9]{40} # v1/u);
-  assert.match(workflow, /npm run ios:pods/u);
-  assert.match(workflow, /npm run doctor:ios/u);
-  assert.match(workflow, /-workspace ios\/BirthdayAutopilot\.xcworkspace/u);
-  assert.match(workflow, /CODE_SIGNING_ALLOWED=NO/u);
-  assert.equal(
-    (workflow.match(/BIRTHDAY_IOS_SIMULATOR_COMPILE_SMOKE=YES/gu) ?? []).length,
-    4,
-  );
-  assert.match(workflow, /-only-testing:BirthdayAutopilotTests/u);
-  assert.match(workflow, /BirthdayAutopilotTests\.xcresult/u);
-  assert.match(
-    workflow,
-    /BIRTHDAY_IOS_SIMULATOR_RUNTIME=.*iphonesimulator.*show-sdk-version/u,
-  );
-  assert.match(
-    workflow,
-    /SimRuntime\.iOS-#\{ENV\.fetch\("BIRTHDAY_IOS_SIMULATOR_RUNTIME"\)/u,
-  );
-  assert.doesNotMatch(workflow, /candidates\.max_by/u);
-  assert.doesNotMatch(workflow, /BIRTHDAY_FIREBASE_CONFIG_REQUIRED=NO/u);
-
-  assert.match(
-    bundleScript,
-    new RegExp(`v${TOOLCHAIN_VERSIONS.node.replaceAll('.', '\\.')}`),
-  );
-  assert.match(project, /scripts\/bundle-react-native\.sh/u);
-  assert.match(project, /com\.apple\.product-type\.bundle\.unit-test/u);
-  assert.match(scheme, /BirthdayAutopilotTests/u);
-  assert.match(scheme, /<TestableReference/u);
-});
-
 test('every third-party CI action is pinned to an immutable commit', () => {
   const workflow = read('.github/workflows/ci.yml');
   const actionReferences = [...workflow.matchAll(/^\s*uses:\s+(\S+)/gmu)].map(
@@ -339,14 +194,14 @@ test('CI hashes complete retained candidate trees instead of entry points', () =
   assert.equal(
     (workflow.match(/node tools\/create-evidence-manifest\.mjs/gu) ?? [])
       .length,
-    3,
+    2,
   );
   assert.equal(
     (
       workflow.match(/test -s release-evidence\/.+\/sha256-manifest\.json/gu) ??
       []
     ).length,
-    3,
+    2,
   );
   assert.match(workflow, /backend\/functions\/lib/u);
   assert.match(workflow, /backend\/hosting\/public/u);
@@ -359,16 +214,7 @@ test('CI hashes complete retained candidate trees instead of entry points', () =
   assert.match(workflow, /android-prod-runtime\.cdx\.json/u);
   assert.match(workflow, /android-build-plugins-native\.cdx\.json/u);
   assert.match(workflow, /android-native-osv\.json/u);
-  assert.match(workflow, /BirthdayAutopilot-Mobile\.cdx\.json/u);
-  assert.match(workflow, /BirthdayAutopilot-iOS\.cdx\.json/u);
-  assert.match(workflow, /BirthdayAutopilot-iOS-native-osv\.json/u);
-  assert.match(workflow, /BirthdayAutopilot-JavaScript-licenses\.json/u);
-  assert.match(workflow, /Mobile-package-lock\.json/u);
-  assert.match(workflow, /Debug-iphonesimulator\/BirthdayAutopilot\.app/u);
-  assert.match(workflow, /Release-iphonesimulator\/BirthdayAutopilot\.app/u);
-  assert.match(workflow, /BirthdayAutopilot-Debug-simulator\.app\.tar\.gz/u);
-  assert.match(workflow, /BirthdayAutopilot-Release-simulator\.app\.tar\.gz/u);
-  assert.match(workflow, /tar -tzf/u);
+  assert.match(workflow, /javascript-licenses\.json/u);
   assert.match(manifestTool, /mode: portableMode\(stableFile\.metadata\)/u);
   assert.match(manifestTool, /fstatSync\(descriptor, \{ bigint: true \}\)/u);
   assert.match(manifestTool, /constants\.O_NOFOLLOW/u);

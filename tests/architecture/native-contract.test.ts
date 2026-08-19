@@ -8,7 +8,6 @@ import {
   birthdayJobProjectionSchema,
   contactSummarySchema,
   currentPrivacyOperationProjectionSchema,
-  iosComposerProposalProjectionSchema,
   notificationPermissionProjectionSchema,
   peoplePageSchema,
   senderTransferOperationProjectionSchema,
@@ -366,40 +365,6 @@ describe('native contract decoder', () => {
     );
 
     expect(result.kind).toBe('error');
-  });
-
-  it('accepts only opaque iOS composer proposal metadata', () => {
-    const valid = decodeNativeResponse(
-      {
-        ...baseRawResponse,
-        payloadJson: JSON.stringify({
-          kind: 'ready',
-          proposalId: 'proposal-1',
-          occurrenceId: 'occurrence-1',
-          occurrenceDate: '2026-07-18',
-          recipient: 'Private name',
-        }),
-      },
-      iosComposerProposalProjectionSchema,
-    );
-    const leaked = decodeNativeResponse(
-      {
-        ...baseRawResponse,
-        payloadJson: JSON.stringify({
-          kind: 'ready',
-          proposalId: 'proposal-1',
-          occurrenceId: 'occurrence-1',
-          occurrenceDate: '2026-07-18',
-          recipient: 'Private name',
-          phone: '+919876543210',
-          body: 'Private draft',
-        }),
-      },
-      iosComposerProposalProjectionSchema,
-    );
-
-    expect(valid.kind).toBe('ok');
-    expect(leaked.kind).toBe('error');
   });
 
   it('rejects unknown values in every safety-relevant union', () => {

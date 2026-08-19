@@ -228,13 +228,6 @@ const androidCapability: PlatformCapability = {
   userComposer: 'available-as-explicit-alternative',
 };
 
-const iosCapability: PlatformCapability = {
-  platform: 'ios',
-  deliveryMode: 'user-controlled-composer',
-  unattendedSms: 'unavailable',
-  userComposer: 'required',
-};
-
 const renderActivity = async (
   harness: ActivityHarness,
   capability: PlatformCapability = androidCapability,
@@ -342,21 +335,11 @@ it.each([
     capability: androidCapability,
     expected:
       'Android can retain a separate content-free duplicate-safety record for up to 400 days. Clear activity does not remove it.',
-    excluded:
-      'iPhone retains only the minimum opaque composer marker needed to prevent reopening the same birthday draft. It is not Android’s 400-day sending ledger.',
     platform: 'Android',
-  },
-  {
-    capability: iosCapability,
-    expected:
-      'iPhone retains only the minimum opaque composer marker needed to prevent reopening the same birthday draft. It is not Android’s 400-day sending ledger.',
-    excluded:
-      'Android can retain a separate content-free duplicate-safety record for up to 400 days. Clear activity does not remove it.',
-    platform: 'iOS',
   },
 ])(
   '$platform clear review shows only its exact retention boundary',
-  async ({ capability, excluded, expected }) => {
+  async ({ capability, expected }) => {
     const harness = createActivityHarness();
     await renderActivity(harness, capability);
 
@@ -364,7 +347,6 @@ it.each([
 
     expect(screen.getByTestId('live-activity-clear-retention')).toBeTruthy();
     expect(screen.getByText(expected)).toBeTruthy();
-    expect(screen.queryByText(excluded)).toBeNull();
     expect(
       screen.getAllByText(
         'Copies in carriers, recipients, SMS, Messages and outside backups are not erased.',

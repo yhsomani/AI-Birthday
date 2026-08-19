@@ -53,7 +53,7 @@ jobs:
       - name: Set up deployed Functions Node.js line
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: 24.18.0
+          node-version-file: backend/functions/.nvmrc
           cache: npm
           cache-dependency-path: backend/functions/package-lock.json
 
@@ -541,5 +541,5 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(jq 'length' <<< "$REQUIRED_JOB_RESULTS")" = 4
+          test "$(jq 'length' <<< "$REQUIRED_JOB_RESULTS")" = 5
           jq -e 'all(.[]; .result == "success")' <<< "$REQUIRED_JOB_RESULTS" > /dev/null

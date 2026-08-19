@@ -7,7 +7,6 @@ import {
 import {
   ANDROID_BIRTHDAY_JOB_PHASES,
   ANDROID_TEST_PHASES,
-  IOS_BIRTHDAY_JOB_PHASES,
 } from '../../domain/automation/model';
 import { CONTACT_ISSUE_CODES } from '../../domain/contacts/model';
 import { MESSAGE_LANGUAGES, MESSAGE_TONES } from '../../domain/messages/model';
@@ -17,18 +16,17 @@ import {
   androidReadinessProjectionSchema,
   approvalProjectionSchema,
   deviceEligibilitySchema,
-  iosReadinessProjectionSchema,
   platformCapabilitySchema,
   readinessProjectionSchema,
   setupStepSchema,
 } from './coreSchemas';
+
 import {
   activationReviewHandleSchema,
   activityIdSchema,
   birthdayChoiceIdSchema,
   boundedUiTextSchema,
   contactIdSchema,
-  composerProposalIdSchema,
   deletionPrivacyOperationIdSchema,
   enrollmentReviewHandleSchema,
   fieldIssueSchema,
@@ -263,20 +261,6 @@ export const messageEditorProjectionSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
-export const iosComposerProposalProjectionSchema = z.discriminatedUnion(
-  'kind',
-  [
-    strictObject({ kind: z.literal('none') }),
-    strictObject({
-      kind: z.literal('ready'),
-      proposalId: composerProposalIdSchema,
-      occurrenceId: occurrenceIdSchema,
-      occurrenceDate: localDateSchema,
-      recipient: privateDisplayNameSchema,
-    }),
-  ],
-);
-
 export const geminiSuggestionsProjectionSchema = z.discriminatedUnion('kind', [
   strictObject({ kind: z.literal('requesting') }),
   strictObject({
@@ -340,113 +324,59 @@ export const policyPreviewSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
-export const birthdayJobProjectionSchema = z.discriminatedUnion('platform', [
-  strictObject({
-    platform: z.literal('android'),
-    occurrenceId: occurrenceIdSchema,
-    occurrenceDate: localDateSchema,
-    phase: z.enum(ANDROID_BIRTHDAY_JOB_PHASES),
-    updatedAt: utcInstantSchema,
-    attempt: z.union([z.literal(1), z.literal(2)]),
-  }),
-  strictObject({
-    platform: z.literal('ios'),
-    occurrenceId: occurrenceIdSchema,
-    occurrenceDate: localDateSchema,
-    phase: z.enum(IOS_BIRTHDAY_JOB_PHASES),
-    updatedAt: utcInstantSchema,
-  }),
-]);
+export const birthdayJobProjectionSchema = strictObject({
+  platform: z.literal('android'),
+  occurrenceId: occurrenceIdSchema,
+  occurrenceDate: localDateSchema,
+  phase: z.enum(ANDROID_BIRTHDAY_JOB_PHASES),
+  updatedAt: utcInstantSchema,
+  attempt: z.union([z.literal(1), z.literal(2)]),
+});
 
-export const testProjectionSchema = z.discriminatedUnion('platform', [
-  strictObject({
-    platform: z.literal('android'),
-    phase: z.enum(ANDROID_TEST_PHASES),
-    updatedAt: utcInstantSchema,
-    reason: safeReasonCodeSchema.optional(),
-  }),
-  strictObject({
-    platform: z.literal('ios'),
-    kind: z.literal('unavailable'),
-    reason: z.literal('platform-composer-only'),
-  }),
-]);
+export const testProjectionSchema = strictObject({
+  platform: z.literal('android'),
+  phase: z.enum(ANDROID_TEST_PHASES),
+  updatedAt: utcInstantSchema,
+  reason: safeReasonCodeSchema.optional(),
+});
 
-export const automationProjectionSchema = z.discriminatedUnion('platform', [
-  strictObject({
-    platform: z.literal('android'),
-    desired: z.enum(['on', 'paused']),
-    effective: z.enum([
-      'not-configured',
-      'test-only',
-      'paused-repair',
-      'active',
-      'action-required',
-      'standby',
-      'transfer-pending',
-      'deleting',
-    ]),
-    readiness: androidReadinessProjectionSchema,
-  }),
-  strictObject({
-    platform: z.literal('ios'),
-    desired: z.enum(['composer-reminders-on', 'paused']),
-    effective: z.enum(['not-configured', 'ready', 'action-required', 'paused']),
-    readiness: iosReadinessProjectionSchema,
-  }),
-]);
+export const automationProjectionSchema = strictObject({
+  platform: z.literal('android'),
+  desired: z.enum(['on', 'paused']),
+  effective: z.enum([
+    'not-configured',
+    'test-only',
+    'paused-repair',
+    'active',
+    'action-required',
+    'standby',
+    'transfer-pending',
+    'deleting',
+  ]),
+  readiness: androidReadinessProjectionSchema,
+});
 
-export const testReviewSchema = z.discriminatedUnion('platform', [
-  strictObject({
-    platform: z.literal('android'),
-    handle: testReviewHandleSchema,
-    maskedDestination: maskedPhoneSchema,
-    exactText: privateMessageTextSchema,
-    simLabel: boundedShortLabel,
-    segmentCount: z.number().int().min(1).max(2),
-    chargeDisclosure: boundedDisclosure,
-  }),
-  strictObject({
-    platform: z.literal('ios'),
-    kind: z.literal('unavailable'),
-    reason: z.literal('platform-composer-only'),
-  }),
-]);
+export const testReviewSchema = strictObject({
+  platform: z.literal('android'),
+  handle: testReviewHandleSchema,
+  maskedDestination: maskedPhoneSchema,
+  exactText: privateMessageTextSchema,
+  simLabel: boundedShortLabel,
+  segmentCount: z.number().int().min(1).max(2),
+  chargeDisclosure: boundedDisclosure,
+});
 
-export const activationReviewSchema = z.discriminatedUnion('platform', [
-  strictObject({
-    platform: z.literal('android'),
-    handle: activationReviewHandleSchema,
-    enabledRecipientCount: boundedCount,
-    attentionCount: boundedCount,
-    templatePreview: privateMessageTextSchema,
-    windowLabel: boundedShortLabel,
-    simLabel: boundedShortLabel,
-    dailyCap: z.number().int().min(1).max(20),
-    limitationsDisclosure: boundedDisclosure,
-  }),
-  strictObject({
-    platform: z.literal('ios'),
-    handle: activationReviewHandleSchema,
-    reminderRecipientCount: boundedCount,
-    plannedReminderCount: boundedCount,
-    reminderWindowLabel: boundedShortLabel,
-    reminderHorizon: z.enum(['denied', 'full', 'not-built', 'partial']),
-    coexistence: z.enum([
-      'clear',
-      'deleting',
-      'managed',
-      'stale-or-unknown',
-      'unavailable',
-    ]),
-    contactsReady: z.boolean(),
-    messageUiReady: z.boolean(),
-    protectedStorageReady: z.boolean(),
-    readiness: iosReadinessProjectionSchema,
-    deliveryMode: z.literal('user-controlled-composer'),
-    limitationsDisclosure: boundedDisclosure,
-  }),
-]);
+export const activationReviewSchema = strictObject({
+  platform: z.literal('android'),
+  handle: activationReviewHandleSchema,
+  enabledRecipientCount: boundedCount,
+  attentionCount: boundedCount,
+  templatePreview: privateMessageTextSchema,
+  windowLabel: boundedShortLabel,
+  simLabel: boundedShortLabel,
+  dailyCap: z.number().int().min(1).max(20),
+  limitationsDisclosure: boundedDisclosure,
+});
 
 export const upcomingGreetingSchema = strictObject({
   occurrenceId: occurrenceIdSchema,

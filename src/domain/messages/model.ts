@@ -1,11 +1,8 @@
 import type {
-  ComposerProposalId,
   MessagePreviewHandle,
   PrivateDisplayName,
   PrivateMessageText,
 } from '../shared/brand';
-import type { OccurrenceId } from '../shared/brand';
-import type { LocalDate } from '../shared/temporal';
 import type { FieldIssue } from '../shared/result';
 
 export const MESSAGE_LANGUAGES = ['en', 'hi'] as const;
@@ -105,16 +102,6 @@ export type MessagePreview =
 export type MessageEditorProjection =
   | Readonly<{ kind: 'not-configured' }>
   | Readonly<{ kind: 'configured'; draft: MessageDraft }>;
-
-export type IosComposerProposalProjection =
-  | Readonly<{ kind: 'none' }>
-  | Readonly<{
-      kind: 'ready';
-      proposalId: ComposerProposalId;
-      occurrenceId: OccurrenceId;
-      occurrenceDate: LocalDate;
-      recipient: PrivateDisplayName;
-    }>;
 
 export type GeminiRequest = Readonly<{
   language: MessageLanguage;

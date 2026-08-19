@@ -11,7 +11,7 @@ import {
 import { appI18n } from '../localization/i18n';
 import type { SafeSupportCode } from '../domain/shared/brand';
 import type { LiveAppPort } from '../features/live/LiveAppPort';
-import { CompanionNativeGateway } from '../infrastructure/native/ios/CompanionNativeGateway';
+
 
 jest.mock('react-native-localize', () => ({
   getLocales: () => [{ languageCode: 'en' }],
@@ -352,10 +352,10 @@ describe('production-safe data source selection', () => {
 
     await render(
       <BirthdayAutopilotApp
-        companionPort={new CompanionNativeGateway(null, null)}
         nativeProjectionPort={nativeProjectionPort}
       />,
     );
+
 
     await waitFor(() =>
       expect(screen.getByTestId('native-bootstrap-unavailable')).toBeTruthy(),

@@ -39,14 +39,13 @@ import { RouteAccessibilityFocus } from '../../design-system/components/RouteAcc
 import { minimumTargetSize, spacing } from '../../design-system/tokens/theme';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
-import type { LiveAppPort, LiveCompanionPort } from './LiveAppPort';
+import type { LiveAppPort } from './LiveAppPort';
 import {
   LiveActivityDetailScreen,
   LiveActivityScreen,
 } from './LiveActivityScreen';
 import { LiveAttentionScreen } from './LiveAttentionScreen';
 import { LiveAutomationScreen } from './LiveAutomationScreen';
-import { LiveComposerReviewScreen } from './LiveComposerReviewScreen';
 import { LiveDiagnosticsScreen } from './LiveDiagnosticsScreen';
 import { LiveHomeScreen } from './LiveHomeScreen';
 import { LiveHelpLegalScreen } from './LiveHelpLegalScreen';
@@ -70,7 +69,6 @@ type LiveRootStackParamList = {
   ActivityDetail: Readonly<{ activityId: ActivityId }>;
   Attention: undefined;
   Automation: undefined;
-  ComposerReview: undefined;
   Diagnostics: undefined;
   HelpLegal: undefined;
   Message: undefined;
@@ -82,7 +80,6 @@ type LiveRootLeaf =
   | 'Activity'
   | 'Attention'
   | 'Automation'
-  | 'ComposerReview'
   | 'Diagnostics'
   | 'HelpLegal'
   | 'Message'
@@ -96,7 +93,6 @@ const Stack = createNativeStackNavigator<LiveRootStackParamList>();
 type LiveNavigationDependencies = Readonly<{
   account: AccountProjection;
   capability: PlatformCapability;
-  companionPort: LiveCompanionPort;
   onContinueSetup: () => void;
   port: LiveAppPort;
   productSetupRequired: boolean;
@@ -202,13 +198,8 @@ function LiveRouteFrame({
 }
 
 function LiveHomeRoute() {
-  const {
-    capability,
-    companionPort,
-    onContinueSetup,
-    port,
-    productSetupRequired,
-  } = useLiveNavigationDependencies();
+  const { capability, onContinueSetup, port, productSetupRequired } =
+    useLiveNavigationDependencies();
   const navigation = useRootNavigation();
   const { t } = useAppLocalization();
 
@@ -216,14 +207,10 @@ function LiveHomeRoute() {
     <LiveRouteFrame announcement={t('tabs.home')} routeKey="tab:home">
       <LiveHomeScreen
         capability={capability}
-        companionPort={companionPort}
         onOpenActivity={() => navigateToLeafFromHome(navigation, 'Activity')}
         onOpenAttention={() => navigateToLeafFromHome(navigation, 'Attention')}
         onOpenAutomation={() =>
           navigateToLeafFromHome(navigation, 'Automation')
-        }
-        onOpenComposerReview={() =>
-          navigateToLeafFromHome(navigation, 'ComposerReview')
         }
         onOpenPeople={() => navigateToTab(navigation, 'People')}
         onContinueSetup={onContinueSetup}
@@ -367,43 +354,18 @@ function LiveAttentionRoute({
 function LiveAutomationRoute({
   navigation,
 }: NativeStackScreenProps<LiveRootStackParamList, 'Automation'>) {
-  const { capability, companionPort, port } = useLiveNavigationDependencies();
+  const { capability, port } = useLiveNavigationDependencies();
   const { t } = useAppLocalization();
   return (
     <LiveRouteFrame
-      announcement={t(
-        capability.platform === 'android'
-          ? 'live.automation.title'
-          : 'live.companion.activationTitle',
-      )}
+      announcement={t('live.automation.title')}
       routeKey="automation"
     >
       <LiveAutomationScreen
         capability={capability}
-        companionPort={companionPort}
         onBack={() => navigation.goBack()}
         onOpenMessage={() => navigation.navigate('Message')}
         onOpenSchedule={() => navigation.navigate('Schedule')}
-        port={port}
-      />
-    </LiveRouteFrame>
-  );
-}
-
-function LiveComposerReviewRoute({
-  navigation,
-}: NativeStackScreenProps<LiveRootStackParamList, 'ComposerReview'>) {
-  const { capability, companionPort, port } = useLiveNavigationDependencies();
-  const { t } = useAppLocalization();
-  return (
-    <LiveRouteFrame
-      announcement={t('live.companion.composerTitle')}
-      routeKey="composer-review"
-    >
-      <LiveComposerReviewScreen
-        capability={capability}
-        companionPort={companionPort}
-        onBack={() => navigation.goBack()}
         port={port}
       />
     </LiveRouteFrame>
@@ -629,7 +591,6 @@ function LiveMainTabs() {
 export function LiveAppShell({
   account,
   capability,
-  companionPort,
   onContinueSetup,
   port,
   productSetupRequired,
@@ -646,7 +607,6 @@ export function LiveAppShell({
     () => ({
       account,
       capability,
-      companionPort,
       onContinueSetup,
       port,
       productSetupRequired,
@@ -655,7 +615,6 @@ export function LiveAppShell({
     [
       account,
       capability,
-      companionPort,
       onContinueSetup,
       port,
       productSetupRequired,
@@ -702,10 +661,7 @@ export function LiveAppShell({
         try {
           const result = await port.getPendingRoute();
           if (active && result.kind === 'ok') {
-            if (result.envelope.value.kind === 'automation-review') {
-              pendingLeafRef.current = 'ComposerReview';
-              flushPendingLeaf();
-            } else if (result.envelope.value.kind === 'attention') {
+            if (result.envelope.value.kind === 'attention') {
               pendingLeafRef.current = 'Attention';
               flushPendingLeaf();
             }
@@ -759,10 +715,6 @@ export function LiveAppShell({
             />
             <Stack.Screen name="Attention" component={LiveAttentionRoute} />
             <Stack.Screen name="Automation" component={LiveAutomationRoute} />
-            <Stack.Screen
-              name="ComposerReview"
-              component={LiveComposerReviewRoute}
-            />
             <Stack.Screen name="Diagnostics" component={LiveDiagnosticsRoute} />
             <Stack.Screen name="HelpLegal" component={LiveHelpLegalRoute} />
             <Stack.Screen name="Message" component={LiveMessageRoute} />

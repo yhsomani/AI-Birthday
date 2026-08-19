@@ -22,7 +22,6 @@ import type {
   ActionHandle,
   ApprovalReviewHandle,
   BirthdayChoiceId,
-  ComposerProposalId,
   MessagePreviewHandle,
   IssueId,
   OccurrenceId,
@@ -44,11 +43,7 @@ import type {
   BootstrapProjection,
   SetupProjection,
 } from '../domain/setup/model';
-import type {
-  LiveAppPort,
-  LiveCompanionPort,
-} from '../features/live/LiveAppPort';
-import { CompanionNativeGateway } from '../infrastructure/native/ios/CompanionNativeGateway';
+import type { LiveAppPort } from '../features/live/LiveAppPort';
 import { appI18n } from '../localization/i18n';
 import { resources } from '../localization/resources';
 import { BirthdayAutopilotApp } from './AppRoot';
@@ -99,18 +94,14 @@ const revision = (value: string) => value as NativeRevision;
 const instant = (value: string) => value as UtcInstant;
 const contactId = 'contact-live-1' as ContactId;
 const generatedAt = instant('2026-07-12T07:00:00Z');
-const unavailableCompanionPort = new CompanionNativeGateway(null, null);
 
-const renderLiveApp = (
-  port: LiveAppPort,
-  companionPort: LiveCompanionPort = unavailableCompanionPort,
-) =>
+const renderLiveApp = (port: LiveAppPort) =>
   render(
     <BirthdayAutopilotApp
-      companionPort={companionPort}
       nativeProjectionPort={port}
     />,
   );
+
 
 const openSettingsDestination = async (
   destination: 'automation' | 'message' | 'schedule',
@@ -177,67 +168,6 @@ const completeBootstrap: BootstrapProjection = {
   setupStep: 'complete',
 };
 
-const iosCapability = {
-  platform: 'ios',
-  deliveryMode: 'user-controlled-composer',
-  unattendedSms: 'unavailable',
-  userComposer: 'required',
-} as const;
-
-const iosReadiness: ReadinessProjection = {
-  platform: 'ios',
-  composer: { kind: 'allowed' },
-  unattendedAutomation: {
-    kind: 'unavailable',
-    reason: 'platform-composer-only',
-  },
-  lastCheckedAt: generatedAt,
-};
-
-const iosAccount: AccountProjection = {
-  kind: 'connected',
-  displayEmail: 'user@example.test' as PrivateEmail,
-  sender: {
-    platform: 'ios',
-    kind: 'companion',
-    unattendedAutomation: 'unavailable',
-    composer: 'available',
-  },
-};
-
-const iosBootstrap: BootstrapProjection = {
-  capability: iosCapability,
-  eligibility: {
-    kind: 'supported',
-    capability: iosCapability,
-    channelLabel: 'test',
-    chargeDisclosureVersion: 'composer-v1',
-  },
-  account: iosAccount,
-  setupStep: 'complete',
-};
-
-const iosHome: HomeProjection = {
-  automation: {
-    platform: 'ios',
-    desired: 'composer-reminders-on',
-    effective: 'ready',
-    readiness: iosReadiness,
-  },
-  counts: {
-    enabled: 1,
-    needsAttention: 0,
-    unavailable: 0,
-    today: 0,
-    nextSevenDays: 1,
-  },
-  contactsSync: {
-    kind: 'fresh',
-    completedAt: generatedAt,
-    contactCount: 1,
-  },
-};
-
 const nextBirthday = {
   occurrenceId: 'occurrence-next' as OccurrenceId,
   recipient: 'Live Contact' as PrivateDisplayName,
@@ -245,18 +175,6 @@ const nextBirthday = {
   windowLabel: '09:00–11:00',
   maskedPhone: '•••• 4321',
   exactText: 'Happy birthday!' as PrivateMessageText,
-};
-
-const iosDueHome: HomeProjection = {
-  ...iosHome,
-  counts: {
-    ...iosHome.counts,
-    today: 1,
-  },
-  next: {
-    ...nextBirthday,
-    occurrenceId: 'occurrence-1' as OccurrenceId,
-  },
 };
 
 const liveHome = (effective: 'active' | 'paused-repair'): HomeProjection => ({
@@ -326,20 +244,6 @@ const configuredPolicy = {
     latePolicy: { kind: 'none' as const },
     dailyCap: 10,
   },
-};
-
-const iosCompleteSetup: SetupProjection = {
-  step: 'complete',
-  initialActivationCompleted: true,
-  eligibility: iosBootstrap.eligibility,
-  account: iosAccount,
-  contacts: {
-    kind: 'fresh',
-    completedAt: generatedAt,
-    contactCount: 1,
-  },
-  readiness: iosReadiness,
-  automation: iosHome.automation,
 };
 
 const lifecycleRepairFixture = () => {
@@ -870,90 +774,7 @@ describe('production live projections', () => {
     expect(pauseAll).not.toHaveBeenCalled();
   });
 
-  it('hides healthy iPhone internals while keeping a useful ready Home', async () => {
-    const healthyCompanionPort: LiveCompanionPort = {
-      canOpenComposer: jest.fn(async () => true),
-      getReminderStatus: jest.fn(async () => ({
-        kind: 'ok' as const,
-        value: {
-          authorization: 'authorized' as const,
-          failedCount: 0,
-          kind: 'ok' as const,
-          plannedDateCount: 1,
-          scheduledCount: 1,
-          truncated: false,
-        },
-      })),
-      openNotificationSettings: jest.fn(),
-      openUserConfirmedComposer: jest.fn(),
-      prepareComposerReview: jest.fn(),
-      requestReminderAuthorization: jest.fn(),
-    };
-    const readyHome: HomeProjection = {
-      ...iosHome,
-      next: nextBirthday,
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(readyHome)),
-    });
 
-    await renderLiveApp(port, healthyCompanionPort);
-
-    expect(
-      await screen.findByText('Birthday reminders are ready'),
-    ).toBeTruthy();
-    await waitFor(() =>
-      expect(healthyCompanionPort.getReminderStatus).toHaveBeenCalledTimes(1),
-    );
-    await waitFor(() =>
-      expect(
-        screen.queryByText('iPhone reminder and Messages readiness'),
-      ).toBeNull(),
-    );
-    expect(screen.queryByText('Allowed')).toBeNull();
-    expect(screen.queryByText('1 reminder scheduled')).toBeNull();
-    expect(screen.queryByText('1 birthday date planned')).toBeNull();
-    expect(screen.queryByText('Available for your review')).toBeNull();
-    expect(screen.queryByTestId('live-home-attention')).toBeNull();
-    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
-    expect(screen.queryByTestId('live-home-automation')).toBeNull();
-    expect(screen.queryByTestId('live-home-refresh')).toBeNull();
-    expect(screen.getByTestId('live-home-activity')).toBeTruthy();
-
-    const labels = [
-      screen.getByTestId('live-home-approved-message-toggle'),
-      screen.getByTestId('live-home-activity'),
-      screen.getByTestId('live-home-pause'),
-    ].map(control => control.props.accessibilityLabel);
-    expect(labels.every(label => typeof label === 'string')).toBe(true);
-    expect(new Set(labels).size).toBe(labels.length);
-  });
-
-  it('offers one contextual manage-plan action when iPhone reminders are paused', async () => {
-    const pausedHome: HomeProjection = {
-      ...iosHome,
-      automation: {
-        platform: 'ios',
-        desired: 'paused',
-        effective: 'paused',
-        readiness: iosReadiness,
-      },
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(pausedHome)),
-    });
-
-    await renderLiveApp(port);
-
-    const manage = await screen.findByTestId('live-home-automation');
-    expect(manage.props.accessibilityLabel).toBe('Review birthday plan');
-    expect(screen.getAllByTestId('live-home-automation')).toHaveLength(1);
-    expect(screen.queryByTestId('live-home-attention')).toBeNull();
-    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
-    expect(screen.queryByTestId('live-home-pause')).toBeNull();
-  });
 
   it('opens only fixed verified Hosting routes from Help and legal', async () => {
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
@@ -984,243 +805,10 @@ describe('production live projections', () => {
     expect(getPublicResources).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps live iOS status in foreground, user-controlled Companion mode', async () => {
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosHome)),
-      getAccount: jest.fn(async () => ok(iosAccount)),
-      getReadiness: jest.fn(async () => ok(iosReadiness)),
-    });
 
-    await renderLiveApp(port);
 
-    await waitFor(() =>
-      expect(screen.getByText('Birthday reminders are ready')).toBeTruthy(),
-    );
-    expect(screen.getByText('iOS Companion Edition')).toBeTruthy();
-    expect(screen.getByText(/editable Messages screen/u)).toBeTruthy();
-    expect(screen.queryByText('Automation is on')).toBeNull();
-  });
 
-  it('reports native iPhone notification, horizon, MessageUI, and Android coexistence status on Home', async () => {
-    const coexistenceHome: HomeProjection = {
-      ...iosHome,
-      automation: {
-        platform: 'ios',
-        desired: 'composer-reminders-on',
-        effective: 'action-required',
-        readiness: {
-          ...iosReadiness,
-          composer: {
-            kind: 'blocked',
-            issues: [
-              {
-                id: 'ios-active-android' as IssueId,
-                code: 'active-sender-other-device',
-                severity: 'blocking',
-                blocks: ['composer'],
-              },
-            ],
-          },
-        },
-      },
-    };
-    const companionPort: LiveCompanionPort = {
-      canOpenComposer: jest.fn(async () => false),
-      getReminderStatus: jest.fn(async () => ({
-        kind: 'ok' as const,
-        value: {
-          authorization: 'denied' as const,
-          earliestUnscheduledCivilDate:
-            '2026-07-19' as import('../domain/shared/temporal').LocalDate,
-          failedCount: 2,
-          kind: 'ok' as const,
-          plannedDateCount: 3,
-          scheduledCount: 1,
-          truncated: true,
-        },
-      })),
-      openNotificationSettings: jest.fn(),
-      openUserConfirmedComposer: jest.fn(),
-      prepareComposerReview: jest.fn(),
-      requestReminderAuthorization: jest.fn(),
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(coexistenceHome)),
-    });
 
-    await renderLiveApp(port, companionPort);
-
-    expect(
-      await screen.findByText('iPhone reminder and Messages readiness'),
-    ).toBeTruthy();
-    expect(screen.getByText('Not allowed')).toBeTruthy();
-    expect(screen.queryByText('1 reminder scheduled')).toBeNull();
-    expect(screen.queryByText('3 birthday dates planned')).toBeNull();
-    expect(screen.getByText('2 reminders could not be scheduled')).toBeTruthy();
-    expect(
-      screen.getByText('Some dates could not fit in iPhone’s reminder limit.'),
-    ).toBeTruthy();
-    expect(screen.getByText('Earliest unscheduled birthday')).toBeTruthy();
-    expect(screen.getByText('19 July 2026')).toBeTruthy();
-    expect(screen.getByText('Unavailable on this device')).toBeTruthy();
-    expect(
-      screen.getByText('Managed by an active Android sender'),
-    ).toBeTruthy();
-  });
-
-  it('withholds the due iPhone review action when MessageUI is unavailable', async () => {
-    const companionPort: LiveCompanionPort = {
-      canOpenComposer: jest.fn(async () => false),
-      getReminderStatus: jest.fn(async () => ({
-        kind: 'ok' as const,
-        value: {
-          authorization: 'authorized' as const,
-          failedCount: 0,
-          kind: 'ok' as const,
-          plannedDateCount: 1,
-          scheduledCount: 1,
-          truncated: false,
-        },
-      })),
-      openNotificationSettings: jest.fn(),
-      openUserConfirmedComposer: jest.fn(),
-      prepareComposerReview: jest.fn(),
-      requestReminderAuthorization: jest.fn(),
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosDueHome)),
-    });
-
-    await renderLiveApp(port, companionPort);
-
-    expect(await screen.findByText('Unavailable on this device')).toBeTruthy();
-    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
-  });
-
-  it('withholds the due iPhone review action when native composer readiness is blocked', async () => {
-    const blockedHome: HomeProjection = {
-      ...iosDueHome,
-      automation: {
-        platform: 'ios',
-        desired: 'paused',
-        effective: 'paused',
-        readiness: {
-          ...iosReadiness,
-          composer: {
-            kind: 'blocked',
-            issues: [
-              {
-                id: 'ios-managed-elsewhere' as IssueId,
-                code: 'active-sender-other-device',
-                severity: 'blocking',
-                blocks: ['composer'],
-              },
-            ],
-          },
-        },
-      },
-    };
-    const companionPort: LiveCompanionPort = {
-      canOpenComposer: jest.fn(async () => true),
-      getReminderStatus: jest.fn(async () => ({
-        kind: 'ok' as const,
-        value: {
-          authorization: 'authorized' as const,
-          failedCount: 0,
-          kind: 'ok' as const,
-          plannedDateCount: 1,
-          scheduledCount: 1,
-          truncated: false,
-        },
-      })),
-      openNotificationSettings: jest.fn(),
-      openUserConfirmedComposer: jest.fn(),
-      prepareComposerReview: jest.fn(),
-      requestReminderAuthorization: jest.fn(),
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(blockedHome)),
-    });
-
-    await renderLiveApp(port, companionPort);
-
-    expect(
-      await screen.findByText('Managed by an active Android sender'),
-    ).toBeTruthy();
-    expect(screen.queryByTestId('live-home-review-today')).toBeNull();
-    expect(screen.getByTestId('live-home-automation')).toBeTruthy();
-  });
-
-  it('refreshes iPhone warning status on foreground without restoring a Home refresh button', async () => {
-    let appStateHandler: ((state: 'active' | 'background') => void) | undefined;
-    jest
-      .spyOn(AppState, 'addEventListener')
-      .mockImplementation((_event, handler) => {
-        appStateHandler = handler as (state: 'active' | 'background') => void;
-        return { remove: jest.fn() };
-      });
-    const getReminderStatus = jest
-      .fn()
-      .mockResolvedValueOnce({
-        kind: 'ok' as const,
-        value: {
-          authorization: 'denied' as const,
-          failedCount: 0,
-          kind: 'ok' as const,
-          plannedDateCount: 1,
-          scheduledCount: 0,
-          truncated: false,
-        },
-      })
-      .mockResolvedValue({
-        kind: 'ok' as const,
-        value: {
-          authorization: 'authorized' as const,
-          failedCount: 0,
-          kind: 'ok' as const,
-          plannedDateCount: 1,
-          scheduledCount: 1,
-          truncated: false,
-        },
-      });
-    const canOpenComposer = jest
-      .fn()
-      .mockResolvedValueOnce(false)
-      .mockResolvedValue(true);
-    const companionPort: LiveCompanionPort = {
-      canOpenComposer,
-      getReminderStatus,
-      openNotificationSettings: jest.fn(),
-      openUserConfirmedComposer: jest.fn(),
-      prepareComposerReview: jest.fn(),
-      requestReminderAuthorization: jest.fn(),
-    };
-    const getHome = jest.fn(async () => ok(iosHome, revision('7')));
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome,
-    });
-
-    await renderLiveApp(port, companionPort);
-
-    expect(await screen.findByText('Not allowed')).toBeTruthy();
-    expect(screen.getByText('Unavailable on this device')).toBeTruthy();
-    expect(screen.queryByTestId('live-home-refresh')).toBeNull();
-
-    await act(async () => appStateHandler?.('background'));
-    await act(async () => appStateHandler?.('active'));
-
-    await waitFor(() => expect(getReminderStatus).toHaveBeenCalledTimes(2));
-    expect(screen.queryByText('Not allowed')).toBeNull();
-    expect(screen.queryByText('Unavailable on this device')).toBeNull();
-    expect(getReminderStatus).toHaveBeenCalledTimes(2);
-    expect(canOpenComposer).toHaveBeenCalledTimes(2);
-    expect(getHome).toHaveBeenCalledTimes(1);
-  });
 
   it('requests Android safety alerts once and routes later denial to phone settings', async () => {
     const getNotificationPermission = jest
@@ -1402,33 +990,6 @@ describe('production live projections', () => {
     expect(screen.queryByText('Automation is on')).toBeNull();
   });
 
-  it('does not expose Android notification or sender-transfer controls on iOS', async () => {
-    const getNotificationPermission = jest.fn(async () =>
-      ok({ kind: 'not-requested' as const }),
-    );
-    const getSenderTransferOperation = jest.fn(async () =>
-      ok({ kind: 'none' as const }),
-    );
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosHome)),
-      getAccount: jest.fn(async () => ok(iosAccount)),
-      getReadiness: jest.fn(async () => ok(iosReadiness)),
-      getNotificationPermission,
-      getSenderTransferOperation,
-    });
-
-    await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-tab-settings'));
-
-    expect(screen.queryByText('Safety alerts')).toBeNull();
-    expect(screen.queryByText('Android sender phone')).toBeNull();
-    expect(
-      screen.getByTestId('live-settings-automation').props.accessibilityLabel,
-    ).toMatch(/^iPhone reminders\./u);
-    expect(getNotificationPermission).not.toHaveBeenCalled();
-    expect(getSenderTransferOperation).not.toHaveBeenCalled();
-  });
 
   it('keeps phone preferences and the detailed inventory out of Settings while preserving them in Privacy', async () => {
     const inventory = {
@@ -1481,28 +1042,6 @@ describe('production live projections', () => {
     expect(getInventory).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the iOS minimum composer marker instead of Android ledger retention', async () => {
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosHome)),
-      getAccount: jest.fn(async () => ok(iosAccount)),
-      getReadiness: jest.fn(async () => ok(iosReadiness)),
-    });
-
-    await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-tab-settings'));
-    await fireEvent.press(screen.getByTestId('live-settings-privacy'));
-    await fireEvent.press(
-      screen.getByTestId('live-privacy-data-details-toggle'),
-    );
-
-    expect(
-      await screen.findByText(/minimum opaque composer marker/u),
-    ).toBeTruthy();
-    expect(
-      screen.queryByText(/retain a separate content-free duplicate-safety/u),
-    ).toBeNull();
-  });
 
   it('requeries a visible projection when native invalidation arrives', async () => {
     const getHome = jest
@@ -2144,43 +1683,6 @@ describe('production live projections', () => {
     expect(screen.queryByTestId('live-policy-editor')).toBeNull();
   });
 
-  it('explains iOS reported-Sent and final MessageUI visibility boundaries in activity detail', async () => {
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosHome)),
-      listActivity: jest.fn(async () =>
-        ok({
-          items: [
-            {
-              id: 'activity-ios-sent' as import('../domain/shared/brand').ActivityId,
-              kind: 'composer-reported-sent' as const,
-              occurredAt: generatedAt,
-            },
-          ],
-        }),
-      ),
-    });
-
-    await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-home-activity'));
-    await fireEvent.press(
-      await screen.findByTestId('live-activity-activity-ios-sent'),
-    );
-
-    expect(
-      await screen.findAllByText(
-        'Messages reported sent; delivery not confirmed',
-      ),
-    ).not.toHaveLength(0);
-    expect(
-      screen.getByTestId('live-activity-detail-ios-visibility').props
-        .accessibilityLabel,
-    ).toMatch(/cannot see the final edited recipient or text/u);
-    expect(
-      screen.getByTestId('live-activity-detail-disclosure').props
-        .accessibilityLabel,
-    ).toMatch(/will not offer a second in-app composer/u);
-  });
 
   it('uses tab history for Android back and leaves Home to the operating system', async () => {
     let hardwareBack: (() => boolean | null | undefined) | undefined;
@@ -2577,273 +2079,9 @@ describe('production live projections', () => {
     expect(screen.queryByText('sent-from-device')).toBeNull();
   });
 
-  it('enters the due iOS review from Home and opens Messages only with a reviewed opaque proposal', async () => {
-    const proposalId = 'proposal-1' as ComposerProposalId;
-    const getNextComposerProposal = jest.fn(async () =>
-      ok({
-        kind: 'ready' as const,
-        proposalId,
-        occurrenceId: 'occurrence-1' as OccurrenceId,
-        occurrenceDate:
-          '2026-07-18' as import('../domain/shared/temporal').LocalDate,
-        recipient: 'Live Contact' as PrivateDisplayName,
-      }),
-    );
-    const prepareComposerReview = jest.fn(async () => ({
-      kind: 'ok' as const,
-      value: {
-        actionNonce: 'a'.repeat(43),
-        body: 'Happy birthday!',
-        expiresAtEpochMilliseconds: Date.now() + 60_000,
-        maskedDestination: '•••• 4321',
-        proposalId: 'proposal-1',
-        revision: '2',
-      },
-    }));
-    const openUserConfirmedComposer = jest.fn(async () => ({
-      kind: 'ok' as const,
-      value: 'reported-sent' as const,
-    }));
-    const companionPort: LiveCompanionPort = {
-      canOpenComposer: jest.fn(async () => true),
-      getReminderStatus: jest.fn(async () => ({
-        kind: 'ok' as const,
-        value: {
-          authorization: 'authorized' as const,
-          failedCount: 0,
-          kind: 'ok' as const,
-          plannedDateCount: 1,
-          scheduledCount: 1,
-          truncated: false,
-        },
-      })),
-      openNotificationSettings: jest.fn(),
-      openUserConfirmedComposer,
-      prepareComposerReview,
-      requestReminderAuthorization: jest.fn(),
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosDueHome)),
-      getNextComposerProposal,
-    });
 
-    await renderLiveApp(port, companionPort);
-    await fireEvent.press(await screen.findByTestId('live-home-review-today'));
-    await waitFor(() =>
-      expect(screen.getByTestId('live-prepare-composer')).toBeTruthy(),
-    );
-    expect(screen.getByTestId('live-composer-review-screen')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('live-prepare-composer'));
-    await waitFor(() =>
-      expect(screen.getByTestId('live-open-composer')).toBeTruthy(),
-    );
-    expect(
-      screen.getByTestId('live-ios-composer-review-focus').props
-        .accessibilityRole,
-    ).toBe('header');
-    expect(
-      screen.getByTestId('live-ios-composer-review-focus').props
-        .accessibilityLabel,
-    ).toBe('Ready to review message?');
-    expect(
-      screen.getByTestId('live-composer-final-disclosure').props
-        .accessibilityLabel,
-    ).toMatch(/SMS or MMS carrier charges may apply/u);
-    expect(
-      screen.getByTestId('live-composer-final-disclosure').props
-        .accessibilityLabel,
-    ).toMatch(/Messages and iOS control the available sender line/u);
-    expect(
-      StyleSheet.flatten(
-        screen.getByTestId('live-composer-final-disclosure').props.style,
-      ).backgroundColor,
-    ).toBe('#FFF2D8');
-    expect(openUserConfirmedComposer).not.toHaveBeenCalled();
-    expect(screen.getByText('•••• 4321')).toBeTruthy();
-    expect(screen.getByText('18 July 2026')).toBeTruthy();
-    expect(screen.getByText('Review message')).toBeTruthy();
-    expect(screen.queryByText('2026-07-18')).toBeNull();
-    expect(screen.queryByText('+919876543210')).toBeNull();
 
-    await fireEvent.press(screen.getByTestId('live-open-composer'));
 
-    await waitFor(() =>
-      expect(
-        screen.getByText(/Messages reported sent; delivery not confirmed/u),
-      ).toBeTruthy(),
-    );
-    const postComposerSafety = screen.getByTestId('live-composer-post-safety')
-      .props.accessibilityLabel;
-    expect(postComposerSafety).toMatch(/hold remains until its server expiry/u);
-    expect(postComposerSafety).toMatch(
-      /Check Messages before any manual retry/u,
-    );
-    expect(postComposerSafety).toMatch(/will not retry automatically/u);
-    expect(postComposerSafety).not.toMatch(/Tapping Open Messages/u);
-    expect(
-      StyleSheet.flatten(
-        screen.getByTestId('live-composer-post-safety').props.style,
-      ).backgroundColor,
-    ).toBe('#FFF2D8');
-    expect(prepareComposerReview).toHaveBeenCalledWith({
-      expectedRevision: '1',
-      proposalId: 'proposal-1',
-    });
-    expect(openUserConfirmedComposer).toHaveBeenCalledWith({
-      actionNonce: 'a'.repeat(43),
-      expectedRevision: '2',
-      proposalId: 'proposal-1',
-    });
-  });
-
-  it('keeps every Messages composer control out of iOS Settings Automation', async () => {
-    const getNextComposerProposal = jest.fn(async () =>
-      ok({ kind: 'none' as const }),
-    );
-    const companionPort: LiveCompanionPort = {
-      canOpenComposer: jest.fn(async () => true),
-      getReminderStatus: jest.fn(async () => ({
-        kind: 'ok' as const,
-        value: {
-          authorization: 'authorized' as const,
-          failedCount: 0,
-          kind: 'ok' as const,
-          plannedDateCount: 1,
-          scheduledCount: 1,
-          truncated: false,
-        },
-      })),
-      openNotificationSettings: jest.fn(),
-      openUserConfirmedComposer: jest.fn(),
-      prepareComposerReview: jest.fn(),
-      requestReminderAuthorization: jest.fn(),
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosDueHome)),
-      getNextComposerProposal,
-    });
-
-    await renderLiveApp(port, companionPort);
-    await openSettingsDestination('automation');
-    expect(await screen.findByTestId('live-automation-screen')).toBeTruthy();
-    expect(
-      screen.getAllByRole('header', { name: 'iPhone reminders' }),
-    ).not.toHaveLength(0);
-    expect(screen.queryByText(/automation/iu)).toBeNull();
-    for (const id of [
-      'live-composer-review-screen',
-      'live-prepare-composer',
-      'live-ios-composer-review',
-      'live-composer-final-disclosure',
-      'live-open-composer',
-      'live-composer-repair-contacts',
-      'live-composer-post-safety',
-    ]) {
-      expect(screen.queryByTestId(id)).toBeNull();
-    }
-    expect(getNextComposerProposal).not.toHaveBeenCalled();
-    expect(companionPort.prepareComposerReview).not.toHaveBeenCalled();
-    expect(companionPort.openUserConfirmedComposer).not.toHaveBeenCalled();
-  });
-
-  it('repairs required Google Contacts access from the due iOS Home review', async () => {
-    const continueWithGoogle = jest.fn(async () => ok(iosAccount));
-    const companionPort: LiveCompanionPort = {
-      canOpenComposer: jest.fn(async () => true),
-      getReminderStatus: jest.fn(async () => ({
-        kind: 'ok' as const,
-        value: {
-          authorization: 'authorized' as const,
-          failedCount: 0,
-          kind: 'ok' as const,
-          plannedDateCount: 1,
-          scheduledCount: 1,
-          truncated: false,
-        },
-      })),
-      openNotificationSettings: jest.fn(),
-      openUserConfirmedComposer: jest.fn(),
-      prepareComposerReview: jest.fn(async () => ({
-        kind: 'error' as const,
-        code: 'COMPOSER_CONTACTS_RECONNECT_REQUIRED',
-      })),
-      requestReminderAuthorization: jest.fn(),
-    };
-    const { port } = createPort({
-      continueWithGoogle,
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosDueHome)),
-      getNextComposerProposal: jest.fn(async () =>
-        ok({
-          kind: 'ready' as const,
-          proposalId: 'proposal-1' as ComposerProposalId,
-          occurrenceId: 'occurrence-1' as OccurrenceId,
-          occurrenceDate:
-            '2026-07-18' as import('../domain/shared/temporal').LocalDate,
-          recipient: 'Live Contact' as PrivateDisplayName,
-        }),
-      ),
-    });
-
-    await renderLiveApp(port, companionPort);
-    await fireEvent.press(await screen.findByTestId('live-home-review-today'));
-    await fireEvent.press(await screen.findByTestId('live-prepare-composer'));
-
-    expect(
-      await screen.findByText(
-        'Reconnect Google Contacts, then review this Messages draft again.',
-      ),
-    ).toBeTruthy();
-    expect(
-      screen.queryByText(
-        'Technical code: COMPOSER_CONTACTS_RECONNECT_REQUIRED',
-      ),
-    ).toBeNull();
-    await fireEvent.press(screen.getByTestId('live-composer-support-toggle'));
-    expect(
-      screen.getByText('Technical code: COMPOSER_CONTACTS_RECONNECT_REQUIRED'),
-    ).toBeTruthy();
-    expect(screen.queryByTestId('live-open-composer')).toBeNull();
-
-    await fireEvent.press(screen.getByTestId('live-composer-repair-contacts'));
-    await waitFor(() => expect(continueWithGoogle).toHaveBeenCalledTimes(1));
-    expect(
-      await screen.findByText(
-        'Contacts access was checked again. Review the Messages draft once more.',
-      ),
-    ).toBeTruthy();
-  });
-
-  it('fails an unexpected iOS companion bridge rejection closed', async () => {
-    const companionPort: LiveCompanionPort = {
-      canOpenComposer: jest.fn(async () => false),
-      getReminderStatus: jest.fn(async () => {
-        throw new Error('bridge rejected');
-      }),
-      openNotificationSettings: jest.fn(),
-      openUserConfirmedComposer: jest.fn(),
-      prepareComposerReview: jest.fn(),
-      requestReminderAuthorization: jest.fn(),
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosHome)),
-      getSetup: jest.fn(async () => ok(iosCompleteSetup)),
-      getNextComposerProposal: jest.fn(async () =>
-        ok({ kind: 'none' as const }),
-      ),
-    });
-
-    await renderLiveApp(port, companionPort);
-    await openSettingsDestination('automation');
-
-    await waitFor(() =>
-      expect(screen.getByText(/Reminder status is unavailable/u)).toBeTruthy(),
-    );
-    expect(screen.queryByTestId('live-open-composer')).toBeNull();
-  });
 
   it('requires a native privacy review and revalidates root lifecycle truth after confirmation', async () => {
     const prepareAction = jest.fn(async () =>
@@ -3906,63 +3144,6 @@ describe('production live projections', () => {
     );
   });
 
-  it('consumes cold and warm iOS reminder routes into Composer Review above Home', async () => {
-    const getPendingRoute = jest
-      .fn()
-      .mockResolvedValueOnce(
-        ok({
-          kind: 'automation-review' as const,
-          routeId:
-            '9c65f8be-f37d-4e57-a1c0-b93ddc51658b' as import('../domain/shared/brand').NativeRouteId,
-          source: 'birthday-reminder' as const,
-        }),
-      )
-      .mockResolvedValueOnce(
-        ok({
-          kind: 'automation-review' as const,
-          routeId:
-            'a4f2a2c0-8df3-4b2e-b9e4-661a2050d4a1' as import('../domain/shared/brand').NativeRouteId,
-          source: 'birthday-reminder' as const,
-        }),
-      )
-      .mockResolvedValue(ok({ kind: 'none' as const }));
-    const harness = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosDueHome)),
-      getNextComposerProposal: jest.fn(async () =>
-        ok({ kind: 'none' as const }),
-      ),
-      getPendingRoute,
-    });
-
-    await renderLiveApp(harness.port);
-    await waitFor(() =>
-      expect(screen.getByTestId('live-composer-review-screen')).toBeTruthy(),
-    );
-    expect(screen.queryByTestId('live-automation-screen')).toBeNull();
-    expect(screen.queryByTestId('live-message-screen')).toBeNull();
-    expect(getPendingRoute).toHaveBeenCalledTimes(1);
-
-    await fireEvent.press(screen.getByTestId('live-composer-review-back'));
-    await waitFor(() =>
-      expect(screen.getByTestId('live-home-screen')).toBeTruthy(),
-    );
-    await fireEvent.press(screen.getByTestId('live-tab-settings'));
-    await waitFor(() =>
-      expect(screen.getByTestId('live-settings-screen')).toBeTruthy(),
-    );
-    await act(async () => {
-      harness.emitRoute({ kind: 'available' });
-    });
-    await waitFor(() =>
-      expect(screen.getByTestId('live-composer-review-screen')).toBeTruthy(),
-    );
-    expect(getPendingRoute).toHaveBeenCalledTimes(2);
-    await fireEvent.press(screen.getByTestId('live-composer-review-back'));
-    await waitFor(() =>
-      expect(screen.getByTestId('live-home-screen')).toBeTruthy(),
-    );
-  });
 
   it('previews and saves a strict Android policy review handle', async () => {
     const configured = {
@@ -4034,83 +3215,6 @@ describe('production live projections', () => {
     });
   });
 
-  it('keeps a dense iOS reminder preview valid beyond Android send caps', async () => {
-    const configured = {
-      kind: 'configured' as const,
-      draft: {
-        primaryStart: '09:00' as const,
-        primaryEnd: '11:00' as const,
-        latePolicy: { kind: 'none' as const },
-        dailyCap: 1,
-      },
-    };
-    const previewPolicy = jest.fn(async () =>
-      ok(
-        {
-          kind: 'valid' as const,
-          handle:
-            'ios-dense-policy-review' as import('../domain/shared/brand').PolicyReviewHandle,
-          summary: '09:00–11:00',
-          maximumPlannedInLocalDay: 21,
-          maximumPlannedInRolling24Hours: 27,
-          simulatedDays: 400 as const,
-        },
-        revision('8'),
-      ),
-    );
-    const savePolicy = jest.fn(async () => ok(iosHome.automation));
-    const companionPort: LiveCompanionPort = {
-      canOpenComposer: jest.fn(async () => true),
-      getReminderStatus: jest.fn(async () => ({
-        kind: 'ok' as const,
-        value: {
-          authorization: 'authorized' as const,
-          failedCount: 0,
-          kind: 'ok' as const,
-          plannedDateCount: 1,
-          scheduledCount: 1,
-          truncated: false,
-        },
-      })),
-      openNotificationSettings: jest.fn(),
-      openUserConfirmedComposer: jest.fn(),
-      prepareComposerReview: jest.fn(),
-      requestReminderAuthorization: jest.fn(),
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosHome)),
-      getAccount: jest.fn(async () => ok(iosAccount)),
-      getPolicyEditor: jest.fn(async () => ok(configured)),
-      getNextComposerProposal: jest.fn(async () =>
-        ok({ kind: 'none' as const }),
-      ),
-      previewPolicy,
-      savePolicy,
-    });
-
-    await renderLiveApp(port, companionPort);
-    await openSettingsDestination('schedule');
-    expect(screen.queryByTestId('live-policy-daily-cap')).toBeNull();
-    expect(screen.queryByText(/60 civil dates/u)).toBeNull();
-    await fireEvent.press(screen.getByTestId('live-policy-options-toggle'));
-    expect(await screen.findByText(/60 civil dates/u)).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('live-policy-preview'));
-    expect(await screen.findByText(/checked 400 days/u)).toBeTruthy();
-    expect(screen.queryByText('21')).toBeNull();
-    expect(screen.queryByText('27')).toBeNull();
-    await fireEvent.press(screen.getByTestId('live-policy-save'));
-
-    await waitFor(() => expect(savePolicy).toHaveBeenCalledTimes(1));
-    expect(previewPolicy).toHaveBeenCalledWith({
-      draft: configured.draft,
-      expectedRevision: '1',
-    });
-    expect(savePolicy).toHaveBeenCalledWith({
-      handle: 'ios-dense-policy-review',
-      expectedRevision: '8',
-    });
-  });
 
   it('turns policy validation codes into actionable primary copy', async () => {
     const configured = {
@@ -4424,247 +3528,8 @@ describe('production live projections', () => {
     });
   });
 
-  it('validates and confirms an iOS approval with explicit composer disclosure', async () => {
-    const prepareApprovals = jest.fn(async () =>
-      ok(
-        {
-          handle: 'approval-review-ios' as ApprovalReviewHandle,
-          items: [
-            {
-              platform: 'ios' as const,
-              contactId,
-              recipient: 'Live Contact' as PrivateDisplayName,
-              maskedPhone: '•••• 4321',
-              birthdayLabel: '18 July',
-              exactText: 'Happy birthday!' as PrivateMessageText,
-              deliveryMode: 'user-controlled-composer' as const,
-              consentDisclosure: 'Review and tap Send yourself.',
-            },
-          ],
-          readyCount: 1,
-          blockedCount: 0,
-          explicitConfirmationRequired: true as const,
-        },
-        revision('6'),
-      ),
-    );
-    const confirmApprovals = jest.fn(async () => ok(iosHome.automation));
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosHome)),
-      listPeople: jest.fn(async () =>
-        ok({ items: [contactSummary()], totalCount: 1 }),
-      ),
-      getPerson: jest.fn(async () => ok(contactDetailNeedingApproval())),
-      prepareApprovals,
-      confirmApprovals,
-    });
 
-    await renderLiveApp(port);
-    await fireEvent.press(await screen.findByTestId('live-tab-people'));
-    await fireEvent.press(
-      await screen.findByTestId('live-person-contact-live-1'),
-    );
-    await fireEvent.press(await screen.findByTestId('live-review-approval'));
-    expect(
-      await screen.findByText(
-        'You decide whether to tap Send after reviewing the recipient and text. Messages and iOS control the available sender line and final transport; this app cannot select or guarantee either.',
-      ),
-    ).toBeTruthy();
-    expect(screen.queryByText('Review and tap Send yourself.')).toBeNull();
-    await fireEvent.press(screen.getByTestId('live-confirm-approval'));
 
-    await waitFor(() => expect(confirmApprovals).toHaveBeenCalledTimes(1));
-    expect(confirmApprovals).toHaveBeenCalledWith({
-      handle: 'approval-review-ios',
-      expectedRevision: '6',
-    });
-  });
-
-  it('activates and pauses iOS reminders only through explicit native reviews', async () => {
-    const notConfigured: HomeProjection = {
-      ...iosHome,
-      automation: {
-        platform: 'ios',
-        desired: 'paused',
-        effective: 'paused',
-        readiness: iosReadiness,
-      },
-    };
-    const paused: HomeProjection = {
-      ...iosHome,
-      automation: {
-        platform: 'ios',
-        desired: 'paused',
-        effective: 'paused',
-        readiness: iosReadiness,
-      },
-    };
-    let currentHome = notConfigured;
-    let currentRevision = revision('1');
-    let initialActivationCompleted = false;
-    const getHome = jest.fn(async () => ok(currentHome, currentRevision));
-    const prepareActivation = jest.fn(async () =>
-      ok(
-        {
-          platform: 'ios' as const,
-          handle: 'ios-activation-review' as ActivationReviewHandle,
-          reminderRecipientCount: 1,
-          plannedReminderCount: 1,
-          reminderWindowLabel: '09:00–11:00',
-          reminderHorizon: 'full' as const,
-          coexistence: 'clear' as const,
-          contactsReady: true,
-          messageUiReady: true,
-          protectedStorageReady: true,
-          readiness: iosReadiness,
-          deliveryMode: 'user-controlled-composer' as const,
-          limitationsDisclosure: 'Reminders are best effort.',
-        },
-        revision('7'),
-      ),
-    );
-    const activate = jest.fn(async () => {
-      currentHome = iosHome;
-      currentRevision = revision('2');
-      initialActivationCompleted = true;
-      return ok(iosHome.automation, currentRevision);
-    });
-    const pauseAll = jest.fn(async () => {
-      currentHome = paused;
-      currentRevision = revision('3');
-      return ok(paused.automation, currentRevision);
-    });
-    const companionPort: LiveCompanionPort = {
-      canOpenComposer: jest.fn(async () => false),
-      getReminderStatus: jest.fn(async () => ({
-        kind: 'ok' as const,
-        value: {
-          authorization: 'authorized' as const,
-          failedCount: 0,
-          kind: 'ok' as const,
-          plannedDateCount: 1,
-          scheduledCount: currentHome.automation.desired === 'paused' ? 0 : 1,
-          truncated: false,
-        },
-      })),
-      openNotificationSettings: jest.fn(),
-      openUserConfirmedComposer: jest.fn(),
-      prepareComposerReview: jest.fn(),
-      requestReminderAuthorization: jest.fn(),
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getAccount: jest.fn(async () => ok(iosAccount, currentRevision)),
-      getHome,
-      getSetup: jest.fn(async () =>
-        ok(
-          {
-            ...iosCompleteSetup,
-            initialActivationCompleted,
-            automation: currentHome.automation,
-          },
-          currentRevision,
-        ),
-      ),
-      getMessageEditor: jest.fn(async () =>
-        ok(configuredMessage, currentRevision),
-      ),
-      getPolicyEditor: jest.fn(async () =>
-        ok(configuredPolicy, currentRevision),
-      ),
-      getNextComposerProposal: jest.fn(async () =>
-        ok({ kind: 'none' as const }),
-      ),
-      prepareActivation,
-      activate,
-      pauseAll,
-    });
-
-    await renderLiveApp(port, companionPort);
-    await fireEvent.press(await screen.findByTestId('live-product-setup-next'));
-    expect(await screen.findByTestId('live-automation-screen')).toBeTruthy();
-    await fireEvent.press(
-      await screen.findByTestId('live-ios-review-activation'),
-    );
-    expect(
-      (await screen.findByTestId('live-ios-activation-review-focus')).props
-        .accessibilityRole,
-    ).toBe('header');
-    expect(
-      screen.getByText(
-        'This enables reminders only. iPhone never sends automatically; you review an editable system Messages screen and tap Send yourself. SMS or MMS carrier charges may apply, and iOS/Messages controls the available sender line and transport.',
-      ),
-    ).toBeTruthy();
-    expect(screen.getByText('09:00–11:00')).toBeTruthy();
-    expect(
-      screen.getByText('Current reminder horizon is fully reconciled'),
-    ).toBeTruthy();
-    expect(
-      screen.getByText('No Android sender is managing this account'),
-    ).toBeTruthy();
-    expect(screen.queryByText('Reminders are best effort.')).toBeNull();
-    await fireEvent.press(screen.getByTestId('live-ios-confirm-activation'));
-    await fireEvent.press(await screen.findByTestId('live-ios-review-pause'));
-    await fireEvent.press(screen.getByTestId('live-ios-confirm-pause'));
-
-    await waitFor(() => expect(pauseAll).toHaveBeenCalledTimes(1));
-    expect(activate).toHaveBeenCalledWith({
-      handle: 'ios-activation-review',
-      expectedRevision: '7',
-    });
-    expect(pauseAll).toHaveBeenCalledWith({ expectedRevision: '2' });
-  });
-
-  it('opens Settings for denied iOS notifications and reports unscheduled reminders', async () => {
-    const openNotificationSettings = jest.fn(async () => ({
-      kind: 'ok' as const,
-      value: null,
-    }));
-    const requestReminderAuthorization = jest.fn();
-    const companionPort: LiveCompanionPort = {
-      canOpenComposer: jest.fn(async () => false),
-      getReminderStatus: jest.fn(async () => ({
-        kind: 'ok' as const,
-        value: {
-          authorization: 'denied' as const,
-          earliestUnscheduledCivilDate:
-            '2026-07-19' as import('../domain/shared/temporal').LocalDate,
-          failedCount: 2,
-          kind: 'ok' as const,
-          plannedDateCount: 3,
-          scheduledCount: 1,
-          truncated: true,
-        },
-      })),
-      openNotificationSettings,
-      openUserConfirmedComposer: jest.fn(),
-      prepareComposerReview: jest.fn(),
-      requestReminderAuthorization,
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosHome)),
-      getSetup: jest.fn(async () => ok(iosCompleteSetup)),
-      getNextComposerProposal: jest.fn(async () =>
-        ok({ kind: 'none' as const }),
-      ),
-    });
-
-    await renderLiveApp(port, companionPort);
-    await openSettingsDestination('automation');
-    expect(
-      await screen.findByText('2 reminders could not be scheduled'),
-    ).toBeTruthy();
-    expect(screen.getByText('19 July 2026')).toBeTruthy();
-    expect(screen.queryByTestId('live-policy-daily-cap')).toBeNull();
-    await fireEvent.press(screen.getByTestId('live-reminder-settings'));
-
-    await waitFor(() =>
-      expect(openNotificationSettings).toHaveBeenCalledTimes(1),
-    );
-    expect(requestReminderAuthorization).not.toHaveBeenCalled();
-  });
 
   it('sends a today decision only through native prepare and confirm reviews', async () => {
     const todayHome: HomeProjection = {
@@ -4699,7 +3564,7 @@ describe('production live projections', () => {
       ok(todayHome.automation),
     );
     const { port } = createPort({
-      getHome: jest.fn(async () => ok(todayHome)),
+      getHome: jest.fn(async () => ok(todayHome, revision('5'))),
       prepareTodayOccurrence,
       confirmTodayOccurrence,
     });
@@ -4722,8 +3587,9 @@ describe('production live projections', () => {
     );
     expect(prepareTodayOccurrence).toHaveBeenCalledWith({
       occurrenceId: 'occurrence-today',
-      expectedRevision: '1',
+      expectedRevision: '5',
     });
+
     expect(confirmTodayOccurrence).toHaveBeenCalledWith({
       handle: 'today-review-1',
       choice: 'send-through-normal-path',
@@ -4815,7 +3681,7 @@ describe('production live projections', () => {
     const confirmTodayOccurrence = jest.fn();
     const { port } = createPort({
       confirmTodayOccurrence,
-      getHome: jest.fn(async () => ok(todayHome, revision('1'))),
+      getHome: jest.fn(async () => ok(todayHome, revision('2'))),
       prepareTodayOccurrence: jest.fn(async () =>
         ok(
           {
@@ -4854,7 +3720,7 @@ describe('production live projections', () => {
       next: nextBirthday,
       counts: { ...liveHome('active').counts, today: 1 },
     };
-    let harness!: PortHarness;
+    let harness!: ReturnType<typeof createPort>;
     let homeRequests = 0;
     const getHome = jest.fn(async () => {
       homeRequests += 1;
@@ -4864,6 +3730,7 @@ describe('production live projections', () => {
       return ok(todayHome, revision(String(homeRequests)));
     });
     harness = createPort({
+
       getHome,
       prepareTodayOccurrence: jest.fn(async () => ({
         kind: 'error' as const,
@@ -4948,17 +3815,18 @@ describe('production live projections', () => {
       ok(todayHome.automation),
     );
     const { port } = createPort({
-      getHome: jest.fn(async () => ok(todayHome)),
+      getHome: jest.fn(async () => ok(todayHome, revision('6'))),
       prepareTodayOccurrence,
       confirmTodayOccurrence,
     });
 
+
     await renderLiveApp(port);
     await fireEvent.press(await screen.findByTestId('live-home-review-today'));
-    expect(screen.getAllByText('•••• 4321')).toHaveLength(2);
     expect(
-      screen.getByTestId('live-home-confirm-today-next-year'),
+      await screen.findByTestId('live-home-confirm-today-next-year'),
     ).toBeTruthy();
+    expect(screen.getAllByText('•••• 4321')).toHaveLength(2);
     expect(confirmTodayOccurrence).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('live-home-confirm-today'));
 
@@ -4988,7 +3856,7 @@ describe('production live projections', () => {
       ok(todayHome.automation),
     );
     const { port } = createPort({
-      getHome: jest.fn(async () => ok(todayHome)),
+      getHome: jest.fn(async () => ok(todayHome, revision('7'))),
       prepareTodayOccurrence: jest.fn(async () =>
         ok(
           {
@@ -5011,7 +3879,7 @@ describe('production live projections', () => {
     await renderLiveApp(port);
     await fireEvent.press(await screen.findByTestId('live-home-review-today'));
     await fireEvent.press(
-      screen.getByTestId('live-home-confirm-today-next-year'),
+      await screen.findByTestId('live-home-confirm-today-next-year'),
     );
 
     await waitFor(() =>
@@ -5022,6 +3890,7 @@ describe('production live projections', () => {
       }),
     );
   });
+
 
   it('shows the completed deletion status without claiming external copies were erased', async () => {
     const completedReceipt = {
@@ -5324,125 +4193,7 @@ describe('production live projections', () => {
     expect(screen.queryByTestId('live-setup-resume-cleanup')).toBeNull();
   });
 
-  it('routes complete-bootstrap iOS cleanup to its exact resumable operation', async () => {
-    const cleanupAccount: AccountProjection = {
-      kind: 'cleanup-pending',
-      operation: 'disconnect',
-      issue: {
-        id: 'ios-cleanup-disconnect' as IssueId,
-        code: 'coordination-unavailable',
-        severity: 'blocking',
-        blocks: ['composer'],
-      },
-    };
-    const cleanupBootstrap: BootstrapProjection = {
-      ...iosBootstrap,
-      account: cleanupAccount,
-      setupStep: 'complete',
-    };
-    const cleanupSetup: SetupProjection = {
-      step: 'complete',
-      initialActivationCompleted: true,
-      eligibility: iosBootstrap.eligibility,
-      account: cleanupAccount,
-      contacts: {
-        kind: 'fresh',
-        completedAt: generatedAt,
-        contactCount: 1,
-      },
-      readiness: iosReadiness,
-      automation: {
-        platform: 'ios',
-        desired: 'paused',
-        effective: 'paused',
-        readiness: iosReadiness,
-      },
-    };
-    const operationId = 'privacy-ios-disconnect' as PrivacyOperationId;
-    const resumeOperation = jest.fn(async () =>
-      ok({
-        kind: 'complete' as const,
-        id: operationId,
-        action: 'disconnect-contacts' as const,
-        completedAt: generatedAt,
-        externalSmsCopiesNotErased: true as const,
-      }),
-    );
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(cleanupBootstrap)),
-      getCurrentOperation: jest.fn(async () =>
-        ok({
-          kind: 'remote-pending' as const,
-          id: operationId,
-          action: 'disconnect-contacts' as const,
-          reason: 'coordination-unavailable' as const,
-          updatedAt: generatedAt,
-        }),
-      ),
-      getSetup: jest.fn(async () => ok(cleanupSetup)),
-      resumeOperation,
-    });
 
-    await renderLiveApp(port);
-
-    expect(await screen.findByTestId('live-setup-screen')).toBeTruthy();
-    expect(screen.queryByTestId('live-app-shell')).toBeNull();
-    expect(screen.queryByTestId('live-setup-action')).toBeNull();
-    await fireEvent.press(screen.getByTestId('live-setup-resume-cleanup'));
-    await waitFor(() =>
-      expect(resumeOperation).toHaveBeenCalledWith(operationId),
-    );
-  });
-
-  it('routes complete-bootstrap iOS deletion to the neutral deletion stage', async () => {
-    const deletingAccount: AccountProjection = {
-      kind: 'cleanup-pending',
-      operation: 'delete',
-      issue: {
-        id: 'ios-cleanup-delete' as IssueId,
-        code: 'coordination-unavailable',
-        severity: 'blocking',
-        blocks: ['composer'],
-      },
-    };
-    const deletingBootstrap: BootstrapProjection = {
-      ...iosBootstrap,
-      account: deletingAccount,
-      setupStep: 'complete',
-    };
-    const deletingSetup: SetupProjection = {
-      step: 'complete',
-      initialActivationCompleted: true,
-      eligibility: iosBootstrap.eligibility,
-      account: deletingAccount,
-      contacts: {
-        kind: 'fresh',
-        completedAt: generatedAt,
-        contactCount: 1,
-      },
-      readiness: iosReadiness,
-      automation: {
-        platform: 'ios',
-        desired: 'paused',
-        effective: 'paused',
-        readiness: iosReadiness,
-      },
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(deletingBootstrap)),
-      getSetup: jest.fn(async () => ok(deletingSetup)),
-    });
-
-    await renderLiveApp(port);
-
-    expect(await screen.findByTestId('live-setup-screen')).toBeTruthy();
-    expect(screen.queryByTestId('live-app-shell')).toBeNull();
-    expect(
-      await screen.findByText('Account deletion cleanup needs attention'),
-    ).toBeTruthy();
-    expect(screen.queryByTestId('live-setup-resume-cleanup')).toBeNull();
-    expect(screen.queryByTestId('live-setup-cleanup-unavailable')).toBeNull();
-  });
 
   it('routes a complete-bootstrap connected Android sender deleting state to exact lifecycle recovery', async () => {
     const deletingSenderAccount: AccountProjection = {
@@ -5958,13 +4709,11 @@ describe('production live projections', () => {
     expect(screen.getByText(/Nothing was changed/u)).toBeTruthy();
   });
 
-  it.each(['android', 'ios'] as const)(
+  it.each(['android'] as const)(
     'starts a supported signed-out %s install at Step 1 and resumes it in-session after Finish later',
-    async platform => {
-      const platformCapability =
-        platform === 'android' ? capability : iosCapability;
-      const platformReadiness =
-        platform === 'android' ? readiness : iosReadiness;
+    async _platform => {
+      const platformCapability = capability;
+      const platformReadiness = readiness;
       const signedOutAccount: AccountProjection = {
         kind: 'signed-out',
         retainedSetup: 'none',
@@ -5974,7 +4723,7 @@ describe('production live projections', () => {
         capability: platformCapability,
         channelLabel: 'test',
         chargeDisclosureVersion:
-          platform === 'android' ? 'carrier-v1' : 'composer-v1',
+          'carrier-v1',
       };
       const bootstrap: BootstrapProjection = {
         capability: platformCapability,
@@ -5989,20 +4738,12 @@ describe('production live projections', () => {
         account: signedOutAccount,
         contacts: { kind: 'never-synced' },
         readiness: platformReadiness,
-        automation:
-          platform === 'android'
-            ? {
-                platform: 'android',
-                desired: 'paused',
-                effective: 'not-configured',
-                readiness,
-              }
-            : {
-                platform: 'ios',
-                desired: 'paused',
-                effective: 'not-configured',
-                readiness: iosReadiness,
-              },
+        automation: {
+          platform: 'android',
+          desired: 'paused',
+          effective: 'not-configured',
+          readiness,
+        },
       };
       const getPendingRoute = jest.fn(async () =>
         ok({ kind: 'attention' as const }),
@@ -6086,51 +4827,6 @@ describe('production live projections', () => {
     ).toBeTruthy();
   });
 
-  it('states before iOS Contacts consent that recipients are not registered or sent automatically', async () => {
-    const contactsConsentSetup: SetupProjection = {
-      step: 'contacts-disclosure',
-      initialActivationCompleted: false,
-      eligibility: iosBootstrap.eligibility,
-      account: iosAccount,
-      contacts: {
-        kind: 'authorization-required',
-        reason: 'contacts-authorization-required',
-      },
-      readiness: iosReadiness,
-      automation: {
-        platform: 'ios',
-        desired: 'paused',
-        effective: 'not-configured',
-        readiness: iosReadiness,
-      },
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () =>
-        ok({ ...iosBootstrap, setupStep: 'contacts-disclosure' as const }),
-      ),
-      getSetup: jest.fn(async () => ok(contactsConsentSetup)),
-    });
-
-    await renderLiveApp(port);
-
-    expect(
-      await screen.findByTestId('live-setup-contacts-privacy'),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/protected, encrypted storage on this iPhone/u),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        /does not register recipients.*cannot send automatically/u,
-      ),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/Remote Config and service metadata/u),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: 'Allow read-only Google Contacts' }),
-    ).toBeTruthy();
-  });
 
   it('keeps the current setup action fail-closed during recheck and after setup recheck failure', async () => {
     const contactsConsentSetup: SetupProjection = {
@@ -7235,130 +5931,7 @@ describe('production live projections', () => {
     expect(listPeople).toHaveBeenCalledTimes(2);
   });
 
-  it('uses the same resumable final setup step for iPhone without implying automatic sending', async () => {
-    const iosNotConfigured: SetupProjection = {
-      step: 'complete',
-      initialActivationCompleted: false,
-      eligibility: iosBootstrap.eligibility,
-      account: iosAccount,
-      contacts: iosHome.contactsSync,
-      readiness: iosReadiness,
-      automation: {
-        platform: 'ios',
-        desired: 'paused',
-        effective: 'not-configured',
-        readiness: iosReadiness,
-      },
-    };
-    const { port } = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(iosHome)),
-      getSetup: jest.fn(async () => ok(iosNotConfigured)),
-      getMessageEditor: jest.fn(async () =>
-        ok({
-          kind: 'configured' as const,
-          draft: {
-            language: 'en' as const,
-            tone: 'warm' as const,
-            placeholderMode: {
-              kind: 'generic' as const,
-              requiredCount: 0 as const,
-            },
-            text: 'Happy birthday!' as PrivateMessageText,
-            requestedSegmentCap: 1 as const,
-          },
-        }),
-      ),
-      getPolicyEditor: jest.fn(async () =>
-        ok({
-          kind: 'configured' as const,
-          draft: {
-            primaryStart: '09:00',
-            primaryEnd: '11:00',
-            latePolicy: { kind: 'none' as const },
-            dailyCap: 10,
-          },
-        }),
-      ),
-    });
 
-    await renderLiveApp(port);
-
-    expect(await screen.findByText('Step 4 of 4')).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: 'Turn on reminders' }),
-    ).toBeTruthy();
-    expect(screen.queryByText(/automatic iPhone sending/iu)).toBeNull();
-  });
-
-  it('keeps configured but never-enabled iPhone setup at step four without reopening after a later pause', async () => {
-    const pausedHome: HomeProjection = {
-      ...iosHome,
-      automation: {
-        platform: 'ios',
-        desired: 'paused',
-        effective: 'paused',
-        readiness: iosReadiness,
-      },
-    };
-    const neverEnabledMessage = {
-      kind: 'configured' as const,
-      draft: {
-        language: 'en' as const,
-        tone: 'warm' as const,
-        placeholderMode: {
-          kind: 'generic' as const,
-          requiredCount: 0 as const,
-        },
-        text: 'Happy birthday!' as PrivateMessageText,
-        requestedSegmentCap: 1 as const,
-      },
-    };
-    const neverEnabledPolicy = {
-      kind: 'configured' as const,
-      draft: {
-        primaryStart: '09:00',
-        primaryEnd: '11:00',
-        latePolicy: { kind: 'none' as const },
-        dailyCap: 10,
-      },
-    };
-    const neverEnabledSetup: SetupProjection = {
-      step: 'complete',
-      initialActivationCompleted: false,
-      eligibility: iosBootstrap.eligibility,
-      account: iosAccount,
-      contacts: iosHome.contactsSync,
-      readiness: iosReadiness,
-      automation: pausedHome.automation,
-    };
-    const neverEnabled = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(pausedHome)),
-      getSetup: jest.fn(async () => ok(neverEnabledSetup)),
-      getMessageEditor: jest.fn(async () => ok(neverEnabledMessage)),
-      getPolicyEditor: jest.fn(async () => ok(neverEnabledPolicy)),
-    });
-
-    const first = await renderLiveApp(neverEnabled.port);
-    expect(await screen.findByText('Step 4 of 4')).toBeTruthy();
-    expect(screen.queryByTestId('live-app-shell')).toBeNull();
-    await first.unmount();
-
-    const intentionallyPaused = createPort({
-      getBootstrap: jest.fn(async () => ok(iosBootstrap)),
-      getHome: jest.fn(async () => ok(pausedHome)),
-      getSetup: jest.fn(async () =>
-        ok({ ...neverEnabledSetup, initialActivationCompleted: true }),
-      ),
-    });
-    await renderLiveApp(intentionallyPaused.port);
-
-    expect(
-      await screen.findByText('Birthday reminders are paused'),
-    ).toBeTruthy();
-    expect(screen.queryByTestId('live-product-setup-journey')).toBeNull();
-  });
 
   it.each(['action-required', 'paused-repair'] as const)(
     'uses durable Android activation history for %s instead of guessing from the current mode',

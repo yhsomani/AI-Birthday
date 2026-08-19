@@ -129,10 +129,10 @@ test('CI and cloud workflows retain the exact-source release-admission chain', (
     'android-instrumentation',
     'android-device-e2e',
     'quality-and-android',
-    'ios-build',
   ]) {
     assert.match(aggregate, new RegExp(`^      - ${dependency}$`, 'mu'));
   }
+
   assert.match(aggregate, /jq -e 'all\(\.\[\]; \.result == "success"\)'/u);
 
   const cloud = readFileSync(

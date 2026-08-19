@@ -9,8 +9,8 @@ import {
   type BindingInput,
   type Claim,
   type ClaimRequestRecord,
-  type CompanionStatus,
   type DeletionTombstone,
+
   type DestinationGuard,
   type GlobalControl,
   type Installation,
@@ -1016,52 +1016,3 @@ export function decideAdvanceDeletionDrain(
   };
 }
 
-export function decideCompanionStatus(
-  control: GlobalControl | null,
-  expectedLedgerGeneration: string,
-  tombstone: DeletionTombstone | null,
-  fence: AccountFence | null,
-  hasOrphanedUidState: boolean,
-  nowMs: number,
-): CompanionStatus {
-  if (
-    control?.continuityState !== 'HEALTHY' ||
-    control.ledgerGeneration !== expectedLedgerGeneration
-  ) {
-    return {
-      composerAllowed: false,
-      state: 'SAFETY_STATUS_UNAVAILABLE',
-      serverNowMs: nowMs,
-    };
-  }
-  if (tombstone !== null || fence?.mode === 'DELETING') {
-    return {
-      composerAllowed: false,
-      state: 'DELETING',
-      serverNowMs: nowMs,
-      ledgerGeneration: control.ledgerGeneration,
-    };
-  }
-  if (fence !== null) {
-    return {
-      composerAllowed: false,
-      state: 'MANAGED_BY_ANDROID',
-      serverNowMs: nowMs,
-      ledgerGeneration: control.ledgerGeneration,
-    };
-  }
-  if (hasOrphanedUidState) {
-    return {
-      composerAllowed: false,
-      state: 'SAFETY_STATUS_UNAVAILABLE',
-      serverNowMs: nowMs,
-      ledgerGeneration: control.ledgerGeneration,
-    };
-  }
-  return {
-    composerAllowed: true,
-    state: 'NO_ANDROID_STATE',
-    serverNowMs: nowMs,
-    ledgerGeneration: control.ledgerGeneration,
-  };
-}

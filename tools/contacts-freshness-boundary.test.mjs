@@ -14,9 +14,6 @@ const androidPolicy = read(
 const androidBridge = read(
   'android/app/src/main/java/com/yashsomani/birthdayautopilot/bridge/BirthdayNativeModule.kt',
 );
-const iosPolicy = read('ios/BirthdayAutopilot/Contacts/PeopleContracts.swift');
-const iosStore = read('ios/BirthdayAutopilot/CompanionProtectedStore.swift');
-const iosBridge = read('ios/BirthdayAutopilot/BirthdayNativeModule.swift');
 
 test('shared Contacts freshness contract is bounded and uniquely identified', () => {
   assert.equal(contract.version, 'contacts-freshness-v1');
@@ -50,70 +47,4 @@ test('Android projections and readiness derive age from trusted monotonic time',
     androidBridge,
     /when \(state\.freshness\)[\s\S]*?SyncFreshness\.FRESH/u,
   );
-});
-
-test(
-  'production iOS freshness policy executes every shared boundary case',
-  { skip: process.platform !== 'darwin' },
-  t => {
-    const directory = mkdtempSync(join(tmpdir(), 'birthday-ios-freshness-'));
-    const binary = join(directory, 'contacts-freshness-tests');
-    const moduleCache = join(directory, 'module-cache');
-    mkdirSync(moduleCache);
-    try {
-      const compile = spawnSync(
-        'xcrun',
-        [
-          'swiftc',
-          'ios/BirthdayAutopilot/Contacts/PeopleContracts.swift',
-          'tests/ios/ContactsFreshnessPolicyTests.swift',
-          '-o',
-          binary,
-        ],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            CLANG_MODULE_CACHE_PATH: moduleCache,
-            SWIFT_MODULECACHE_PATH: moduleCache,
-          },
-        },
-      );
-      if (
-        compile.status !== 0 &&
-        /SDK is not supported by the compiler|compiler\/SDK version mismatch/u.test(
-          compile.stderr,
-        )
-      ) {
-        t.skip('host Command Line Tools compiler and SDK do not match');
-        return;
-      }
-      assert.equal(compile.status, 0, compile.stderr || compile.stdout);
-      const run = spawnSync(binary, [contractPath], { encoding: 'utf8' });
-      assert.equal(run.status, 0, run.stderr || run.stdout);
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
-  },
-);
-
-test('iOS bridge uses recent authenticated time and never ages from device wall time alone', () => {
-  assert.match(iosPolicy, /enum IOSContactsFreshnessPolicy/u);
-  assert.match(iosPolicy, /age <= normalMaximumAge/u);
-  assert.match(iosPolicy, /age <= companionMaximumAge/u);
-  assert.match(
-    iosPolicy,
-    /receiptAge >= 0, receiptAge <= maximumObservationAge/u,
-  );
-  assert.match(
-    iosStore,
-    /IOSContactsFreshnessPolicy\.estimateTrustedNow\([\s\S]*?control\.trustedServerTime/u,
-  );
-  assert.match(iosStore, /trustedNow: trustedNow/u);
-  assert.match(
-    iosBridge,
-    /contactsFreshnessAssessment\([\s\S]*?trustedNow: status\.trustedNow/u,
-  );
-  assert.match(iosBridge, /assessment\.allowsCompanionAction/u);
-  assert.match(iosBridge, /assessment\.band == \.normal/u);
 });

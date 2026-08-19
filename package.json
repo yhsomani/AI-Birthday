@@ -1,7 +1,7 @@
 {
   "name": "birthday-autopilot",
   "version": "0.1.0",
-  "description": "Cross-platform, privacy-preserving birthday planning with Android automation and an iOS message companion.",
+  "description": "Autonomous birthday SMS automation system for Android devices.",
   "private": true,
   "packageManager": "npm@11.6.0",
   "scripts": {
@@ -23,23 +23,15 @@
     "codegen:check": "node tools/patch-react-native-codegen.mjs --check",
     "e2e:android": "tools/run-mobile-e2e.sh android smoke",
     "e2e:android:large-text": "tools/run-mobile-e2e.sh android large-text",
-    "e2e:ios": "tools/run-mobile-e2e.sh ios smoke",
-    "e2e:ios:large-text": "tools/run-mobile-e2e.sh ios large-text",
     "e2e:maestro:config": "tools/install-maestro.sh --print-config",
     "e2e:manifest:verify": "node tools/verify-mobile-e2e-boundary.mjs --android-e2e-manifest android/app/build/intermediates/merged_manifests/e2eDebug/processE2eDebugManifest/AndroidManifest.xml --android-prod-manifest android/app/build/intermediates/merged_manifests/prodRelease/processProdReleaseManifest/AndroidManifest.xml",
     "smoke:android": "tools/run-production-smoke.sh android",
     "smoke:fixture:verify": "node tools/validate-production-smoke-fixture.mjs e2e/production-smoke/production-smoke-projections.json",
-    "smoke:ios": "tools/run-production-smoke.sh ios",
     "smoke:manifest:verify": "node tools/verify-production-smoke-manifest.mjs --android-smoke-manifest android/app/build/intermediates/merged_manifests/smokeDebug/processSmokeDebugManifest/AndroidManifest.xml",
-    "ios": "react-native run-ios",
-    "ios:pods": "cd ios && bundle exec pod install --deployment",
-    "ios:release:inspect": "node tools/verify-ios-release-artifact.mjs --mode inspect",
-    "ios:release:verify": "node tools/verify-ios-release-artifact.mjs --mode verify",
     "release:closure:template:check": "node tools/validate-production-release-closure.mjs --mode template --file tools/production-release-closure.template.json",
     "release:closure:validate": "node tools/validate-production-release-closure.mjs --mode release",
     "doctor": "node tools/doctor.mjs",
     "doctor:android": "node tools/doctor.mjs --platform=android",
-    "doctor:ios": "node tools/doctor.mjs --platform=ios",
     "lint": "eslint .",
     "postinstall": "node tools/patch-react-native-codegen.mjs",
     "format:check": "prettier --check .",
@@ -52,7 +44,6 @@
     "security:history": "node tools/scan-git-history-secrets.mjs",
     "security:licenses": "echo PASS",
     "security:native:android": "node tools/run-native-advisory-gate.mjs --platform android",
-    "security:native:ios": "node tools/run-native-advisory-gate.mjs --platform ios",
     "store:template:check": "node tools/validate-store-submission-evidence.mjs --file tools/store-submission-evidence.template.json --mode template",
     "store:release:check": "node tools/check-store-release.mjs",
     "typecheck": "tsc --noEmit",
@@ -80,7 +71,6 @@
     "@babel/runtime": "7.29.7",
     "@react-native-community/cli": "20.2.0",
     "@react-native-community/cli-platform-android": "20.2.0",
-    "@react-native-community/cli-platform-ios": "20.2.0",
     "@react-native/babel-preset": "0.86.0",
     "@react-native/eslint-config": "0.86.0",
     "@react-native/jest-preset": "0.86.0",
@@ -106,11 +96,6 @@
     "jsSrcsDir": "specs/native",
     "android": {
       "javaPackageName": "com.yashsomani.birthdayautopilot.bridge.codegen"
-    },
-    "ios": {
-      "modulesProvider": {
-        "BirthdayNative": "BirthdayNative"
-      }
     }
   }
 }

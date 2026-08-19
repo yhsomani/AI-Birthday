@@ -152,71 +152,7 @@ test('Android smoke loads production index with only the synthetic bridge', () =
   );
 });
 
-test('iOS Smoke is unsigned, simulator-only, production-entry, and startup-free', () => {
-  const project = read('ios/BirthdayAutopilot.xcodeproj/project.pbxproj');
-  const scheme = read(
-    'ios/BirthdayAutopilot.xcodeproj/xcshareddata/xcschemes/BirthdayAutopilotProductionSmoke.xcscheme',
-  );
-  const info = read('ios/BirthdayAutopilot/Info-Smoke.plist');
-  const appDelegate = read('ios/BirthdayAutopilot/AppDelegate.swift');
-  const sceneDelegate = read('ios/BirthdayAutopilot/SceneDelegate.swift');
-  const bridge = read(
-    'ios/BirthdayAutopilot/BirthdayNativeSmokeModuleBridge.mm',
-  );
-  const bundleScript = read('ios/scripts/bundle-react-native.sh');
-  const googleScript = read('ios/scripts/copy-google-config.sh');
-  const fixtureScript = read('ios/scripts/copy-production-smoke-fixture.sh');
-  assert.match(project, /BIRTHDAY_PRODUCTION_SMOKE = YES/u);
-  assert.match(project, /BIRTHDAY_SMOKE=1/u);
-  assert.match(
-    project,
-    /PRODUCT_BUNDLE_IDENTIFIER = com\.yashsomani\.birthdayautopilot\.smoke/u,
-  );
-  assert.match(project, /SUPPORTED_PLATFORMS = iphonesimulator/u);
-  assert.match(project, /CODE_SIGNING_ALLOWED = NO/u);
-  assert.match(project, /BirthdayAutopilot-Smoke\.entitlements/u);
-  assert.match(scheme, /buildConfiguration = "Smoke"/u);
-  assert.match(scheme, /buildForArchiving = "NO"/u);
-  assert.match(info, /BirthdayProductionPathSmoke/u);
-  assert.doesNotMatch(
-    info,
-    /Firebase|Google|BGTaskScheduler|UIBackgroundModes|CFBundleURLTypes/u,
-  );
-  assert.match(appDelegate, /#elseif BIRTHDAY_SMOKE/u);
-  assert.match(appDelegate, /RCTAppDependencyProvider\(\)/u);
-  assert.match(sceneDelegate, /withModuleName: "BirthdayAutopilot"/u);
-  assert.match(bridge, /^#ifdef BIRTHDAY_SMOKE/mu);
-  assert.match(bridge, /RCT_EXPORT_MODULE\(BirthdayNative\)/u);
-  assert.match(bridge, /distribution-channel-unapproved/u);
-  assert.doesNotMatch(
-    bridge,
-    /^#import[^\n]*(?:Firebase|Google|MessageUI|UserNotifications)|ProtectedStore|WorkflowEngine/mu,
-  );
-  assert.match(
-    bundleScript,
-    /elif \[ "\$\{CONFIGURATION:-\}" = "Smoke" \]; then[\s\S]*ENTRY_FILE='index\.js'/u,
-  );
-  assert.match(
-    googleScript,
-    /BIRTHDAY_PRODUCTION_SMOKE[\s\S]*production-path smoke must never have a Firebase configuration/u,
-  );
-  assert.match(
-    fixtureScript,
-    /validate-production-smoke-fixture\.mjs[\s\S]*\/usr\/bin\/ditto/u,
-  );
-});
-
 test('product bridges are absent from Smoke while fixture E2E stays unchanged', () => {
-  for (const bridge of [
-    'ios/BirthdayAutopilot/BirthdayNativeModuleBridge.mm',
-    'ios/BirthdayAutopilot/CompanionMessageModuleBridge.m',
-    'ios/BirthdayAutopilot/CompanionReminderModuleBridge.m',
-  ]) {
-    assert.match(
-      read(bridge),
-      /^#if !defined\(BIRTHDAY_E2E\) && !defined\(BIRTHDAY_SMOKE\)/u,
-    );
-  }
   assert.match(
     read(
       'android/app/src/e2e/java/com/yashsomani/birthdayautopilot/e2e/E2EMainApplication.kt',
@@ -340,7 +276,7 @@ test('production-path Maestro flow is app-ID-bound and read-only', () => {
   );
 });
 
-test('CI blocks unsafe history and exercises both production-path smoke hosts', () => {
+test('CI blocks unsafe history and exercises production-path smoke', () => {
   const ci = read('.github/workflows/ci.yml');
   const historyJob = ci.slice(
     ci.indexOf('  history-secrets:'),
@@ -362,10 +298,4 @@ test('CI blocks unsafe history and exercises both production-path smoke hosts', 
   assert.match(ci, /:app:processSmokeDebugMainManifest/u);
   assert.match(ci, /npm run smoke:manifest:verify/u);
   assert.match(ci, /npm run smoke:android/u);
-  assert.match(ci, /-scheme BirthdayAutopilotProductionSmoke/u);
-  assert.match(ci, /npm run smoke:ios/u);
-  assert.match(ci, /Info-Smoke\.plist/u);
-  assert.match(ci, /BirthdayAutopilot-Smoke\.entitlements/u);
-  assert.match(ci, /copy-production-smoke-fixture\.sh/u);
-  assert.match(ci, /BirthdayAutopilotProductionSmoke\.xcscheme/u);
 });

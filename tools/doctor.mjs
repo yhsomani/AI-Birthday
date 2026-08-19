@@ -15,9 +15,9 @@ const requestedPlatform =
     .find(argument => argument.startsWith('--platform='))
     ?.split('=')[1] ?? 'all';
 
-if (!['all', 'android', 'ios'].includes(requestedPlatform)) {
+if (!['all', 'android'].includes(requestedPlatform)) {
   process.stderr.write(
-    `FAIL platform: expected all, android, or ios; found ${requestedPlatform}\n`,
+    `FAIL platform: expected all or android; found ${requestedPlatform}\n`,
   );
   process.exit(1);
 }
@@ -98,50 +98,6 @@ if (requestedPlatform === 'all' || requestedPlatform === 'android') {
     requirePath(
       'Android NDK 27.1',
       `${androidHome}/ndk/27.1.12297006/source.properties`,
-    );
-  }
-}
-
-if (requestedPlatform === 'all' || requestedPlatform === 'ios') {
-  requireValue(
-    'Ruby',
-    semanticVersion(command('ruby', ['--version'])),
-    TOOLCHAIN_VERSIONS.ruby,
-  );
-  requireValue(
-    'Bundler',
-    semanticVersion(command('bundle', ['--version'])),
-    TOOLCHAIN_VERSIONS.bundler,
-  );
-  requirePath('Bundler lockfile', 'Gemfile.lock');
-
-  if (command('bundle', ['check']) === null) {
-    failures.push('Bundler: run bundle install with the pinned Ruby');
-  }
-
-  requireValue(
-    'CocoaPods',
-    semanticVersion(command('bundle', ['exec', 'pod', '--version'])),
-    TOOLCHAIN_VERSIONS.cocoaPods,
-  );
-  requirePath('CocoaPods lockfile', 'ios/Podfile.lock');
-  requirePath(
-    'CocoaPods workspace',
-    'ios/BirthdayAutopilot.xcworkspace/contents.xcworkspacedata',
-  );
-
-  const xcodeOutput = command('xcodebuild', ['-version']);
-  if (!xcodeOutput) {
-    failures.push(
-      'Xcode: full Xcode is required; Apple Command Line Tools alone cannot build iOS',
-    );
-  } else {
-    const xcodeVersion = xcodeOutput.match(/^Xcode ([0-9.]+)/u)?.[1] ?? null;
-    requireValue('Xcode', xcodeVersion, TOOLCHAIN_VERSIONS.xcode);
-    requireValue(
-      'iOS Simulator SDK',
-      command('xcrun', ['--sdk', 'iphonesimulator', '--show-sdk-version']),
-      TOOLCHAIN_VERSIONS.iosSdk,
     );
   }
 }

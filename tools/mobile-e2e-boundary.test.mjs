@@ -137,67 +137,6 @@ test('Android E2E build is debug-only and omits every product graph', () => {
   );
 });
 
-test('iOS E2E configuration is unsigned, simulator-only, and bridge-free', () => {
-  const project = read('ios/BirthdayAutopilot.xcodeproj/project.pbxproj');
-  const info = read('ios/BirthdayAutopilot/Info-E2E.plist');
-  const appDelegate = read('ios/BirthdayAutopilot/AppDelegate.swift');
-  const sceneDelegate = read('ios/BirthdayAutopilot/SceneDelegate.swift');
-  assert.match(
-    project,
-    /PRODUCT_BUNDLE_IDENTIFIER = com\.yashsomani\.birthdayautopilot\.e2e/u,
-  );
-  assert.match(project, /SUPPORTED_PLATFORMS = iphonesimulator/u);
-  assert.match(project, /CODE_SIGNING_ALLOWED = NO/u);
-  assert.match(project, /ASSETCATALOG_COMPILER_APPICON_NAME = ""/u);
-  assert.match(
-    project,
-    /SWIFT_ACTIVE_COMPILATION_CONDITIONS = "\$\(inherited\) DEBUG BIRTHDAY_E2E"/u,
-  );
-  assert.match(info, /<key>BirthdayE2EFixture<\/key>[\s\S]*?<true\/>/u);
-  assert.doesNotMatch(
-    info,
-    /Firebase|Google|BGTaskScheduler|UIBackgroundModes|CFBundleURLTypes/u,
-  );
-  assert.match(appDelegate, /#if BIRTHDAY_E2E[\s\S]*?validateE2EHost/u);
-  assert.match(
-    appDelegate,
-    /delegate\.dependencyProvider = E2EReactNativeDependencyProvider\(\)/u,
-  );
-  assert.match(
-    appDelegate,
-    /class E2EReactNativeDependencyProvider: RCTAppDependencyProvider[\s\S]*?override func moduleProviders\(\)[\s\S]*?\[:\]/u,
-  );
-  assert.match(appDelegate, /forBundleRoot: "e2e\/index"/u);
-  assert.match(sceneDelegate, /withModuleName: "BirthdayAutopilotE2E"/u);
-  for (const bridge of [
-    'ios/BirthdayAutopilot/BirthdayNativeModuleBridge.mm',
-    'ios/BirthdayAutopilot/CompanionMessageModuleBridge.m',
-    'ios/BirthdayAutopilot/CompanionReminderModuleBridge.m',
-  ]) {
-    assert.match(
-      read(bridge),
-      /^#if !defined\(BIRTHDAY_E2E\) && !defined\(BIRTHDAY_SMOKE\)[\s\S]*#endif\s{2}\/\/ !BIRTHDAY_E2E && !BIRTHDAY_SMOKE\s*$/u,
-    );
-  }
-});
-
-test('iOS signing entitlements remain configuration-specific', () => {
-  const project = read('ios/BirthdayAutopilot.xcodeproj/project.pbxproj');
-  const debug = read(
-    'ios/BirthdayAutopilot/BirthdayAutopilot-Debug.entitlements',
-  );
-  const release = read('ios/BirthdayAutopilot/BirthdayAutopilot.entitlements');
-  const e2e = read('ios/BirthdayAutopilot/BirthdayAutopilot-E2E.entitlements');
-  assert.match(project, /Debug[\s\S]*BirthdayAutopilot-Debug\.entitlements/u);
-  assert.match(project, /Release[\s\S]*BirthdayAutopilot\.entitlements/u);
-  assert.match(project, /E2E[\s\S]*BirthdayAutopilot-E2E\.entitlements/u);
-  assert.match(debug, /<string>development<\/string>/u);
-  assert.match(release, /<string>production<\/string>/u);
-  assert.match(debug, /NSFileProtectionComplete/u);
-  assert.match(release, /NSFileProtectionComplete/u);
-  assert.doesNotMatch(e2e, /appattest|data-protection/u);
-});
-
 test('Maestro installer is version and checksum pinned without pipe execution', t => {
   const installer = read('tools/install-maestro.sh');
   const runner = read('tools/run-mobile-e2e.sh');

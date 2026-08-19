@@ -277,12 +277,17 @@ const makeReleaseFixture = () => {
     'app-export-compliance',
   );
 
-  const privacyManifestBytes = readFileSync(
-    path.join(ROOT, document.appStore.privacyManifest.sourcePath),
+  const privacyManifestBytes = Buffer.from('<xml><dict/></xml>');
+  const privacyManifestPath = path.join(
+    fixture.directory,
+    document.appStore.privacyManifest.sourcePath,
   );
+  mkdirSync(path.dirname(privacyManifestPath), { recursive: true });
+  writeFileSync(privacyManifestPath, privacyManifestBytes);
   document.appStore.privacyManifest.status = 'approved';
   document.appStore.privacyManifest.sha256 = SHA(privacyManifestBytes);
   document.appStore.privacyManifest.requiredReasonApisReviewed = true;
+
   const mergedManifest = writeEvidence(fixture, 'merged-privacy-manifest');
   document.appStore.privacyManifest.mergedArchiveManifestReference =
     mergedManifest.reference;
@@ -345,8 +350,9 @@ const makeReleaseFixture = () => {
   fixture.context = {
     mode: 'release',
     now: NOW,
-    projectRoot: ROOT,
+    projectRoot: fixture.directory,
     currentSourceRevision: SOURCE_REVISION,
+
     artifacts: fixture.artifacts,
     assetRoot,
     evidenceRoot,

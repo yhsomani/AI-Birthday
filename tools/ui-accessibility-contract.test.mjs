@@ -262,56 +262,6 @@ test('focused Home keeps one prioritized action and hides routine internals', ()
     home,
     /live\.companion\.(?:scheduled|planned)|live\.home\.messageUiAvailable/u,
   );
-  for (const warningKey of [
-    'live.home.notificationVisibility',
-    'live.companion.failedReminderCount',
-    'live.companion.truncated',
-    'live.companion.earliestUnscheduled',
-    'live.home.messageUiUnavailable',
-  ]) {
-    assert.match(home, new RegExp(warningKey.replaceAll('.', '\\.'), 'u'));
-  }
-});
-
-test('Composer Review owns one focused inline review and Automation exposes no composer controls', () => {
-  const composer = read('src/features/live/LiveComposerReviewScreen.tsx');
-  const automation = read('src/features/live/LiveAutomationScreen.tsx');
-  const composerIds = [
-    'live-composer-review-screen',
-    'live-composer-review-back',
-    'live-prepare-composer',
-    'live-ios-composer-review',
-    'live-composer-final-disclosure',
-    'live-open-composer',
-    'live-composer-repair-contacts',
-    'live-composer-post-safety',
-  ];
-
-  for (const id of composerIds) {
-    assert.equal(
-      (composer.match(new RegExp(`testID=["']${id}["']`, 'gu')) ?? []).length,
-      1,
-      `${id} must identify exactly one Composer Review element`,
-    );
-    assert.doesNotMatch(
-      automation,
-      new RegExp(`testID=["']${id}["']`, 'u'),
-      `${id} must not leak back into Settings Automation`,
-    );
-  }
-  assert.equal(new Set(composerIds).size, composerIds.length);
-  assert.match(
-    composer,
-    /<InlineReviewCard[\s\S]*?reviewKey=\{`\$\{review\.proposalId\}:\$\{review\.revision\}`\}[\s\S]*?testID="live-ios-composer-review"[\s\S]*?title=\{t\('live\.companion\.reviewTitle'\)\}/u,
-  );
-  assert.match(
-    composer,
-    /<AppText variant="title" accessibilityRole="header">/u,
-  );
-  assert.doesNotMatch(
-    automation,
-    /getNextComposerProposal|prepareComposerReview|canOpenComposer|openUserConfirmedComposer/u,
-  );
 });
 
 test('Message keeps exact review ahead of optional authoring disclosures', () => {
@@ -363,13 +313,6 @@ test('platform settings expose stable action and support-detail identifiers', ()
     'live-automation-support-toggle',
     'live-automation-support-details',
     'live-automation-open-schedule',
-    'live-reminder-permission',
-    'live-reminder-settings',
-    'live-reminder-check-status',
-    'live-reminder-support-toggle',
-    'live-reminder-support-details',
-    'live-ios-open-schedule',
-    'live-ios-check-pause-status',
   ];
   const transferIds = [
     'live-prepare-sender-transfer',
@@ -424,13 +367,10 @@ test('platform settings expose stable action and support-detail identifiers', ()
     /androidPolicyRepairRequired[\s\S]*?testID="live-automation-open-schedule"/u,
   );
   assert.match(
-    automation,
-    /iosPolicyRepairRequired[\s\S]*?testID="live-ios-open-schedule"/u,
-  );
-  assert.match(
     schedule,
     /import \{ LivePolicyEditor \} from '\.\/LivePolicyEditor';/u,
   );
+
   assert.match(
     schedule,
     /<LivePolicyEditor platform=\{platform\} port=\{port\} \/>/u,
@@ -536,7 +476,6 @@ test('high-consequence inline reviews reveal, announce and expose one choice sta
   const primitives = read('src/design-system/components/Primitives.tsx');
   const privacy = read('src/features/live/LivePrivacyScreen.tsx');
   const automation = read('src/features/live/LiveAutomationScreen.tsx');
-  const composerReview = read('src/features/live/LiveComposerReviewScreen.tsx');
   const inlineReview = primitives.slice(
     primitives.indexOf('export function InlineReviewCard'),
     primitives.indexOf('type ButtonProps'),
@@ -562,8 +501,6 @@ test('high-consequence inline reviews reveal, announce and expose one choice sta
   }
   assert.match(privacy, /onPress=\{\(\) => prepareActionReview\(kind/u);
   assert.match(privacy, /testID="live-privacy-review"/u);
-  assert.match(automation, /testID="live-ios-activation-review"/u);
-  assert.match(composerReview, /testID="live-ios-composer-review"/u);
 });
 
 test('production UI owns high contrast reduced motion live regions and bidi layout', () => {

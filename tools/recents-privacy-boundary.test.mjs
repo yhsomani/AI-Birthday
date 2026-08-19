@@ -20,20 +20,6 @@ test('Android protects recents without globally disabling active support screens
   );
 });
 
-test('iOS installs an opaque content-free app-switcher cover and removes it on active', () => {
-  const scene = read('ios/BirthdayAutopilot/SceneDelegate.swift');
-  assert.match(scene, /sceneWillResignActive[\s\S]*?installPrivacyCover/u);
-  assert.match(scene, /sceneDidBecomeActive[\s\S]*?removePrivacyCover/u);
-  assert.match(scene, /cover\.backgroundColor = \.systemBackground/u);
-  assert.match(scene, /label\.text = "Birthday Autopilot"/u);
-  assert.match(scene, /window\.endEditing\(true\)/u);
-  assert.match(scene, /cover\.accessibilityViewIsModal = true/u);
-  assert.doesNotMatch(
-    scene,
-    /recipient|phone|message|birthdayLabel|displayName|contactName/u,
-  );
-});
-
 test('Privacy UI truthfully discloses active screenshot and recording limits in both languages', () => {
   const screen = read('src/features/live/LivePrivacyScreen.tsx');
   const resources = read('src/localization/liveResources.ts');

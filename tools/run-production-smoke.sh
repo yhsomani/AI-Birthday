@@ -3,9 +3,10 @@ set -eu
 
 platform=${1:-}
 case "$platform" in
-  android|ios) ;;
-  *) echo 'usage: tools/run-production-smoke.sh <android|ios>' >&2; exit 64 ;;
+  android) ;;
+  *) echo 'usage: tools/run-production-smoke.sh android' >&2; exit 64 ;;
 esac
+
 
 expected_app_id='com.yashsomani.birthdayautopilot.smoke'
 if [ "${PRODUCTION_SMOKE_APP_ID:-$expected_app_id}" != "$expected_app_id" ]; then

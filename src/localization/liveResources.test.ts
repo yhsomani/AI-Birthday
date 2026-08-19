@@ -207,20 +207,6 @@ describe('production live localization', () => {
         '2 संपर्क जाँचे गए',
       ],
       [
-        'live.companion.scheduled',
-        '1 reminder scheduled',
-        '2 reminders scheduled',
-        '1 रिमाइंडर तय है',
-        '2 रिमाइंडर तय हैं',
-      ],
-      [
-        'live.companion.planned',
-        '1 birthday date planned',
-        '2 birthday dates planned',
-        '1 जन्मदिन तारीख नियोजित है',
-        '2 जन्मदिन तारीखें नियोजित हैं',
-      ],
-      [
         'live.policy.simulatedDays',
         '1 day simulated',
         '2 days simulated',
@@ -242,34 +228,6 @@ describe('production live localization', () => {
       expect(appI18n.t(key, { count: 1, lng: 'hi' })).toBe(hindiOne);
       expect(appI18n.t(key, { count: 2, lng: 'hi' })).toBe(hindiOther);
     });
-  });
-
-  it('does not promise control over the iOS sender line or transport', () => {
-    const english = [
-      resources.en.translation['message.iosDisclosure'],
-      liveEnglish['live.person.iosApprovalBody'],
-      liveEnglish['live.companion.editableWarning'],
-    ].join('\n');
-    const hindi = [
-      resources.hi.translation['message.iosDisclosure'],
-      liveHindi['live.person.iosApprovalBody'],
-      liveHindi['live.companion.editableWarning'],
-    ].join('\n');
-
-    expect(english).toMatch(/Messages and iOS control/u);
-    expect(english).toMatch(/cannot select or guarantee/u);
-    expect(english).not.toMatch(
-      /choose a sender line|you control.*sender line/u,
-    );
-    expect(hindi).toMatch(/Messages व iOS नियंत्रित करते हैं/u);
-    expect(hindi).toMatch(/चुन या पक्का नहीं कर सकता/u);
-    expect(hindi).not.toMatch(/सेंडर लाइन चुनें/u);
-    expect(liveEnglish['live.companion.editableWarning']).toMatch(
-      /SMS or MMS carrier charges may apply/u,
-    );
-    expect(liveHindi['live.companion.editableWarning']).toMatch(
-      /SMS या MMS पर कैरियर शुल्क लग सकता है/u,
-    );
   });
 
   it('keeps Android TEST submission, device send, and protected pass truth distinct', () => {
@@ -308,13 +266,6 @@ describe('production live localization', () => {
       'live.automation.showSupportDetails',
       'live.automation.hideSupportDetails',
       'live.automation.supportDetailsBody',
-      'live.companion.checkReminderStatus',
-      'live.companion.showReminderDetails',
-      'live.companion.hideReminderDetails',
-      'live.companion.reminderDetailsBody',
-      'live.companion.checkPauseStatus',
-      'live.companion.pauseVerificationComplete',
-      'live.companion.pauseVerificationStillRequired',
     ] as const;
 
     compactKeys.forEach(key => {
@@ -322,21 +273,6 @@ describe('production live localization', () => {
       expect(liveHindi[key]).toMatch(/[\u0900-\u097f]/u);
       expect(liveHindi[key]).not.toBe(liveEnglish[key]);
     });
-
-    const iosEnglish = [
-      liveEnglish['live.automation.iosBody'],
-      liveEnglish['live.companion.activationDisclosure'],
-      liveEnglish['live.companion.reminderDetailsBody'],
-    ].join('\n');
-    const iosHindi = [
-      liveHindi['live.automation.iosBody'],
-      liveHindi['live.companion.activationDisclosure'],
-      liveHindi['live.companion.reminderDetailsBody'],
-    ].join('\n');
-    expect(iosEnglish).toMatch(/never send|never sends/u);
-    expect(iosEnglish).not.toMatch(/messages? (?:are|is) sent automatically/u);
-    expect(iosHindi).toMatch(/(?:संदेश नहीं भेज|अपने-आप नहीं भेज)/u);
-    expect(iosHindi).not.toMatch(/अपने-आप संदेश भेज/u);
   });
 
   it('keeps message authoring optional, privacy-bounded, and honest about approval invalidation', () => {
@@ -433,12 +369,6 @@ describe('production live localization', () => {
     expect(liveEnglish['live.policy.androidSaveConsequenceBody']).toMatch(
       /clears affected recipient approvals.*invalidates the bound SMS TEST receipt/u,
     );
-    expect(liveEnglish['live.policy.iosSafetySummary']).toMatch(
-      /best effort.*never sends automatically/u,
-    );
-    expect(liveEnglish['live.policy.iosSaveConsequenceBody']).toMatch(
-      /invalidates affected birthday proposals.*rebuilds.*reminder plan/u,
-    );
     expect(liveEnglish['live.policy.savedNeedsCheck']).toMatch(
       /saved.*could not be checked/u,
     );
@@ -447,67 +377,31 @@ describe('production live localization', () => {
     );
   });
 
-  it('discloses the sticky account-wide iOS hold before the final Review message tap', () => {
-    const english = liveEnglish['live.companion.editableWarning'];
-    const hindi = liveHindi['live.companion.editableWarning'];
-    expect(english).toMatch(
-      /Tapping Review message commits an account-wide safety hold/u,
-    );
-    expect(english).toMatch(/before presentation/u);
-    expect(english).toMatch(
-      /pause Android birthday sending for up to 72 hours/u,
-    );
-    expect(english).toMatch(
-      /even after Cancel, presentation failure, or an unknown result/u,
-    );
-    expect(english).toMatch(/Android birthdays may be missed/u);
-    expect(hindi).toMatch(/संदेश की समीक्षा दबाते ही/u);
-    expect(hindi).toMatch(/पूरे खाते की सुरक्षा रोक/u);
-    expect(hindi).toMatch(/72 घंटे तक रोक सकती है/u);
-    expect(hindi).toMatch(
-      /Cancel, प्रस्तुति विफलता या अज्ञात परिणाम के बाद भी/u,
-    );
-    expect(hindi).toMatch(/जन्मदिन संदेश छूट सकते हैं/u);
-  });
-
   it('describes cloud metadata and AI requests without claiming that cloud use is data-free', () => {
     const english = [
       liveEnglish['live.setup.contactsPrivacyAndroid'],
-      liveEnglish['live.setup.contactsPrivacyIos'],
       liveEnglish['live.message.geminiPrivacyBody'],
       liveEnglish['live.privacy.cloudMetadataBody'],
       liveEnglish['live.privacy.androidCoordinationBoundary'],
-      liveEnglish['live.privacy.iosCoordinationBoundary'],
       liveEnglish['live.privacy.providerRetentionBody'],
     ].join('\n');
     const hindi = [
       liveHindi['live.setup.contactsPrivacyAndroid'],
-      liveHindi['live.setup.contactsPrivacyIos'],
       liveHindi['live.message.geminiPrivacyBody'],
       liveHindi['live.privacy.cloudMetadataBody'],
       liveHindi['live.privacy.androidCoordinationBoundary'],
-      liveHindi['live.privacy.iosCoordinationBoundary'],
       liveHindi['live.privacy.providerRetentionBody'],
     ].join('\n');
 
     expect(english).toMatch(/fixed-length pseudonymous/u);
     expect(english).toMatch(/not anonymous/u);
     expect(english).toMatch(/Firebase Installations token/u);
-    expect(english).toMatch(/does not register recipients/u);
-    expect(english).toMatch(/composer-reservation/u);
-    expect(english).toMatch(/one-way owner-capability key/u);
-    expect(english).toMatch(
-      /not released by Cancel, presentation failure, an unknown result/u,
-    );
     expect(english).toMatch(/no contact names, phone numbers, birthdays/u);
     expect(english).toMatch(/provider logs/u);
     expect(english).not.toMatch(/no cloud data|nothing.*cloud/u);
     expect(hindi).toMatch(/तय लंबाई वाले छद्मनामित/u);
     expect(hindi).toMatch(/अनाम नहीं/u);
     expect(hindi).toMatch(/Firebase Installations टोकन/u);
-    expect(hindi).toMatch(/पंजीकृत नहीं करता/u);
-    expect(hindi).toMatch(/कंपोज़र-रिज़र्वेशन/u);
-    expect(hindi).toMatch(/एकतरफ़ा मालिक-क्षमता कुंजी/u);
     expect(hindi).toMatch(/संपर्क नाम, फ़ोन नंबर, जन्मदिन/u);
     expect(hindi).toMatch(/प्रदाता लॉग/u);
   });

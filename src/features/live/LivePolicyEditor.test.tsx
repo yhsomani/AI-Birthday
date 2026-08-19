@@ -164,7 +164,7 @@ it('hides and guards Preview when saved policy truth has a refresh problem', asy
   await render(
     <LocalizationProvider>
       <ThemeProvider initialPreference="light">
-        <LivePolicyEditor platform="ios" port={port} />
+        <LivePolicyEditor platform="android" port={port} />
       </ThemeProvider>
     </LocalizationProvider>,
   );
@@ -392,7 +392,7 @@ it('leads with the saved window and keeps grace and cap in Schedule options', as
   expect(screen.getByTestId('live-policy-daily-cap').props.value).toBe('7');
 });
 
-it.each(['android', 'ios'] as const)(
+it.each(['android'] as const)(
   'reviews a localized %s draft for 400 days with explicit save consequences',
   async platform => {
     captureAppStateListeners();
@@ -432,13 +432,7 @@ it.each(['android', 'ios'] as const)(
 
     expect(await screen.findByTestId('live-policy-review')).toBeTruthy();
     expect(screen.getByTestId('live-policy-save-consequence')).toBeTruthy();
-    expect(
-      screen.getByText(
-        platform === 'android'
-          ? '400 days simulated'
-          : /protected preview checked 400 days/u,
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText('400 days simulated')).toBeTruthy();
     expect(screen.queryByText('RAW NATIVE ENGLISH POLICY SUMMARY')).toBeNull();
     expect(screen.queryByTestId('live-policy-preview')).toBeNull();
     expect(screen.getByTestId('live-policy-save')).toBeTruthy();
