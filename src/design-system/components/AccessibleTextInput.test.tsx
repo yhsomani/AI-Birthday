@@ -41,6 +41,31 @@ it('forces a normalized label and the 200 percent text scaling contract', async 
   ).toBe(0);
 });
 
+it('explicitly exposes disabled accessibility state when not editable', async () => {
+  await renderWithTheme(
+    <AccessibleTextInput
+      accessibilityLabel="Name"
+      editable={false}
+      testID="disabled-input"
+    />,
+  );
+  expect(screen.getByTestId('disabled-input').props.accessibilityState).toEqual(
+    { disabled: true },
+  );
+
+  await renderWithTheme(
+    <AccessibleTextInput
+      accessibilityLabel="Surname"
+      accessibilityState={{ busy: true }}
+      editable={false}
+      testID="disabled-busy-input"
+    />,
+  );
+  expect(
+    screen.getByTestId('disabled-busy-input').props.accessibilityState,
+  ).toEqual({ busy: true, disabled: true });
+});
+
 it('rejects an empty accessibility label', async () => {
   await expect(
     (async () => {
