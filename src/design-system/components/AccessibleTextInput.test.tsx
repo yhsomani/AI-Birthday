@@ -50,3 +50,35 @@ it('rejects an empty accessibility label', async () => {
     'AccessibleTextInput requires a non-empty accessibilityLabel',
   );
 });
+
+it('propagates the disabled accessibility state when not editable', async () => {
+  await renderWithTheme(
+    <AccessibleTextInput
+      accessibilityLabel="Name"
+      editable={false}
+      testID="disabled-input"
+    />,
+  );
+
+  const input = screen.getByTestId('disabled-input');
+  expect(input.props.accessibilityState).toEqual(
+    expect.objectContaining({ disabled: true }),
+  );
+});
+
+it('preserves other accessibility states while computing disabled state', async () => {
+  await renderWithTheme(
+    <AccessibleTextInput
+      accessibilityLabel="Email"
+      editable={false}
+      accessibilityState={{ checked: true }}
+      testID="mixed-state-input"
+    />,
+  );
+
+  const input = screen.getByTestId('mixed-state-input');
+  expect(input.props.accessibilityState).toEqual({
+    disabled: true,
+    checked: true,
+  });
+});
