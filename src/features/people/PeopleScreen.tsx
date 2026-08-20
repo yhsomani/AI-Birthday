@@ -33,6 +33,8 @@ export function PeopleScreen({ navigation }: Props) {
   const { selectedPersonIds, repairedPersonIds } = useFixture();
   const { language, t } = useAppLocalization();
   const [query, setQuery] = useState('');
+  // ⚡ Bolt: Defer search query state updates
+  // Defers expensive list filtering in useMemo below, keeping the UI responsive during rapid keystrokes.
   const deferredQuery = useDeferredValue(query);
   const [filter, setFilter] = useState<Filter>('all');
 
