@@ -75,13 +75,13 @@ const URL_OBFUSCATED_DOMAIN = unicodePattern(
 const IPV4 = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/u;
 const EMAIL = /\b[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\b/iu;
 const TRACKING_OR_AFFILIATE = unicodePattern(
-  '(?:\\butm_[a-z0-9_]+\\s*=|\\b(?:gclid|fbclid|msclkid|ref|referrer|affiliate_id|aff_id)\\s*=|#[\\p{L}\\p{N}_]+|\\b(?:affiliate|referral|sponsored)\\s+(?:link|code|post)|\\buse\\s+(?:my|code)\\s+(?:affiliate\\s+)?code\\b|\\bearns?\\s+(?:a\\s+)?commission\\b|(?:रेफरल|एफिलिएट|संबद्ध)\\s*(?:लिंक|कोड)|(?:प्रायोजित|कमीशन))',
+  '(?:\\butm_[a-z0-9_]+\\s*=|\\b(?:gclid|fbclid|msclkid|ref|referrer|affiliate_id|aff_id)\\s*=|#[\\p{L}\\p{N}_]{1,254}|\\b(?:affiliate|referral|sponsored)\\s+(?:link|code|post)|\\buse\\s+(?:my|code)\\s+(?:affiliate\\s+)?code\\b|\\bearns?\\s+(?:a\\s+)?commission\\b|(?:रेफरल|एफिलिएट|संबद्ध)\\s*(?:लिंक|कोड)|(?:प्रायोजित|कमीशन))',
   'iu',
 );
 const PROMOTION =
   /\b(?:limited(?:[- ]time)? offer|special offer|special deal|flash sale|birthday sale|discount(?: code)?|coupon(?: code)?|promo(?: code)?|buy now|shop now|order now|free offer|free gift|claim (?:your )?(?:offer|gift|discount)|save [0-9]{1,3}%|[0-9]{1,3}% off|subscribe(?: now| today)?|start (?:a|your) subscription)\b|(?:सीमित|खास|विशेष)\s*(?:समय का\s*)?ऑफर|अभी\s*(?:खरीदें|ऑर्डर करें)|(?:विशेष\s*)?छूट|कूपन|प्रोमो\s*कोड|मुफ़्त\s*(?:ऑफर|उपहार)|फ्लैश\s*सेल|सदस्यता\s*लें/iu;
 const PHONE_NUMBER = unicodePattern(
-  '(?:^|[^\\p{L}\\p{N}])(?:\\+?[0-9०-९][\\s().-]*){10,15}(?:$|[^\\p{L}\\p{N}])',
+  '(?:^|[^\\p{L}\\p{N}])(?:\\+?[0-9०-९][\\s().-]{0,254}){10,15}(?:$|[^\\p{L}\\p{N}])',
   'u',
 );
 const NUMERIC_DATE =
