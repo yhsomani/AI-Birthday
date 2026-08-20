@@ -475,7 +475,6 @@ test('Attention keeps one safe repair action and discloses support identifiers e
 test('high-consequence inline reviews reveal, announce and expose one choice state', () => {
   const primitives = read('src/design-system/components/Primitives.tsx');
   const privacy = read('src/features/live/LivePrivacyScreen.tsx');
-  const automation = read('src/features/live/LiveAutomationScreen.tsx');
   const inlineReview = primitives.slice(
     primitives.indexOf('export function InlineReviewCard'),
     primitives.indexOf('type ButtonProps'),
