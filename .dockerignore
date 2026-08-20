@@ -1,0 +1,8 @@
+node_modules/
+android/app/build/
+android/.gradle/
+ios/Pods/
+.git/
+.github/
+scratch/
+e2e/

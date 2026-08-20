@@ -42,7 +42,7 @@
     "test:tools": "node --test tools/*.test.mjs",
     "security:secrets": "node tools/scan-repository-secrets.mjs",
     "security:history": "node tools/scan-git-history-secrets.mjs",
-    "security:licenses": "echo PASS",
+    "security:licenses": "npx -y license-checker --summary",
     "security:native:android": "node tools/run-native-advisory-gate.mjs --platform android",
     "store:template:check": "node tools/validate-store-submission-evidence.mjs --file tools/store-submission-evidence.template.json --mode template",
     "store:release:check": "node tools/check-store-release.mjs",
@@ -87,8 +87,8 @@
     "typescript": "5.9.3"
   },
   "engines": {
-    "node": "24.18.0",
-    "npm": "11.6.0"
+    "node": ">=24.18.0",
+    "npm": ">=11.6.0"
   },
   "codegenConfig": {
     "name": "BirthdayNativeSpec",
