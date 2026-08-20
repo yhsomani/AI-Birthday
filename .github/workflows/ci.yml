@@ -160,8 +160,8 @@ jobs:
 
       - name: Install pinned Android build dependencies
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager \
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             'platforms;android-36' \
             'build-tools;36.0.0' \
             'ndk;27.1.12297006'
@@ -227,8 +227,8 @@ jobs:
 
       - name: Install pinned Android build dependencies
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager \
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             'platforms;android-36' \
             'build-tools;36.0.0' \
             'ndk;27.1.12297006'
@@ -392,8 +392,8 @@ jobs:
 
       - name: Install pinned Android SDK components
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager \
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             'platforms;android-36' \
             'build-tools;36.0.0' \
             'ndk;27.1.12297006'
