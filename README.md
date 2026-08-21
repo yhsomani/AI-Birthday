@@ -12,6 +12,7 @@ This remains a React Native application even though the repository contains Kotl
 ## Getting Started
 
 Please see our dedicated guides for setting up the project:
+
 - [Quickstart Guide](QUICKSTART.md): Minimal steps to get the app running locally.
 - [Developer Guide](DEVELOPER_GUIDE.md): Detailed onboarding, prerequisites, and troubleshooting.
 
