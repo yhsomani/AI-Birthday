@@ -41,6 +41,19 @@ it('forces a normalized label and the 200 percent text scaling contract', async 
   ).toBe(0);
 });
 
+it('announces as disabled when editable is false', async () => {
+  await renderWithTheme(
+    <AccessibleTextInput
+      accessibilityLabel="Disabled Input"
+      editable={false}
+      testID="disabled-input"
+    />,
+  );
+
+  const input = screen.getByTestId('disabled-input');
+  expect(input.props.accessibilityState?.disabled).toBe(true);
+});
+
 it('rejects an empty accessibility label', async () => {
   await expect(
     (async () => {
