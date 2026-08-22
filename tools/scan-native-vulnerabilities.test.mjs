@@ -15,7 +15,6 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 import { symlinksAvailable } from './test-capabilities.mjs';
 
 import { createNativeSbom } from './generate-native-sbom.mjs';
