@@ -37,7 +37,7 @@
     "firebase": "12.16.0",
     "firebase-tools": "15.23.0",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.63.0",
+    "typescript-eslint": "8.64.0",
     "vitest": "4.1.10"
   },
   "overrides": {
