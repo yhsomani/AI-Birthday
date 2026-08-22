@@ -1,4 +1,4 @@
-# Birthday Autopilot UI Simplification — Final Implementation Plan
+# WishWell UI Simplification — Final Implementation Plan
 
 ## Outcome and scope
 

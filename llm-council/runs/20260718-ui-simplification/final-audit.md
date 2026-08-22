@@ -1,4 +1,4 @@
-# Birthday Autopilot UI Simplification — Final Audit
+# WishWell UI Simplification — Final Audit
 
 Date: 2026-07-20
 

@@ -342,7 +342,7 @@ const fixture = t => {
   }
   writeJson('github-environment-audit-log.json', governanceAudit);
   writeJson('project.json', {
-    name: 'Birthday Autopilot Production',
+    name: 'WishWell Production',
     projectId,
     projectNumber,
   });

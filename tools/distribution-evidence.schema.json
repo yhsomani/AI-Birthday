@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://birthday-autopilot.invalid/schemas/distribution-evidence-v4.json",
-  "title": "Birthday Autopilot authority-signed restricted SMS distribution evidence",
+  "title": "WishWell authority-signed restricted SMS distribution evidence",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "approvals"],

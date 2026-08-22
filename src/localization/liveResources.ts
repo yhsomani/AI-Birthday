@@ -343,6 +343,12 @@ export const liveEnglish = {
     'This exact text is bound to the current recipient approval. Editing a material detail invalidates it.',
   'live.home.viewApprovedMessage': 'View approved message',
   'live.home.hideApprovedMessage': 'Hide approved message',
+  'live.home.showPreview': 'Show preview',
+  'live.home.hidePreview': 'Hide preview',
+  'live.home.loadingPreview': 'Loading preview...',
+  'live.home.previewError': 'Failed to load preview. Please try again.',
+  'live.home.noOtherUpcoming':
+    'No other upcoming birthdays in the next 7 days.',
   'live.home.reviewToday': 'Review today’s birthday decision',
   'live.home.preparingToday': 'Preparing today’s review…',
   'live.home.todayReviewTitle': 'Confirm what should happen today?',
@@ -1639,6 +1645,13 @@ export const liveHindi: typeof liveEnglish = {
     'यह सटीक टेक्स्ट मौजूदा व्यक्ति की मंज़ूरी से जुड़ा है। ज़रूरी विवरण बदलने पर मंज़ूरी अमान्य हो जाएगी।',
   'live.home.viewApprovedMessage': 'मंज़ूर संदेश देखें',
   'live.home.hideApprovedMessage': 'मंज़ूर संदेश छिपाएँ',
+  'live.home.showPreview': 'पूर्वावलोकन दिखाएं',
+  'live.home.hidePreview': 'पूर्वावलोकन छिपाएं',
+  'live.home.loadingPreview': 'पूर्वावलोकन लोड हो रहा है...',
+  'live.home.previewError':
+    'पूर्वावलोकन लोड करने में विफल। कृपया पुन: प्रयास करें।',
+  'live.home.noOtherUpcoming':
+    'अगले 7 दिनों में कोई अन्य आगामी जन्मदिन नहीं है।',
   'live.home.reviewToday': 'आज के जन्मदिन का निर्णय देखें',
   'live.home.preparingToday': 'आज की समीक्षा तैयार हो रही है…',
   'live.home.todayReviewTitle': 'आज क्या होना चाहिए, पक्का करें?',

@@ -10,7 +10,7 @@ Historical audited blueprint SHA-256: `acf9457cb40ef3131686e7e3db39d667962f95977
 
 The exact source artifact for that historical digest is not present in current tracked history or elsewhere in this repository and is therefore unavailable for reproduction. The digest is preserved append-only as provenance, not represented as a reproducible audit object, and must never be replaced by a later hash.
 
-Directive supersession: the user's later explicit instructions to build Birthday Autopilot as a React Native application for Android and iOS supersede the earlier attached VS Code Developer Workbench objective. `PROJECT_ABOUT.md` is authoritative; the earlier objective is historical context only.
+Directive supersession: the user's later explicit instructions to build WishWell as a React Native application for Android and iOS supersede the earlier attached VS Code Developer Workbench objective. `PROJECT_ABOUT.md` is authoritative; the earlier objective is historical context only.
 
 ### 2026-07-12 cross-platform amendment lineage
 
@@ -205,7 +205,7 @@ Charter: [RN_NATIVE_BOUNDARY_SPIKE.md](RN_NATIVE_BOUNDARY_SPIKE.md)
 ### Scope and quarantine
 
 - The accepted source is retained at `spikes/rn-native-boundary/` under the permanent throwaway package `dev.phase0.disposable.boundaryprobe` and display name `DELETE ME — PHASE 0`.
-- It is not a Birthday Autopilot scaffold. It has no production package, Firebase configuration/plugin, Google identity, Contacts, Gemini, SMS, telephony, real personal data, or production signing material.
+- It is not a WishWell scaffold. It has no production package, Firebase configuration/plugin, Google identity, Contacts, Gemini, SMS, telephony, real personal data, or production signing material.
 - The only key file is the stock Android debug keystore. The final control APK verifies with one V2 debug signer whose certificate SHA-256 is `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`.
 - The first `/private/tmp` reconstruction was unexpectedly purged. Its APK hash and one manual API 29 observation are superseded historical observations, not accepted results. Every result below was rebuilt or rerun from the retained quarantine.
 - `node_modules`, Gradle state, CMake/build outputs, reports, and APKs are ignored. Production import/copy/cherry-pick is forbidden by `DO_NOT_PROMOTE.md` and `spikes/README.md`.

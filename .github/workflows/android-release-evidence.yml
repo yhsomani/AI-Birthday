@@ -79,8 +79,8 @@ jobs:
 
       - name: Install pinned Android SDK components
         run: |
-          yes | "/opt/android-sdk/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
-          "/opt/android-sdk/cmdline-tools/latest/bin/sdkmanager" \
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager \
             'platforms;android-36' \
             'build-tools;36.0.0' \
             'ndk;27.1.12297006'
@@ -361,8 +361,8 @@ jobs:
 
       - name: Install pinned Android SDK components
         run: |
-          yes | "/opt/android-sdk/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
-          "/opt/android-sdk/cmdline-tools/latest/bin/sdkmanager" \
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager \
             'platforms;android-36' \
             'build-tools;36.0.0' \
             'ndk;27.1.12297006'

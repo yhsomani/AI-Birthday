@@ -788,7 +788,7 @@ test('Hosting report deterministically composes exact cloud, store, config, and 
   const { context } = fixture();
   const config = {
     schemaVersion: 1,
-    developerDisplayName: 'Birthday Autopilot Team',
+    developerDisplayName: 'WishWell Team',
     publicBaseUrl: 'https://birthday-autopilot.example.co/',
     supportUrl: 'https://support.vendor.org/birthday/',
     recaptchaEnterpriseSiteKey,

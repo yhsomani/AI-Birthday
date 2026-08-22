@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://birthday-autopilot.invalid/schemas/cloud-readonly-observation-report-v1.json",
-  "title": "Birthday Autopilot protected cloud read-only observation report",
+  "title": "WishWell protected cloud read-only observation report",
   "type": "object",
   "additionalProperties": false,
   "required": [

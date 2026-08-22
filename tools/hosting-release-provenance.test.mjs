@@ -127,7 +127,7 @@ function deploymentExecutionFixture({ checkedAt, authenticatedAt }) {
 function fixture() {
   const releaseConfig = {
     schemaVersion: 1,
-    developerDisplayName: 'Birthday Autopilot Team',
+    developerDisplayName: 'WishWell Team',
     publicBaseUrl: 'https://birthday.example.co/',
     supportUrl: 'https://support.vendor.org/birthday/',
     recaptchaEnterpriseSiteKey: 'provisioned-recaptcha-enterprise-site-key',

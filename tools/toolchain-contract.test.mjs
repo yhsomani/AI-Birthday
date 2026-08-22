@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {} from 'node:child_process';
+import { } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,

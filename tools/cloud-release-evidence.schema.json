@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://birthday-autopilot.invalid/schemas/cloud-release-evidence-v1.json",
-  "title": "Birthday Autopilot production Firebase and Google Cloud release evidence",
+  "title": "WishWell production Firebase and Google Cloud release evidence",
   "description": "Structural contract only. The semantic validator additionally binds clean source, external file digests, live configuration, cross-field invariants, expiry, and an Ed25519 authority signature. The repository template is intentionally not approvable.",
   "type": "object",
   "additionalProperties": false,

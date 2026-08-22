@@ -4,7 +4,7 @@ Simplify the production app into a three-tab control center with focused task le
 
 | Surface  | Core user job                                          | Focused leaves                                                               |
 | -------- | ------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| Home     | “Is Birthday Autopilot ready, and what happens next?”  | Activity, Attention/Fix, iOS Review message, setup continuation              |
+| Home     | “Is WishWell ready, and what happens next?”            | Activity, Attention/Fix, iOS Review message, setup continuation              |
 | People   | Find someone and safely prepare their greeting         | Person setup/detail, batch approval                                          |
 | Settings | Change the birthday plan, account/privacy, or get help | Message, schedule, Android sending/iOS reminders, Privacy, Help, Diagnostics |
 
@@ -160,7 +160,7 @@ The redesign should remove duplicated dashboards and internal implementation lan
 2. Preserve all existing proposal revision, reservation, nonce, CAS, and recovery calls.
 3. Keep the final disclosure immediately before opening `MessageUI`.
 4. Remove composer controls from ordinary iOS reminder settings.
-5. Use “Apple’s message composer opens inside Birthday Autopilot”; never imply that the app knows final content, sender, transport, or delivery.
+5. Use “Apple’s message composer opens inside WishWell”; never imply that the app knows final content, sender, transport, or delivery.
 
 **Acceptance**
 
