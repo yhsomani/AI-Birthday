@@ -43,9 +43,7 @@ export const verifyE2EMergedManifest = manifest => {
     'E2E application host is missing',
   );
   assert(
-    /<application\b[^>]*\bandroid:label="Birthday Autopilot E2E"/u.test(
-      manifest,
-    ) ||
+    /<application\b[^>]*\bandroid:label="WishWell E2E"/u.test(manifest) ||
       /<application\b[^>]*\bandroid:label="@string\/app_name"/u.test(manifest),
     'E2E app has no distinct visible label',
   );
@@ -117,7 +115,7 @@ export const verifyProdMergedManifest = manifest => {
     'production MainActivity is missing',
   );
   assert(
-    !/(E2EMain|Birthday Autopilot E2E|birthday-e2e-fixture-v1)/u.test(manifest),
+    !/(E2EMain|WishWell E2E|birthday-e2e-fixture-v1)/u.test(manifest),
     'production merged manifest contains fixture identity',
   );
 };

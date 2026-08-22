@@ -6,15 +6,23 @@ import type {
   TodayOccurrenceChoice,
   TodayOccurrenceReview,
 } from '../../domain/automation/model';
-import type { NativeRevision } from '../../domain/shared/brand';
-import type { NativeProblem } from '../../domain/shared/result';
-import type { SyncProjection } from '../../domain/contacts/model';
+import type {
+  ContactId,
+  PageCursor,
+  NativeRevision,
+} from '../../domain/shared/brand';
+import type { NativeProblem, NativeResult } from '../../domain/shared/result';
+import type {
+  ContactSummary,
+  SyncProjection,
+} from '../../domain/contacts/model';
 import type { PlatformCapability } from '../../domain/shared/platform';
 import { AppText } from '../../design-system/components/AppText';
 import {
   Button,
   Card,
   KeyValue,
+  PersonRow,
   ReadinessBanner,
   Screen,
   SectionHeading,
@@ -23,6 +31,7 @@ import {
 } from '../../design-system/components/Primitives';
 import { spacing } from '../../design-system/tokens/theme';
 import type { StatusTone } from '../../design-system/tokens/theme';
+import { bidiIsolate } from '../../localization/bidi';
 import { formatLiveDate } from '../../localization/formatLive';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
 import { safeReasonMessageKey } from '../../localization/reasonCopy';
@@ -36,7 +45,9 @@ import {
 } from './LiveProjectionState';
 import {
   nativeBridgeProblem,
+  nativeContractProblem,
   nativePlatformMismatchProblem,
+  staleRevisionProblem,
 } from './nativeProblem';
 import { useLiveProjection } from './useLiveProjection';
 
@@ -94,6 +105,156 @@ const automationStatus = (
   }
 };
 
+const initials = (name: string): string =>
+  name
+    .trim()
+    .split(/\s+/u)
+    .slice(0, 2)
+    .map(part => part.charAt(0).toUpperCase())
+    .join('') || '•';
+
+const parseBirthdayLabel = (
+  label: string | undefined,
+): { month: number; day: number } | undefined => {
+  if (!label) return undefined;
+  const match = label.match(/^([^\d\s]+)\s+(\d+)$|^\s*(\d+)\s+([^\d\s]+)$/u);
+  if (!match) return undefined;
+  const monthStr = (match[1] || match[4] || '').toLowerCase();
+  const dayStr = match[2] || match[3] || '';
+  const day = parseInt(dayStr, 10);
+  if (isNaN(day)) return undefined;
+
+  const englishMonths = [
+    'jan',
+    'feb',
+    'mar',
+    'apr',
+    'may',
+    'jun',
+    'jul',
+    'aug',
+    'sep',
+    'oct',
+    'nov',
+    'dec',
+  ];
+  const hindiMonths = [
+    'जनवरी',
+    'फ़रवरी',
+    'मार्च',
+    'अप्रैल',
+    'मई',
+    'जून',
+    'जुलाई',
+    'अगस्त',
+    'सितंबर',
+    'अक्टूबर',
+    'नवंबर',
+    'दिसंबर',
+  ];
+
+  let month = englishMonths.findIndex(m => monthStr.startsWith(m));
+  if (month === -1) {
+    month = hindiMonths.findIndex(
+      m => monthStr.includes(m) || m.includes(monthStr),
+    );
+  }
+
+  if (month === -1) return undefined;
+  return { month: month + 1, day };
+};
+
+const isBirthdayInNextSevenDays = (month: number, day: number): boolean => {
+  const now = new Date();
+  const todayMidnight = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+  const currentYear = todayMidnight.getFullYear();
+
+  const bdate = new Date(currentYear, month - 1, day);
+  if (bdate.getTime() < todayMidnight.getTime() - 24 * 60 * 60 * 1000) {
+    bdate.setFullYear(currentYear + 1);
+  }
+
+  const diffTime = bdate.getTime() - todayMidnight.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays >= 0 && diffDays <= 7;
+};
+
+const scanUpcomingPeople = async (
+  port: LiveAppPort,
+  include: (contact: ContactSummary) => boolean,
+): Promise<NativeResult<readonly ContactSummary[]>> => {
+  let cursor: PageCursor | undefined;
+  let expectedRevision: NativeRevision | undefined;
+  let expectedTotal: number | undefined;
+  let expectedGeneratedAt:
+    | import('../../domain/shared/temporal').UtcInstant
+    | undefined;
+  const seenContactIds = new Set<ContactId>();
+  const selectedContacts: ContactSummary[] = [];
+
+  for (let pageIndex = 0; pageIndex < 200; pageIndex += 1) {
+    let page: Awaited<ReturnType<LiveAppPort['listPeople']>>;
+    try {
+      page = await port.listPeople({
+        filter: 'enabled',
+        pageSize: 50,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+    } catch {
+      return { kind: 'error', problem: nativeBridgeProblem };
+    }
+    if (page.kind === 'error') return page;
+
+    if (
+      expectedRevision !== undefined &&
+      page.envelope.revision !== expectedRevision
+    ) {
+      return {
+        kind: 'error',
+        problem: staleRevisionProblem(page.envelope.revision),
+      };
+    }
+    if (
+      expectedTotal !== undefined &&
+      page.envelope.value.totalCount !== expectedTotal
+    ) {
+      return { kind: 'error', problem: nativeContractProblem };
+    }
+
+    expectedRevision = page.envelope.revision;
+    expectedTotal = page.envelope.value.totalCount;
+    expectedGeneratedAt = page.envelope.generatedAt;
+
+    for (const contact of page.envelope.value.items) {
+      if (seenContactIds.has(contact.id)) {
+        return { kind: 'error', problem: nativeContractProblem };
+      }
+      seenContactIds.add(contact.id);
+      if (include(contact)) selectedContacts.push(contact);
+    }
+
+    const nextCursor = page.envelope.value.nextCursor;
+    if (nextCursor === undefined) {
+      return {
+        kind: 'ok',
+        envelope: {
+          contractVersion: 1,
+          generatedAt: expectedGeneratedAt!,
+          revision: expectedRevision,
+          value: selectedContacts,
+        },
+      };
+    }
+    cursor = nextCursor;
+  }
+
+  return { kind: 'error', problem: nativeContractProblem };
+};
+
 type TodayReviewState = Readonly<{
   review: TodayOccurrenceReview;
   reviewRevision: NativeRevision;
@@ -114,6 +275,7 @@ export function LiveHomeScreen({
   onOpenAutomation,
   onContinueSetup,
   onOpenPeople,
+  onOpenPerson,
   port,
   productSetupRequired,
 }: {
@@ -123,6 +285,7 @@ export function LiveHomeScreen({
   onOpenAutomation: () => void;
   onContinueSetup: () => void;
   onOpenPeople: () => void;
+  onOpenPerson?: (contactId: ContactId) => void;
   port: LiveAppPort;
   productSetupRequired: boolean;
 }) {
@@ -143,6 +306,46 @@ export function LiveHomeScreen({
   const [pauseReview, setPauseReview] = useState<PauseReviewState>();
   const [expandedApprovedOccurrenceId, setExpandedApprovedOccurrenceId] =
     useState<string>();
+  const [previewExpanded, setPreviewExpanded] = useState(false);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
+  const [upcomingContacts, setUpcomingContacts] = useState<
+    readonly ContactSummary[]
+  >([]);
+
+  useEffect(() => {
+    if (!previewExpanded) return;
+
+    let active = true;
+    const fetchPreview = async () => {
+      setLoadingPreview(true);
+      setPreviewError(false);
+      try {
+        const nextName = trustedHomeEnvelope?.value.next?.recipient;
+        const result = await scanUpcomingPeople(port, contact => {
+          if (contact.displayName === nextName) return false;
+          const parsed = parseBirthdayLabel(contact.birthdayLabel);
+          if (!parsed) return false;
+          return isBirthdayInNextSevenDays(parsed.month, parsed.day);
+        });
+        if (!active) return;
+        if (result.kind === 'ok') {
+          setUpcomingContacts(result.envelope.value);
+        } else {
+          setPreviewError(true);
+        }
+      } catch {
+        if (active) setPreviewError(true);
+      } finally {
+        if (active) setLoadingPreview(false);
+      }
+    };
+
+    fetchPreview().catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [previewExpanded, port, trustedHomeEnvelope?.value.next?.recipient]);
   const homeActionSequence = useRef(0);
   const homeTrustGeneration = useRef(0);
   const trustedHomeEnvelopeRef = useRef(trustedHomeEnvelope);
@@ -157,6 +360,8 @@ export function LiveHomeScreen({
         setTodayReview(undefined);
         setPauseReview(undefined);
         setExpandedApprovedOccurrenceId(undefined);
+        setPreviewExpanded(false);
+        setUpcomingContacts([]);
         setTodayPending(false);
         setTodayProblem(undefined);
         setTodayMessage(undefined);
@@ -180,6 +385,8 @@ export function LiveHomeScreen({
           setTodayReview(undefined);
           setPauseReview(undefined);
           setExpandedApprovedOccurrenceId(undefined);
+          setPreviewExpanded(false);
+          setUpcomingContacts([]);
           setTodayPending(false);
           setTodayProblem(undefined);
           setTodayMessage(undefined);
@@ -611,15 +818,70 @@ export function LiveHomeScreen({
 
           {projection.counts.nextSevenDays > 1 ? (
             <Card testID="live-home-weekly-preview">
-              <AppText variant="heading">
-                {t('live.home.weeklyPreviewTitle')}
-              </AppText>
-              <StatusRow
-                title={t('live.home.weeklyPreviewBody', {
-                  count: projection.counts.nextSevenDays - 1,
-                })}
-                tone="info"
-              />
+              <View style={styles.weeklyHeader}>
+                <AppText variant="heading">
+                  {t('live.home.weeklyPreviewTitle')}
+                </AppText>
+                <Button
+                  label={
+                    previewExpanded
+                      ? t('live.home.hidePreview')
+                      : t('live.home.showPreview')
+                  }
+                  onPress={() => setPreviewExpanded(expanded => !expanded)}
+                  variant="secondary"
+                  testID="live-home-weekly-preview-toggle"
+                />
+              </View>
+              {!previewExpanded ? (
+                <StatusRow
+                  title={t('live.home.weeklyPreviewBody', {
+                    count: projection.counts.nextSevenDays - 1,
+                  })}
+                  tone="info"
+                />
+              ) : (
+                <View
+                  style={styles.weeklyList}
+                  testID="live-home-weekly-preview-list"
+                >
+                  {loadingPreview ? (
+                    <LiveLoading label={t('live.home.loadingPreview')} />
+                  ) : previewError ? (
+                    <AppText color="critical">
+                      {t('live.home.previewError')}
+                    </AppText>
+                  ) : upcomingContacts.length === 0 ? (
+                    <AppText color="muted">
+                      {t('live.home.noOtherUpcoming')}
+                    </AppText>
+                  ) : (
+                    upcomingContacts.map(contact => (
+                      <PersonRow
+                        key={contact.id}
+                        initials={initials(contact.displayName)}
+                        name={contact.displayName}
+                        birthday={contact.birthdayLabel ?? ''}
+                        phone={contact.maskedPhone || ''}
+                        status={t('common.enabled')}
+                        statusTone="positive"
+                        onPress={
+                          onOpenPerson
+                            ? () => onOpenPerson(contact.id)
+                            : () => {}
+                        }
+                        accessibilityLabel={t('live.people.open', {
+                          name: bidiIsolate(contact.displayName),
+                          birthday: contact.birthdayLabel ?? '',
+                          phone: contact.maskedPhone ?? '',
+                          status: t('common.enabled'),
+                        })}
+                        testID={`live-home-weekly-person-${contact.id}`}
+                      />
+                    ))
+                  )}
+                </View>
+              )}
             </Card>
           ) : null}
         </>
@@ -808,4 +1070,14 @@ export function LiveHomeScreen({
 
 const styles = StyleSheet.create({
   heading: { gap: spacing.xs },
+  weeklyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  weeklyList: {
+    marginTop: spacing.sm,
+    gap: spacing.xs,
+  },
 });

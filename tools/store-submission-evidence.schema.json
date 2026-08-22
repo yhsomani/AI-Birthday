@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://birthday-autopilot.invalid/schemas/store-submission-evidence-v1.json",
-  "title": "Birthday Autopilot Play and App Store submission evidence",
+  "title": "WishWell Play and App Store submission evidence",
   "description": "Structural contract only. tools/validate-store-submission-evidence.mjs owns the stricter semantic, file-digest, source, artifact, hosting-config, submission-stage, and release-stage checks.",
   "type": "object",
   "additionalProperties": false,

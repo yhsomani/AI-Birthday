@@ -20,7 +20,7 @@ test('creates a deterministic CycloneDX component set from a Gradle lock', () =>
   const bom = createNativeSbom({
     kind: 'gradle',
     lockBytes: lock,
-    applicationName: 'Birthday Autopilot Android',
+    applicationName: 'WishWell Android',
     version: '1.0',
   });
   assert.equal(bom.bomFormat, 'CycloneDX');
@@ -46,7 +46,7 @@ test('creates an exact configuration-scoped Gradle runtime SBOM', () => {
   const bom = createNativeSbom({
     kind: 'gradle',
     lockBytes: lock,
-    applicationName: 'Birthday Autopilot Android prod runtime',
+    applicationName: 'WishWell Android prod runtime',
     version: '1.0',
     configuration: 'prodReleaseRuntimeClasspath',
   });

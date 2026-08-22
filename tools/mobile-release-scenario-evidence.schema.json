@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://birthday-autopilot.invalid/schemas/mobile-release-scenario-evidence-v2.json",
-  "title": "Birthday Autopilot physical, carrier, and accessibility scenario evidence",
+  "title": "WishWell physical, carrier, and accessibility scenario evidence",
   "type": "object",
   "additionalProperties": false,
   "required": [

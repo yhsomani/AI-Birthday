@@ -213,6 +213,7 @@ function LiveHomeRoute() {
           navigateToLeafFromHome(navigation, 'Automation')
         }
         onOpenPeople={() => navigateToTab(navigation, 'People')}
+        onOpenPerson={contactId => navigateToPerson(navigation, contactId)}
         onContinueSetup={onContinueSetup}
         port={port}
         productSetupRequired={productSetupRequired}

@@ -126,7 +126,7 @@ describe('BirthdayNativeAdapter fail-closed behavior', () => {
           : area === 'privacy' && request.kind === 'public-resources'
           ? {
               kind: 'available',
-              buildLabel: 'Birthday Autopilot 0.1.0 (1)',
+              buildLabel: 'WishWell 0.1.0 (1)',
               baseUrl: 'https://birthday-autopilot-prod.web.app',
             }
           : {

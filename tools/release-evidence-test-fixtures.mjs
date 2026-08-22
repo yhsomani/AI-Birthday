@@ -234,7 +234,7 @@ export const createPerformanceEvidenceFixture = (
   const protocolReference = `performance-protocol--${evidenceSetId}.txt`;
   const rawResultsReference = `performance-raw--${evidenceSetId}.jsonl`;
   const protocol = Buffer.from(
-    `Birthday Autopilot ${platform} physical-device performance protocol v1\n`,
+    `WishWell ${platform} physical-device performance protocol v1\n`,
   );
   const raw = Buffer.from(
     `${JSON.stringify({ evidenceSetId, platform, retained: true })}\n`,

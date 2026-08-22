@@ -19,7 +19,7 @@ const manifest = ({ e2e = true, extra = '' } = {}) =>
   e2e
     ? `<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.yashsomani.birthdayautopilot.e2e">
         <uses-permission android:name="android.permission.INTERNET" />
-        <application android:name="com.yashsomani.birthdayautopilot.e2e.E2EMainApplication" android:allowBackup="false" android:icon="@drawable/e2e_launcher_icon" android:label="Birthday Autopilot E2E" android:networkSecurityConfig="@xml/e2e_network_security_config" android:usesCleartextTraffic="true">
+        <application android:name="com.yashsomani.birthdayautopilot.e2e.E2EMainApplication" android:allowBackup="false" android:icon="@drawable/e2e_launcher_icon" android:label="WishWell E2E" android:networkSecurityConfig="@xml/e2e_network_security_config" android:usesCleartextTraffic="true">
           <activity android:name="com.yashsomani.birthdayautopilot.e2e.E2EMainActivity" />${extra}
         </application>
       </manifest>`
