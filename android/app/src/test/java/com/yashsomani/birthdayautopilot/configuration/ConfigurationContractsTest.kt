@@ -466,7 +466,7 @@ class ConfigurationContractsTest {
     destinationPrehash = "c".repeat(64),
     normalizedDestination = "+919999999999",
     maskedDestination = "•••• 9999",
-    exactMessage = "Birthday Autopilot test",
+    exactMessage = "WishWell test",
     payloadHash = "d".repeat(64),
     simPolicyKind = "SYSTEM_DEFAULT",
     resolvedSubscriptionId = 4,

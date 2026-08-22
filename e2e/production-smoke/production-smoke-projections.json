@@ -181,7 +181,7 @@
       },
       "privacy:public-resources": {
         "kind": "unavailable",
-        "buildLabel": "Birthday Autopilot read-only smoke"
+        "buildLabel": "WishWell read-only smoke"
       },
       "readiness": {
         "platform": "android",
@@ -494,7 +494,7 @@
       },
       "privacy:public-resources": {
         "kind": "unavailable",
-        "buildLabel": "Birthday Autopilot read-only smoke"
+        "buildLabel": "WishWell read-only smoke"
       },
       "readiness": {
         "platform": "ios",

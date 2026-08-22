@@ -1,4 +1,4 @@
-# Birthday Autopilot operations runbook
+# WishWell operations runbook
 
 Status: required release procedure subordinate to `PROJECT_ABOUT.md`. This file
 does not authorize a release or replace signed policy, device, carrier, privacy,

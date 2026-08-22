@@ -3,7 +3,7 @@
 Status: **required fail-closed release procedure subordinate to `PROJECT_ABOUT.md`; no store,
 policy, legal, developer-account, domain, screenshot, or release approval is represented here**
 
-Birthday Autopilot has one combined, source-bound evidence contract for the English and Hindi
+WishWell has one combined, source-bound evidence contract for the English and Hindi
 Google Play and App Store packages. It complements—not replaces—the Android restricted-distribution
 evidence and signed iOS archive evidence. A valid store package cannot make an unsigned artifact
 releasable, authorize `SEND_SMS`, prove physical carrier behavior, or turn the iPhone Companion

@@ -268,7 +268,7 @@ it('keeps optional controls closed with safe defaults and preserves choices acro
   ).toEqual({ selected: true });
 });
 
-it('sends Gemini only the four allowed authoring choices', async () => {
+it('sends Gemini only the allowed authoring choices', async () => {
   const harness = createPort();
   await renderMessage(harness.port);
 
@@ -287,8 +287,41 @@ it('sends Gemini only the four allowed authoring choices', async () => {
     tone: 'warm',
     placeholderMode: { kind: 'generic', requiredCount: 0 },
     requestedSegmentCap: 2,
+    relationship: undefined,
+    milestone: undefined,
   });
   expect(await screen.findByTestId('live-message-suggestion-0')).toBeTruthy();
+});
+
+it('sends Gemini selected relationship and milestone choices', async () => {
+  const harness = createPort();
+  await renderMessage(harness.port);
+
+  await fireEvent.press(screen.getByTestId('live-message-help-toggle'));
+
+  // Select relationship chip
+  await fireEvent.press(
+    await screen.findByTestId('live-message-relationship-friend'),
+  );
+
+  // Select milestone chip
+  await fireEvent.press(
+    await screen.findByTestId('live-message-milestone-new-job'),
+  );
+
+  await fireEvent.press(await screen.findByTestId('live-message-suggest'));
+
+  await waitFor(() =>
+    expect(harness.generateSuggestions).toHaveBeenCalledTimes(1),
+  );
+  expect(harness.generateSuggestions).toHaveBeenCalledWith({
+    language: 'en',
+    tone: 'warm',
+    placeholderMode: { kind: 'generic', requiredCount: 0 },
+    requestedSegmentCap: 2,
+    relationship: 'friend',
+    milestone: 'new-job',
+  });
 });
 
 it('ignores an in-flight Gemini result after a material edit', async () => {

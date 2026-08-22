@@ -91,7 +91,7 @@ export function parseReleaseConfig(input) {
     'developerDisplayName',
   );
   if (
-    /(?:todo|tbd|placeholder|birthday autopilot developer)/iu.test(
+    /(?:todo|tbd|placeholder|birthday autopilot developer|wishwell developer)/iu.test(
       developerDisplayName,
     )
   ) {

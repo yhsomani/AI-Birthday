@@ -1,4 +1,4 @@
-# Birthday Autopilot — Android Installation, Build & Deployment Guide
+# WishWell — Android Installation, Build & Deployment Guide
 
 > **Target Audience**: Developers, Quality Assurance (QA) Engineers, Release Engineers, and Technical Support Engineers.  
 > **Platform**: Android Only (React Native 0.86 + Android Kotlin Native Daemon)  
@@ -27,7 +27,7 @@
 
 ### 1.1 Application Overview
 
-**Birthday Autopilot** is an autonomous, unattended birthday SMS automation application designed exclusively for Android. It operates across two distinct execution tiers:
+**WishWell** is an autonomous, unattended birthday SMS automation application designed exclusively for Android. It operates across two distinct execution tiers:
 
 1. **Foreground User Interface (React Native / TypeScript)**: A graphical interface used for initial onboarding, contact enrollment, AI message customization, policy configuration, and privacy data management.
 2. **Background Automation Engine (Android Kotlin Native)**: An autonomous background daemon scheduled via Android `WorkManager` (`BirthdayWorker.kt`). It interacts directly with Android's `SmsManager` and an encrypted Room SQLite database (`SQLCipher`). **It does not rely on the React Native JavaScript runtime being active to send messages.**
@@ -676,7 +676,7 @@ Before declaring the deployment complete, verify each of the following criteria:
 
 #### Q1: Can I run this application on an iOS Simulator or iPhone?
 
-**A**: No. Birthday Autopilot is an Android-only application. It utilizes native Android telephony components (`android.telephony.SmsManager`, `SubscriptionManager`) and Android `WorkManager` for background execution that do not exist on iOS.
+**A**: No. WishWell is an Android-only application. It utilizes native Android telephony components (`android.telephony.SmsManager`, `SubscriptionManager`) and Android `WorkManager` for background execution that do not exist on iOS.
 
 #### Q2: Does the phone need to stay awake or unlocked to send birthday SMS?
 
@@ -692,4 +692,4 @@ Before declaring the deployment complete, verify each of the following criteria:
 
 ---
 
-_Document Maintained by Birthday Autopilot Core Engineering Team._
+_Document Maintained by WishWell Core Engineering Team._

@@ -169,6 +169,25 @@ describe('production live localization', () => {
     for (const enrollment of ['off', 'enabled', 'excluded'] as const) {
       reachable.add(`live.common.${enrollment}`);
     }
+    for (const rel of [
+      'friend',
+      'family',
+      'colleague',
+      'partner',
+      'casual',
+    ] as const) {
+      reachable.add(`live.message.rel_${rel}`);
+    }
+    for (const milestone of [
+      'none',
+      'new-job',
+      'graduation',
+      'moved',
+      'new-baby',
+      'milestone-age',
+    ] as const) {
+      reachable.add(`live.message.milestone_${milestone}`);
+    }
 
     expect([...liveKeys].filter(key => !reachable.has(key)).sort()).toEqual([]);
   });

@@ -162,7 +162,7 @@ internal class AndroidLifecycleController(
     val standbyCode = appStandbyBucketCode()
     if (lifecycleJournalUnreadable()) {
       return JSONObject()
-        .put("buildLabel", "Birthday Autopilot ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+        .put("buildLabel", "WishWell ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         .put("androidOrIosVersionLabel", "Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
         .put(
           "capabilityCodes",
@@ -189,7 +189,7 @@ internal class AndroidLifecycleController(
       .distinct()
       .take(64)
     return JSONObject()
-      .put("buildLabel", "Birthday Autopilot ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+      .put("buildLabel", "WishWell ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
       .put("androidOrIosVersionLabel", "Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
       .put("capabilityCodes", JSONArray(codes))
       .put("transitionCount", boundedCount(bounds.eventCount))
@@ -212,7 +212,7 @@ internal class AndroidLifecycleController(
     val activity = activityProvider() ?: return JSONObject().put("kind", "cancelled")
     val preview = diagnosticsPayload()
     val text = buildString {
-      append("Birthday Autopilot diagnostics\n")
+      append("WishWell diagnostics\n")
       append("Build: ").append(preview.getString("buildLabel")).append('\n')
       append("System: ").append(preview.getString("androidOrIosVersionLabel")).append('\n')
       append("Transitions: ").append(preview.getInt("transitionCount")).append('\n')
@@ -229,7 +229,7 @@ internal class AndroidLifecycleController(
     val send = Intent(Intent.ACTION_SEND)
       .setType("text/plain")
       .putExtra(Intent.EXTRA_TEXT, text)
-      .putExtra(Intent.EXTRA_SUBJECT, "Birthday Autopilot diagnostics")
+      .putExtra(Intent.EXTRA_SUBJECT, "WishWell diagnostics")
     return try {
       activity.startActivity(Intent.createChooser(send, "Share diagnostics"))
       JSONObject().put("kind", "shared")
@@ -267,7 +267,7 @@ internal class AndroidLifecycleController(
   }
 
   fun publicResourcesPayload(): JSONObject {
-    val buildLabel = "Birthday Autopilot ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+    val buildLabel = "WishWell ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
     val projectId = runCatching {
       FirebaseApp.getApps(appContext)
         .singleOrNull { it.name == FirebaseApp.DEFAULT_APP_NAME }

@@ -1,14 +1,14 @@
 {
   "name": "birthday-autopilot-control-plane",
   "version": "0.1.0",
-  "description": "Server-only Firebase sender-fencing control plane for Birthday Autopilot.",
+  "description": "Server-only Firebase sender-fencing control plane for WishWell.",
   "private": true,
   "main": "lib/functions/index.js",
   "type": "module",
   "packageManager": "npm@11.6.0",
   "engines": {
     "node": ">=22 <25",
-    "npm": "11.6.0"
+    "npm": ">=11.6.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

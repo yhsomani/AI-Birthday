@@ -2,7 +2,7 @@
 
 Everything under this directory exists only to answer a recorded Phase 0 uncertainty from `PROJECT_ABOUT.md`.
 
-- A spike is not the Birthday Autopilot production application.
+- A spike is not the WishWell production application.
 - Spike packages, signing identities, dependencies, data models, UI, and source files are non-authoritative.
 - Spikes contain no real personal data or production credentials.
 - A passing spike narrows one risk; it does not accept a product or release gate.

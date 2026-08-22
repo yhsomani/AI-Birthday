@@ -7,6 +7,8 @@ import type {
   MessageLanguage,
   MessagePreview,
   MessageTone,
+  MessageRelationship,
+  MessageMilestone,
 } from '../../domain/messages/model';
 import { BUILT_IN_MESSAGE_TEMPLATES } from '../../domain/messages/model';
 import type { NativeRevision } from '../../domain/shared/brand';
@@ -76,6 +78,10 @@ export function LiveMessageScreen({
     defaultFields.language,
   );
   const [tone, setTone] = useState<MessageTone>(defaultFields.tone);
+  const [relationship, setRelationship] = useState<
+    MessageRelationship | undefined
+  >();
+  const [milestone, setMilestone] = useState<MessageMilestone | undefined>();
   const [placeholderMode, setPlaceholderMode] = useState<
     'given-name' | 'generic'
   >(defaultFields.placeholderMode);
@@ -126,12 +132,16 @@ export function LiveMessageScreen({
         setPlaceholderMode(envelope.value.draft.placeholderMode.kind);
         setSegmentCap(envelope.value.draft.requestedSegmentCap);
         setText(envelope.value.draft.text);
+        setRelationship(undefined);
+        setMilestone(undefined);
       } else {
         setLanguage(defaultFields.language);
         setTone(defaultFields.tone);
         setPlaceholderMode(defaultFields.placeholderMode);
         setSegmentCap(defaultFields.segmentCap);
         setText('');
+        setRelationship(undefined);
+        setMilestone(undefined);
       }
       editGenerationRef.current += 1;
       previewRequestRef.current += 1;
@@ -372,6 +382,8 @@ export function LiveMessageScreen({
             ? { kind: 'given-name', requiredCount: 1 }
             : { kind: 'generic', requiredCount: 0 },
         requestedSegmentCap: segmentCap,
+        relationship,
+        milestone,
       });
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
@@ -403,6 +415,8 @@ export function LiveMessageScreen({
     setPlaceholderMode(template.draft.placeholderMode);
     setSegmentCap(template.draft.requestedSegmentCap as 1 | 2);
     setText(template.draft.text);
+    setRelationship(undefined);
+    setMilestone(undefined);
     markDirty();
   };
 
@@ -732,6 +746,78 @@ export function LiveMessageScreen({
                   </View>
                 ))}
               </SingleChoiceGroup>
+
+              <AppText variant="label">
+                {t('live.message.relationship')}
+              </AppText>
+              <SingleChoiceGroup
+                label={t('live.message.relationship')}
+                testID="live-message-relationship-group"
+              >
+                <View style={styles.choices}>
+                  {(
+                    [
+                      undefined,
+                      'friend',
+                      'family',
+                      'colleague',
+                      'partner',
+                      'casual',
+                    ] as const
+                  ).map(value => (
+                    <ChoiceChip
+                      key={value ?? 'any'}
+                      label={
+                        value
+                          ? t(`live.message.rel_${value}`)
+                          : t('live.message.any')
+                      }
+                      selected={relationship === value}
+                      onPress={() => {
+                        setRelationship(value);
+                        markDirty();
+                      }}
+                      testID={`live-message-relationship-${value ?? 'any'}`}
+                    />
+                  ))}
+                </View>
+              </SingleChoiceGroup>
+
+              <AppText variant="label">{t('live.message.milestone')}</AppText>
+              <SingleChoiceGroup
+                label={t('live.message.milestone')}
+                testID="live-message-milestone-group"
+              >
+                <View style={styles.choices}>
+                  {(
+                    [
+                      undefined,
+                      'none',
+                      'new-job',
+                      'graduation',
+                      'moved',
+                      'new-baby',
+                      'milestone-age',
+                    ] as const
+                  ).map(value => (
+                    <ChoiceChip
+                      key={value ?? 'any'}
+                      label={
+                        value
+                          ? t(`live.message.milestone_${value}`)
+                          : t('live.message.any')
+                      }
+                      selected={milestone === value}
+                      onPress={() => {
+                        setMilestone(value);
+                        markDirty();
+                      }}
+                      testID={`live-message-milestone-${value ?? 'any'}`}
+                    />
+                  ))}
+                </View>
+              </SingleChoiceGroup>
+
               <ReadinessBanner
                 title={t('live.message.geminiPrivacyTitle')}
                 detail={t('live.message.geminiPrivacyBody')}

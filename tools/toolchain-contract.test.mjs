@@ -27,8 +27,8 @@ test('mobile Node and npm pins agree across install contracts', () => {
   assert.equal(read('.nvmrc').trim(), TOOLCHAIN_VERSIONS.node);
   assert.equal(packageJson.packageManager, `npm@${TOOLCHAIN_VERSIONS.npm}`);
   assert.deepEqual(packageJson.engines, {
-    node: TOOLCHAIN_VERSIONS.node,
-    npm: TOOLCHAIN_VERSIONS.npm,
+    node: `>=${TOOLCHAIN_VERSIONS.node}`,
+    npm: `>=${TOOLCHAIN_VERSIONS.npm}`,
   });
   assert.deepEqual(packageLock.packages[''].engines, packageJson.engines);
   assert.deepEqual(hostingPackage.engines, packageJson.engines);
@@ -166,7 +166,7 @@ test('Functions compile and run against the deployed Node 22 runtime line', () =
   assert.match(functionsPackage.devDependencies['@types/node'], /^22\./u);
   assert.deepEqual(functionsPackage.engines, {
     node: '>=22 <25',
-    npm: TOOLCHAIN_VERSIONS.npm,
+    npm: `>=${TOOLCHAIN_VERSIONS.npm}`,
   });
   assert.match(read('backend/functions/.npmrc'), /^engine-strict=true$/mu);
   assert.match(read('backend/hosting/.npmrc'), /^engine-strict=true$/mu);

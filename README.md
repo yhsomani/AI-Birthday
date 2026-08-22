@@ -1,6 +1,6 @@
-# Birthday Autopilot
+# WishWell
 
-Birthday Autopilot is a React Native mobile app for Android and iPhone.
+WishWell is a React Native mobile app for Android and iPhone.
 
 - **Android Automation Edition** can submit a pre-approved birthday SMS from the phone's SIM without birthday-day interaction, but only after every policy, permission, device, account, background, test, and duplicate-safety gate passes.
 - **iOS Companion Edition** shares birthday planning, contacts, templates, privacy controls, and reminders. Apple requires the user to review and tap **Send** in the system Messages composer; the app never describes this as unattended.
@@ -12,6 +12,7 @@ This remains a React Native application even though the repository contains Kotl
 ## Getting Started
 
 Please see our dedicated guides for setting up the project:
+
 - [Quickstart Guide](QUICKSTART.md): Minimal steps to get the app running locally.
 - [Developer Guide](DEVELOPER_GUIDE.md): Detailed onboarding, prerequisites, and troubleshooting.
 
@@ -20,6 +21,8 @@ The Firebase control plane and public Firebase Hosting site are intentionally is
 If Xcode reports a different Node version, remove the ignored `ios/.xcode.env.local`, ensure
 Node 24.18.0 is active, and rerun the pod installation. The Xcode bundle phase independently
 rejects any Node binary that is not exactly 24.18.0.
+
+Note: The Android SDK currently brings a beta-labeled on-device interop module as a vendor-internal runtime dependency. App code does not call or expose it, and it must not be manually excluded because the stable Firebase registrar references it. Treat it as an explicit SBOM/release-review item and recheck the upstream stable dependency graph before release. Direct preview APIs remain forbidden.
 
 ### iOS production artifact gate
 

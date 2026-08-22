@@ -2,7 +2,7 @@
 
 `app-icon-master.png` was created with Codex's built-in image-generation tool on 2026-07-12 for this project. `app-icon-1024.png` is the opaque 1024 px production master used to derive the Android launcher and iPhone AppIcon sizes.
 
-Design brief: an original, minimal Birthday Autopilot mark combining a white message envelope, one birthday candle/flame, and a restrained orbit/check for dependable automation. The requested palette was indigo `#4B52A3`, white, warm amber, and a small coral accent. The prompt prohibited text, letters, numbers, faces, phone/robot/brain imagery, trademarks, watermarks, device mockups, and celebratory clutter, and kept critical artwork inside the central safe area.
+Design brief: an original, minimal WishWell mark combining a white message envelope, one birthday candle/flame, and a restrained orbit/check for dependable automation. The requested palette was indigo `#4B52A3`, white, warm amber, and a small coral accent. The prompt prohibited text, letters, numbers, faces, phone/robot/brain imagery, trademarks, watermarks, device mockups, and celebratory clutter, and kept critical artwork inside the central safe area.
 
 SHA-256:
 

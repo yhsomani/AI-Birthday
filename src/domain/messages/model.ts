@@ -103,11 +103,27 @@ export type MessageEditorProjection =
   | Readonly<{ kind: 'not-configured' }>
   | Readonly<{ kind: 'configured'; draft: MessageDraft }>;
 
+export type MessageRelationship =
+  | 'friend'
+  | 'family'
+  | 'colleague'
+  | 'partner'
+  | 'casual';
+export type MessageMilestone =
+  | 'none'
+  | 'new-job'
+  | 'graduation'
+  | 'moved'
+  | 'new-baby'
+  | 'milestone-age';
+
 export type GeminiRequest = Readonly<{
   language: MessageLanguage;
   tone: MessageTone;
   placeholderMode: PlaceholderMode;
   requestedSegmentCap: 1 | 2;
+  relationship?: MessageRelationship | undefined;
+  milestone?: MessageMilestone | undefined;
 }>;
 
 export type GeminiSuggestionsProjection =

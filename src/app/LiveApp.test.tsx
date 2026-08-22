@@ -383,7 +383,7 @@ const createPort = (
     getPublicResources: jest.fn(async () =>
       ok({
         kind: 'unavailable' as const,
-        buildLabel: 'Birthday Autopilot 0.1.0 (1)',
+        buildLabel: 'WishWell 0.1.0 (1)',
       }),
     ),
     getCurrentOperation: jest.fn(async () => ok({ kind: 'none' as const })),
@@ -781,7 +781,7 @@ describe('production live projections', () => {
     const getPublicResources = jest.fn(async () =>
       ok({
         kind: 'available' as const,
-        buildLabel: 'Birthday Autopilot 0.1.0 (1)',
+        buildLabel: 'WishWell 0.1.0 (1)',
         baseUrl: 'https://birthday-autopilot-prod.web.app',
       }),
     );
@@ -792,7 +792,7 @@ describe('production live projections', () => {
     await fireEvent.press(screen.getByTestId('live-settings-help-legal'));
 
     expect(await screen.findByTestId('live-help-legal-screen')).toBeTruthy();
-    expect(screen.getByText('Birthday Autopilot 0.1.0 (1)')).toBeTruthy();
+    expect(screen.getByText('WishWell 0.1.0 (1)')).toBeTruthy();
     expect(screen.getByText(/every supported-device/u)).toBeTruthy();
     expect(screen.queryByTestId('live-cloud-privacy-boundary')).toBeNull();
     expect(screen.queryByText(/content-free, not data-free/u)).toBeNull();
@@ -1028,7 +1028,7 @@ describe('production live projections', () => {
     expect(screen.getByText('contacts-v1, privacy-v2')).toBeTruthy();
     expect(screen.getByText(/at most 30 days/u)).toBeTruthy();
     expect(screen.getByText(/up to 400 days/u)).toBeTruthy();
-    expect(screen.getByText('Copies outside Birthday Autopilot')).toBeTruthy();
+    expect(screen.getByText('Copies outside WishWell')).toBeTruthy();
     expect(
       screen.getByText(/For enabled Android recipients only/u),
     ).toBeTruthy();
@@ -2620,7 +2620,7 @@ describe('production live projections', () => {
       expect(screen.getByTestId('live-attention-action-issue-1')).toBeTruthy(),
     );
     expect(
-      screen.getByText(/Allow Birthday Autopilot to run in the background/u),
+      screen.getByText(/Allow WishWell to run in the background/u),
     ).toBeTruthy();
     expect(screen.queryByText(/background-restricted/u)).toBeNull();
     await fireEvent.press(screen.getByTestId('live-attention-support-toggle'));
@@ -4688,7 +4688,7 @@ describe('production live projections', () => {
     expect(screen.getByText(/Step 1 of 4:/u)).toBeTruthy();
     expect(
       screen.getByText(
-        'Allow Birthday Autopilot to run in the background, then check readiness again.',
+        'Allow WishWell to run in the background, then check readiness again.',
       ),
     ).toBeTruthy();
     const setupTree = JSON.stringify(rendered.toJSON());

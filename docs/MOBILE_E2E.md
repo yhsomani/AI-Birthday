@@ -110,7 +110,7 @@ preference, or remote flag:
   `adb reverse`; the fixture pins React Native's dev-server preference to
   `localhost:8081`, while emulator gateways and remote hosts remain denied.
 - iOS uses the `E2E` configuration and the same distinct `.e2e` bundle ID. It
-  is unsigned, simulator-only, visibly named `Birthday Autopilot E2E`, uses an
+  is unsigned, simulator-only, visibly named `WishWell E2E`, uses an
   entitlement-free file, intentionally uses the simulator's generic icon so it
   cannot resemble the production icon, and loads `e2e/index.js`. Product native
   module bridges, Firebase/Google startup, MessageUI/reminder startup,

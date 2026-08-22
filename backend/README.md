@@ -1,4 +1,4 @@
-# Birthday Autopilot Firebase control plane
+# WishWell Firebase control plane
 
 This directory is an isolated, server-only coordination foundation. It does not
 store contacts or messages and it does not grant a mobile client direct

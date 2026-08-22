@@ -1,6 +1,6 @@
-# Birthday Autopilot public site
+# WishWell public site
 
-This package builds the public Firebase Hosting surface for Birthday Autopilot.
+This package builds the public Firebase Hosting surface for WishWell.
 It provides deterministic routes:
 
 - `/` — product and public-resource entry point;

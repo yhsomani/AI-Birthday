@@ -1,8 +1,9 @@
-# Birthday Autopilot Quickstart
+# WishWell Quickstart
 
 Follow these minimal steps to get the development environment running.
 
 ## Prerequisites
+
 - **Node.js**: >= 24.18.0
 - **npm**: >= 11.6.0
 - **Java**: JDK 21
@@ -10,6 +11,7 @@ Follow these minimal steps to get the development environment running.
 - **React Native CLI**: 0.86.0 environment setup
 
 ## 1. Install Dependencies
+
 ```zsh
 # Using nvm
 nvm use
@@ -18,12 +20,15 @@ npm ci
 ```
 
 ## 2. Start the Metro Bundler
+
 ```zsh
 npm start
 ```
 
 ## 3. Run Android
+
 In a separate terminal:
+
 ```zsh
 export JAVA_HOME=/path/to/openjdk-21
 export ANDROID_HOME="$HOME/Library/Android/sdk"
@@ -31,6 +36,7 @@ npm run android
 ```
 
 ## 4. Run iOS (macOS only)
+
 ```zsh
 # Install ruby dependencies
 bundle install

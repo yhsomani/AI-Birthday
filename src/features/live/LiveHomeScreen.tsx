@@ -548,55 +548,81 @@ export function LiveHomeScreen({
 
       <SectionHeading title={t('live.home.upcoming')} />
       {projection.next ? (
-        <Card>
-          <AppText variant="heading">{projection.next.recipient}</AppText>
-          <KeyValue
-            label={t('live.home.birthday')}
-            value={formatLiveDate(projection.next.localDate, language)}
-          />
-          <KeyValue
-            label={t('live.home.window')}
-            value={projection.next.windowLabel}
-          />
-          <KeyValue
-            label={t('live.home.phone')}
-            value={projection.next.maskedPhone}
-          />
-          {projection.next.exactText && homeStable ? (
-            <>
-              <Button
-                label={t(
-                  approvedMessageVisible
-                    ? 'live.home.hideApprovedMessage'
-                    : 'live.home.viewApprovedMessage',
-                )}
-                onPress={() =>
-                  setExpandedApprovedOccurrenceId(
+        <>
+          <Card>
+            <AppText variant="heading">{projection.next.recipient}</AppText>
+            <KeyValue
+              label={t('live.home.birthday')}
+              value={formatLiveDate(projection.next.localDate, language)}
+            />
+            <KeyValue
+              label={t('live.home.window')}
+              value={projection.next.windowLabel}
+            />
+            <KeyValue
+              label={t('live.home.phone')}
+              value={projection.next.maskedPhone}
+            />
+            {projection.next.exactText && homeStable ? (
+              <>
+                <Button
+                  label={t(
                     approvedMessageVisible
-                      ? undefined
-                      : projection.next?.occurrenceId,
-                  )
-                }
+                      ? 'live.home.hideApprovedMessage'
+                      : 'live.home.viewApprovedMessage',
+                  )}
+                  onPress={() =>
+                    setExpandedApprovedOccurrenceId(
+                      approvedMessageVisible
+                        ? undefined
+                        : projection.next?.occurrenceId,
+                    )
+                  }
+                  variant="secondary"
+                  testID="live-home-approved-message-toggle"
+                />
+                {approvedMessageVisible ? (
+                  <View testID="live-home-approved-message">
+                    <AppText variant="label">
+                      {t('live.home.approvedMessage')}
+                    </AppText>
+                    <AppText>{projection.next.exactText}</AppText>
+                    <AppText color="muted" variant="caption">
+                      {t('live.home.approvedMessageBody')}
+                    </AppText>
+                  </View>
+                ) : null}
+              </>
+            ) : null}
+            {projection.next?.occurrenceId &&
+            hasTodayReview &&
+            !isInlineReviewOpen ? (
+              <Button
+                label={t('live.home.skipOccurrence')}
+                onPress={prepareToday}
                 variant="secondary"
-                testID="live-home-approved-message-toggle"
+                testID="live-home-skip-occurrence"
               />
-              {approvedMessageVisible ? (
-                <View testID="live-home-approved-message">
-                  <AppText variant="label">
-                    {t('live.home.approvedMessage')}
-                  </AppText>
-                  <AppText>{projection.next.exactText}</AppText>
-                  <AppText color="muted" variant="caption">
-                    {t('live.home.approvedMessageBody')}
-                  </AppText>
-                </View>
-              ) : null}
-            </>
+            ) : null}
+            <AppText color="muted" variant="caption">
+              {t('live.home.planNotOutcome')}
+            </AppText>
+          </Card>
+
+          {projection.counts.nextSevenDays > 1 ? (
+            <Card testID="live-home-weekly-preview">
+              <AppText variant="heading">
+                {t('live.home.weeklyPreviewTitle')}
+              </AppText>
+              <StatusRow
+                title={t('live.home.weeklyPreviewBody', {
+                  count: projection.counts.nextSevenDays - 1,
+                })}
+                tone="info"
+              />
+            </Card>
           ) : null}
-          <AppText color="muted" variant="caption">
-            {t('live.home.planNotOutcome')}
-          </AppText>
-        </Card>
+        </>
       ) : (
         <Card>
           <AppText>{t('live.home.noUpcoming')}</AppText>

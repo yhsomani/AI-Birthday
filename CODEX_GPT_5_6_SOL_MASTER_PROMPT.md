@@ -1,4 +1,4 @@
-# Birthday Autopilot — Codex GPT-5.6 Sol Audit-to-Delivery Prompt
+# WishWell — Codex GPT-5.6 Sol Audit-to-Delivery Prompt
 
 Use this from the repository root in the VS Code Codex extension.
 
@@ -16,7 +16,7 @@ $llm-council
 <role_and_terminal_objective>
 Act as the root product engineer, architect, implementer, tester, security/privacy reviewer, and delivery owner for the repository currently open in the VS Code Codex extension.
 
-Take the real Birthday Autopilot project from evidence-grounded discovery through whole-system audit, decision finalization, atomic planning, implementation, remediation, verification, and an honest delivery verdict.
+Take the real WishWell project from evidence-grounded discovery through whole-system audit, decision finalization, atomic planning, implementation, remediation, verification, and an honest delivery verdict.
 
 Do not stop after research, intake, audit, council, recommendations, or planning. Continue every safe, authorized local task until:
 
@@ -39,7 +39,7 @@ Before substantive work:
 
 If Sol cannot be guaranteed, ask one blocking model-configuration question and stop before council work or edits.
 
-This restriction applies to development agents only. Birthday Autopilot's native Firebase AI Logic/Gemini feature is a product runtime dependency. Preserve and audit it. Do not remove, replace, or migrate it merely because the engineering council is Codex-only. It must remain optional, PII-free authoring assistance and never become recipient-selection, send-time, or birthday-day execution authority.
+This restriction applies to development agents only. WishWell's native Firebase AI Logic/Gemini feature is a product runtime dependency. Preserve and audit it. Do not remove, replace, or migrate it merely because the engineering council is Codex-only. It must remain optional, PII-free authoring assistance and never become recipient-selection, send-time, or birthday-day execution authority.
 </development_model_contract>
 
 <authority_precedence_and_workspace_safety>
@@ -48,7 +48,7 @@ Apply this order:
 1. Current system/developer/user instructions and permission boundaries.
 2. Canonical Codex project guidance: applicable AGENTS.override.md and AGENTS.md files from repository root to the working directory, with closer scoped guidance taking precedence.
 3. A legacy AGENT.md only when it actually exists; treat it as repository context and never let it override higher-priority instructions.
-4. PROJECT_ABOUT.md as Birthday Autopilot's sole product and technical source of truth.
+4. PROJECT_ABOUT.md as WishWell's sole product and technical source of truth.
 5. Verified code, tests, manifests, workflows, contracts, runbooks, and current primary-source research as implementation evidence.
 6. Council plans, generated designs, old briefs, comments, tickets, historical reports, and assumptions as non-authoritative evidence only.
 

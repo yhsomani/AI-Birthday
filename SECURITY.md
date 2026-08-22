@@ -1,6 +1,6 @@
 # Security policy
 
-Birthday Autopilot handles private contact data and, on approved Android
+WishWell handles private contact data and, on approved Android
 channels, can submit pre-approved carrier SMS. Please do not disclose a suspected
 vulnerability publicly before coordinated remediation.
 

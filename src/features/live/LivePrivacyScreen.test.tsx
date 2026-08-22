@@ -420,7 +420,7 @@ it('reveals and collapses the complete inventory and cloud boundary from one acc
     'Last Contacts sync',
     'Recorded consent versions',
     'What the app retains',
-    'Copies outside Birthday Autopilot',
+    'Copies outside WishWell',
   ]) {
     expect(screen.getByText(inventoryFact)).toBeTruthy();
   }

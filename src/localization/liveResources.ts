@@ -54,7 +54,7 @@ export const liveEnglish = {
   'live.reason.approvalMissing':
     'Review and approve the exact birthday message before continuing.',
   'live.reason.backgroundRestricted':
-    'Allow Birthday Autopilot to run in the background, then check readiness again.',
+    'Allow WishWell to run in the background, then check readiness again.',
   'live.reason.clockUntrusted':
     'Turn on automatic date, time and timezone, then check again online.',
   'live.reason.contactsAuthorization':
@@ -70,7 +70,7 @@ export const liveEnglish = {
   'live.reason.iosComposerReserved':
     'iPhone message review currently owns sending safety for this account. Android sending is paused until the protected review window expires.',
   'live.reason.dataSaverRestricted':
-    'Allow unrestricted background data for Birthday Autopilot, then check again.',
+    'Allow unrestricted background data for WishWell, then check again.',
   'live.reason.distributionUnapproved':
     'This build or install channel is not approved for unattended SMS.',
   'live.reason.dozeExemptionMissing':
@@ -80,7 +80,7 @@ export const liveEnglish = {
   'live.reason.playServicesMissing':
     'Supported Google Play services are required on this Android phone.',
   'live.reason.hibernationUnsafe':
-    'Turn off unused-app restrictions for Birthday Autopilot, then check again.',
+    'Turn off unused-app restrictions for WishWell, then check again.',
   'live.reason.installerAllowlistMissing':
     'The installer did not allow the restricted SMS permission. This build cannot enable unattended sending.',
   'live.reason.internalContractInvalid':
@@ -175,9 +175,9 @@ export const liveEnglish = {
     'The sender, SIM or permission setup changed. Review the approval again.',
   'live.approvalReason.disclosureChanged':
     'The consent or charge disclosure changed. Read and approve the current version.',
-  'live.bootstrap.loading': 'Starting Birthday Autopilot safely',
-  'live.bootstrap.unavailable': 'Birthday Autopilot is unavailable',
-  'live.setup.title': 'Set up Birthday Autopilot',
+  'live.bootstrap.loading': 'Starting WishWell safely',
+  'live.bootstrap.unavailable': 'WishWell is unavailable',
+  'live.setup.title': 'Set up WishWell',
   'live.setup.loading': 'Loading setup status',
   'live.setup.unavailable': 'Setup status is unavailable',
   'live.setup.platformMismatch': 'Setup platform could not be verified',
@@ -204,9 +204,9 @@ export const liveEnglish = {
     'Reminders do not send messages. SMS or MMS sent from Messages can incur carrier charges. iOS and Messages control the available sender line and final transport; this app cannot select or guarantee either.',
   'live.setup.contactsPrivacyTitle': 'Your Contacts privacy boundary',
   'live.setup.contactsPrivacyAndroid':
-    'Birthday Autopilot keeps imported raw names, phone numbers, birthdays and source fields in protected, encrypted storage on this phone. Only after you enable an Android recipient do fixed-length pseudonymous duplicate-safety bases and bounded occurrence/send timing cross to Firebase. Those values are not raw Contacts and are not anonymous. Firebase account, installation, attestation and service metadata can also cross the device boundary; review Privacy for the full inventory.',
+    'WishWell keeps imported raw names, phone numbers, birthdays and source fields in protected, encrypted storage on this phone. Only after you enable an Android recipient do fixed-length pseudonymous duplicate-safety bases and bounded occurrence/send timing cross to Firebase. Those values are not raw Contacts and are not anonymous. Firebase account, installation, attestation and service metadata can also cross the device boundary; review Privacy for the full inventory.',
   'live.setup.contactsPrivacyIos':
-    'Birthday Autopilot keeps imported raw names, phone numbers, birthdays and source fields in protected, encrypted storage on this iPhone. iOS does not register recipients with Android duplicate-safety coordination and cannot send automatically. Firebase account, installation, App Check, Remote Config and service metadata can still cross the device boundary; review Privacy for the full inventory.',
+    'WishWell keeps imported raw names, phone numbers, birthdays and source fields in protected, encrypted storage on this iPhone. iOS does not register recipients with Android duplicate-safety coordination and cannot send automatically. Firebase account, installation, App Check, Remote Config and service metadata can still cross the device boundary; review Privacy for the full inventory.',
   'live.setup.senderGateTitle': "Choose this phone's role",
   'live.setup.senderGateBody':
     'Another Android phone is active. This phone will not read Contacts or change birthday settings unless you explicitly transfer the sender role. You can safely leave it on Standby.',
@@ -244,7 +244,7 @@ export const liveEnglish = {
     'The request finished and setup was checked again. The screen never advances a step by itself.',
   'live.setup.actionUnverified':
     'The request was accepted, but setup could not be checked again. Refresh before doing anything else.',
-  'live.guidedSetup.title': 'Finish setting up Birthday Autopilot',
+  'live.guidedSetup.title': 'Finish setting up WishWell',
   'live.guidedSetup.body':
     'Your Google account and Contacts import are ready. Finish the remaining choices now, or leave and return without losing saved progress.',
   'live.guidedSetup.step': 'Step {{step}} of 4',
@@ -329,6 +329,10 @@ export const liveEnglish = {
   'live.home.androidNotConfiguredBody':
     'No automatic SMS is active. Finish setup, approval and testing first.',
   'live.home.upcoming': 'Upcoming',
+  'live.home.weeklyPreviewTitle': 'Weekly Automation Preview',
+  'live.home.weeklyPreviewBody':
+    'You have {{count}} other birthday sends scheduled for the next 7 days.',
+  'live.home.skipOccurrence': 'Skip this occurrence',
   'live.home.birthday': 'Birthday',
   'live.home.window': 'Time window',
   'live.home.phone': 'Phone',
@@ -573,7 +577,7 @@ export const liveEnglish = {
     'The choice was saved and details were checked again.',
   'live.person.googleContactsRepairTitle': 'Update the source contact',
   'live.person.googleContactsRepairBody':
-    'Open Google Contacts without sharing a person identifier. After you return, Birthday Autopilot will sync and review this person again; it will not assume the edit succeeded.',
+    'Open Google Contacts without sharing a person identifier. After you return, WishWell will sync and review this person again; it will not assume the edit succeeded.',
   'live.person.googleContactsRegionRepairBody':
     'This local phone format has no reliable country or region. Add the international country code (for example, +91) in Google Contacts, then return and sync again.',
   'live.person.openGoogleContacts': 'Fix in Google Contacts',
@@ -669,7 +673,7 @@ export const liveEnglish = {
     'Android can retain a separate content-free duplicate-safety record for up to 400 days. Clear activity does not remove it.',
   'live.settings.iosSafetyRetention':
     'iPhone retains only the minimum opaque composer marker needed to prevent reopening the same birthday draft. It is not Android’s 400-day sending ledger.',
-  'live.settings.externalBoundary': 'Copies outside Birthday Autopilot',
+  'live.settings.externalBoundary': 'Copies outside WishWell',
   'live.settings.externalCopies':
     'The app cannot erase carrier, recipient, Android SMS, Apple Messages or outside backup copies.',
   'live.settings.birthdayPlan': 'Birthday plan',
@@ -817,14 +821,14 @@ export const liveEnglish = {
   'live.activity.detail.composerReportedSentTitle':
     'Messages reported sent; delivery not confirmed',
   'live.activity.detail.composerReportedSentBody':
-    'This result is terminal for this local birthday occurrence. Birthday Autopilot will not offer a second in-app composer for it.',
+    'This result is terminal for this local birthday occurrence. WishWell will not offer a second in-app composer for it.',
   'live.activity.detail.composerUnknownTitle': 'Composer outcome unknown',
   'live.activity.detail.composerUnknownBody':
     'Do not assume success or failure. This result is terminal for this local birthday occurrence, and the app will not offer a second in-app composer for it.',
   'live.activity.detail.iosVisibilityTitle':
     'Final message details are outside this app',
   'live.activity.detail.iosVisibilityBody':
-    'Birthday Autopilot cannot see the final edited recipient or text, sender line, SMS/MMS/iMessage transport, carrier acceptance, or delivery.',
+    'WishWell cannot see the final edited recipient or text, sender line, SMS/MMS/iMessage transport, carrier acceptance, or delivery.',
   'live.activity.nextPage': 'Next page',
   'live.activity.previousPage': 'Previous page',
   'live.attention.title': 'Needs attention',
@@ -886,6 +890,20 @@ export const liveEnglish = {
   'live.message.english': 'English',
   'live.message.hindi': 'Hindi',
   'live.message.tone': 'Tone',
+  'live.message.relationship': 'Relationship',
+  'live.message.milestone': 'Milestone',
+  'live.message.any': 'Any',
+  'live.message.rel_friend': 'Friend',
+  'live.message.rel_family': 'Family',
+  'live.message.rel_colleague': 'Colleague',
+  'live.message.rel_partner': 'Partner',
+  'live.message.rel_casual': 'Casual',
+  'live.message.milestone_none': 'None',
+  'live.message.milestone_new-job': 'New job',
+  'live.message.milestone_graduation': 'Graduation',
+  'live.message.milestone_moved': 'Moved',
+  'live.message.milestone_new-baby': 'New baby',
+  'live.message.milestone_milestone-age': 'Milestone age',
   'live.message.warm': 'Warm',
   'live.message.simple': 'Simple',
   'live.message.cheerful': 'Cheerful',
@@ -1108,7 +1126,7 @@ export const liveEnglish = {
   'live.privacy.body': 'Review exactly what will happen before confirming.',
   'live.privacy.screenCaptureTitle': 'Screen privacy',
   'live.privacy.screenCaptureBody':
-    'Birthday Autopilot hides personal content in the app switcher when supported. Screenshots and recordings taken while the app is open can still contain names, phone numbers or message text. Review them before sharing.',
+    'WishWell hides personal content in the app switcher when supported. Screenshots and recordings taken while the app is open can still contain names, phone numbers or message text. Review them before sharing.',
   'live.privacy.showDataDetails': 'Data details',
   'live.privacy.hideDataDetails': 'Hide data details',
   'live.privacy.loading': 'Loading privacy information',
@@ -1231,11 +1249,11 @@ export const liveEnglish = {
     'Gemini suggestion requests contain only language, tone, name-style and SMS-part preferences. They exclude contact names, phone numbers, birthdays, message history and the current saved or draft message.',
   'live.privacy.providerRetentionTitle': 'Provider retention boundary',
   'live.privacy.providerRetentionBody':
-    'Firebase, Google, Gemini, carrier, Messages, iCloud and backup providers may retain authentication, installation, attestation, request/response, operational, abuse-prevention, billing or transport records under their own policies and legal duties. Product deletion handles Birthday Autopilot-controlled data; it cannot promise immediate erasure of provider logs or outside copies. Review the current public privacy policy for details.',
+    'Firebase, Google, Gemini, carrier, Messages, iCloud and backup providers may retain authentication, installation, attestation, request/response, operational, abuse-prevention, billing or transport records under their own policies and legal duties. Product deletion handles WishWell-controlled data; it cannot promise immediate erasure of provider logs or outside copies. Review the current public privacy policy for details.',
   'live.help.title': 'Help, legal and about',
   'live.help.body':
     'Read the public policies, get verified support, or use the account-deletion website without reinstalling the app.',
-  'live.help.about': 'About Birthday Autopilot',
+  'live.help.about': 'About WishWell',
   'live.help.androidLimitation':
     'Automatic device-SIM birthday texts work only after every supported-device, permission, policy, background, test and release gate passes.',
   'live.help.iosLimitation':
@@ -1243,7 +1261,7 @@ export const liveEnglish = {
   'live.help.build': 'App build',
   'live.help.externalCopies': 'Some copies are outside this app',
   'live.help.externalCopiesBody':
-    'SMS, Messages, iCloud, carrier, recipient and outside backup copies cannot be erased or recalled by Birthday Autopilot.',
+    'SMS, Messages, iCloud, carrier, recipient and outside backup copies cannot be erased or recalled by WishWell.',
   'live.help.loading': 'Checking public resources',
   'live.help.unavailable': 'Public resources are unavailable',
   'live.help.linksUnavailable': 'Public links are not configured',
@@ -1337,7 +1355,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.reason.approvalMissing':
     'आगे बढ़ने से पहले सटीक जन्मदिन संदेश देखकर स्वीकृत करें।',
   'live.reason.backgroundRestricted':
-    'Birthday Autopilot को बैकग्राउंड में चलने दें, फिर तैयारी जाँचें।',
+    'WishWell को बैकग्राउंड में चलने दें, फिर तैयारी जाँचें।',
   'live.reason.clockUntrusted':
     'अपने-आप तारीख, समय और समय-क्षेत्र चालू करके ऑनलाइन फिर जाँचें।',
   'live.reason.contactsAuthorization':
@@ -1353,7 +1371,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.reason.iosComposerReserved':
     'इस खाते की भेजने की सुरक्षा अभी iPhone संदेश समीक्षा के पास है। सुरक्षित समीक्षा अवधि पूरी होने तक Android भेजना रुका रहेगा।',
   'live.reason.dataSaverRestricted':
-    'Birthday Autopilot के लिए बिना रोक बैकग्राउंड डेटा चालू करके फिर जाँचें।',
+    'WishWell के लिए बिना रोक बैकग्राउंड डेटा चालू करके फिर जाँचें।',
   'live.reason.distributionUnapproved':
     'यह बिल्ड या इंस्टॉल माध्यम अपने-आप SMS के लिए स्वीकृत नहीं है।',
   'live.reason.dozeExemptionMissing':
@@ -1363,7 +1381,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.reason.playServicesMissing':
     'इस Android फ़ोन पर समर्थित Google Play services चाहिए।',
   'live.reason.hibernationUnsafe':
-    'Birthday Autopilot के लिए unused-app रोक बंद करके फिर जाँचें।',
+    'WishWell के लिए unused-app रोक बंद करके फिर जाँचें।',
   'live.reason.installerAllowlistMissing':
     'इंस्टॉलर ने सीमित SMS अनुमति नहीं दी। यह बिल्ड अपने-आप भेजना चालू नहीं कर सकता।',
   'live.reason.internalContractInvalid':
@@ -1454,9 +1472,9 @@ export const liveHindi: typeof liveEnglish = {
     'भेजने वाला, SIM या अनुमति सेटअप बदल गया। स्वीकृति फिर देखें।',
   'live.approvalReason.disclosureChanged':
     'सहमति या शुल्क जानकारी बदल गई। मौजूदा संस्करण पढ़कर स्वीकृत करें।',
-  'live.bootstrap.loading': 'Birthday Autopilot सुरक्षित रूप से शुरू हो रहा है',
-  'live.bootstrap.unavailable': 'Birthday Autopilot उपलब्ध नहीं है',
-  'live.setup.title': 'Birthday Autopilot सेट करें',
+  'live.bootstrap.loading': 'WishWell सुरक्षित रूप से शुरू हो रहा है',
+  'live.bootstrap.unavailable': 'WishWell उपलब्ध नहीं है',
+  'live.setup.title': 'WishWell सेट करें',
   'live.setup.loading': 'सेटअप स्थिति लोड हो रही है',
   'live.setup.unavailable': 'सेटअप स्थिति उपलब्ध नहीं है',
   'live.setup.platformMismatch': 'फ़ोन प्लेटफ़ॉर्म सत्यापित नहीं हुआ',
@@ -1483,9 +1501,9 @@ export const liveHindi: typeof liveEnglish = {
     'रिमाइंडर संदेश नहीं भेजते। Messages से भेजे SMS या MMS पर कैरियर शुल्क लग सकता है। उपलब्ध भेजने वाली लाइन और अंतिम ट्रांसपोर्ट को iOS व Messages नियंत्रित करते हैं; यह ऐप उन्हें चुन या पक्का नहीं कर सकता।',
   'live.setup.contactsPrivacyTitle': 'आपके Contacts की गोपनीयता सीमा',
   'live.setup.contactsPrivacyAndroid':
-    'Birthday Autopilot आयात किए गए कच्चे नाम, फ़ोन नंबर, जन्मदिन और स्रोत फ़ील्ड इस फ़ोन के सुरक्षित, एन्क्रिप्टेड स्टोरेज में रखता है। Android पर किसी व्यक्ति को चालू करने के बाद ही तय लंबाई वाले छद्मनामित डुप्लिकेट-सुरक्षा आधार और सीमित घटना/भेजने का समय Firebase तक जाता है। वे कच्चे Contacts नहीं हैं और अनाम नहीं हैं। Firebase खाते, इंस्टॉलेशन, सत्यापन और सेवा मेटाडेटा भी डिवाइस की सीमा से बाहर जा सकते हैं; पूरी सूची गोपनीयता में देखें।',
+    'WishWell आयात किए गए कच्चे नाम, फ़ोन नंबर, जन्मदिन और स्रोत फ़ील्ड इस फ़ोन के सुरक्षित, एन्क्रिप्टेड स्टोरेज में रखता है। Android पर किसी व्यक्ति को चालू करने के बाद ही तय लंबाई वाले छद्मनामित डुप्लिकेट-सुरक्षा आधार और सीमित घटना/भेजने का समय Firebase तक जाता है। वे कच्चे Contacts नहीं हैं और अनाम नहीं हैं। Firebase खाते, इंस्टॉलेशन, सत्यापन और सेवा मेटाडेटा भी डिवाइस की सीमा से बाहर जा सकते हैं; पूरी सूची गोपनीयता में देखें।',
   'live.setup.contactsPrivacyIos':
-    'Birthday Autopilot आयात किए गए कच्चे नाम, फ़ोन नंबर, जन्मदिन और स्रोत फ़ील्ड इस iPhone के सुरक्षित, एन्क्रिप्टेड स्टोरेज में रखता है। iOS, Android की डुप्लिकेट-सुरक्षा समन्वय सेवा में लोगों को पंजीकृत नहीं करता और अपने-आप संदेश नहीं भेज सकता। Firebase खाते, इंस्टॉलेशन, App Check, Remote Config और सेवा मेटाडेटा फिर भी डिवाइस की सीमा से बाहर जा सकते हैं; पूरी सूची गोपनीयता में देखें।',
+    'WishWell आयात किए गए कच्चे नाम, फ़ोन नंबर, जन्मदिन और स्रोत फ़ील्ड इस iPhone के सुरक्षित, एन्क्रिप्टेड स्टोरेज में रखता है। iOS, Android की डुप्लिकेट-सुरक्षा समन्वय सेवा में लोगों को पंजीकृत नहीं करता और अपने-आप संदेश नहीं भेज सकता। Firebase खाते, इंस्टॉलेशन, App Check, Remote Config और सेवा मेटाडेटा फिर भी डिवाइस की सीमा से बाहर जा सकते हैं; पूरी सूची गोपनीयता में देखें।',
   'live.setup.senderGateTitle': 'इस फ़ोन की भूमिका चुनें',
   'live.setup.senderGateBody':
     'दूसरा Android फ़ोन सक्रिय है। भेजने वाली भूमिका साफ़ तौर पर ट्रांसफ़र किए बिना यह फ़ोन Contacts नहीं पढ़ेगा या जन्मदिन सेटिंग नहीं बदलेगा। इसे Standby पर छोड़ना सुरक्षित है।',
@@ -1522,7 +1540,7 @@ export const liveHindi: typeof liveEnglish = {
     'अनुरोध पूरा हुआ और सेटअप फिर जाँचा गया। स्क्रीन खुद चरण नहीं बढ़ाती।',
   'live.setup.actionUnverified':
     'अनुरोध स्वीकार हुआ, पर सेटअप फिर जाँचा नहीं जा सका। पहले ताज़ा करें।',
-  'live.guidedSetup.title': 'Birthday Autopilot का सेटअप पूरा करें',
+  'live.guidedSetup.title': 'WishWell का सेटअप पूरा करें',
   'live.guidedSetup.body':
     'आपका Google खाता और Contacts आयात तैयार हैं। बाकी चुनाव अभी पूरे करें या बाद में लौटें; सहेजी प्रगति सुरक्षित रहेगी।',
   'live.guidedSetup.step': '4 में से चरण {{step}}',
@@ -1608,6 +1626,10 @@ export const liveHindi: typeof liveEnglish = {
   'live.home.androidNotConfiguredBody':
     'कोई स्वचालित SMS सक्रिय नहीं है। पहले सेटअप, स्वीकृति और टेस्ट पूरा करें।',
   'live.home.upcoming': 'आने वाला',
+  'live.home.weeklyPreviewTitle': 'साप्ताहिक ऑटोमेशन पूर्वावलोकन',
+  'live.home.weeklyPreviewBody':
+    'अगले 7 दिनों के लिए आपके पास {{count}} अन्य जन्मदिन संदेश निर्धारित हैं।',
+  'live.home.skipOccurrence': 'इस बार न भेजें',
   'live.home.birthday': 'जन्मदिन',
   'live.home.window': 'समय सीमा',
   'live.home.phone': 'फ़ोन',
@@ -1846,7 +1868,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.person.choiceAccepted': 'पसंद सहेजी गई और विवरण फिर जाँचा गया।',
   'live.person.googleContactsRepairTitle': 'मूल संपर्क अपडेट करें',
   'live.person.googleContactsRepairBody':
-    'किसी व्यक्ति की पहचान साझा किए बिना Google Contacts खोलें। लौटने पर Birthday Autopilot फिर सिंक करके इस व्यक्ति की समीक्षा करेगा; बदलाव सफल होने का अनुमान नहीं लगाएगा।',
+    'किसी व्यक्ति की पहचान साझा किए बिना Google Contacts खोलें। लौटने पर WishWell फिर सिंक करके इस व्यक्ति की समीक्षा करेगा; बदलाव सफल होने का अनुमान नहीं लगाएगा।',
   'live.person.googleContactsRegionRepairBody':
     'इस स्थानीय फ़ोन प्रारूप का देश या क्षेत्र भरोसे से तय नहीं होता। Google Contacts में अंतरराष्ट्रीय देश कोड (जैसे +91) जोड़ें, फिर लौटकर दोबारा सिंक करें।',
   'live.person.openGoogleContacts': 'Google Contacts में ठीक करें',
@@ -1939,7 +1961,7 @@ export const liveHindi: typeof liveEnglish = {
     'Android अलग सामग्री-रहित डुप्लिकेट-सुरक्षा रिकॉर्ड अधिकतम 400 दिन रख सकता है। गतिविधि साफ़ करने से यह नहीं मिटता।',
   'live.settings.iosSafetyRetention':
     'iPhone केवल वही न्यूनतम अपारदर्शी कंपोज़र निशान रखता है जो उसी जन्मदिन ड्राफ़्ट को फिर खोलने से रोकता है। यह Android का 400-दिन भेजने वाला लेजर नहीं है।',
-  'live.settings.externalBoundary': 'Birthday Autopilot के बाहर की प्रतियाँ',
+  'live.settings.externalBoundary': 'WishWell के बाहर की प्रतियाँ',
   'live.settings.externalCopies':
     'ऐप कैरियर, प्राप्तकर्ता, Android SMS, Apple Messages या बाहरी बैकअप की प्रतियाँ नहीं मिटा सकता।',
   'live.settings.birthdayPlan': 'जन्मदिन योजना',
@@ -2085,14 +2107,14 @@ export const liveHindi: typeof liveEnglish = {
   'live.activity.detail.composerReportedSentTitle':
     'Messages ने भेजा बताया; डिलीवरी पक्की नहीं',
   'live.activity.detail.composerReportedSentBody':
-    'इस स्थानीय जन्मदिन घटना के लिए यह अंतिम नतीजा है। Birthday Autopilot इसके लिए दूसरा इन-ऐप कंपोज़र नहीं देगा।',
+    'इस स्थानीय जन्मदिन घटना के लिए यह अंतिम नतीजा है। WishWell इसके लिए दूसरा इन-ऐप कंपोज़र नहीं देगा।',
   'live.activity.detail.composerUnknownTitle': 'कंपोज़र का नतीजा अज्ञात है',
   'live.activity.detail.composerUnknownBody':
     'सफलता या विफलता का अनुमान न लगाएँ। इस स्थानीय जन्मदिन घटना के लिए यह अंतिम नतीजा है और ऐप दूसरा इन-ऐप कंपोज़र नहीं देगा।',
   'live.activity.detail.iosVisibilityTitle':
     'अंतिम संदेश की जानकारी इस ऐप के बाहर है',
   'live.activity.detail.iosVisibilityBody':
-    'Birthday Autopilot अंतिम बदला व्यक्ति या संदेश, भेजने वाली लाइन, SMS/MMS/iMessage माध्यम, कैरियर स्वीकृति या डिलीवरी नहीं देख सकता।',
+    'WishWell अंतिम बदला व्यक्ति या संदेश, भेजने वाली लाइन, SMS/MMS/iMessage माध्यम, कैरियर स्वीकृति या डिलीवरी नहीं देख सकता।',
   'live.activity.nextPage': 'अगला पृष्ठ',
   'live.activity.previousPage': 'पिछला पृष्ठ',
   'live.attention.title': 'ध्यान चाहिए',
@@ -2153,6 +2175,20 @@ export const liveHindi: typeof liveEnglish = {
   'live.message.english': 'अंग्रेज़ी',
   'live.message.hindi': 'हिन्दी',
   'live.message.tone': 'भाव',
+  'live.message.relationship': 'संबंध',
+  'live.message.milestone': 'महत्वपूर्ण पड़ाव',
+  'live.message.any': 'कोई भी',
+  'live.message.rel_friend': 'मित्र',
+  'live.message.rel_family': 'परिवार',
+  'live.message.rel_colleague': 'सहकर्मी',
+  'live.message.rel_partner': 'साथी',
+  'live.message.rel_casual': 'अनौपचारिक',
+  'live.message.milestone_none': 'कोई नहीं',
+  'live.message.milestone_new-job': 'नई नौकरी',
+  'live.message.milestone_graduation': 'स्नातक',
+  'live.message.milestone_moved': 'स्थानांतरण',
+  'live.message.milestone_new-baby': 'नया बच्चा',
+  'live.message.milestone_milestone-age': 'विशेष आयु',
   'live.message.warm': 'स्नेहपूर्ण',
   'live.message.simple': 'सरल',
   'live.message.cheerful': 'खुशनुमा',
@@ -2369,7 +2405,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.privacy.body': 'पुष्टि से पहले सटीक परिणाम देखें।',
   'live.privacy.screenCaptureTitle': 'स्क्रीन गोपनीयता',
   'live.privacy.screenCaptureBody':
-    'जहाँ सिस्टम इसकी अनुमति देता है, Birthday Autopilot ऐप स्विचर में निजी सामग्री छिपाता है। ऐप खुला होने पर लिए गए स्क्रीनशॉट या रिकॉर्डिंग में नाम, फ़ोन नंबर या संदेश रह सकते हैं। साझा करने से पहले उन्हें जाँचें।',
+    'जहाँ सिस्टम इसकी अनुमति देता है, WishWell ऐप स्विचर में निजी सामग्री छिपाता है। ऐप खुला होने पर लिए गए स्क्रीनशॉट या रिकॉर्डिंग में नाम, फ़ोन नंबर या संदेश रह सकते हैं। साझा करने से पहले उन्हें जाँचें।',
   'live.privacy.showDataDetails': 'डेटा विवरण',
   'live.privacy.hideDataDetails': 'डेटा विवरण छिपाएँ',
   'live.privacy.loading': 'गोपनीयता जानकारी लोड हो रही है',
@@ -2490,11 +2526,11 @@ export const liveHindi: typeof liveEnglish = {
     'Gemini सुझाव अनुरोध में केवल भाषा, भाव, नाम शैली और SMS-भाग की पसंद होती है। उसमें संपर्क नाम, फ़ोन नंबर, जन्मदिन, संदेश इतिहास और मौजूदा सहेजा या ड्राफ़्ट संदेश नहीं होता।',
   'live.privacy.providerRetentionTitle': 'प्रदाता की डेटा-रखाव सीमा',
   'live.privacy.providerRetentionBody':
-    'Firebase, Google, Gemini, कैरियर, Messages, iCloud और बैकअप प्रदाता अपनी नीतियों और कानूनी दायित्वों के तहत प्रमाणीकरण, इंस्टॉलेशन, सत्यापन, अनुरोध/जवाब, परिचालन, दुरुपयोग-रोकथाम, बिलिंग या ट्रांसपोर्ट रिकॉर्ड रख सकते हैं। उत्पाद से मिटाना Birthday Autopilot के नियंत्रण वाले डेटा पर लागू होता है; यह प्रदाता लॉग या बाहरी प्रतियों के तुरंत मिटने का वादा नहीं कर सकता। विवरण के लिए मौजूदा सार्वजनिक गोपनीयता नीति देखें।',
+    'Firebase, Google, Gemini, कैरियर, Messages, iCloud और बैकअप प्रदाता अपनी नीतियों और कानूनी दायित्वों के तहत प्रमाणीकरण, इंस्टॉलेशन, सत्यापन, अनुरोध/जवाब, परिचालन, दुरुपयोग-रोकथाम, बिलिंग या ट्रांसपोर्ट रिकॉर्ड रख सकते हैं। उत्पाद से मिटाना WishWell के नियंत्रण वाले डेटा पर लागू होता है; यह प्रदाता लॉग या बाहरी प्रतियों के तुरंत मिटने का वादा नहीं कर सकता। विवरण के लिए मौजूदा सार्वजनिक गोपनीयता नीति देखें।',
   'live.help.title': 'सहायता, कानूनी और परिचय',
   'live.help.body':
     'सार्वजनिक नीतियाँ पढ़ें, सत्यापित सहायता लें या ऐप दोबारा इंस्टॉल किए बिना खाता मिटाने की वेबसाइट इस्तेमाल करें।',
-  'live.help.about': 'Birthday Autopilot के बारे में',
+  'live.help.about': 'WishWell के बारे में',
   'live.help.androidLimitation':
     'डिवाइस-SIM से अपने-आप जन्मदिन संदेश तभी चलते हैं जब समर्थित डिवाइस, अनुमति, नीति, बैकग्राउंड, टेस्ट और रिलीज़ की हर शर्त पूरी हो।',
   'live.help.iosLimitation':
@@ -2502,7 +2538,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.help.build': 'ऐप बिल्ड',
   'live.help.externalCopies': 'कुछ प्रतियाँ इस ऐप के बाहर हैं',
   'live.help.externalCopiesBody':
-    'SMS, Messages, iCloud, कैरियर, प्राप्तकर्ता और बाहरी बैकअप प्रतियाँ Birthday Autopilot मिटा या वापस नहीं ले सकता।',
+    'SMS, Messages, iCloud, कैरियर, प्राप्तकर्ता और बाहरी बैकअप प्रतियाँ WishWell मिटा या वापस नहीं ले सकता।',
   'live.help.loading': 'सार्वजनिक संसाधन जाँचे जा रहे हैं',
   'live.help.unavailable': 'सार्वजनिक संसाधन उपलब्ध नहीं हैं',
   'live.help.linksUnavailable': 'सार्वजनिक लिंक कॉन्फ़िगर नहीं हैं',

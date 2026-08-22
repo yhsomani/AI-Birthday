@@ -12,6 +12,8 @@ import {
   Card,
   KeyValue,
   Screen,
+  SectionHeading,
+  StatusRow,
 } from '../../design-system/components/Primitives';
 import { formatLiveInstant } from '../../localization/formatLive';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
@@ -236,77 +238,146 @@ export function LiveDiagnosticsScreen({
           testID="live-diagnostics-preview"
         />
       ) : (
-        <Card testID="live-diagnostics-review">
-          <KeyValue
-            label={t('live.diagnostics.build')}
-            value={preview.preview.buildLabel}
-          />
-          <KeyValue
-            label={t('live.diagnostics.system')}
-            value={preview.preview.androidOrIosVersionLabel}
-          />
-          <KeyValue
-            label={t('live.diagnostics.transitions')}
-            value={String(preview.preview.transitionCount)}
-          />
-          <KeyValue
-            label={t('live.diagnostics.health')}
-            value={t(
-              preview.preview.capabilityCodes.length === 0
-                ? 'live.diagnostics.healthClear'
-                : 'live.diagnostics.healthReported',
-              { count: preview.preview.capabilityCodes.length },
-            )}
-          />
-          {preview.preview.schedulerHeartbeatAt ? (
-            <KeyValue
-              label={t('live.diagnostics.schedulerHeartbeat')}
-              value={formatLiveInstant(
-                preview.preview.schedulerHeartbeatAt,
-                language,
-              )}
-            />
-          ) : null}
-          {preview.preview.earliestEventAt ? (
-            <KeyValue
-              label={t('live.diagnostics.earliestEvent')}
-              value={formatLiveInstant(
-                preview.preview.earliestEventAt,
-                language,
-              )}
-            />
-          ) : null}
-          {preview.preview.latestEventAt ? (
-            <KeyValue
-              label={t('live.diagnostics.latestEvent')}
-              value={formatLiveInstant(preview.preview.latestEventAt, language)}
-            />
-          ) : null}
-          <KeyValue
-            label={t('live.diagnostics.capabilities')}
-            value={
-              preview.preview.capabilityCodes.join(', ') ||
-              t('live.common.none')
-            }
-          />
-          <Button
-            label={
-              pending === 'share'
-                ? t('live.diagnostics.sharing')
-                : t('live.diagnostics.share')
-            }
-            disabled={pending !== undefined}
-            onPress={share}
-            testID="live-diagnostics-share"
-          />
-          <Button
-            label={t('live.common.close')}
-            disabled={pending !== undefined}
-            onPress={retireProtectedState}
-            variant="secondary"
-            testID="live-diagnostics-close-review"
-          />
-        </Card>
+        (() => {
+          const capabilityCodes = preview.preview.capabilityCodes;
+          const hasAccountIssue = capabilityCodes.some(
+            c => c.includes('account') || c.includes('reauth'),
+          );
+          const hasContactsIssue = capabilityCodes.some(
+            c => c.includes('contacts') || c.includes('auth'),
+          );
+          const hasSmsIssue = capabilityCodes.some(
+            c =>
+              c.includes('sms') || c.includes('sim') || c.includes('telephony'),
+          );
+          const hasBackgroundIssue = capabilityCodes.some(
+            c =>
+              c.includes('background') ||
+              c.includes('doze') ||
+              c.includes('power') ||
+              c.includes('hibernation'),
+          );
+
+          return (
+            <Card testID="live-diagnostics-review">
+              <KeyValue
+                label={t('live.diagnostics.build')}
+                value={preview.preview.buildLabel}
+              />
+              <KeyValue
+                label={t('live.diagnostics.system')}
+                value={preview.preview.androidOrIosVersionLabel}
+              />
+              <KeyValue
+                label={t('live.diagnostics.transitions')}
+                value={String(preview.preview.transitionCount)}
+              />
+              <KeyValue
+                label={t('live.diagnostics.health')}
+                value={t(
+                  preview.preview.capabilityCodes.length === 0
+                    ? 'live.diagnostics.healthClear'
+                    : 'live.diagnostics.healthReported',
+                  { count: preview.preview.capabilityCodes.length },
+                )}
+              />
+
+              <SectionHeading title={t('live.diagnostics.health')} />
+              <StatusRow
+                title={t('live.setup.step.google')}
+                detail={
+                  hasAccountIssue
+                    ? t('live.reason.accountReconnect')
+                    : t('live.diagnostics.healthClear')
+                }
+                tone={hasAccountIssue ? 'warning' : 'positive'}
+                testID="diag-check-account"
+              />
+              <StatusRow
+                title={t('live.setup.step.contacts')}
+                detail={
+                  hasContactsIssue
+                    ? t('live.reason.contactsAuthorization')
+                    : t('live.diagnostics.healthClear')
+                }
+                tone={hasContactsIssue ? 'warning' : 'positive'}
+                testID="diag-check-contacts"
+              />
+              <StatusRow
+                title={t('live.device.transfer.title')}
+                detail={
+                  hasSmsIssue
+                    ? t('live.reason.noActiveSim')
+                    : t('live.diagnostics.healthClear')
+                }
+                tone={hasSmsIssue ? 'warning' : 'positive'}
+                testID="diag-check-sms"
+              />
+              <StatusRow
+                title={t('live.reason.backgroundRestricted')}
+                detail={
+                  hasBackgroundIssue
+                    ? t('live.reason.backgroundRestricted')
+                    : t('live.diagnostics.healthClear')
+                }
+                tone={hasBackgroundIssue ? 'warning' : 'positive'}
+                testID="diag-check-background"
+              />
+
+              {preview.preview.schedulerHeartbeatAt ? (
+                <KeyValue
+                  label={t('live.diagnostics.schedulerHeartbeat')}
+                  value={formatLiveInstant(
+                    preview.preview.schedulerHeartbeatAt,
+                    language,
+                  )}
+                />
+              ) : null}
+              {preview.preview.earliestEventAt ? (
+                <KeyValue
+                  label={t('live.diagnostics.earliestEvent')}
+                  value={formatLiveInstant(
+                    preview.preview.earliestEventAt,
+                    language,
+                  )}
+                />
+              ) : null}
+              {preview.preview.latestEventAt ? (
+                <KeyValue
+                  label={t('live.diagnostics.latestEvent')}
+                  value={formatLiveInstant(
+                    preview.preview.latestEventAt,
+                    language,
+                  )}
+                />
+              ) : null}
+              <KeyValue
+                label={t('live.diagnostics.capabilities')}
+                value={
+                  preview.preview.capabilityCodes.join(', ') ||
+                  t('live.common.none')
+                }
+              />
+              <Button
+                label={
+                  pending === 'share'
+                    ? t('live.diagnostics.sharing')
+                    : t('live.diagnostics.share')
+                }
+                disabled={pending !== undefined}
+                onPress={share}
+                testID="live-diagnostics-share"
+              />
+              <Button
+                label={t('live.common.close')}
+                disabled={pending !== undefined}
+                onPress={retireProtectedState}
+                variant="secondary"
+                testID="live-diagnostics-close-review"
+              />
+            </Card>
+          );
+        })()
       )}
     </Screen>
   );

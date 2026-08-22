@@ -2,7 +2,7 @@ import { liveEnglish, liveHindi } from './liveResources';
 
 const productionEnglish = {
   ...liveEnglish,
-  'home.title': 'Birthday Autopilot',
+  'home.title': 'WishWell',
   'settings.title': 'Settings',
   'tabs.home': 'Home',
   'tabs.people': 'People',
@@ -11,7 +11,7 @@ const productionEnglish = {
 
 const productionHindi: Record<keyof typeof productionEnglish, string> = {
   ...liveHindi,
-  'home.title': 'Birthday Autopilot',
+  'home.title': 'WishWell',
   'settings.title': 'सेटिंग',
   'tabs.home': 'होम',
   'tabs.people': 'लोग',

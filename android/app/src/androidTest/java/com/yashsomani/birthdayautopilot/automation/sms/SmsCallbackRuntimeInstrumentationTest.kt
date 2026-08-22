@@ -392,7 +392,7 @@ class SmsCallbackRuntimeInstrumentationTest {
     destinationPrehash = "destination-prehash",
     normalizedDestination = "+919999999999",
     maskedDestination = "•••• 9999",
-    exactMessage = "Birthday Autopilot test",
+    exactMessage = "WishWell test",
     payloadHash = PAYLOAD_HASH,
     simPolicyKind = "EXPLICIT_SUBSCRIPTION",
     resolvedSubscriptionId = 4,

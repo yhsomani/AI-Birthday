@@ -57,11 +57,11 @@ const messages = {
       'This release is not configured for account deletion. Do not send identity documents or account details through an unverified channel.',
     loading: 'Preparing the secure deletion service…',
     ready:
-      'Secure sign-in is ready. Your Google password is never shared with Birthday Autopilot.',
+      'Secure sign-in is ready. Your Google password is never shared with WishWell.',
     signingIn: 'Opening Google sign-in…',
     signedIn: 'Signed in as',
     wrongProvider:
-      'This account is not linked exactly once through Google. Use the Google account connected to Birthday Autopilot.',
+      'This account is not linked exactly once through Google. Use the Google account connected to WishWell.',
     popupClosed: 'Google sign-in was cancelled. No deletion request was sent.',
     signInFailed:
       'Google sign-in could not be confirmed. No deletion request was sent. Please try again.',
@@ -124,11 +124,11 @@ const messages = {
       'इस रिलीज़ में खाता हटाने की सेवा कॉन्फ़िगर नहीं है। किसी असत्यापित माध्यम से पहचान दस्तावेज़ या खाते की जानकारी न भेजें।',
     loading: 'सुरक्षित खाता हटाने की सेवा तैयार हो रही है…',
     ready:
-      'सुरक्षित साइन-इन तैयार है। आपका Google पासवर्ड Birthday Autopilot के साथ साझा नहीं होता।',
+      'सुरक्षित साइन-इन तैयार है। आपका Google पासवर्ड WishWell के साथ साझा नहीं होता।',
     signingIn: 'Google साइन-इन खोला जा रहा है…',
     signedIn: 'साइन-इन किया गया खाता',
     wrongProvider:
-      'यह खाता Google के माध्यम से ठीक एक बार लिंक नहीं है। Birthday Autopilot से जुड़ा Google खाता इस्तेमाल करें।',
+      'यह खाता Google के माध्यम से ठीक एक बार लिंक नहीं है। WishWell से जुड़ा Google खाता इस्तेमाल करें।',
     popupClosed:
       'Google साइन-इन रद्द हुआ। खाता हटाने का कोई अनुरोध नहीं भेजा गया।',
     signInFailed:

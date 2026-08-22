@@ -3300,7 +3300,7 @@ internal class AndroidConfigurationController(
     const val POLICY_VERSION = "global-window-v1"
     const val TEST_RETENTION_MILLIS = 30L * 24 * 60 * 60 * 1_000
     const val TEST_MESSAGE =
-      "Birthday Autopilot test message. No birthday greeting will be sent."
+      "WishWell test message. No birthday greeting will be sent."
     const val TEST_CHARGE_DISCLOSURE =
       "This sends a real SMS now. Your carrier may charge for each SMS segment."
     const val ACTIVATION_LIMITATIONS =
