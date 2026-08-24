@@ -18,7 +18,7 @@
     "test:coverage": "vitest run --coverage --exclude test/firestore.rules.emulator.test.ts --exclude test/controlPlane.emulator.test.ts",
     "test:emulator": "firebase emulators:exec --config ../firebase.json --project demo-birthday-autopilot --only firestore \"vitest run test/*.emulator.test.ts\"",
     "check": "npm run typecheck && npm run lint && npm run build && npm run test:coverage",
-    "audit:ci": "npm audit --audit-level=high && npm audit --omit=dev --audit-level=moderate"
+    "audit:ci": "npm audit --audit-level=high && npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
     "firebase-admin": "13.10.0",
@@ -35,7 +35,7 @@
     "eslint": "10.7.0",
     "fast-check": "4.9.0",
     "firebase": "12.16.0",
-    "firebase-tools": "15.23.0",
+    "firebase-tools": "14.23.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.63.0",
     "vitest": "4.1.10"

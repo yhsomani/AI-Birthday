@@ -15,7 +15,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+
 import { symlinksAvailable } from './test-capabilities.mjs';
 
 import { createNativeSbom } from './generate-native-sbom.mjs';
@@ -32,7 +32,6 @@ import {
   writeNativeAdvisoryReport,
 } from './scan-native-vulnerabilities.mjs';
 
-const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 const scanTime = new Date('2026-07-12T12:00:00.000Z');
 const emptyExceptionBytes = Buffer.from(
   '{\n  "schemaVersion": 1,\n  "exceptions": []\n}\n',

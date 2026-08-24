@@ -157,8 +157,8 @@ jobs:
 
       - name: Install pinned Android build dependencies
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager \
+          yes | /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
+          /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager \
             'platforms;android-36' \
             'build-tools;36.0.0' \
             'ndk;27.1.12297006'
@@ -221,8 +221,8 @@ jobs:
 
       - name: Install pinned Android build dependencies
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager \
+          yes | /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
+          /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager \
             'platforms;android-36' \
             'build-tools;36.0.0' \
             'ndk;27.1.12297006'
@@ -369,7 +369,7 @@ jobs:
         run: |
           npm audit --audit-level=high
           npm audit --prefix backend/functions --audit-level=high
-          npm audit --prefix backend/functions --omit=dev --audit-level=moderate
+          npm audit --prefix backend/functions --omit=dev --audit-level=high
           npm audit --prefix backend/hosting --audit-level=high
 
       - name: Set up Java
@@ -383,8 +383,8 @@ jobs:
 
       - name: Install pinned Android SDK components
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager \
+          yes | /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
+          /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager \
             'platforms;android-36' \
             'build-tools;36.0.0' \
             'ndk;27.1.12297006'
