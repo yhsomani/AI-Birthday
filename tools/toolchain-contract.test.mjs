@@ -1,21 +1,11 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
+
+import { readFileSync } from 'node:fs';
+
 import test from 'node:test';
 
 import { TOOLCHAIN_VERSIONS } from './toolchain-versions.mjs';
 import { commandAvailable } from './test-capabilities.mjs';
-
-const shAvailable = commandAvailable('sh');
 
 const read = file => readFileSync(file, 'utf8').replace(/\r\n/gu, '\n');
 
