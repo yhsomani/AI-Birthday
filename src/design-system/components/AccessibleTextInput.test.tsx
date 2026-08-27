@@ -41,6 +41,36 @@ it('forces a normalized label and the 200 percent text scaling contract', async 
   ).toBe(0);
 });
 
+it('exposes a disabled state to screen readers when not editable', async () => {
+  await renderWithTheme(
+    <AccessibleTextInput
+      accessibilityLabel="Read only field"
+      editable={false}
+      testID="disabled-input"
+    />,
+  );
+
+  const input = screen.getByTestId('disabled-input');
+  expect(input.props.accessibilityState).toEqual({ disabled: true });
+});
+
+it('merges an explicitly provided accessibilityState', async () => {
+  await renderWithTheme(
+    <AccessibleTextInput
+      accessibilityLabel="Read only field"
+      accessibilityState={{ busy: true }}
+      editable={false}
+      testID="disabled-busy-input"
+    />,
+  );
+
+  const input = screen.getByTestId('disabled-busy-input');
+  expect(input.props.accessibilityState).toEqual({
+    busy: true,
+    disabled: true,
+  });
+});
+
 it('rejects an empty accessibility label', async () => {
   await expect(
     (async () => {
