@@ -8,8 +8,6 @@ Welcome to the WishWell repository. This guide covers environment setup, workflo
 - [ ] npm `>=11.6.0`
 - [ ] Java JDK 21 (for Android build)
 - [ ] Android Studio and Android SDK (API 36)
-- [ ] Xcode 26.5 (for iOS build)
-- [ ] Ruby `3.4.10` and Bundler `4.0.15` (for iOS CocoaPods)
 - [ ] (Optional) Docker for reproducible builds
 
 ## 2. Step-by-Step Environment Setup
@@ -44,16 +42,7 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 npm run doctor:android
 ```
 
-### iOS Setup (macOS only)
-
-Ensure you are using the correct Xcode and Ruby versions:
-
-```zsh
-sudo xcode-select --switch /Applications/Xcode_26.5.app/Contents/Developer
-bundle install
-npm run ios:pods
-npm run doctor:ios
-```
+The former iOS Setup steps were removed together with the iOS platform; Android is the only supported target.
 
 ## 3. Development Workflow
 
@@ -68,11 +57,6 @@ npm run doctor:ios
 
 **Error**: `npm error engine Unsupported engine`
 **Fix**: Ensure your node version is at least `24.18.0`. Use `nvm install 24.18.0 && nvm use`.
-
-### iOS Pod Install Fails
-
-**Error**: CocoaPods errors during `npm run ios:pods`
-**Fix**: Ensure you are using exactly Ruby `3.4.10`. Verify with `ruby -v`. Use `rbenv` or `rvm` to manage Ruby versions.
 
 ### Android SDK Missing
 

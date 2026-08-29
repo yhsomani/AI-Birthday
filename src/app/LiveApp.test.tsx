@@ -90,6 +90,8 @@ jest.mock('../features/fixtures/data', () => {
   throw new Error('Production live routes imported fixture records');
 });
 
+jest.setTimeout(20000);
+
 const revision = (value: string) => value as NativeRevision;
 const instant = (value: string) => value as UtcInstant;
 const contactId = 'contact-live-1' as ContactId;

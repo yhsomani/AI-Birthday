@@ -7,7 +7,6 @@ Follow these minimal steps to get the development environment running.
 - **Node.js**: >= 24.18.0
 - **npm**: >= 11.6.0
 - **Java**: JDK 21
-- **Ruby**: 3.4.10 (macOS/iOS only)
 - **React Native CLI**: 0.86.0 environment setup
 
 ## 1. Install Dependencies
@@ -35,15 +34,6 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 npm run android
 ```
 
-## 4. Run iOS (macOS only)
-
-```zsh
-# Install ruby dependencies
-bundle install
-npm run ios:pods
-
-# Run
-npm run ios
-```
+Android is the only supported platform; the former iOS Companion Edition has been removed.
 
 For more detailed setup, troubleshooting, and workflow information, see the [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md).

@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 const require = createRequire(import.meta.url);
 const cli = require.resolve('@react-native-community/cli/build/bin.js');
 const workspace = mkdtempSync(join(tmpdir(), 'birthday-rn-bundle-'));
-const platforms = ['android', 'ios'];
+const platforms = ['android'];
 const maximumBundleBytes = 2_500_000;
 const fixtureMarkers = [
   'Interactive UI fixture',

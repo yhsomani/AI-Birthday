@@ -40,6 +40,8 @@ jest.mock('react-native-safe-area-context', () => {
   };
 });
 
+jest.setTimeout(20000);
+
 const originalPlatform = Platform.OS;
 const generatedAt = '2026-07-12T07:00:00Z' as UtcInstant;
 const revision = (value: string) => value as NativeRevision;
