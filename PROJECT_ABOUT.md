@@ -1435,9 +1435,11 @@ It minimizes cognitive load by separating **management** (People) from **monitor
 - `contacts.readonly` restricted scope → requires web deletion landing, privacy policy, and verification.
 - No `contacts` (write) scope ever.
 
-## 12.5 Contacts Access
-- Read-only; snapshot stored locally; synced to Firebase as encrypted backup for multi-device.
-- User can disconnect contacts anytime.
+## 12.5 Contacts Access — CRITICAL PRIVACY BOUNDARY
+- **Read-only**; contacts synced to device storage.
+- **CRITICAL:** Server stores **HMAC-SHA256 aliases** (derived via `birthday-autopilot/control-plane/v1` keyring) for coordination ONLY.
+- **NO raw contact names, phone numbers, or birthdates are ever stored server-side.**
+- User can disconnect contacts anytime; local snapshot deleted on sign-out.
 
 ## 12.6 Sender Identity
 - Sender device is explicitly set; no hidden sending from cloud.

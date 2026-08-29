@@ -8,15 +8,13 @@ authority and every production coordinate are independently provisioned.
 ## What this closes
 
 `npm run release:closure:validate -- ...` is the one executable decision that
-composes the Android AAB distribution, physical Play delivery, iOS artifact, cloud, store-submission, and
+composes the Android AAB distribution, physical Play delivery, cloud, store-submission, and
 Hosting proofs. It accepts only an authority-signed final manifest whose exact
 bytes bind:
 
 - one clean authoritative Git HEAD and the tracked Ed25519 authority SPKI pin;
-- the production Firebase project number/ID and exact Android/iOS Firebase app
-  IDs;
-- the exact Google Play AAB and App Store IPA bytes, names, versions, package /
-  bundle IDs, signing-certificate digests, and the exact Play-delivered base/split
+- the production Firebase project number/ID and exact Android Firebase app ID;
+- the exact Google Play AAB bytes, name, version, package ID, signing-certificate digest, and the exact Play-delivered base/split
   APK inventory observed on a physical device installed by Google Play;
 - the exact Hosting origin, approved release-config bytes, and deployed
   artifact bytes;
@@ -62,16 +60,7 @@ placeholders; do not copy values from another tier or invent missing evidence.
    access-controlled directory using their reported APK file names; the final
    validator independently hashes the exact base and every split and rejects
    missing, additional, linked, renamed, or changed files.
-3. Run the existing iOS verifier. Its required `--report` is deterministic and
-   includes the signed evidence digest, authority SPKI digest, clean source,
-   approval expiry, inspected Firebase projection, IPA digest, versions, and
-   exported distribution certificate. Its mandatory `--evidence-root` must
-   retain the exact 14 primary support files plus every scenario-raw and
-   performance-support file they bind. Likewise retain the Android verifier's
-   complete primary/scenario-raw/performance-support evidence root. Component
-   reports summarize successful verification; they do not replace those raw
-   inputs in the immutable release package.
-4. Run the cloud validator with its new optional report output:
+3. Run the cloud validator with its new optional report output:
 
    ```sh
    npm run cloud:evidence:validate -- \
@@ -85,9 +74,9 @@ placeholders; do not copy values from another tier or invent missing evidence.
    The report contains no credentials or request bodies. It deterministically
    projects the signed evidence/source/authority, production project and mobile
    app IDs, earliest approval expiry, Android Play App Check/OAuth trust,
-   inspected iOS OAuth/team trust, web reCAPTCHA Enterprise registration, and
+   web reCAPTCHA Enterprise registration, and
    Hosting source/config/deployment digests. The final closure cross-checks
-   those projections against the delivered Android signer, inspected IPA, and
+   those projections against the delivered Android signer and
    exact Hosting release config.
 
 5. Run the signed store wrapper with all its existing environment inputs and an
@@ -233,7 +222,6 @@ npm run release:closure:validate -- \
   --android-artifact <protected/exact-production.aab> \
   --android-delivered-base <protected/play-installed-apks/base.apk> \
   --android-installed-apk-root <protected/play-installed-apks> \
-  --ios-artifact <protected/exact-production.ipa> \
   --hosting-artifact <protected/hosting-deployment-artifact.json>
 ```
 
@@ -241,6 +229,10 @@ Only a final `PASS production release closure ...` result authorizes those exact
 bytes during that unexpired window. Changing a report, artifact, version,
 certificate, Play-installed base/split inventory, Firebase app, project, Hosting origin/config, approval, manifest,
 signature, authority pin, source file, HEAD, or worktree requires a new closure.
+
+## Android-only launch scope
+
+This closure process supports Android-only production releases. iOS companion remains a Phase 3 future opportunity; no iOS artifact (IPA) is required for Android Automation Edition launches. When iOS companion reaches production readiness, this closure process will be extended to include iOS artifact verification.
 
 ## Intentional blockers
 
