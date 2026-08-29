@@ -85,7 +85,7 @@ so existing release evidence can never be overwritten.
 
 The live [native dependency advisory gate](docs/NATIVE_DEPENDENCY_ADVISORY_GATE.md) scans four
 truthfully labeled scopes: Android production runtime, the broader Android app/build/test graph,
-Android build plugins, and iOS CocoaPods. It verifies every SBOM against its lock, verifies trunk
+Android build plugins, and iOS CocoaPods scaffolding (Phase 3). It verifies every SBOM against its lock, verifies trunk
 podspec checksum/source mappings before SwiftURL queries, and requires Maven, npm, and Swift
 ecosystem canaries. A service outage, incomplete mapping, active finding, or unauthorized exception fails
 closed. Ordinary CI permits zero exceptions; a reported zero means no active mapped OSV advisory at
