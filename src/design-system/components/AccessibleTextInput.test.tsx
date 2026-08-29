@@ -41,6 +41,19 @@ it('forces a normalized label and the 200 percent text scaling contract', async 
   ).toBe(0);
 });
 
+it('sets accessibilityState disabled based on editable prop', async () => {
+  await renderWithTheme(
+    <AccessibleTextInput
+      accessibilityLabel="Read only input"
+      editable={false}
+      testID="disabled-input"
+    />,
+  );
+
+  const input = screen.getByTestId('disabled-input');
+  expect(input.props.accessibilityState).toEqual({ disabled: true });
+});
+
 it('rejects an empty accessibility label', async () => {
   await expect(
     (async () => {
