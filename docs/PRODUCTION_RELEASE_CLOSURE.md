@@ -79,7 +79,7 @@ placeholders; do not copy values from another tier or invent missing evidence.
    those projections against the delivered Android signer and
    exact Hosting release config.
 
-5. Run the signed store wrapper with all its existing environment inputs and an
+4. Run the signed store wrapper with all its existing environment inputs and an
    additional protected output path:
 
    ```sh
@@ -92,7 +92,7 @@ placeholders; do not copy values from another tier or invent missing evidence.
    Hosting config, signed store evidence, approval scope, current signed mobile
    version/build coordinates, and earliest approval expiry.
 
-6. Download the exact retained output of the protected
+5. Download the exact retained output of the protected
    `Hosting production artifact deploy and provenance` workflow. Compose the
    Hosting report from the successful cloud/store report bytes, approved raw
    config, canonical deployment artifact, its manifest, and the provider-bound
