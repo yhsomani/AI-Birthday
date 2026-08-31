@@ -27,11 +27,11 @@ refresh token, API key, signing key, or real user identity is forbidden.
 
 ## Three states
 
-| State        | What can pass                                                                 | What remains blocked                                                                             |
-| ------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `draft`      | Candidate EN/HI copy and a complete inventory of missing inputs               | Submission, upload, policy claims, and release                                                   |
-| `submission` | Real artifacts/assets/console exports plus all internal approvals             | Public release; Play SMS decision may still be pending                                           |
-| `release`    | Everything in submission plus accepted Play SMS outcome                       | Nothing in this file waives Android distribution, signing, device/carrier, or Firebase gates     |
+| State        | What can pass                                                     | What remains blocked                                                                         |
+| ------------ | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `draft`      | Candidate EN/HI copy and a complete inventory of missing inputs   | Submission, upload, policy claims, and release                                               |
+| `submission` | Real artifacts/assets/console exports plus all internal approvals | Public release; Play SMS decision may still be pending                                       |
+| `release`    | Everything in submission plus accepted Play SMS outcome           | Nothing in this file waives Android distribution, signing, device/carrier, or Firebase gates |
 
 A Play rejection of the SMS permission blocks unattended Play distribution; it never disguises the app as a default SMS handler.
 
