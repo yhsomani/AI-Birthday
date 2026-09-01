@@ -17,7 +17,7 @@
     "check": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
-    "firebase": "12.16.0"
+    "firebase": "12.18.0"
   },
   "devDependencies": {
     "typescript": "5.9.3",
