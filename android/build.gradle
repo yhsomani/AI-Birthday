@@ -13,7 +13,7 @@ buildscript {
     }
     dependencies {
         classpath("com.android.tools.build:gradle")
-        classpath("com.android.tools.build:bundletool:1.18.1")
+        classpath("com.android.tools.build:bundletool:1.18.3")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("com.google.devtools.ksp:com.google.devtools.ksp.gradle.plugin:2.1.20-2.0.1")
         classpath("com.google.gms:google-services:4.5.0")
@@ -72,8 +72,8 @@ tasks.register("dumpBirthdayAabManifest", JavaExec) {
                 artifact.name == "bundletool"
         }.toList()
         if (bundletoolArtifacts.size() != 1 ||
-            bundletoolArtifacts[0].moduleVersion.id.version != "1.18.1") {
-            throw new GradleException("The AAB inspector requires exactly bundletool 1.18.1 from the locked buildscript graph.")
+            bundletoolArtifacts[0].moduleVersion.id.version != "1.18.3") {
+            throw new GradleException("The AAB inspector requires exactly bundletool 1.18.3 from the locked buildscript graph.")
         }
         def requestedPath = providers.gradleProperty("birthdayAabPath").orNull
         if (requestedPath == null || requestedPath.trim().isEmpty()) {
@@ -111,8 +111,8 @@ tasks.register("dumpBirthdayAabResources", JavaExec) {
                 artifact.name == "bundletool"
         }.toList()
         if (bundletoolArtifacts.size() != 1 ||
-            bundletoolArtifacts[0].moduleVersion.id.version != "1.18.1") {
-            throw new GradleException("The AAB inspector requires exactly bundletool 1.18.1 from the locked buildscript graph.")
+            bundletoolArtifacts[0].moduleVersion.id.version != "1.18.3") {
+            throw new GradleException("The AAB inspector requires exactly bundletool 1.18.3 from the locked buildscript graph.")
         }
         def requestedPath = providers.gradleProperty("birthdayAabPath").orNull
         if (requestedPath == null || requestedPath.trim().isEmpty()) {
