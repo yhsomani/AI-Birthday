@@ -657,7 +657,7 @@ dependencies {
     implementation("com.google.firebase:firebase-config:23.1.0")
     implementation("com.google.firebase:firebase-functions:22.1.1")
     implementation("com.google.code.gson:gson:2.14.0")
-    implementation("com.googlecode.libphonenumber:libphonenumber:9.0.34")
+    implementation("com.googlecode.libphonenumber:libphonenumber:9.0.38")
     // Room 2.8.4 migration/test serializers require the Java-default-method ABI introduced by
     // kotlinx.serialization 1.8.x. Firebase AI otherwise resolves 1.7.3, which compiles but
     // crashes when Room reads an exported schema on-device.
