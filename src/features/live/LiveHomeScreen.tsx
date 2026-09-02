@@ -348,8 +348,6 @@ export function LiveHomeScreen({
   }, [previewExpanded, port, trustedHomeEnvelope?.value.next?.recipient]);
   const homeActionSequence = useRef(0);
   const homeTrustGeneration = useRef(0);
-  const trustedHomeEnvelopeRef = useRef(trustedHomeEnvelope);
-  trustedHomeEnvelopeRef.current = trustedHomeEnvelope;
   const renderTrustGeneration = homeTrustGeneration.current;
 
   useEffect(() => {
@@ -808,6 +806,7 @@ export function LiveHomeScreen({
                 label={t('live.home.skipOccurrence')}
                 onPress={prepareToday}
                 variant="secondary"
+                disabled={todayPending}
                 testID="live-home-skip-occurrence"
               />
             ) : null}

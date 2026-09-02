@@ -21,7 +21,9 @@ export const liveEnglish = {
   'live.common.none': 'None reported',
   'live.common.sim': 'SIM',
   'live.common.message': 'Message',
-  'live.common.parts': '{{count}} SMS part(s)',
+  'live.common.parts': '{{count}} SMS part',
+  'live.common.parts_one': '{{count}} SMS part',
+  'live.common.parts_other': '{{count}} SMS parts',
   'live.common.code': 'Technical code: {{value}}',
   'live.common.reference': 'Support reference: {{reference}}',
   'live.common.blocks': 'Blocks: {{value}}',
@@ -331,6 +333,10 @@ export const liveEnglish = {
   'live.home.upcoming': 'Upcoming',
   'live.home.weeklyPreviewTitle': 'Weekly Automation Preview',
   'live.home.weeklyPreviewBody':
+    'You have {{count}} other birthday send scheduled for the next 7 days.',
+  'live.home.weeklyPreviewBody_one':
+    'You have {{count}} other birthday send scheduled for the next 7 days.',
+  'live.home.weeklyPreviewBody_other':
     'You have {{count}} other birthday sends scheduled for the next 7 days.',
   'live.home.skipOccurrence': 'Skip this occurrence',
   'live.home.birthday': 'Birthday',
@@ -667,7 +673,9 @@ export const liveEnglish = {
   'live.settings.activityRecords': 'Activity records',
   'live.settings.templates': 'Saved message templates',
   'live.settings.localStorage': 'Local storage',
-  'live.settings.bytes': '{{count}} bytes',
+  'live.settings.bytes': '{{count}} byte',
+  'live.settings.bytes_one': '{{count}} byte',
+  'live.settings.bytes_other': '{{count}} bytes',
   'live.settings.lastContactsSync': 'Last Contacts sync',
   'live.settings.neverSynced': 'No successful sync recorded',
   'live.settings.consentVersions': 'Recorded consent versions',
@@ -1333,6 +1341,8 @@ export const liveHindi: typeof liveEnglish = {
   'live.common.sim': 'SIM',
   'live.common.message': 'संदेश',
   'live.common.parts': '{{count}} SMS भाग',
+  'live.common.parts_one': '{{count}} SMS भाग',
+  'live.common.parts_other': '{{count}} SMS भाग',
   'live.common.code': 'तकनीकी कोड: {{value}}',
   'live.common.reference': 'सहायता संदर्भ: {{reference}}',
   'live.common.blocks': 'रोकता है: {{value}}',
@@ -1634,6 +1644,10 @@ export const liveHindi: typeof liveEnglish = {
   'live.home.upcoming': 'आने वाला',
   'live.home.weeklyPreviewTitle': 'साप्ताहिक ऑटोमेशन पूर्वावलोकन',
   'live.home.weeklyPreviewBody':
+    'अगले 7 दिनों के लिए आपके पास {{count}} अन्य जन्मदिन संदेश निर्धारित हैं।',
+  'live.home.weeklyPreviewBody_one':
+    'अगले 7 दिनों के लिए आपके पास {{count}} और जन्मदिन संदेश निर्धारित है।',
+  'live.home.weeklyPreviewBody_other':
     'अगले 7 दिनों के लिए आपके पास {{count}} अन्य जन्मदिन संदेश निर्धारित हैं।',
   'live.home.skipOccurrence': 'इस बार न भेजें',
   'live.home.birthday': 'जन्मदिन',
@@ -1963,6 +1977,8 @@ export const liveHindi: typeof liveEnglish = {
   'live.settings.templates': 'सहेजे संदेश टेम्पलेट',
   'live.settings.localStorage': 'स्थानीय स्टोरेज',
   'live.settings.bytes': '{{count}} बाइट',
+  'live.settings.bytes_one': '{{count}} बाइट',
+  'live.settings.bytes_other': '{{count}} बाइट',
   'live.settings.lastContactsSync': 'आखिरी Contacts सिंक',
   'live.settings.neverSynced': 'कोई सफल सिंक दर्ज नहीं है',
   'live.settings.consentVersions': 'दर्ज सहमति संस्करण',

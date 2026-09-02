@@ -1120,6 +1120,7 @@ export function LivePeopleScreen({
         clearA11yLabel={t('live.people.clearSearch')}
       />
       <View
+        accessible={false}
         accessibilityLabel={t('live.people.filters')}
         accessibilityRole="radiogroup"
         style={styles.filters}
@@ -1311,6 +1312,7 @@ export function LivePeopleScreen({
             <Button
               label={t('live.people.nextPage')}
               disabled={
+                !peopleUsable ||
                 enrollmentPending ||
                 syncPending ||
                 currentEnrollmentReview !== undefined ||

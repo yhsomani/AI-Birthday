@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Request deletion of a WishWell account and associated server data."
+    />
+    <meta name="referrer" content="no-referrer" />
+    <link rel="canonical" />
+    <title
+      data-en="Delete your account — WishWell"
+      data-hi="अपना खाता हटाएँ — WishWell"
+    >
+      Delete your account — WishWell
+    </title>
+    <script type="module" crossorigin src="/assets/app-BQ6U1bLD.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/app-DfGRdsqp.css">
+  </head>
+  <body data-page="delete-account">
+    <a
+      class="skip-link"
+      href="#main"
+      data-en="Skip to content"
+      data-hi="मुख्य सामग्री पर जाएँ"
+      >Skip to content</a
+    >
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/" aria-label="WishWell home">
+          <span class="brand-mark" aria-hidden="true">B</span>
+          <span>WishWell</span>
+        </a>
+        <nav class="nav" aria-label="Primary navigation">
+          <a
+            href="/delete/"
+            aria-current="page"
+            data-en="Delete account"
+            data-hi="खाता हटाएँ"
+            >Delete account</a
+          >
+          <a href="/privacy/" data-en="Privacy" data-hi="गोपनीयता">Privacy</a>
+          <a href="/terms/" data-en="Terms" data-hi="शर्तें">Terms</a>
+          <a href="/support/" data-en="Help" data-hi="सहायता">Help</a>
+          <button class="language-toggle" id="language-toggle" type="button">
+            हिन्दी
+          </button>
+        </nav>
+      </div>
+    </header>
+    <div class="config-banner" data-config-banner hidden role="alert">
+      <strong
+        data-en="Account deletion is not configured in this build."
+        data-hi="इस बिल्ड में खाता हटाने की सेवा कॉन्फ़िगर नहीं है।"
+        >Account deletion is not configured in this build.</strong
+      >
+      <span
+        data-en=" Do not share identity documents or account details through an unverified channel."
+        data-hi=" किसी असत्यापित माध्यम से पहचान दस्तावेज़ या खाते की जानकारी साझा न करें।"
+      >
+        Do not share identity documents or account details through an unverified
+        channel.</span
+      >
+    </div>
+    <main class="main" id="main">
+      <section class="hero">
+        <p
+          class="eyebrow"
+          data-en="Privacy control"
+          data-hi="गोपनीयता नियंत्रण"
+        >
+          Privacy control
+        </p>
+        <h1
+          data-en="Delete your WishWell account"
+          data-hi="अपना WishWell खाता हटाएँ"
+        >
+          Delete your WishWell account
+        </h1>
+        <p
+          class="lede"
+          data-en="This starts permanent deletion of your Firebase Authentication account and associated WishWell server records. You do not need to reinstall the mobile app."
+          data-hi="यह आपके Firebase Authentication खाते और उससे जुड़े WishWell सर्वर रिकॉर्ड को स्थायी रूप से हटाने की प्रक्रिया शुरू करता है। मोबाइल ऐप दोबारा इंस्टॉल करना आवश्यक नहीं है।"
+        >
+          This starts permanent deletion of your Firebase Authentication account
+          and associated WishWell server records. You do not need to
+          reinstall the mobile app.
+        </p>
+      </section>
+
+      <div class="deletion-layout">
+        <article class="content-card">
+          <h2
+            data-en="Read before continuing"
+            data-hi="आगे बढ़ने से पहले पढ़ें"
+          >
+            Read before continuing
+          </h2>
+          <ul>
+            <li
+              data-en="The server first blocks new Android automation permits. A previously issued permit may still submit before its frozen deadline, normally no more than one minute."
+              data-hi="सर्वर पहले नए Android ऑटोमेशन परमिट रोकता है। हटाने से ठीक पहले जारी परमिट अपनी तय समय-सीमा तक संदेश जमा कर सकता है, जो सामान्यतः एक मिनट से अधिक नहीं होती।"
+            >
+              The server first blocks new Android automation permits. A
+              previously issued permit may still submit before its frozen
+              deadline, normally no more than one minute.
+            </li>
+            <li
+              data-en="The server then recursively removes app-operated coordination records and verifies their absence before deleting the Firebase account."
+              data-hi="इसके बाद सर्वर ऐप-संचालित समन्वय रिकॉर्ड को क्रमशः हटाता है, उनकी अनुपस्थिति की जाँच करता है और फिर Firebase खाता हटाता है।"
+            >
+              The server then recursively removes app-operated coordination
+              records and verifies their absence before deleting the Firebase
+              account.
+            </li>
+            <li
+              data-en="This website cannot erase protected data that remains on a phone. Use the app’s local wipe control on each device, or remove the app, and remember that uninstalling alone does not delete the online account."
+              data-hi="यह वेबसाइट फ़ोन पर बचे सुरक्षित डेटा को नहीं मिटा सकती। हर डिवाइस पर ऐप का स्थानीय डेटा मिटाने वाला नियंत्रण इस्तेमाल करें या ऐप हटाएँ; केवल ऐप अनइंस्टॉल करने से ऑनलाइन खाता नहीं हटता।"
+            >
+              This website cannot erase protected data that remains on a phone.
+              Use the app’s local wipe control on each device, or remove the
+              app, and remember that uninstalling alone does not delete the
+              online account.
+            </li>
+            <li
+              data-en="Deletion does not remove source contacts from Google, messages in Android’s SMS Provider, Apple Messages or iCloud copies, carrier records, recipients’ copies, or backups outside the app’s control."
+              data-hi="खाता हटाने से Google के मूल संपर्क, Android SMS Provider के संदेश, Apple Messages या iCloud प्रतियाँ, मोबाइल नेटवर्क रिकॉर्ड, प्राप्तकर्ता की प्रतियाँ या ऐप के नियंत्रण से बाहर बैकअप नहीं मिटते।"
+            >
+              Deletion does not remove source contacts from Google, messages in
+              Android’s SMS Provider, Apple Messages or iCloud copies, carrier
+              records, recipients’ copies, or backups outside the app’s control.
+            </li>
+            <li
+              data-en="Deleting the Firebase account does not automatically promise revocation of every Google permission granted to this app. You can separately remove WishWell access in your Google Account."
+              data-hi="Firebase खाता हटाने से इस ऐप को दी गई हर Google अनुमति स्वतः रद्द होने की गारंटी नहीं है। आप अपने Google Account में WishWell की पहुँच अलग से हटा सकते हैं।"
+            >
+              Deleting the Firebase account does not automatically promise
+              revocation of every Google permission granted to this app. You can
+              separately remove WishWell access in your Google
+              Account.
+            </li>
+          </ul>
+
+          <h2
+            data-en="If you cannot access Google"
+            data-hi="यदि Google खाते तक पहुँच नहीं है"
+          >
+            If you cannot access Google
+          </h2>
+          <p
+            data-en="Do not send identity documents to an unlisted address. Use only the identity-verified support workflow linked below. Verified administrative requests use the same Android permit drain and recursive deletion process; there is no unsafe shortcut."
+            data-hi="किसी अनजान पते पर पहचान दस्तावेज़ न भेजें। नीचे दिए गए सत्यापित सहायता माध्यम का ही उपयोग करें। सत्यापित प्रशासनिक अनुरोध भी उसी Android परमिट समय-सीमा और क्रमिक हटाने की प्रक्रिया से गुजरते हैं; कोई असुरक्षित शॉर्टकट नहीं है।"
+          >
+            Do not send identity documents to an unlisted address. Use only the
+            identity-verified support workflow linked below. Verified
+            administrative requests use the same Android permit drain and
+            recursive deletion process; there is no unsafe shortcut.
+          </p>
+          <p>
+            <a
+              data-support-link
+              href="/support/"
+              data-en="Open verified account-deletion support"
+              data-hi="सत्यापित खाता हटाने की सहायता खोलें"
+              >Open verified account-deletion support</a
+            >
+          </p>
+
+          <h2 data-en="Timing and receipts" data-hi="समय और रसीद">
+            Timing and receipts
+          </h2>
+          <p
+            data-en="An authenticated request is acknowledged on this page immediately. Verified support requests are acknowledged within 7 calendar days. Verified deletion requests are completed within 30 days unless a disclosed legal hold applies. A request receipt confirms acceptance, not completion."
+            data-hi="प्रमाणित अनुरोध की रसीद इस पेज पर तुरंत मिलती है। सत्यापित सहायता अनुरोध की पुष्टि 7 कैलेंडर दिनों के भीतर की जाती है। किसी स्पष्ट कानूनी रोक को छोड़कर सत्यापित हटाने के अनुरोध 30 दिनों के भीतर पूरे किए जाते हैं। अनुरोध रसीद केवल स्वीकार होने की पुष्टि है, पूरा होने की नहीं।"
+          >
+            An authenticated request is acknowledged on this page immediately.
+            Verified support requests are acknowledged within 7 calendar days.
+            Verified deletion requests are completed within 30 days unless a
+            disclosed legal hold applies. A request receipt confirms acceptance,
+            not completion.
+          </p>
+        </article>
+
+        <aside class="deletion-panel" aria-labelledby="secure-request-title">
+          <h2
+            id="secure-request-title"
+            data-en="Secure deletion request"
+            data-hi="सुरक्षित खाता हटाने का अनुरोध"
+          >
+            Secure deletion request
+          </h2>
+          <p
+            data-en="Google sign-in proves which Firebase account to delete. WishWell never receives your Google password or exposes an access token on this page."
+            data-hi="Google साइन-इन यह प्रमाणित करता है कि कौन-सा Firebase खाता हटाना है। WishWell को आपका Google पासवर्ड नहीं मिलता और यह पेज कोई access token नहीं दिखाता।"
+          >
+            Google sign-in proves which Firebase account to delete. Birthday
+            Autopilot never receives your Google password or exposes an access
+            token on this page.
+          </p>
+          <div
+            class="status"
+            id="deletion-status"
+            role="status"
+            aria-live="polite"
+          >
+            Preparing the secure deletion service…
+          </div>
+          <button
+            class="button-primary"
+            id="continue-google"
+            type="button"
+            disabled
+            data-en="Continue with Google"
+            data-hi="Google से आगे बढ़ें"
+          >
+            Continue with Google
+          </button>
+
+          <div id="signed-in-panel" hidden>
+            <p class="signed-in">
+              <span
+                data-en="Signed in account:"
+                data-hi="साइन-इन किया गया खाता:"
+                >Signed in account:</span
+              >
+              <strong id="signed-in-email"></strong>
+            </p>
+            <label class="confirm-row" for="delete-confirm">
+              <input id="delete-confirm" type="checkbox" />
+              <span
+                data-en="I understand this request is permanent, does not erase external message or contact copies, and may allow one already-issued Android permit to finish before its frozen deadline."
+                data-hi="मैं समझता/समझती हूँ कि यह अनुरोध स्थायी है, बाहरी संदेश या संपर्क प्रतियाँ नहीं मिटाता, और पहले से जारी एक Android परमिट अपनी तय समय-सीमा तक पूरा हो सकता है।"
+                >I understand this request is permanent, does not erase external
+                message or contact copies, and may allow one already-issued
+                Android permit to finish before its frozen deadline.</span
+              >
+            </label>
+            <div class="button-stack">
+              <button
+                class="button-danger"
+                id="delete-account"
+                type="button"
+                disabled
+                data-en="Permanently delete account"
+                data-hi="खाता स्थायी रूप से हटाएँ"
+              >
+                Permanently delete account
+              </button>
+              <button
+                class="button-secondary"
+                id="sign-out"
+                type="button"
+                data-en="Sign out without deleting"
+                data-hi="बिना हटाए साइन-आउट करें"
+              >
+                Sign out without deleting
+              </button>
+            </div>
+          </div>
+
+          <div class="receipt" id="request-receipt" hidden tabindex="-1">
+            <h3
+              data-en="Private deletion reference"
+              data-hi="निजी deletion reference"
+            >
+              Private deletion reference
+            </h3>
+            <p
+              data-en="After an exact acceptance response, this reference confirms that the request was accepted, not that deletion finished. A reference recovered after an interrupted submission is not acceptance evidence by itself. Check status and save it until completion."
+              data-hi="सटीक acceptance response के बाद यह reference केवल अनुरोध स्वीकार होने की पुष्टि करता है, deletion पूरी होने की नहीं। बाधित submission के बाद वापस मिला reference अपने-आप acceptance का प्रमाण नहीं है। स्थिति जाँचें और completion तक इसे रखें।"
+            >
+              After an exact acceptance response, this reference confirms that
+              the request was accepted, not that deletion finished. A reference
+              recovered after an interrupted submission is not acceptance
+              evidence by itself. Check status and save it until completion.
+            </p>
+            <code id="receipt-id"></code>
+            <button
+              class="button-secondary"
+              id="copy-reference"
+              type="button"
+              data-en="Copy reference"
+              data-hi="संदर्भ संख्या कॉपी करें"
+            >
+              Copy reference
+            </button>
+          </div>
+          <button
+            class="button-secondary"
+            id="retry-sign-out"
+            type="button"
+            hidden
+            data-en="Retry secure sign-out"
+            data-hi="सुरक्षित साइन-आउट फिर करें"
+          >
+            Retry secure sign-out
+          </button>
+
+          <div class="receipt-check">
+            <h3
+              data-en="Check an existing receipt"
+              data-hi="मौजूदा रसीद जाँचें"
+            >
+              Check an existing receipt
+            </h3>
+            <p
+              data-en="The receipt is a private bearer reference. A pending reference is kept only in this tab’s temporary session storage so a reload can recover an uncertain submission. It is never put in the URL, local storage, a cookie, analytics, or logs. Clear it below or close the tab session; save a separate copy for later checks. NOT_FOUND is not proof of completion or failure."
+              data-hi="रसीद एक निजी bearer reference है। अनिश्चित submission को reload के बाद वापस पाने के लिए pending reference केवल इस टैब के temporary session storage में रहता है। इसे URL, local storage, cookie, analytics या logs में नहीं रखा जाता। इसे नीचे से हटाएँ या tab session बंद करें; बाद में जाँचने के लिए अलग copy रखें। NOT_FOUND completion या failure का प्रमाण नहीं है।"
+            >
+              The receipt is a private bearer reference. A pending reference is
+              kept only in this tab’s temporary session storage so a reload can
+              recover an uncertain submission. It is never put in the URL, local
+              storage, a cookie, analytics, or logs. Clear it below or close the
+              tab session; save a separate copy for later checks. NOT_FOUND is
+              not proof of completion or failure.
+            </p>
+            <label
+              for="receipt-check-id"
+              data-en="Deletion receipt UUID"
+              data-hi="Deletion receipt UUID"
+              >Deletion receipt UUID</label
+            >
+            <input
+              id="receipt-check-id"
+              class="receipt-input"
+              type="text"
+              inputmode="text"
+              autocomplete="off"
+              autocapitalize="none"
+              spellcheck="false"
+            />
+            <div class="button-stack">
+              <button
+                class="button-secondary"
+                id="check-receipt"
+                type="button"
+                data-en="Check deletion status"
+                data-hi="खाता हटाने की स्थिति जाँचें"
+              >
+                Check deletion status
+              </button>
+              <button
+                class="button-secondary"
+                id="clear-receipt"
+                type="button"
+                data-en="Clear private receipt from this tab"
+                data-hi="इस टैब से निजी रसीद हटाएँ"
+              >
+                Clear private receipt from this tab
+              </button>
+            </div>
+            <div
+              class="status"
+              id="receipt-status"
+              role="status"
+              aria-live="polite"
+              data-en="Enter a receipt to check its status."
+              data-hi="स्थिति जाँचने के लिए रसीद दर्ज करें।"
+            >
+              Enter a receipt to check its status.
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <p>
+          © <span data-current-year>2026</span>
+          <span data-developer>Public developer identity not configured</span>
+        </p>
+        <div class="footer-links">
+          <a href="/privacy/" data-en="Privacy" data-hi="गोपनीयता">Privacy</a>
+          <a href="/terms/" data-en="Terms" data-hi="शर्तें">Terms</a>
+          <a href="/support/" data-en="Help" data-hi="सहायता">Help</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

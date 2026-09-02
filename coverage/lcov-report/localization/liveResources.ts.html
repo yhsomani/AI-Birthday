@@ -2655,7 +2655,31 @@
 <a name='L2590'></a><a href='#L2590'>2590</a>
 <a name='L2591'></a><a href='#L2591'>2591</a>
 <a name='L2592'></a><a href='#L2592'>2592</a>
-<a name='L2593'></a><a href='#L2593'>2593</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">14x</span>
+<a name='L2593'></a><a href='#L2593'>2593</a>
+<a name='L2594'></a><a href='#L2594'>2594</a>
+<a name='L2595'></a><a href='#L2595'>2595</a>
+<a name='L2596'></a><a href='#L2596'>2596</a>
+<a name='L2597'></a><a href='#L2597'>2597</a>
+<a name='L2598'></a><a href='#L2598'>2598</a>
+<a name='L2599'></a><a href='#L2599'>2599</a>
+<a name='L2600'></a><a href='#L2600'>2600</a>
+<a name='L2601'></a><a href='#L2601'>2601</a>
+<a name='L2602'></a><a href='#L2602'>2602</a>
+<a name='L2603'></a><a href='#L2603'>2603</a>
+<a name='L2604'></a><a href='#L2604'>2604</a>
+<a name='L2605'></a><a href='#L2605'>2605</a>
+<a name='L2606'></a><a href='#L2606'>2606</a>
+<a name='L2607'></a><a href='#L2607'>2607</a>
+<a name='L2608'></a><a href='#L2608'>2608</a>
+<a name='L2609'></a><a href='#L2609'>2609</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -5247,6 +5271,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">export const liveEnglish = {
   'live.common.androidEdition': 'Android Automation Edition',
   'live.common.iosEdition': 'iOS Companion Edition',
@@ -5270,7 +5302,9 @@
   'live.common.none': 'None reported',
   'live.common.sim': 'SIM',
   'live.common.message': 'Message',
-  'live.common.parts': '{{count}} SMS part(s)',
+  'live.common.parts': '{{count}} SMS part',
+  'live.common.parts_one': '{{count}} SMS part',
+  'live.common.parts_other': '{{count}} SMS parts',
   'live.common.code': 'Technical code: {{value}}',
   'live.common.reference': 'Support reference: {{reference}}',
   'live.common.blocks': 'Blocks: {{value}}',
@@ -5580,6 +5614,10 @@
   'live.home.upcoming': 'Upcoming',
   'live.home.weeklyPreviewTitle': 'Weekly Automation Preview',
   'live.home.weeklyPreviewBody':
+    'You have {{count}} other birthday send scheduled for the next 7 days.',
+  'live.home.weeklyPreviewBody_one':
+    'You have {{count}} other birthday send scheduled for the next 7 days.',
+  'live.home.weeklyPreviewBody_other':
     'You have {{count}} other birthday sends scheduled for the next 7 days.',
   'live.home.skipOccurrence': 'Skip this occurrence',
   'live.home.birthday': 'Birthday',
@@ -5916,7 +5954,9 @@
   'live.settings.activityRecords': 'Activity records',
   'live.settings.templates': 'Saved message templates',
   'live.settings.localStorage': 'Local storage',
-  'live.settings.bytes': '{{count}} bytes',
+  'live.settings.bytes': '{{count}} byte',
+  'live.settings.bytes_one': '{{count}} byte',
+  'live.settings.bytes_other': '{{count}} bytes',
   'live.settings.lastContactsSync': 'Last Contacts sync',
   'live.settings.neverSynced': 'No successful sync recorded',
   'live.settings.consentVersions': 'Recorded consent versions',
@@ -6582,6 +6622,8 @@ export const liveHindi: typeof liveEnglish = {
   'live.common.sim': 'SIM',
   'live.common.message': 'संदेश',
   'live.common.parts': '{{count}} SMS भाग',
+  'live.common.parts_one': '{{count}} SMS भाग',
+  'live.common.parts_other': '{{count}} SMS भाग',
   'live.common.code': 'तकनीकी कोड: {{value}}',
   'live.common.reference': 'सहायता संदर्भ: {{reference}}',
   'live.common.blocks': 'रोकता है: {{value}}',
@@ -6883,6 +6925,10 @@ export const liveHindi: typeof liveEnglish = {
   'live.home.upcoming': 'आने वाला',
   'live.home.weeklyPreviewTitle': 'साप्ताहिक ऑटोमेशन पूर्वावलोकन',
   'live.home.weeklyPreviewBody':
+    'अगले 7 दिनों के लिए आपके पास {{count}} अन्य जन्मदिन संदेश निर्धारित हैं।',
+  'live.home.weeklyPreviewBody_one':
+    'अगले 7 दिनों के लिए आपके पास {{count}} और जन्मदिन संदेश निर्धारित है।',
+  'live.home.weeklyPreviewBody_other':
     'अगले 7 दिनों के लिए आपके पास {{count}} अन्य जन्मदिन संदेश निर्धारित हैं।',
   'live.home.skipOccurrence': 'इस बार न भेजें',
   'live.home.birthday': 'जन्मदिन',
@@ -7212,6 +7258,8 @@ export const liveHindi: typeof liveEnglish = {
   'live.settings.templates': 'सहेजे संदेश टेम्पलेट',
   'live.settings.localStorage': 'स्थानीय स्टोरेज',
   'live.settings.bytes': '{{count}} बाइट',
+  'live.settings.bytes_one': '{{count}} बाइट',
+  'live.settings.bytes_other': '{{count}} बाइट',
   'live.settings.lastContactsSync': 'आखिरी Contacts सिंक',
   'live.settings.neverSynced': 'कोई सफल सिंक दर्ज नहीं है',
   'live.settings.consentVersions': 'दर्ज सहमति संस्करण',
@@ -7846,7 +7894,7 @@ export const liveHindi: typeof liveEnglish = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-29T09:50:14.262Z
+                at 2026-08-30T17:37:46.506Z
             </div>
         <script src="../prettify.js"></script>
         <script>

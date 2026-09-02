@@ -659,6 +659,41 @@ it('offers same-account deletion retry only after all projections share a revisi
   expect(onLifecycleStateChange).toHaveBeenCalledTimes(1);
 });
 
+it('keeps the pending delete status visible while the operation projection refreshes', async () => {
+  const pendingDelete = pendingDeletion(operationId('pending-del-status'));
+  const harness = createHarness({ currentOperation: pendingDelete });
+  let operationCalls = 0;
+  const pendingRefresh = deferred<
+    Awaited<ReturnType<LiveAppPort['getCurrentOperation']>>
+  >();
+  harness.getCurrentOperation.mockImplementation(async () => {
+    operationCalls += 1;
+    if (operationCalls === 1) return ok(pendingDelete, harness.state.revision);
+    return pendingRefresh.promise;
+  });
+  await renderPrivacy(harness);
+
+  expect(
+    await screen.findByTestId('live-privacy-deletion-status'),
+  ).toBeTruthy();
+
+  await act(async () => {
+    harness.emit({ areas: ['privacy'], revision: harness.state.revision });
+    await Promise.resolve();
+  });
+
+  // The operation projection is mid-refresh (refreshing: true), so the live
+  // projection is not usable; the last verified operation must keep the
+  // delete status visible rather than letting it flicker out.
+  expect(screen.getByTestId('live-privacy-deletion-status')).toBeTruthy();
+
+  await act(async () => {
+    pendingRefresh.resolve(ok(pendingDelete, harness.state.revision));
+    await Promise.resolve();
+  });
+  expect(screen.getByTestId('live-privacy-deletion-status')).toBeTruthy();
+});
+
 it('coalesces a double confirmation into one native request', async () => {
   const harness = createHarness();
   const response = completedOperation('clear-gemini-templates');

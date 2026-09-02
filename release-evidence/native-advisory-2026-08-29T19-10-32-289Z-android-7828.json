@@ -1,0 +1,294 @@
+{
+  "schemaVersion": 1,
+  "scanner": {
+    "name": "birthday-native-osv-api-gate",
+    "implementationVersion": 1,
+    "provider": "OSV.dev",
+    "apiEndpoint": "https://api.osv.dev/v1/querybatch",
+    "apiContract": "POST /v1/querybatch",
+    "scannedAt": "2026-08-29T19:10:32.289Z",
+    "policy": "block-every-active-osv-match-unless-exact-unexpired-exception",
+    "canaries": [
+      {
+        "purl": "pkg:maven/com.google.guava/guava@30.1.1-jre",
+        "vulnerabilityId": "GHSA-5mg8-w23w-74h3"
+      },
+      {
+        "purl": "pkg:npm/lodash@4.17.20",
+        "vulnerabilityId": "GHSA-35jh-r3h4-6jhm"
+      },
+      {
+        "purl": "pkg:swift/github.com/apple/swift-asn1@1.3.0",
+        "vulnerabilityId": "GHSA-w8xv-rwgf-4fwh"
+      }
+    ],
+    "requestCount": 3
+  },
+  "exceptionPolicy": {
+    "path": "tools/native-advisory-exceptions.json",
+    "sha256": "af779c1dea4c6b472330c33e22f55b6e880c3973478e0a3639ed3e4a9fa62ac4",
+    "configuredCount": 0,
+    "appliedCount": 0,
+    "maximumLifetimeDays": 30,
+    "authorityPublicKeySpkiSha256": null
+  },
+  "dependencySets": [
+    {
+      "label": "android-complete-graph",
+      "kind": "gradle",
+      "configuration": null,
+      "lockfileSha256": "858d5c774c53e74c88f5941d0e0a9f1f6f7b4fdd9cf64972de2b608dcc329576",
+      "sbomSha256": "c2486b2313204abecae5d5394a62fd89398b02c94c77e340622a335c45d0a148",
+      "componentCount": 432,
+      "queryIdentityCount": 432,
+      "verifiedPodspecSourceCount": 0
+    },
+    {
+      "label": "android-prod-runtime",
+      "kind": "gradle",
+      "configuration": "prodReleaseRuntimeClasspath",
+      "lockfileSha256": "858d5c774c53e74c88f5941d0e0a9f1f6f7b4fdd9cf64972de2b608dcc329576",
+      "sbomSha256": "e5d040277262b9b3c850fb630eca1c425c88b57c865899e28ff345399b7899c9",
+      "componentCount": 228,
+      "queryIdentityCount": 228,
+      "verifiedPodspecSourceCount": 0
+    },
+    {
+      "label": "android-build-plugins",
+      "kind": "gradle",
+      "configuration": null,
+      "lockfileSha256": "80144eae32864b5c12cb463ab5afe71af4c832c866dc20e48eaa7f153724efdd",
+      "sbomSha256": "78609aa55e53795269b3b678a715dee4e291790b5cd2a441c9943fd64794590b",
+      "componentCount": 152,
+      "queryIdentityCount": 152,
+      "verifiedPodspecSourceCount": 0
+    }
+  ],
+  "findings": [
+    {
+      "dependencySet": "android-build-plugins",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-4mp9-239f-g9hg",
+      "modified": "2026-07-24T16:01:11.495588Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-build-plugins",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-6cqp-g7gg-8hr5",
+      "modified": "2026-07-24T16:00:20.409094Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-build-plugins",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-6jqx-86gh-f27w",
+      "modified": "2026-07-24T16:00:30.994967Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-build-plugins",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-8c42-7qj2-3j46",
+      "modified": "2026-08-18T22:26:59.174151Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-build-plugins",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-gcjf-9mgh-3p7g",
+      "modified": "2026-07-24T09:14:31.612560Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-build-plugins",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-jppx-w49h-x2qq",
+      "modified": "2026-07-24T09:14:31.550506Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-build-plugins",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-mvh2-crg5-v77c",
+      "modified": "2026-07-24T09:14:30.573268Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-build-plugins",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-q4f6-jm68-57ww",
+      "modified": "2026-07-24T16:01:48.284679Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-build-plugins",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http2@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http2@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-93wv-jw9v-4972",
+      "modified": "2026-08-01T21:44:50.263846Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-build-plugins",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http2@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http2@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-c69g-56f8-xwqj",
+      "modified": "2026-07-24T09:14:30.139580Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-build-plugins",
+      "componentPurl": "pkg:maven/io.netty/netty-codec@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-558v-64gr-wgg4",
+      "modified": "2026-07-23T22:29:34.272229Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-build-plugins",
+      "componentPurl": "pkg:maven/org.jetbrains.kotlin/kotlin-gradle-plugin@2.1.20",
+      "queryPurl": "pkg:maven/org.jetbrains.kotlin/kotlin-gradle-plugin@2.1.20",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-r937-wjx7-w2jp",
+      "modified": "2026-08-12T19:30:12.246087Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-complete-graph",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-4mp9-239f-g9hg",
+      "modified": "2026-07-24T16:01:11.495588Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-complete-graph",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-6cqp-g7gg-8hr5",
+      "modified": "2026-07-24T16:00:20.409094Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-complete-graph",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-6jqx-86gh-f27w",
+      "modified": "2026-07-24T16:00:30.994967Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-complete-graph",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-8c42-7qj2-3j46",
+      "modified": "2026-08-18T22:26:59.174151Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-complete-graph",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-gcjf-9mgh-3p7g",
+      "modified": "2026-07-24T09:14:31.612560Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-complete-graph",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-jppx-w49h-x2qq",
+      "modified": "2026-07-24T09:14:31.550506Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-complete-graph",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-mvh2-crg5-v77c",
+      "modified": "2026-07-24T09:14:30.573268Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-complete-graph",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-q4f6-jm68-57ww",
+      "modified": "2026-07-24T16:01:48.284679Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-complete-graph",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http2@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http2@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-93wv-jw9v-4972",
+      "modified": "2026-08-01T21:44:50.263846Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-complete-graph",
+      "componentPurl": "pkg:maven/io.netty/netty-codec-http2@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec-http2@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-c69g-56f8-xwqj",
+      "modified": "2026-07-24T09:14:30.139580Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-complete-graph",
+      "componentPurl": "pkg:maven/io.netty/netty-codec@4.1.135.Final",
+      "queryPurl": "pkg:maven/io.netty/netty-codec@4.1.135.Final",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-558v-64gr-wgg4",
+      "modified": "2026-07-23T22:29:34.272229Z",
+      "exception": null
+    },
+    {
+      "dependencySet": "android-complete-graph",
+      "componentPurl": "pkg:maven/org.jsoup/jsoup@1.21.2",
+      "queryPurl": "pkg:maven/org.jsoup/jsoup@1.21.2",
+      "mappingKind": "direct-maven-purl",
+      "vulnerabilityId": "GHSA-pmhh-3w7g-xqp8",
+      "modified": "2026-08-07T21:11:57.380593Z",
+      "exception": null
+    }
+  ],
+  "summary": {
+    "status": "blocked",
+    "dependencySetCount": 3,
+    "componentCount": 812,
+    "uniqueQueryIdentityCount": 520,
+    "findingCount": 24,
+    "exceptedCount": 0,
+    "unresolvedCount": 24
+  }
+}

@@ -17,6 +17,9 @@ import { commandAvailable } from './test-capabilities.mjs';
 const bashAvailable = commandAvailable('bash');
 const verifier = resolve('tools/verify-android-aab.sh');
 const certificate = 'ab'.repeat(32).toUpperCase().match(/../gu).join(':');
+// Android NDK verifier only supports darwin-x86_64 and linux-x86_64 host tags
+const supportedPlatform =
+  process.platform === 'darwin' || process.platform === 'linux';
 
 const executable = (path, source) => {
   writeFileSync(path, `#!/usr/bin/env bash\nset -euo pipefail\n${source}\n`);
@@ -149,7 +152,7 @@ printf '%s\\n' "$@" > '${validatorArguments}'`,
 
 test(
   'AAB verifier binds exact bytes to the upload signer and Play evidence mode',
-  { skip: !bashAvailable },
+  { skip: !bashAvailable || !supportedPlatform },
   () => {
     const { result, validatorArguments } = runFixture();
     assert.equal(result.status, 0, result.stderr);
@@ -171,7 +174,7 @@ test(
 
 test(
   'AAB verifier fails closed when compiled Firebase identity cannot be decoded',
-  { skip: !bashAvailable },
+  { skip: !bashAvailable || !supportedPlatform },
   () => {
     const rejected = runFixture({ firebaseState: 'rejected' });
     assert.notEqual(rejected.result.status, 0);
@@ -182,7 +185,7 @@ test(
 
 test(
   'AAB verifier rejects an unsigned artifact and multiple signers',
-  { skip: !bashAvailable },
+  { skip: !bashAvailable || !supportedPlatform },
   () => {
     const unsigned = runFixture({ signatureState: 'unsigned' }).result;
     assert.equal(unsigned.status, 1);
@@ -196,7 +199,7 @@ test(
 
 test(
   'AAB verifier rejects wrong or policy-invalid decoded manifests before evidence acceptance',
-  { skip: !bashAvailable },
+  { skip: !bashAvailable || !supportedPlatform },
   () => {
     const wrong = runFixture({ manifestState: 'wrong-package' });
     assert.equal(wrong.result.status, 1);

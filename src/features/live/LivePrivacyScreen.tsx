@@ -395,6 +395,18 @@ export function LivePrivacyScreen({
   };
   reviewRef.current = currentReview;
 
+  useEffect(() => {
+    if (currentOperationUsable) {
+      setOperation(
+        stableCurrentOperation !== undefined &&
+          stableCurrentOperation.kind !== 'none' &&
+          stableCurrentOperation.kind !== 'unavailable'
+          ? stableCurrentOperation
+          : undefined,
+      );
+    }
+  }, [currentOperationUsable, stableCurrentOperation]);
+
   const clearProtectedRefs = useCallback(() => {
     protectedRequestPendingRef.current = false;
     protectedSourceRevisionRef.current = undefined;

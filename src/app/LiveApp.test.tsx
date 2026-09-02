@@ -1856,7 +1856,7 @@ describe('production live projections', () => {
     expect(screen.getByText('33')).toBeTruthy();
     expect(screen.getByText('SMS encoding')).toBeTruthy();
     expect(screen.getByText('gsm-7')).toBeTruthy();
-    expect(screen.getAllByText('1 SMS part(s)').length).toBeGreaterThanOrEqual(
+    expect(screen.getAllByText('1 SMS part').length).toBeGreaterThanOrEqual(
       2,
     );
     expect(saveMessage).not.toHaveBeenCalled();
@@ -2983,7 +2983,7 @@ describe('production live projections', () => {
     expect(
       await screen.findByText('Already approved birthday text'),
     ).toBeTruthy();
-    expect(screen.getByText('2 SMS part(s)')).toBeTruthy();
+    expect(screen.getByText('2 SMS parts')).toBeTruthy();
     expect(screen.queryByTestId('live-confirm-approval')).toBeNull();
     expect(screen.getByTestId('live-close-approved-review')).toBeTruthy();
     expect(confirmApprovals).not.toHaveBeenCalled();

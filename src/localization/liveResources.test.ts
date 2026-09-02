@@ -239,6 +239,27 @@ describe('production live localization', () => {
         '1 तकनीकी जाँच रिपोर्ट हुई',
         '2 तकनीकी जाँच रिपोर्ट हुईं',
       ],
+      [
+        'live.common.parts',
+        '1 SMS part',
+        '2 SMS parts',
+        '1 SMS भाग',
+        '2 SMS भाग',
+      ],
+      [
+        'live.settings.bytes',
+        '1 byte',
+        '2 bytes',
+        '1 बाइट',
+        '2 बाइट',
+      ],
+      [
+        'live.home.weeklyPreviewBody',
+        'You have 1 other birthday send scheduled for the next 7 days.',
+        'You have 2 other birthday sends scheduled for the next 7 days.',
+        'अगले 7 दिनों के लिए आपके पास 1 और जन्मदिन संदेश निर्धारित है।',
+        'अगले 7 दिनों के लिए आपके पास 2 अन्य जन्मदिन संदेश निर्धारित हैं।',
+      ],
     ] as const;
 
     cases.forEach(([key, englishOne, englishOther, hindiOne, hindiOther]) => {
