@@ -30,6 +30,10 @@ export const AccessibleTextInput = forwardRef<
   return (
     <TextInput
       {...inputProps}
+      accessibilityState={{
+        ...inputProps.accessibilityState,
+        disabled: inputProps.editable === false,
+      }}
       accessibilityLabel={normalizedLabel}
       allowFontScaling
       maxFontSizeMultiplier={2}
