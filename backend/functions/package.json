@@ -21,6 +21,8 @@
     "audit:ci": "npm audit --audit-level=high && npm audit --omit=dev --audit-level=moderate"
   },
   "dependencies": {
+    "body-parser": "2.3.0",
+    "express": "5.2.1",
     "firebase-admin": "13.10.0",
     "firebase-functions": "7.2.5",
     "zod": "4.4.3"
@@ -35,12 +37,19 @@
     "eslint": "10.7.0",
     "fast-check": "4.9.0",
     "firebase": "12.16.0",
-    "firebase-tools": "15.23.0",
+    "firebase-tools": "14.23.0",
+    "qs": "6.16.0",
+    "tar": "7.5.22",
     "typescript": "5.9.3",
     "typescript-eslint": "8.63.0",
+    "uuid": "11.1.1",
     "vitest": "4.1.10"
   },
   "overrides": {
+    "qs": "6.16.0",
+    "tar": "7.5.22",
+    "express": "5.2.1",
+    "body-parser": "2.3.0",
     "gaxios": {
       "uuid": "11.1.1"
     },
@@ -48,6 +57,9 @@
       "uuid": "11.1.1"
     },
     "teeny-request": {
+      "uuid": "11.1.1"
+    },
+    "firebase-tools": {
       "uuid": "11.1.1"
     }
   }
