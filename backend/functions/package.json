@@ -21,8 +21,12 @@
     "audit:ci": "npm audit --audit-level=high && npm audit --omit=dev --audit-level=moderate"
   },
   "dependencies": {
+    "body-parser": "2.3.0",
+    "exegesis": "4.3.0",
+    "express": "5.2.1",
     "firebase-admin": "13.10.0",
-    "firebase-functions": "7.2.5",
+    "firebase-functions": "7.3.2",
+    "qs": "6.16.0",
     "zod": "4.4.3"
   },
   "devDependencies": {
@@ -35,7 +39,7 @@
     "eslint": "10.7.0",
     "fast-check": "4.9.0",
     "firebase": "12.16.0",
-    "firebase-tools": "15.23.0",
+    "firebase-tools": "15.29.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.63.0",
     "vitest": "4.1.10"
@@ -47,6 +51,9 @@
     "google-gax": {
       "uuid": "11.1.1"
     },
+    "qs": "6.16.0",
+    "@opentelemetry/core": "^2.8.0",
+    "stream-json": "^3.6.0",
     "teeny-request": {
       "uuid": "11.1.1"
     }
