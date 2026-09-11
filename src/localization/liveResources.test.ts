@@ -246,13 +246,7 @@ describe('production live localization', () => {
         '1 SMS भाग',
         '2 SMS भाग',
       ],
-      [
-        'live.settings.bytes',
-        '1 byte',
-        '2 bytes',
-        '1 बाइट',
-        '2 बाइट',
-      ],
+      ['live.settings.bytes', '1 byte', '2 bytes', '1 बाइट', '2 बाइट'],
       [
         'live.home.weeklyPreviewBody',
         'You have 1 other birthday send scheduled for the next 7 days.',
