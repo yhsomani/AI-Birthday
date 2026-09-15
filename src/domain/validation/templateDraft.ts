@@ -69,7 +69,7 @@ const URL_DOMAIN = unicodePattern(
   'giu',
 );
 const URL_OBFUSCATED_DOMAIN = unicodePattern(
-  '\\b[\\p{L}\\p{N}][\\p{L}\\p{N}-]{0,62}\\s*(?:\\[\\s*dot\\s*\\]|\\(\\s*dot\\s*\\)|\\s+dot\\s+)\\s*(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})\\b',
+  '\\b[\\p{L}\\p{N}][\\p{L}\\p{N}-]{0,62}(?:\\s*\\[\\s*dot\\s*\\]\\s*|\\s*\\(\\s*dot\\s*\\)\\s*|\\s+dot\\s+)(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})\\b',
   'iu',
 );
 const IPV4 = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/u;
