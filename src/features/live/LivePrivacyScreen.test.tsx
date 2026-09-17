@@ -663,9 +663,8 @@ it('keeps the pending delete status visible while the operation projection refre
   const pendingDelete = pendingDeletion(operationId('pending-del-status'));
   const harness = createHarness({ currentOperation: pendingDelete });
   let operationCalls = 0;
-  const pendingRefresh = deferred<
-    Awaited<ReturnType<LiveAppPort['getCurrentOperation']>>
-  >();
+  const pendingRefresh =
+    deferred<Awaited<ReturnType<LiveAppPort['getCurrentOperation']>>>();
   harness.getCurrentOperation.mockImplementation(async () => {
     operationCalls += 1;
     if (operationCalls === 1) return ok(pendingDelete, harness.state.revision);
