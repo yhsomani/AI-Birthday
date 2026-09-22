@@ -114,7 +114,7 @@ test('Android implements the exact canonical Gemini v2 prompt and account-scope 
 
 test('native Gemini dependencies are exact and use one Firebase family', () => {
   const gradle = read('android/app/build.gradle');
-  const readme = read('README.md');
+  const ssot = read('SSOT.md');
   assert.match(
     gradle,
     /implementation\("com\.google\.firebase:firebase-ai:17\.13\.0"\)/u,
@@ -128,7 +128,7 @@ test('native Gemini dependencies are exact and use one Firebase family', () => {
     /implementation\("com\.google\.firebase:firebase-config:23\.1\.0"\)/u,
   );
   assert.doesNotMatch(androidGateway, /firebase\.ai\.ondevice|OnDevice/u);
-  assert.match(readme, /beta-labeled on-device interop module/u);
+  assert.match(ssot, /on-device native Android Gemini API/u);
   assert.doesNotMatch(gradle, /exclude[^\n]*firebase-ai-ondevice-interop/u);
 });
 

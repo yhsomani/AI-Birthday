@@ -1,1 +1,35 @@
-Nothing should be ignored in this case, as the changes only include markdown documentation files (.md) which are source files and not build artifacts, dependencies, or temporary files.
+```
+# Coverage reports
+coverage/
+*.lcov
+*.info
+clover.xml
+coverage-final.json
+
+# Build artifacts
+build/
+dist/
+*.pyc
+__pycache__/
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+.env
+.env.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Logs
+*.log
+
+# Test and coverage
+.nyc_output/
+istanbul/
+```

@@ -64,6 +64,7 @@ WishWell is an **Android-first autonomous birthday-SMS system** whose defining b
 - **AI expansion roadmap defined** — 4 features planned: auto-generate 3 variations, AI status indicator, smart contact enrollment, approval prioritization
 
 ---
+
 # 2. PRODUCT OVERVIEW
 
 ## 2.1 Purpose [VC]

@@ -51,12 +51,14 @@ cd /workspace/android
 ```
 
 **Expected Output:**
+
 ```
 BUILD SUCCESSFUL in XXs
 Build output: android/app/build/outputs/apk/lab/debug/app-lab-debug.apk
 ```
 
 **Verification:**
+
 - [ ] APK exists: `ls -lh android/app/build/outputs/apk/lab/debug/`
 - [ ] APK size reasonable: ~40-80 MB
 - [ ] No build errors in console
@@ -68,11 +70,13 @@ adb install -r android/app/build/outputs/apk/lab/debug/app-lab-debug.apk
 ```
 
 **Expected Output:**
+
 ```
 Success
 ```
 
 **Verification:**
+
 - [ ] App icon appears on device home screen
 - [ ] App launches without crash
 - [ ] Package name correct: `com.yashsomani.birthdayautopilot`
@@ -84,10 +88,12 @@ Success
 ### Step 2.1: Launch & Welcome
 
 **Actions:**
+
 1. Tap app icon
 2. Observe welcome screen
 
 **Expected Results:**
+
 - [ ] App launches within 3 seconds
 - [ ] No crash dialogs
 - [ ] Welcome screen displays in English
@@ -98,12 +104,14 @@ Success
 ### Step 2.2: Google Sign-In
 
 **Actions:**
+
 1. Tap "Get Started"
 2. Tap "Continue with Google"
 3. Select test account
 4. Grant permissions
 
 **Expected Results:**
+
 - [ ] Google picker appears
 - [ ] Sign-in completes within 5 seconds
 - [ ] Contacts permission screen appears
@@ -114,11 +122,13 @@ Success
 ### Step 2.3: Contacts Sync
 
 **Actions:**
+
 1. Review contacts permission dialog
 2. Grant READ_CONTACTS permission
 3. Wait for sync to complete
 
 **Expected Results:**
+
 - [ ] Permission dialog explains why contacts needed
 - [ ] Sync progress indicator shows
 - [ ] Contact count displays (e.g., "12 contacts found")
@@ -133,10 +143,12 @@ Success
 ### Step 3.1: Navigate to Message Creation
 
 **Actions:**
+
 1. Tap on a contact with upcoming birthday
 2. Tap "Create Message" or "Write Message"
 
 **Expected Results:**
+
 - [ ] Message creation screen opens
 - [ ] Contact name displays
 - [ ] Birthday date displays
@@ -148,12 +160,14 @@ Success
 ### Step 3.2: Trigger AI Suggestion
 
 **Actions:**
+
 1. Select relationship (e.g., "Friend")
 2. Select tone (e.g., "Warm")
 3. Tap "Suggest" button
 4. Start timer
 
 **Expected Results:**
+
 - [ ] Loading indicator appears immediately
 - [ ] No ANR (App Not Responding) dialog
 - [ ] Suggestion appears within 15 seconds
@@ -161,10 +175,12 @@ Success
 - [ ] Suggestion matches selected tone
 
 **Metrics:**
-- Response time: _______ seconds
+
+- Response time: **\_\_\_** seconds
 - Target: < 10 seconds
 
-**Evidence:** 
+**Evidence:**
+
 - Screenshot #5 (loading state)
 - Screenshot #6 (suggestion displayed)
 - Logcat excerpt (sanitized)
@@ -172,11 +188,13 @@ Success
 ### Step 3.3: Verify Fallback Behavior
 
 **Actions:**
+
 1. Turn off WiFi and mobile data
 2. Return to message creation screen
 3. Tap "Suggest" button
 
 **Expected Results:**
+
 - [ ] Loading indicator appears briefly
 - [ ] Error message or fallback template shown
 - [ ] No crash
@@ -187,11 +205,13 @@ Success
 ### Step 3.4: Rate Limiting Test
 
 **Actions:**
+
 1. Re-enable network
 2. Rapidly tap "Suggest" 10 times
 3. Observe behavior
 
 **Expected Results:**
+
 - [ ] First 8 requests succeed (or per configured limit)
 - [ ] Subsequent requests show rate limit message
 - [ ] No duplicate suggestions
@@ -206,11 +226,13 @@ Success
 ### Step 4.1: Logcat Audit
 
 **Actions:**
+
 ```bash
 adb logcat | grep -i "birthday\|gemini\|ai" > /tmp/ai_logs.txt
 ```
 
 **Check For:**
+
 - [ ] NO contact names in logs
 - [ ] NO phone numbers in logs
 - [ ] NO birthdates in logs
@@ -222,11 +244,13 @@ adb logcat | grep -i "birthday\|gemini\|ai" > /tmp/ai_logs.txt
 ### Step 4.2: Network Traffic Analysis (Optional)
 
 **Actions:**
+
 1. Enable HTTP proxy (e.g., Charles Proxy, Wireshark)
 2. Capture traffic during AI suggestion
 3. Inspect request body
 
 **Expected Results:**
+
 - [ ] Request contains relationship type only (not names)
 - [ ] Request contains tone preference only
 - [ ] No PII transmitted to Gemini API
@@ -241,39 +265,44 @@ adb logcat | grep -i "birthday\|gemini\|ai" > /tmp/ai_logs.txt
 ### Step 5.1: Cold Start Time
 
 **Measurement:**
+
 ```bash
 adb shell am start -W com.yashsomani.birthdayautopilot/.MainActivity
 ```
 
 **Result:**
-- TotalTime: _______ ms
+
+- TotalTime: **\_\_\_** ms
 - Target: < 2000 ms
 
 ### Step 5.2: AI Response Time (Multiple Samples)
 
 | Attempt | Response Time (ms) | Success? | Notes |
-|---------|-------------------|----------|-------|
-| 1       |                   |          |       |
-| 2       |                   |          |       |
-| 3       |                   |          |       |
-| 4       |                   |          |       |
-| 5       |                   |          |       |
+| ------- | ------------------ | -------- | ----- |
+| 1       |                    |          |       |
+| 2       |                    |          |       |
+| 3       |                    |          |       |
+| 4       |                    |          |       |
+| 5       |                    |          |       |
 
 **Statistics:**
-- Average: _______ ms
-- p95: _______ ms
-- Min: _______ ms
-- Max: _______ ms
+
+- Average: **\_\_\_** ms
+- p95: **\_\_\_** ms
+- Min: **\_\_\_** ms
+- Max: **\_\_\_** ms
 
 ### Step 5.3: Memory Usage
 
 **Measurement:**
+
 ```bash
 adb shell dumpsys meminfo com.yashsomani.birthdayautopilot
 ```
 
 **Results:**
-- Total PSS: _______ MB
+
+- Total PSS: **\_\_\_** MB
 - Target: < 200 MB
 
 ---
@@ -283,23 +312,27 @@ adb shell dumpsys meminfo com.yashsomani.birthdayautopilot
 ### Step 6.1: Network Transition
 
 **Test:**
+
 1. Start AI request on WiFi
 2. Mid-request, turn off WiFi (let it failover to cellular)
 3. Observe result
 
 **Expected:**
+
 - [ ] Request completes successfully OR
 - [ ] Graceful failure with retry option
 
 ### Step 6.2: Background/App Switch
 
 **Test:**
+
 1. Trigger AI request
 2. Immediately press Home button
 3. Wait 5 seconds
 4. Return to app
 
 **Expected:**
+
 - [ ] Request continues in background OR
 - [ ] Clear indication of interrupted state
 - [ ] No crash on return
@@ -307,21 +340,25 @@ adb shell dumpsys meminfo com.yashsomani.birthdayautopilot
 ### Step 6.3: Low Battery Mode
 
 **Test:**
+
 1. Enable battery saver mode
 2. Trigger AI request
 
 **Expected:**
+
 - [ ] Request succeeds (may be slower) OR
 - [ ] Clear message about power restrictions
 
 ### Step 6.4: Screen Rotation
 
 **Test:**
+
 1. Trigger AI request
 2. Rotate device mid-request
 3. Observe behavior
 
 **Expected:**
+
 - [ ] Request continues (not cancelled)
 - [ ] UI state preserved
 - [ ] No duplicate requests
@@ -357,15 +394,15 @@ adb shell dumpsys meminfo com.yashsomani.birthdayautopilot
 
 ## Results Summary
 
-**Test Date:** _______________
+**Test Date:** **\*\***\_\_\_**\*\***
 
-**Tester:** _______________
+**Tester:** **\*\***\_\_\_**\*\***
 
-**Device:** _______________
+**Device:** **\*\***\_\_\_**\*\***
 
-**Android Version:** _______________
+**Android Version:** **\*\***\_\_\_**\*\***
 
-**Network Conditions:** _______________
+**Network Conditions:** **\*\***\_\_\_**\*\***
 
 ### Overall Result
 
@@ -375,11 +412,11 @@ adb shell dumpsys meminfo com.yashsomani.birthdayautopilot
 
 ### Issues Found
 
-| ID | Severity | Description | Workaround | Status |
-|----|----------|-------------|------------|--------|
-| 1  |          |             |            |        |
-| 2  |          |             |            |        |
-| 3  |          |             |            |        |
+| ID  | Severity | Description | Workaround | Status |
+| --- | -------- | ----------- | ---------- | ------ |
+| 1   |          |             |            |        |
+| 2   |          |             |            |        |
+| 3   |          |             |            |        |
 
 ### Evidence Collected
 
@@ -393,18 +430,21 @@ adb shell dumpsys meminfo com.yashsomani.birthdayautopilot
 ## Next Steps After Verification
 
 ### If PASS:
+
 1. Create RUNTIME_VERIFICATION_REPORT.md with full results
 2. Update SSOT.md: change status to `RUNTIME_VERIFIED`
 3. Proceed to Phase 1 AI expansion (multiple variations)
 4. Schedule real-device E2E testing
 
 ### If PARTIAL:
+
 1. Document all issues in tracker
 2. Implement quick fixes (< 4 hours each)
 3. Re-test failed scenarios
 4. Decide: proceed with known issues or block
 
 ### If FAIL:
+
 1. Stop expansion work immediately
 2. Prioritize bug fixes
 3. Re-run verification after fixes
@@ -415,6 +455,7 @@ adb shell dumpsys meminfo com.yashsomani.birthdayautopilot
 ## Appendix: Useful Commands
 
 ### Logcat Filtering
+
 ```bash
 # AI-related logs
 adb logcat | grep -i "gemini\|ai\|suggestion"
@@ -430,6 +471,7 @@ adb logcat -d > full_logcat.txt
 ```
 
 ### Performance Profiling
+
 ```bash
 # CPU usage
 adb shell top -m 10 | grep birthday
@@ -442,6 +484,7 @@ adb shell dumpsys batterystats --checkin
 ```
 
 ### Build Commands
+
 ```bash
 # Clean build
 ./gradlew clean assembleLabDebug
