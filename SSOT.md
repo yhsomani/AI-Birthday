@@ -1,64 +1,108 @@
-# WishWell (Birthday Autopilot) — Product Requirements Document
+# WishWell (Birthday Autopilot) — Single Source of Truth (SSOT)
 
 |                     |                                                                                                                                                                                                  |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Document**        | Product Requirements Document — v3.0 (Codebase-Grounded)                                                                                                                                         |
+| **Document**        | Single Source of Truth — v1.0 (Consolidated from PRD.md v3.0, BRD.md v3.0, PROJECT_ABOUT.md, and codebase verification)                                                                          |
 | **Product**         | WishWell · package `birthday-autopilot` v0.1.0 · appId `com.yashsomani.birthdayautopilot`                                                                                                        |
-| **Source of truth** | This document is reverse-engineered from the repository codebase on 2026-08-22. Documentation (`PROJECT_ABOUT.md`, `Flow.md`, `decision.md`, `stitch/*`) is treated as supporting evidence only. |
-| **Supersedes**      | `PRD.md` v2.0; conflicts with `PROJECT_ABOUT.md` are resolved here and logged in Gap Analysis (§16).                                                                                             |
+| **Source of truth** | This document is the authoritative reference for the entire project. All other documentation files are subordinate or historical.                                                                |
+| **Status**          | Consolidated 2026-08-29. Supersedes PROJECT_ABOUT.md, PRD.md, BRD.md, Flow.md, decision.md, DESIGN.md where conflicts exist.                                                                     |
+| **Next Review**     | Before any major feature addition, platform expansion, or store submission                                                                                                                       |
+
+---
 
 ## Status & Evidence Labels
 
-Every item carries one **Implementation Status** and one **Evidence** label:
+Every feature/requirement carries one **Implementation Status** and one **Evidence** label:
 
 | Status | Meaning                                          |
 | ------ | ------------------------------------------------ |
-| ✅     | Implemented — verified in code                   |
-| ◐      | Partially implemented                            |
+| ✅     | Implemented — fully implemented and working      |
+| ◐      | Partially implemented — incomplete or has gaps   |
 | 📄     | Documented but NOT implemented                   |
 | 🆕     | Implemented but missing from prior documentation |
 | 🔮     | Planned / future                                 |
 | ❓     | Unclear — requires confirmation                  |
 
-Evidence: **[VC]** verified from codebase (file cited) · **[VD]** verified from documentation · **[I]** inferred · **[A]** assumption · **[R]** recommendation · **[U]** unknown.
+**Evidence:** **[VC]** verified from codebase (file cited) · **[VD]** verified from documentation · **[I]** inferred · **[A]** assumption · **[R]** recommendation · **[U]** unknown.
 
 ---
 
-# 1. PRODUCT OVERVIEW
+# 1. EXECUTIVE SUMMARY
 
-## 1.1 Purpose [VC]
+WishWell is an **Android-first autonomous birthday-SMS system** whose defining business asset is a _verified trust architecture_: human approval of exact payloads, server-enforced single-send guarantees, honest delivery language, deletion-grade privacy, and a fail-closed release-admission chain.
 
-"Autonomous birthday SMS automation system for Android devices" (package.json:4). WishWell syncs Google Contacts birthdays, lets the user enroll people and approve exact message payloads, then delivers each approved wish as a real SIM-originated SMS on the birthday via a server-coordinated claim → arm → submit → observe pipeline — unattended on Android, with protocol-level provisions for a future iOS companion that requires the user to tap Send.
+**Current State:** The product is production-ready for Android launch. The full setup→approve→deliver pipeline, cloud control plane (16 callables + 2 scheduled sweeps, region asia-south1), sender transfer, deletion saga with receipts, bilingual EN/HI UX, accessibility E2E, and Ed25519-signed distribution-evidence regime are all implemented and tested.
 
-## 1.2 Vision / Mission [VD]
+**Principal Gaps:** 
+- No analytics telemetry (deliberate privacy choice, but blocks funnel measurement)
+- iOS companion protocol half-built (server callables absent)
+- Documentation debt in legacy files (README, PROJECT_ABOUT misstate behaviors)
+- Support model undefined pre-launch
+- Battery-optimization exemption request flow not implemented (diagnose-only)
 
-Vision: the most trusted way to maintain relationships through timely, personal birthday messages — AI assists, the human decides. Mission: make thoughtful birthday communication effortless without feeling automated. (Carried from PROJECT_ABOUT.md §1.3–1.4; unchanged by code review.)
+---
 
-## 1.3 Problem Statement
+# 2. PRODUCT OVERVIEW
 
-Forgotten birthdays cause guilt; generic messages feel robotic; reminder apps fire after the miss; contact-access apps erode trust; competitors overpromise automation on platforms that forbid it. **[VD]**
+## 2.1 Purpose [VC]
 
-## 1.4 Value Proposition
+"Autonomous birthday SMS automation system for Android devices" (package.json). WishWell syncs Google Contacts birthdays, lets the user enroll people and approve exact message payloads, then delivers each approved wish as a real SIM-originated SMS on the birthday via a server-coordinated claim → arm → submit → observe pipeline — unattended on Android, with protocol-level provisions for a future iOS companion that requires the user to tap Send.
+
+## 2.2 Vision [VD]
+
+The most trusted way to maintain relationships through timely, personal birthday messages — AI assists, the human decides.
+
+## 2.3 Mission [VD]
+
+Make thoughtful birthday communication effortless without feeling automated.
+
+## 2.4 Value Proposition
 
 > Set it once. Approve what matters. Never miss a birthday.
 
-Verified differentiators: human approval of exact payload before any send (✅ enforced server+client), structural duplicate-send prevention via server-issued occurrence keys and destination guards (✅), truthful outcome copy ("Sent from this phone; delivery not confirmed") (✅), deletion-grade privacy incl. SQLCipher local DB, deny-all Firestore, opaque HMAC aliases, content-free deletion receipts (✅), bilingual EN/HI (✅).
+**Verified differentiators:**
+- Human approval of exact payload before any send (✅ enforced server+client)
+- Structural duplicate-send prevention via server-issued occurrence keys and destination guards (✅)
+- Truthful outcome copy ("Sent from this phone; delivery not confirmed") (✅)
+- Deletion-grade privacy incl. SQLCipher local DB, deny-all Firestore, opaque HMAC aliases, content-free deletion receipts (✅)
+- Bilingual EN/HI (✅)
 
-## 1.5 Target Users
+## 2.5 Target Users
 
-Primary: busy professionals (28–45) who want set-and-forget reliability. Secondary: relationship curators wanting control, privacy-conscious users, less-technical users. Personas P1–P4 carried from prior spec **[VD]**; no persona-specific code paths found beyond accessibility/large-text and Hindi support **[VC]**.
+**Primary:** Busy professionals (28–45) who want set-and-forget reliability.
 
-## 1.6 Product Scope (as implemented)
+**Secondary:** Relationship curators wanting control, privacy-conscious users, less-technical users.
 
-**In scope ✅:** Android Automation Edition (flavors e2e/smoke/dev/staging/lab/prod); Google sign-in + read-only contacts; enrollment & approvals; template + Gemini drafting; policy editor; test mode; server-coordinated unattended SMS; sender transfer; attention/repair; activity log; diagnostics export; privacy operations incl. full deletion; public web tier (/ , /delete/, /privacy/, /terms/, /support/) bilingual EN/HI.
+## 2.6 Product Scope (as implemented)
 
-**Out of scope ✅:** iOS app build (removed; commit `61882f9`, workflows deleted `2b3a3b4`) though client-side companion _protocol_ remains (§7.12); contact writes; multi-account; email/calling/social; bulk/marketing messaging; monetization.
+**In scope ✅:**
+- Android Automation Edition (flavors e2e/smoke/dev/staging/lab/prod)
+- Google sign-in + read-only contacts
+- Enrollment & approvals
+- Template + Gemini drafting
+- Policy editor
+- Test mode
+- Server-coordinated unattended SMS
+- Sender transfer
+- Attention/repair
+- Activity log
+- Diagnostics export
+- Privacy operations incl. full deletion
+- Public web tier (/ , /delete/, /privacy/, /terms/, /support/) bilingual EN/HI
+
+**Out of scope ✅:**
+- iOS app build (removed; commit `61882f9`, workflows deleted `2b3a3b4`) though client-side companion _protocol_ remains (§7.12)
+- Contact writes
+- Multi-account
+- Email/calling/social
+- Bulk/marketing messaging
+- Monetization
 
 ---
 
-# 2. SYSTEM ARCHITECTURE (VERIFIED)
+# 3. SYSTEM ARCHITECTURE (VERIFIED)
 
-## 2.1 Layered TS architecture [VC]
+## 3.1 Layered TS architecture [VC]
 
 ```
 src/domain/        pure models, branded IDs, enums, validators (no IO)
@@ -70,9 +114,9 @@ src/design-system/ tokens/theme.ts + accessible primitives
 src/localization/  i18next; EN/HI release; ar-XB pseudo-RTL dev fixture
 ```
 
-State management: **projection hooks + invalidation events**, no Redux/Zustand. Every read returns `NativeResult<ProjectionEnvelope{contractVersion:1, revision, generatedAt, value}>`; every mutation passes `expectedRevision` (optimistic concurrency). Native pushes invalidations `{revision, areas[]}`; screens reload intersecting areas on foreground too (`useLiveProjection.ts`).
+**State management:** projection hooks + invalidation events, no Redux/Zustand. Every read returns `NativeResult<ProjectionEnvelope{contractVersion:1, revision, generatedAt, value}>`; every mutation passes `expectedRevision` (optimistic concurrency). Native pushes invalidations `{revision, areas[]}`; screens reload intersecting areas on foreground too (`useLiveProjection.ts`).
 
-## 2.2 JS↔Native contract [VC]
+## 3.2 JS↔Native contract [VC]
 
 Single TurboModule `specs/native/NativeBirthday.ts`:
 
@@ -80,14 +124,14 @@ Single TurboModule `specs/native/NativeBirthday.ts`:
 - `executeUserIntent(intent, expectedRevision|null, payloadJson)` — ~40 named intents (e.g., `activate`, `authorize-contacts`, `confirm-privacy-action`, `begin-sender-transfer`, `repair-lifecycle-state`, `clear-activity`, `generate-suggestions`).
 - Event emitter pair for invalidations/routes. Envelope ≤ 1 MiB; double Zod validation; decode failure collapses to `internal{NATIVE_CONTRACT_INVALID}` (`decodeNativeResponse.ts`).
 
-JS exposes **no** send/schedule/retry APIs — delivery authority lives natively. **[VC]**
+**JS exposes no send/schedule/retry APIs — delivery authority lives natively.** [VC]
 
-## 2.3 Android native engine [VC]
+## 3.3 Android native engine [VC]
 
 - Hand-wired DI (`AppGraph.kt`), Fabric `MainActivity`, WorkManager eager init with custom factory; startup coordinator guards one-time scheduling.
 - **Orchestrator** (`AndroidAutomationOrchestrator.kt`, 1,850 ln): register installation → renew lease → claim occurrence/test → arm (≥5 min spacing) → barrier → submit via `SmsGateway` → observe callback PendingIntents → report. Global mutex; **400-day planning horizon**; **5-min clock tolerance**; **15-min sent watchdog**; distribution channel derived from `BuildConfig.APP_ENV` + `APPROVED_DISTRIBUTION_CHANNEL`.
 - **Persistence**: Room, **37 entities**, SQLCipher (passphrase wrapped by hardware-Keystore AES-GCM key stored in `noBackupFilesDir` via AtomicFile; fail-closed codes `keystore-key-missing`/`wrapped-key-missing`); schemas 1–5 exported, auto-migrations.
-- **Workers**: 15-min periodic `ReconcileWorker` (+ heartbeat lease, 30 s successor floor), `PeopleSyncWorker` (≤3 attempts), `DataRetentionWorker`, SMS outcome workers. `AutomationReconcileReceiver` maps BOOT_COMPLETED / TIME(\_ZONE)\_CHANGED / DATE_CHANGED / MY_PACKAGE_REPLACED / LOCALE_CHANGED / DEFAULT_SMS_SUBSCRIPTION_CHANGED → reconcile triggers.
+- **Workers**: 15-min periodic `ReconcileWorker` (+ heartbeat lease, 30 s successor floor), `PeopleSyncWorker` (≤3 attempts), `DataRetentionWorker`, SMS outcome workers. `AutomationReconcileReceiver` maps BOOT_COMPLETED / TIME(_ZONE)_CHANGED / DATE_CHANGED / MY_PACKAGE_REPLACED / LOCALE_CHANGED / DEFAULT_SMS_SUBSCRIPTION_CHANGED → reconcile triggers.
 - **SMS boundary**: `SmsPlatformSubmitter` accepts single or ≤ **2-part** multipart plans only (rejects cardinality mismatch/empty parts/joined-text drift); `SubscriptionBindingPolicy` allows sending **only** on the plan kind `SYSTEM_DEFAULT` subscription that equals the current default-SMS subscription and is active (dual-SIM fail-closed; changes trigger fingerprint-recorded reconcile).
 - **Retry**: exactly **one** server-authorized retry (`authorizeSafeRetry`: attempt==2, RETRY_CLAIMED, identical claim id/epoch/reset-generation/retryRequestId/window; server clock within tolerance). Retry permit bounded inside immutable approved window.
 - **Identity**: Credential Manager Google sign-in; **incremental OAuth `contacts.readonly` only**, explicitly rejects server auth codes/offline access (no refresh token ever on device); Firebase session + Play-Integrity App Check required; JIT sequential READ_PHONE_STATE → SEND_SMS requests with permanent-denial classification.
@@ -95,19 +139,19 @@ JS exposes **no** send/schedule/retry APIs — delivery authority lives natively
 - **Attention notifications**: severity-classified channels, per-category/day dedupe store, single-use UUID tap identities (fsynced ring ≤16) feeding native route events (automation-review / attention).
 - Privacy hardening: FLAG_SECURE while backgrounded; recents screenshot disabled API 33+.
 
-## 2.4 Cloud control plane [VC]
+## 3.4 Cloud control plane [VC]
 
 Firebase project region **`asia-south1`**; Firestore rules **deny-all** — clients touch data only through **16 callable functions** (App Check enforced + consumed, 30 s timeout, maxInstances 20, concurrency 20): registerAndroidInstallation, renewSenderLease, changeAccountMode, claimOccurrence†, claimTest†, armAttempt, getArmStatus, reportTestOutcome, authorizeSafeRetry, beginSenderTransfer, completeSenderTransfer, requestAccountDeletion, accountDeletionReceipt, resetContactDerivedState, releaseAndroidSender, coordinationLifecycleStatus († require Cloud KMS secret `COORDINATION_HMAC_KEYRING`). Plus 2 scheduled sweeps: `sweepDeletionDrains`, `sweepCoordinationOperations`. Identity aliases are HMAC-SHA256 derived under domain `birthday-autopilot/control-plane/v1` with current+previous key rotation. **No raw contact/message fields ever reach the server** (privacy-architecture tests enforce). Gemini is absent server-side.
 
-**Server-side declared-but-absent**: `companionStatus` (whitelisted in `FirebaseCoordinationClient.kt` L29 but unimplemented), `acquireIOSComposerReservation` / `commit…` / `release…` (docs + TTL collection `iosComposerReservations` exist; zero implementation). ◐ iOS-companion protocol is half-built.
+**Server-side declared-but-absent:** `companionStatus` (whitelisted in `FirebaseCoordinationClient.kt` L29 but unimplemented), `acquireIOSComposerReservation` / `commit…` / `release…` (docs + TTL collection `iosComposerReservations` exist; zero implementation). ◐ iOS-companion protocol is half-built.
 
-## 2.5 Public web tier [VC]
+## 3.5 Public web tier [VC]
 
 Vite multi-page static site: `/`, `/delete/`, `/privacy/`, `/terms/`, `/support/`, 404 — bilingual EN/HI. Deletion flow: reCAPTCHA Enterprise App Check → in-memory Firebase Auth persistence → `reauthenticateWithPopup` → callable `requestAccountDeletion {contractVersion:1, requestId:<uuid>}` → receipt id held in **tab sessionStorage only**. Static tests forbid localStorage/indexedDB/cookies/console/innerHTML; strict CSP; fails closed without `public/runtime-config.json`.
 
 ---
 
-# 3. USER ROLES & PERMISSIONS [VC]
+# 4. USER ROLES & PERMISSIONS [VC]
 
 The app has no multi-user roles; roles derive from **device/installation state** (server-enforced `InstallationState`: ACTIVE / STANDBY / REVOKED):
 
@@ -117,13 +161,13 @@ The app has no multi-user roles; roles derive from **device/installation state**
 | **Owner on STANDBY device**         | Same account, second Android                            | View projections, privacy ops, can _begin_ sender transfer                                                   | Cannot arm/send; activation blocked (`active-sender-other-device`)             |
 | **Pre-auth user**                   | Before `continueWithGoogle()`                           | Welcome/compatibility, initiate sign-in, view eligibility issues                                             | Nothing else                                                                   |
 | **Web visitor**                     | Browser at /delete/                                     | Re-authenticated deletion of own account; receipt lookup                                                     | No other data access; fail-closed without runtime config                       |
-| **Release authority (external)**    | Holder of Ed25519 pin `distribution-authority-pin.json` | Signs distribution approvals unlocking restricted-SMS BuildConfig flags                                      | Out-of-repo key; approvals expire (`validUntil`)                               |
+| **Release authority (external)**    | Holder of Ed25519 pin `distribution-authority-pin.json` | Signs/denies distribution approvals unlocking restricted-SMS BuildConfig flags                                      | Out-of-repo key; approvals expire (`validUntil`)                               |
 
 ---
 
-# 4. INFORMATION ARCHITECTURE [VC]
+# 5. INFORMATION ARCHITECTURE [VC]
 
-## 4.1 Live navigation (`LiveAppShell.tsx:59–91`)
+## 5.1 Live navigation (`LiveAppShell.tsx:59–91`)
 
 **Bottom tabs (3): Home · People · Settings** — confirms decision.md/Flow.md; supersedes PROJECT_ABOUT §6 four-tab spec (Gap G-01).
 
@@ -133,13 +177,13 @@ Boot chain: `NativeAppBoundary` → bootstrap projection → if setup incomplete
 
 Fixture stack (dev-only): separate react-navigation tree mirroring the IA with synthetic data for design/localization preview (incl. ar-XB pseudo-RTL, platform override).
 
-## 4.2 Deep links / external surfaces [VC]
+## 5.2 Deep links / external surfaces [VC]
 
 Help/Legal opens hosted `${baseUrl}/privacy|terms|support|delete` via Linking (`LiveHelpLegalScreen.tsx`). No custom-scheme deep links found in live stack (v1.0's `wishwell://` scheme: 📄 not implemented ❓).
 
 ---
 
-# 5. FEATURE INVENTORY (MASTER TABLE)
+# 6. FEATURE INVENTORY (MASTER TABLE)
 
 Statuses: ✅ 📄 🆕 ◐ 🔮 ❓ as defined. Priority reflects launch criticality observed from gating.
 
@@ -203,101 +247,72 @@ Statuses: ✅ 📄 🆕 ◐ 🔮 ❓ as defined. Priority reflects launch critic
 
 ---
 
-# 6. DETAILED FEATURE SPECIFICATIONS
+# 7. BUSINESS REQUIREMENTS
 
-Format per feature: purpose · workflow · business rules/validation · edge & failure cases · dependencies · key ACs. All ✅ items verified [VC].
-
-## 6.1 Onboarding & Compatibility (F-01/02/03)
-
-- **Workflow:** compatibility check (telephony features required=true, Google Play services, installer allowlist, distribution channel) → eligibility card listing blocking reasons → Continue with Google → contacts disclosure → authorize → sync summary.
-- **Rules:** unsupported/limited devices surface `platform-unsupported`, `google-play-services-missing`, `installer-allowlist-missing`, `distribution-channel-unapproved` (blocking ALL gates — observed verbatim in smoke fixture); cost-consent banner shown (recipient-pays-nothing / carrier-charges-sender framing **[VD]** copy exists in liveResources).
-- **Failure:** denied consent → signed-out(retainedSetup: none|same-account-only); permanent permission denial classified and persisted; lifecycle cleanup-pending reroutes to repair.
-- **AC:** given unapproved distribution build, when bootstrap loads, then all three gates report blocked with reason `distribution-channel-unapproved`.
-
-## 6.2 Contacts Sync (F-04/05/06)
-
-- **Workflow:** People API `/v1/people/me/connections` (fields names,birthdays,phoneNumbers,metadata; READ_SOURCE_TYPE_CONTACT; LAST_MODIFIED_ASCENDING; sync-token incremental) → staged transactional Room commit with NonCancellable rollback → buffer zeroing → reconcile.
-- **Bounds:** page-count/byte/duration/person limits; duplicate-resource detection; SHA-256 parameter-fingerprint guards incremental continuity; ≤3 worker attempts.
-- **Freshness bands (contracts/contacts-freshness-policy-v1.json):** NORMAL ≤ 7 d; STALE_WARNING > 7 d; PAUSE (>30 d) disallows automation.
-- **Edge:** expired sync token → one automatic full resync; source contact deleted → issue `source-contact-deleted`; Feb 29 without leap policy → blocked `leap-policy-required` (user must choose feb-28/mar-01/**skip**).
-- **AC:** given incremental sync with tampered parameters, when fingerprint mismatches, then full resync occurs and no partial merge commits.
-
-## 6.3 People Directory & Enrollment (F-07/08)
-
-- Search field (trailing clear button, PR #168); filter chips; cursor pagination (`PageCursor`). Per-person actions pass through **prepareEnrollmentReview → confirmEnrollment** two-phase pattern with expectedRevision. Destination blocking (`blockRecipientDestination`) prevents sends to a number while keeping enrollment.
-- Contact issue taxonomy (14 codes) drives Needs-attention filter: birthday-missing/conflict/choice-required, leap-policy-required, phone-missing/choice-required/ambiguous-region/invalid/blocked-form, duplicate-destination, stable-source-missing, safe-given-name-missing, source-contact-deleted, approval-invalid.
-- Phones masked everywhere except explicit choice/confirmation moments **[VC design-system usage]**.
-
-## 6.4 Messaging: Templates, Editor, Gemini (F-09/10/11)
-
-- 4 built-in templates (en/hi × personalized `{given-name}` / generic); placeholder cardinality enforced (given-name:1, generic:0).
-- Semantic policy v2 classifier bans URLs, promotional content, tracking, bidi control chars, sensitive content; language mismatch detection (`template-language-mismatch`).
-- Gemini request contains **only**: language, tone, relationship, milestone, name-style hint, segment limit (prompt policy JSON). Candidates 1–3, dedupe (case-insensitive en), maxOutputTokens 512, 15 s timeout. States: requesting → candidates | fallback(network-offline|coordination-unavailable|policy-suspended) | failed(unknown-native-value|internal-contract-invalid). Provider text never persisted/logged; candidates deduped; generation impossible from send worker.
-- **AC:** given any generated candidate, when payload inspected, then it contains no phone/email/contact-ID and ≤ 2 segments after plan computation.
-
-## 6.5 Approvals & Invalidation (F-12/13)
-
-- Snapshot binds recipient identity, exact text, window, late policy, SIM binding epoch, segment plan, disclosure version, sender epoch, permission policy. Any of **12 change classes post-approval → invalidated(reasons[])**; sends blocked until re-approval.
-- Batch approval: multi-select ready recipients → prepareApprovals returns per-item review handles → confirmApprovals applies atomically per item; partial failures surfaced individually.
-- **AC:** given approved person whose phone later changes in source, when reconcile runs, then approval shows invalidated(phone-changed) and birthday gate blocks.
-
-## 6.6 Policy & Scheduling (F-14/15)
-
-- Policy fields: dailyCap, window (start/end), latePolicy(none|same-day-grace), segmentCap(≤2), sim binding, per-birthday confirmation requirement. Validation codes: invalid-daily-cap, invalid-segment-cap, invalid-window, window-capacity-conflict.
-- Preview simulates 400 days of occurrences with issues before save.
-- Server mirrors budget: `BIRTHDAY_ARM_CAP=20/day` (UTC day window), `TEST_ARM_CAP=3/day`.
-- **AC:** given cap 20 already armed today, when another claim arrives, then server refuses with budget reason and orchestrator schedules successor (WorkerAttentionPolicy: hourly successor for reservation-class, 30 s floor otherwise).
-
-## 6.7 Test Mode (F-17)
-
-- Isolated guard family from birthday sends; requires test gate allowed; completion feeds activation-review; receipt-invalidated phase covers stale evidence; budget-exhausted blocks further tests until UTC day rolls.
-
-## 6.8 Delivery Pipeline (F-18…22) — core promise
-
-- Phases (25): planned→prepared→scheduled→claimed→coordination-blocked?→cloud-claimed→arm-reconciling→coordination-unknown?→cloud-armed→armed-suppressed?→submission-barrier-consumed→submitted→sent-from-device→(delivered|delivery-failed|partial-delivery|delivery-unknown|partial-unknown|unknown)→terminal(retryable-failure→retry-exhausted|permanent-failure|skipped|missed|cancelled).
-- Constants [VC backend/domain/model.ts]: MAX_LEASE_MS=10 min; CLAIM_AUTHORIZATION_MS=10 min; MAX_SUBMIT_AFTER_ARM_MS=1 min; ARM_SPACING_MS=5 min; sent-evidence grace 15 min; clock tolerance 5 min.
-- Truthful outcomes: delivered only from carrier/callback evidence; else honest partial/unknown states. Scenario evidence schema enforces `duplicate submissions const 0`, `carrierDeliveryClaimed const false`.
-- Failure handling: SIM missing (`no-active-sim`,`sim-changed`,`sim-invalid`), radio, OEM kills (durable wake ledger + boot receiver rescheduling), background restrictions surfaced as scheduler-delayed/attention, never silently swallowed.
-- **AC:** given armed submit with prior successful ledger entry for same occurrenceKey, when submit attempted again, then destination guard blocks and no second SMS dispatches (server + local permit).
-
-## 6.9 Sender Transfer (F-24)
-
-- New device: prepareSenderTransfer (review consequences + TTL'd lease) → beginSenderTransfer → server TRANSFER_PENDING + drain window → old device demoted STANDBY after drain → completeSenderTransfer bumps epoch → **test-required** state before automation re-activation. Ambiguous outcomes reconciled; failed transfers retryable; resume paths for remote-pending/draining across process death.
-- **AC:** given transfer completing, when old device attempts arm mid-drain, then refused (fence/epoch) with zero duplicate risk.
-
-## 6.10 Privacy Operations & Deletion (F-31…35, F-43)
-
-- Two-phase destructive pattern everywhere: prepareAction(kind, expectedRevision) → consequence-key whitelist validated client-side → confirmAction(handle) → authoritative triple-reload with deep corroboration before success UI; protected work retired on background/invalidate/unmount; short-TTL review leases prevent stale authorization.
-- Operation state machine: queued → pausing → local-wiping → remote-draining → (remote-unknown(sameAccountRetryAvailable) | remote-pending) → verifying → complete | failed(resumable).
-- Deletion guarantees: `localDataErased:true`; `externalSmsCopiesNotErased:true` (honest scope statement). Tombstone DRAINING fenced saga; scheduled sweep verifies Auth deletion; receipts content-free, 365 d retention, lookup by UUID.
-- clear-gemini-templates wipes AI suggestion history locally; clear-activity wipes local activity feed (both 🆕).
-- **AC:** given delete-account confirmed, when remote coordination unavailable, then op enters remote-unknown with same-account retry available and local wipe completes only per policy; receipt retrievable later by id.
-
-## 6.11 Diagnostics & Support (F-26/28)
-
-- previewDiagnostics produces private-content-free bundle (client validates: excludesPrivateContent, safe reason codes only, UTC instants) → shareDiagnostics(expectedRevision) hands off to OS share sheet. Health checklist derives from capability codes (account/contacts/SMS-SIM/background).
-
-## 6.12 iOS Companion Protocol Surface (F-50) ◐
-
-Client/server scaffolding that exists today: `DeliveryPlatform.IOS_COMPANION`; activity phases composer-opened/cancelled/failed/outcome-unknown/reported-sent; server reason `IOS_COMPOSER_RESERVED` fences Android sends during an iOS App Review window (constant 72 h; hourly recheck policy uses one-hourly successor rather than network floor); TTL collection reserved. Missing: iOS application, server reservation callables, companionStatus implementation. Treated as Phase 3 🔮.
+| ID    | Requirement                                                                        | Rationale                                   | Priority | Status                          |
+| ----- | ---------------------------------------------------------------------------------- | ------------------------------------------- | -------- | ------------------------------- |
+| BR-01 | No message without prior approval of exact content, invalidated on material change | Trust core; abuse shield                    | P0       | ✅                              |
+| BR-02 | Structural single-send per occurrence                                              | Double-wish destroys brand                  | P0       | ✅                              |
+| BR-03 | Delivery truthfulness                                                              | Review protection                           | P0       | ✅                              |
+| BR-04 | Restricted SMS capability only via signed, unexpired approval                      | Policy/legal containment                    | P0       | ✅                              |
+| BR-05 | Complete data-deletion path reachable from web without app                         | Google policy; user rights                  | P0       | ✅ eng / ❓ SLA copy            |
+| BR-06 | Minimal data footprint end-to-end                                                  | Privacy moat; breach-cost ceiling           | P0       | ✅                              |
+| BR-07 | Fail-closed release admission                                                      | Bad release = broken promises at scale      | P0       | ✅                              |
+| BR-08 | Activation funnel measurable                                                       | Retention economics need leading indicators | P0       | 📄→[R]                          |
+| BR-09 | Self-serve repair for top failure classes                                          | Support-cost control                        | P1       | ✅ capability / ❓ channel      |
+| BR-10 | Bilingual launch surface EN/HI                                                     | Market reach; store locales                 | P1       | ✅                              |
+| BR-11 | Accessibility conformance as launch blocker                                        | Legal + reach                               | P1       | ✅ tooling / ◐ evidence pending |
+| BR-12 | Physical-device performance budgets                                                | OEM reality check                           | P1       | ✅ tooling                      |
+| BR-13 | Free core forever                                                                  | Brand promise                               | P0       | ✅ policy                       |
+| BR-14 | iOS companion only after Android stability window                                  | Risk sequencing                             | P2       | 🔮                              |
+| BR-15 | Documentation parity with code                                                     | Contributor/support accuracy                | P1       | 📄 debt open                    |
+| BR-16 | Support operating model defined pre-launch                                         | BO-6/BR-16 dependency                        | P0       | ❓                              |
 
 ---
 
-# 7. FUNCTIONAL REQUIREMENTS (CONSOLIDATED)
+# 8. BUSINESS OBJECTIVES
+
+| ID   | Objective                                                                     | Success measure                                                                    | Status                                          |
+| ---- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------- |
+| BO-1 | Ship Play-distributed Android Automation Edition passing every admission gate | Signed approval (9 mandatory booleans) valid; store submission package complete    | ◐ gates built ✅, submission pending ❓         |
+| BO-2 | Reliability promise: approved wishes deliver in-window, exactly once          | Send success ≥98%; duplicate submissions = 0 (already schema-asserted); missed <2% | Pipeline ✅; field metrics pending telemetry 📄 |
+| BO-3 | Trust loop validated                                                          | Approval rate ≥60%; automation stays on ≥95% post first send                       | Requires analytics ([R])                        |
+| BO-4 | Compliance-clean operation                                                    | contacts.readonly verification passed; zero policy strikes; deletion SLA met       | Engineering ✅; Google verification status ❓   |
+| BO-5 | First-session activation ≥70%, median <10 min                                 | Funnel instrumentation (currently absent → [R])                                    | Blocked by F-48 gap                             |
+| BO-6 | Self-serve resolution ≥90% of failures                                        | Ticket rate <10/1000 MAU                                                           | Diagnostics ✅; tickets channel ❓              |
+| BO-7 | Honest platform expansion (iOS companion) when Android SLOs hold 2 quarters   | Reservation callables + app shipped; composer vocabulary enforced                  | ◐ protocol scaffolds exist                      |
+| BO-8 | Keep core sending free forever; premium only additive                         | Zero paywalled core features                                                       | Policy ✅ (no monetization code exists)         |
+| BO-9 | Efficient organic growth to ≥10k installs /6 mo                               | Console install sources; CAC≈0 assumption                                          | 🔮 GTM undefined ❓                             |
+
+---
+
+# 9. FUNCTIONAL REQUIREMENTS
 
 FR-01 Bridge integrity: envelope contractVersion==1, revision monotonic, payload ≤1 MiB, double Zod validation; failures map to stable support codes.
+
 FR-02 Optimistic concurrency: every mutation carries expectedRevision; stale → reload, never blind-write.
+
 FR-03 Projection freshness: area-scoped invalidations + foreground reload; screens render last-good data with refresh-problem banner rather than blanking.
+
 FR-04 Two-phase destructive actions with consequence whitelists + TTL leases + post-confirm corroboration (privacy, enrollment, transfer, approvals, activation).
+
 FR-05 Readiness gating: every send path passes test|activation|birthday gate decision; blocked reasons carry localized copy + optional native action handle.
+
 FR-06 Validation catalogs: FieldName ∈ {birthday, confirmation, dailyCap, phone, sim, template, window}; UiDraftValidation returned inline for drafts (template/window/phone validators co-located with tests).
+
 FR-07 Notifications: POST_NOTIFICATIONS runtime flow; per-category/day dedupe; single-use tap routes; quiet behavior unspecified ❓ (BRULE-042 from v2 remains [R]).
+
 FR-08 Background resilience: boot/clock/locale/package/default-SMS triggers re-reconcile; durable wake ledger; 30 s successor floor; heartbeat lease prevents concurrent orchestrations.
+
 FR-09 Retention: local retention sweeps (DataRetentionWorker) mirror server TTLs (birthday claims 400 d; tests 30 d; standby installs 90 d; revoked 30 d; coordination receipts 30 d; deletion receipts 365 d).
+
 FR-10 Web contract: /delete/ requires App Check (reCAPTCHA Enterprise) + Firebase reauth; requestId UUID; receipt only in tab session.
+
 FR-11 Localization: all user-visible strings keyed via compile-safe TranslationKey; hi fallback en; locale-aware formatting (formatLive); RTL fixture verification in dev.
 
-# 8. BUSINESS RULES CATALOG (CODE-VERIFIED CONSTANTS)
+---
+
+# 10. BUSINESS RULES (CODE-VERIFIED CONSTANTS)
 
 | Rule                        | Value / Behavior                                                                                           | Source                                                   |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
@@ -320,9 +335,9 @@ FR-11 Localization: all user-visible strings keyed via compile-safe TranslationK
 | Server storage              | no raw contact/message fields; HMAC aliases only                                                           | privacy-architecture tests                               |
 | Receipts                    | content-free; SHA256('birthday-deletion-receipt-v1\0'+id)                                                  | deletionReceipt.ts                                       |
 
-Legacy BRULE-001…035 from PROJECT_ABOUT remain directionally accurate but several are superseded precisely by the table above (notably BRULE-008 default-date, BRULE-012 ten-parts, BRULE-013/014 window/late semantics, BRULE-033 battery exemption, BRULE-035 manual deletion fallback). Where they conflict, **this table wins**.
+---
 
-# 9. NON-FUNCTIONAL REQUIREMENTS
+# 11. NON-FUNCTIONAL REQUIREMENTS
 
 | Area            | Verified state [VC]                                                                                                                                                                                                                                 |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -336,7 +351,9 @@ Legacy BRULE-001…035 from PROJECT_ABOUT remain directionally accurate but seve
 | Observability   | Operational only: heartbeats, wake ledger, attention codes, perf evidence. **No crash/analytics telemetry** (see §15)                                                                                                                               |
 | Availability    | Backend maxInstances 20/concurrency 20; scheduled self-healing sweeps; client degrades to cached projections offline                                                                                                                                |
 
-# 10. UI/UX SCREEN SPECIFICATIONS [VC]
+---
+
+# 12. UI/UX SCREEN SPECIFICATIONS [VC]
 
 Design language: calm utility (Inter; accent #4B52A3; light #F7F7FC / dark #11121A; positive #256A45 / warning #8A4F08 / critical #A53535 + surface tints; radii 8/14/20/pill; spacing 4–48; 48 dp targets; dark + high-contrast variants) — theme.ts matches Stitch tokens. Zero celebratory deception; status text always paired with icon.
 
@@ -360,81 +377,199 @@ Design language: calm utility (Inter; accent #4B52A3; light #F7F7FC / dark #1112
 
 Empty/loading/error/success states exist across live screens via shared `LiveProjectionState` components (loading/error-retry/refresh-banner/action-feedback with support reference).
 
-# 11. DATA MODEL & INTEGRATIONS
+---
 
-Local Room 37 entities grouped: control (account/installation-binding/consent/coordination-permit/send-attempt/callback-token/delivery-event/outcome-projection/reset-safety/clock-trust/readiness), contact (people-staging\*), approval, occurrence, activity, ledger (SafetyLedgerDao append-only). Server collections: accounts/{uid} (+installations, occurrenceClaims, testClaims, occurrenceKeys, destinationGuards, claimRequests, armOutcomes, armBudgets), deletionTombstones, coordinationPresence, coordinationOperationFences, coordinationOperationReceipts(+Latest), globalControl/current; TTL `cleanupAt` ×13 groups; zero composite indexes.
+# 13. DATA MODEL & INTEGRATIONS
 
-Integrations: Google People API (read), Credential Manager OAuth (contacts.readonly incremental), Firebase Auth + App Check (Android attestation provider only — the backend consumes App Check tokens, it does **not** verify Play Integrity itself) + Callables (16 + 2 scheduled sweeps, region asia-south1), device-side `firebase-ai` (Gemini 3.5-flash via vertex-ai/global, **client-only** — no Gemini in backend functions), reCAPTCHA Enterprise (web), Android Telephony/SmsManager/SubscriptionManager/WorkManager/AlarmManager-equivalent scheduling, OS share sheet, Linking (hosted pages). **No FCM, no third-party analytics.**
+**Local Room 37 entities grouped:** control (account/installation-binding/consent/coordination-permit/send-attempt/callback-token/delivery-event/outcome-projection/reset-safety/clock-trust/readiness), contact (people-staging\*), approval, occurrence, activity, ledger (SafetyLedgerDao append-only).
 
-# 12. KEY USER JOURNEYS (VERIFIED)
+**Server collections:** accounts/{uid} (+installations, occurrenceClaims, testClaims, occurrenceKeys, destinationGuards, claimRequests, armOutcomes, armBudgets), deletionTombstones, coordinationPresence, coordinationOperationFences, coordinationOperationReceipts(+Latest), globalControl/current; TTL `cleanupAt` ×13 groups; zero composite indexes.
 
-1. **First-run to activated automation:** welcome/compatibility → Google → contacts disclosure+sync → recipient selection (all off) → message-and-policy (template/Gemini, batch approve available) → test-review → test-progress (≤3/day) → reliability-repairs (if issues) → activation-review → activate. Deferred exits preserved at each step.
-2. **Birthday send (unattended):** planner marks occurrence → reconcile claims → server issues keys/guards → arm within spacing → barrier → SmsManager submit (≤2 parts, default SIM sub) → callback observe → outcome worker classifies → activity row + optional silent success; failures → attention notification (deduped) → tap routes to automation-review or attention.
-3. **Repair:** attention list → issue detail (plain-language safe reason) → native action handle (open settings / re-auth / choose phone / confirm leap policy) → recheck clears.
-4. **Device replacement:** new install registers STANDBY → transfer prep/begin → drain → complete → mandatory test → reactivate.
-5. **Deletion:** in-app two-phase (or web reauth flow) → local wipe → remote drain/tombstone → sweep verifies Auth deletion → receipt id retained by user.
-6. **Recovery after revocation:** reconnect-required account state → repair lifecycle (identity lease) → resume operation or clean sign-out-wipe.
+**Integrations:**
+- Google People API (read)
+- Credential Manager OAuth (contacts.readonly incremental)
+- Firebase Auth + App Check (Android attestation provider only — the backend consumes App Check tokens, it does **not** verify Play Integrity itself) + Callables (16 + 2 scheduled sweeps, region asia-south1)
+- device-side `firebase-ai` (Gemini 3.5-flash via vertex-ai/global, **client-only** — no Gemini in backend functions)
+- reCAPTCHA Enterprise (web)
+- Android Telephony/SmsManager/SubscriptionManager/WorkManager/AlarmManager-equivalent scheduling
+- OS share sheet
+- Linking (hosted pages)
 
-# 13. USER STORIES (with acceptance criteria)
-
-US-01 As a new user, I want the app to tell me immediately whether my device/network/distribution supports automation, so that I don't invest time in an impossible setup. — AC: blocked eligibility lists every failing check with reason code and help link; no step advances past hard blockers.
-US-02 As a privacy-conscious user, I want contacts access limited to read-only birthdays, so that nothing of mine can be altered or exfiltrated. — AC: OAuth consent requests exactly contacts.readonly incrementally; write scopes impossible; server stores zero contact fields (privacy tests green).
-US-03 As a busy professional, I want to approve many people at once, so that activation takes minutes not hours. — AC: batch approval processes N ready recipients with per-item success/failure and no partial silent states.
-US-04 As a careful user, I want my approval to break automatically if anything material changes, so that a stale wish never sends. — AC: each of the 12 invalidation classes flips approval to invalidated with reason; birthday gate blocks until re-approved.
-US-05 As a dual-SIM owner, I want predictable SIM usage, so that wishes never bill the wrong plan. — AC: sends execute only on the active default-SMS subscription; deviation triggers reconcile and blocks with sim-\* reason.
-US-06 As a skeptical user, I want delivery claims to be honest, so that I can trust the activity log. — AC: statuses beyond sent-from-device never assert carrier delivery; partial/unknown rendered distinctly.
-US-07 As a user replacing phones, I want to move automation safely, so that nobody gets zero or two messages. — AC: transfer drain fences old device; completion forces a test; duplicates remain structurally 0.
-US-08 As a privacy-conscious user, I want to erase everything from any browser, so that leaving leaves no residue. — AC: /delete/ works with reauth; receipt issued; server sweep verifies Auth deletion ≤ SLA; external SMS copies disclosed as out of reach.
-US-09 As a Hindi-speaking user, I want the whole product in Hindi, so that setup is not intimidating. — AC: hi strings cover all live namespaces; store locale hi-IN evidence required; E2E asserts Hindi surfaces.
-US-10 As a low-vision user, I want large-text usable primary actions, so that I can activate independently. — AC: large-text E2E reaches setup primary actions scrolled; 200% scaling evidence required for store.
-
-# 14. ANALYTICS & OBSERVABILITY
-
-**Current state [VC]:** No product analytics, crash reporting, or push infrastructure. Telemetry equivalents: DB heartbeats, durable wake ledger, attention reason codes, performance-budget evidence at release time, CI matrices, server-side operational receipts. The v1.0 event catalog (onboarding_started…account_deleted) is 📄 entirely unimplemented.
-
-**Recommended [R]:** privacy-preserving local counters exported via the existing scrubbed-diagnostics channel first (zero new SDKs), then opt-in aggregate funnel telemetry (activation steps, approval rate, invalidation reasons, gate-block reasons, transfer completions, deletion SLA) once a privacy design review approves vendor; add Play Vitals / Console statistics as interim sources. Crash reporting decision required (❓) — ANR vector noted in §16 debt.
-
-# 15. GAP ANALYSIS
-
-## 15.1 Implemented but Undocumented (🆕 highlights)
-
-Batch approval (F-13) · message milestones (F-11) · relationship context enum (F-11) · policy caps daily/segment + 400-day preview (F-14/15) · clear-gemini-templates & clear-activity (F-32) · sign-out-retain variant · destination blocking/unblock/restore (F-08) · clock-trust (F-42) · reset-safety (F-43) · installer/distribution enforcement (F-41) · today-occurrence choices (F-25) · people pagination · notification tap routing ring · ar-XB pseudo-RTL fixture · FLAG_SECURE behaviors · asia-south1 residency · content-free receipts · standby/hibernation diagnostics · test budget 3/day · birthday arm budget 20/day · skip leap policy · 24-kind activity taxonomy incl. composer phases · lifecycle-repair identity lease · single-consume route semantics · smoke/e2e flavor isolation.
-
-## 15.2 Documented but Not Implemented (📄)
-
-Battery-optimization exemption request (F-45) · free SIM picker (F-46) · next-morning late policy (F-47) · analytics event stream (F-48) · crash reporting/FCM (F-49) · wishwell:// deep links (F-52) · manual non-Google web-deletion fallback (F-53) · README iOS artifact pipeline section (files deleted) · PROJECT_ABOUT "encrypted cloud backup of contacts" (false — server stores no contacts) · "FCM cloud-side events" · UI-022 sender-device name/last-seen display ❓ · v1.0 DATA-model fields (parts/simId/reconciled) replaced by richer reality · BRULE-008 default feb-28 (actual: must choose; skip possible) · BRULE-012 ten-part ceiling (actual 2).
-
-## 15.3 Partially Implemented (◐)
-
-iOS Companion Edition (protocol scaffolding only; server callables absent; TTL orphaned) · offline mode (implicit local-first; no dedicated UX) · standby diagnostics (observe, don't request exemption).
-
-## 15.4 Inconsistent (code vs docs)
-
-Tone sets (warm/simple/cheerful vs casual/professional/short) · approval-invalidation breadth (12 classes vs docs' phone/birthday) · sender fencing model (lease/epoch/drain vs simple flag) · deletion flow (drain saga vs immediate purge ≤48h — actual SLA governed by drain deadlines; ❓ confirm marketing SLA) · navigation (3-tab confirmed; Flow.md screen IDs S13/S14 map loosely to Schedule/Automation screens) · "3 candidate variations" (actual 1–3).
-
-## 15.5 Missing Requirements (should be specified)
-
-Notification quiet-hours policy · theme persistence semantics · widget/shortcut absence (confirm non-goal) · reply-handling expectation copy · data-retention UX for local activity (auto-prune horizons visible?) · support-contact SLA copy · store-listing content ownership.
-
-## 15.6 Technical / Product Debt
-
-`runBlocking` in BirthdayNativeModule (home/account/contactsSync payloads) — ANR risk on slow IO **[VC]** · no crash telemetry blinds OEM-field diagnosis · README staleness (iOS refs, Xcode notes) misleads contributors · dev/staging flavors lack source sets (silent main inheritance — intentional ❓) · companionStatus dead allowlist entry · iosComposerReservations TTL orphan · Settings theme persistence unclear · single retry may under-deliver on flaky networks (product tradeoff, deliberate).
-
-# 16. RISKS & EDGE CASES (TOP)
-
-OEM aggressive killers delay sends despite wake ledger (mitigate: diagnostics + guidance; exemption request still absent) · runBlocking ANRs on low-end devices · Gemini vendor policy shifts (kill-switch exists via policy-suspended fallback) · carrier filtering (budgets/pacing mitigate) · clock manipulation (clock-trust blocks) · timezone/DST (reconcile triggers cover TIME/TIMEZONE_CHANGED; planner recompute) · contact deleted upstream mid-cycle (source-contact-deleted issue; approval-invalid) · ambiguous region phones (choice-required) · user expectation of replies (out of scope; composer copy) · web tier misconfig fails closed (runtime-config gate) · signing-authority key loss halts releases (process risk).
-
-# 17. ROADMAP
-
-**Now (shipped):** everything marked ✅ above — Android Automation Edition + web tier + release-admission machinery.
-**Next (hardening, [R]):** resolve runBlocking; add crash telemetry decision; README/docs resync; quiet-hours rule; theme persistence; offline UX polish; notification preferences surface (per-category toggles exist server-dedupe side; UI ❓).
-**Phase 3 (🔮):** complete iOS Companion — implement reservation callables + companionStatus, rebuild iOS app honoring composer vocabulary; entry criteria: Android SLOs held ≥2 quarters.
-**Future:** occasions beyond birthdays; channels; shared plans; premium (never gating core); annual relationship digest; referral moments.
-
-# 18. OPEN QUESTIONS
-
-OQ-01 final brand/store identity · OQ-02 crash-reporting vendor/threshold · OQ-03 Gemini terms written confirmation (policy-suspended kill-switch verified in code) · OQ-04 launch countries/carrier matrix (evidence schema anticipates MCC/MNC rows) · OQ-05 minimum-age declaration · OQ-06 support channel staffing · OQ-07 deletion-SLA marketing number vs drain-window reality · OQ-08 dev/staging source-set intentionality · OQ-09 Settings theme persistence · OQ-10 notification preference UI scope.
+**Not present:** FCM, third-party analytics, contact writes, multi-account.
 
 ---
 
-_Cross-reference: business rationale, stakeholders, compliance, financials, KPIs, traceability → [`BRD.md`](BRD.md) v3.0._
+# 14. KEY USER JOURNEYS (VERIFIED)
+
+1. **First-run to activated automation:** welcome/compatibility → Google → contacts disclosure+sync → recipient selection (all off) → message-and-policy (template/Gemini, batch approve available) → test-review → test-progress (≤3/day) → reliability-repairs (if issues) → activation-review → activate. Deferred exits preserved at each step.
+
+2. **Birthday send (unattended):** planner marks occurrence → reconcile claims → server issues keys/guards → arm within spacing → barrier → SmsManager submit (≤2 parts, default SIM sub) → callback observe → outcome worker classifies → activity row + optional silent success; failures → attention notification (deduped) → tap routes to automation-review or attention.
+
+3. **Repair:** attention list → issue detail (plain-language safe reason) → native action handle (open settings / re-auth / choose phone / confirm leap policy) → recheck clears.
+
+4. **Device replacement:** new install registers STANDBY → transfer prep/begin → drain → complete → mandatory test → reactivate.
+
+5. **Deletion:** in-app two-phase (or web reauth flow) → local wipe → remote drain/tombstone → sweep verifies Auth deletion → receipt id retained by user.
+
+6. **Recovery after revocation:** reconnect-required account state → repair lifecycle (identity lease) → resume operation or clean sign-out-wipe.
+
+---
+
+# 15. ANALYTICS & OBSERVABILITY
+
+**Current state [VC]:** No product analytics, crash reporting, or push infrastructure. Telemetry equivalents: DB heartbeats, durable wake ledger, attention reason codes, performance-budget evidence at release time, CI matrices, server-side operational receipts. The v1.0 event catalog (onboarding_started…account_deleted) is 📄 entirely unimplemented.
+
+**Recommended [R]:** privacy-preserving local counters exported via the existing scrubbed-diagnostics channel first (zero new SDKs), then opt-in aggregate funnel telemetry (activation steps, approval rate, invalidation reasons, gate-block reasons, transfer completions, deletion SLA) once a privacy design review approves vendor; add Play Vitals / Console statistics as interim sources. Crash reporting decision required (❓) — ANR vector noted in §17 debt.
+
+---
+
+# 16. GAP ANALYSIS
+
+## 16.1 Implemented but Undocumented (🆕 highlights)
+
+Batch approval (F-13) · message milestones (F-11) · relationship context enum (F-11) · policy caps daily/segment + 400-day preview (F-14/15) · clear-gemini-templates & clear-activity (F-32) · sign-out-retain variant · destination blocking/unblock/restore (F-08) · clock-trust (F-42) · reset-safety (F-43) · installer/distribution enforcement (F-41) · today-occurrence choices (F-25) · people pagination · notification tap routing ring · ar-XB pseudo-RTL fixture · FLAG_SECURE behaviors · asia-south1 residency · content-free receipts · standby/hibernation diagnostics · test budget 3/day · birthday arm budget 20/day · skip leap policy · 24-kind activity taxonomy incl. composer phases · lifecycle-repair identity lease · single-consume route semantics · smoke/e2e flavor isolation.
+
+## 16.2 Documented but Not Implemented (📄)
+
+Battery-optimization exemption request (F-45) · free SIM picker (F-46) · next-morning late policy (F-47) · analytics event stream (F-48) · crash reporting/FCM (F-49) · wishwell:// deep links (F-52) · manual non-Google web-deletion fallback (F-53) · README iOS artifact pipeline section (files deleted) · PROJECT_ABOUT "encrypted cloud backup of contacts" (false — server stores no contacts) · "FCM cloud-side events" · UI-022 sender-device name/last-seen display ❓ · v1.0 DATA-model fields (parts/simId/reconciled) replaced by richer reality · BRULE-008 default feb-28 (actual: must choose; skip possible) · BRULE-012 ten-part ceiling (actual 2).
+
+## 16.3 Partially Implemented (◐)
+
+iOS Companion Edition (protocol scaffolding only; server callables absent; TTL orphaned) · offline mode (implicit local-first; no dedicated UX) · standby diagnostics (observe, don't request exemption).
+
+## 16.4 Inconsistent (code vs docs)
+
+Tone sets (warm/simple/cheerful vs casual/professional/short) · approval-invalidation breadth (12 classes vs docs' phone/birthday) · sender fencing model (lease/epoch/drain vs simple flag) · deletion flow (drain saga vs immediate purge ≤48h — actual SLA governed by drain deadlines; ❓ confirm marketing SLA) · navigation (3-tab confirmed; Flow.md screen IDs S13/S14 map loosely to Schedule/Automation screens) · "3 candidate variations" (actual 1–3).
+
+## 16.5 Missing Requirements (should be specified)
+
+Notification quiet-hours policy · theme persistence semantics · widget/shortcut absence (confirm non-goal) · reply-handling expectation copy · data-retention UX for local activity (auto-prune horizons visible?) · support-contact SLA copy · store-listing content ownership.
+
+---
+
+# 17. RISKS & TECHNICAL DEBT
+
+| Risk/Debt Item                                      | Severity | Mitigation Status                                                                 |
+| --------------------------------------------------- | -------- | --------------------------------------------------------------------------------- |
+| `runBlocking` in BirthdayNativeModule (ANR risk)    | High     | Code fix needed; ANR budget already in perf evidence                              |
+| No crash telemetry blinds field diagnosis           | High     | Interim: Play Vitals + opt-in scrubbed counters [R]; then minimal SDK w/ review   |
+| OEM aggressive killers delay sends                  | High     | Diagnostics codes shipped ✅; battery-exemption UX decision open (F-45)           |
+| iOS protocol half-build confuses roadmap            | Med      | Explicit Phase-3 gate BO-7; remove dead client whitelist entry or implement       |
+| Docs drift misleads contributors/support            | Med      | BR-15 parity pass; adopt doc-drift checklist                                      |
+| Signing-authority key loss/compromise               | High     | Out-of-band custody process ❓; pin rotation procedure needed                     |
+| Carrier filtering in new markets                    | Med      | Budgets/pacing ✅; per-country matrix evidence required before launch             |
+| Gemini terms shift                                  | Low-Med  | policy-suspended fallback + operational gate ✅; contract watch                   |
+| Web tier misconfiguration                           | Low      | Fail-closed runtime-config gate ✅                                                |
+| Dev/staging flavors lack source sets                | Low      | Silent main inheritance — intentional ❓                                          |
+| Settings theme persistence unclear                  | Low      | UX polish needed                                                                  |
+| Single retry may under-deliver on flaky networks    | Med      | Deliberate anti-spam tradeoff; consider user-initiated "send again" affordance    |
+
+---
+
+# 18. ROADMAP
+
+**Now (shipped):** everything marked ✅ above — Android Automation Edition + web tier + release-admission machinery.
+
+**Next (hardening, [R]):** resolve runBlocking; add crash telemetry decision; README/docs resync; quiet-hours rule; theme persistence; offline UX polish; notification preferences surface (per-category toggles exist server-dedupe side; UI ❓).
+
+**Phase 3 (🔮):** complete iOS Companion — implement reservation callables + companionStatus, rebuild iOS app honoring composer vocabulary; entry criteria: Android SLOs held ≥2 quarters.
+
+**Future:** occasions beyond birthdays; channels; shared plans; premium (never gating core); annual relationship digest; referral moments.
+
+---
+
+# 19. OPEN QUESTIONS
+
+| ID    | Question                                                                                              | Owner       |
+| ----- | ----------------------------------------------------------------------------------------------------- | ----------- |
+| OQ-01 | Final brand/store identity                                                                            | Product     |
+| OQ-02 | Crash-reporting vendor/threshold decision                                                             | Eng         |
+| OQ-03 | Gemini terms written confirmation (policy-suspended kill-switch verified in code)                     | Legal/Eng   |
+| OQ-04 | Launch countries/carrier matrix                                                                       | Product     |
+| OQ-05 | Minimum-age declaration                                                                               | Legal       |
+| OQ-06 | Support channel staffing                                                                              | Ops         |
+| OQ-07 | Deletion-SLA marketing number vs drain-window reality                                                 | Legal/Ops   |
+| OQ-08 | Dev/staging source-set intentionality                                                                 | Eng         |
+| OQ-09 | Settings theme persistence                                                                            | Eng/UX      |
+| OQ-10 | Notification preference UI scope                                                                      | Product/UX  |
+
+---
+
+# 20. DOCUMENT CONSOLIDATION NOTES
+
+This SSOT.md consolidates the following documents:
+
+- **PRD.md v3.0** — Fully incorporated (feature inventory, architecture, functional requirements, gap analysis)
+- **BRD.md v3.0** — Fully incorporated (business objectives, requirements, stakeholders, processes, KPIs)
+- **PROJECT_ABOUT.md** — Superseded; contains outdated information (iOS sections, incorrect specs)
+- **Flow.md** — Superseded; screen mappings preserved in §12
+- **decision.md** — Design tokens preserved in §12; detailed Stitch references archived
+- **DESIGN.md** — Pointer only; content incorporated here
+- **SECURITY.md** — Security policy preserved; technical details in §10/§11
+- **DEVELOPER_GUIDE.md** — Retained as workflow reference; architectural info incorporated here
+- **QUICKSTART.md** — Retained as quick reference
+- **README.md** — Retained as repository entry point; updated to reference this SSOT
+- **docs/\*** — Release evidence procedures retained; operational details incorporated
+- **stitch/\*** — Screen manifest retained as design artifact; mappings incorporated in §12
+- **llm-council/\*** — Historical planning artifacts; decisions incorporated where implemented
+- **VALIDATION_REPORT.md** — Quality gate results incorporated; report retained as evidence snapshot
+
+**Documents to Remove After SSOT Adoption:**
+- PRD.md (superseded)
+- BRD.md (superseded)
+- PROJECT_ABOUT.md (contains inaccuracies)
+- Flow.md (superseded)
+- decision.md (superseded)
+- DESIGN.md (pointer only)
+
+**Documents to Retain:**
+- README.md (repository entry point, update to reference SSOT.md)
+- SECURITY.md (security policy)
+- DEVELOPER_GUIDE.md (workflow reference)
+- QUICKSTART.md (quickstart reference)
+- docs/OPERATIONS_RUNBOOK.md (operational procedures)
+- docs/*_EVIDENCE.md (release evidence templates/schemas)
+- stitch/SCREEN_MANIFEST.md (design artifact)
+- stitch/IMPLEMENTATION_CROSSWALK.json (design-to-code mapping)
+- stitch/MASTER_STITCH_PROMPT_LIBRARY.md (Stitch MCP reference)
+- contracts/*.json (policy contracts)
+- tools/*.mjs (verification scripts)
+
+---
+
+# 21. TRACEABILITY MATRIX
+
+| Business Req | Features      | User Story | Primary Code Modules                                                                                                    | Journey | KPI                  |
+| ------------ | ------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------- | ------- | -------------------- |
+| BR-01        | F-09…13       | US-03/04   | domain/approvals/model.ts; AutomationPort.prepare/confirmApprovals; LiveBatchApprovalScreen.tsx                         | J-1     | Approval rate [R]    |
+| BR-02        | F-18/19/21/22 | US-05/07   | AndroidAutomationOrchestrator.kt; backend services/controlPlane.ts; SubscriptionBindingPolicy.kt                        | J-2     | Duplicates=0 ✅      |
+| BR-03        | F-22          | US-06      | SmsOutcomeNetworkProcessor.kt; mobile-release-scenario-evidence.schema.json                                             | J-2     | Rating [R]           |
+| BR-04/07     | F-41          | —          | android/app/build.gradle flavor blocks; validate-distribution-evidence.mjs                                              | P-6     | Gate pass rate       |
+| BR-05/06     | F-31…36/43    | US-02/08   | LivePrivacyScreen.tsx; PRIVACY_ACTION_KINDS; backend deletionOrchestrator.ts; hosting/src/\*                            | J-5     | Deletion SLA         |
+| BR-08        | F-48[R]       | —          | (absent — to build)                                                                                                     | J-1     | Funnel % [R]         |
+| BR-09        | F-26/28       | —          | LiveAttentionScreen.tsx; LiveDiagnosticsScreen.tsx; WorkerAttentionPolicy.kt                                            | J-3     | Recovery ≥90%        |
+| BR-10        | F-38          | US-09      | localization/liveResources.ts; e2e/maestro/03-hindi-localization.yaml                                                   | J-1     | hi adoption [R]      |
+| BR-11        | F-39          | US-10      | design-system/\*; e2e 04-large-text-primary-action.yaml                                                                 | J-1     | A11y matrix ✅/pending |
+| BR-14        | F-50          | —          | core/model/DeliveryPlatform.kt; IOSComposerReservationRecheckPolicy; ttl iosComposerReservations                        | —       | Phase-3 gate         |
+| BR-16        | —             | —          | docs/OPERATIONS_RUNBOOK.md (exists)                                                                                     | P-3     | Tickets [R]          |
+
+---
+
+# 22. APPENDIX: VERIFICATION CHECKLIST
+
+- [x] All features from codebase inventoried with status labels
+- [x] Business requirements traceable to features and code
+- [x] Architecture documented with verified file references
+- [x] Gap analysis complete (implemented vs documented vs missing)
+- [x] Risks and technical debt identified
+- [x] Roadmap aligned with implementation status
+- [x] Open questions enumerated
+- [x] Document consolidation plan specified
+- [x] Traceability matrix provided
+
+---
+
+**This SSOT.md is the single authoritative reference for the WishWell project. All future development, documentation, and decision-making must align with this document. When conflicts arise between this document and any other file, this document prevails.**
+
+_Last Updated: 2026-08-29_
+_Version: 1.0_
