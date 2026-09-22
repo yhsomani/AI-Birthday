@@ -16,15 +16,15 @@ Every feature/requirement carries one **Implementation Status** and one **Eviden
 
 ### Implementation Status
 
-| Status | Meaning                                          |
-| ------ | ------------------------------------------------ |
-| ✅     | Implemented — fully implemented and working      |
-| ◐      | Partially implemented — incomplete or has gaps   |
-| 📄     | Documented but NOT implemented                   |
-| 🆕     | Implemented but missing from prior documentation |
-| 🔮     | Planned / future                                 |
-| ❓     | Unclear — requires confirmation                  |
-| ⚠️     | **NOT_RUNTIME_VERIFIED** — code exists but not verified in runtime environment |
+| Status | Meaning                                                                                  |
+| ------ | ---------------------------------------------------------------------------------------- |
+| ✅     | Implemented — fully implemented and working                                              |
+| ◐      | Partially implemented — incomplete or has gaps                                           |
+| 📄     | Documented but NOT implemented                                                           |
+| 🆕     | Implemented but missing from prior documentation                                         |
+| 🔮     | Planned / future                                                                         |
+| ❓     | Unclear — requires confirmation                                                          |
+| ⚠️     | **NOT_RUNTIME_VERIFIED** — code exists but not verified in runtime environment           |
 | 🚫     | **NOT_DEPLOYED** — implementation complete but not deployed to production infrastructure |
 
 ### Verification States (for tracking progress)
@@ -212,6 +212,7 @@ Help/Legal opens hosted `${baseUrl}/privacy|terms|support|delete` via Linking (`
 Statuses: ✅ 📄 🆕 ◐ 🔮 ❓ as defined. Priority reflects launch criticality observed from gating.
 
 **Note:** Each feature below has a corresponding detailed specification in §6.2 that describes:
+
 - **Ideal Behavior**: How the feature should work when fully functional
 - **Current Implementation**: What is actually implemented
 - **Gaps**: Differences between ideal and current state
@@ -262,14 +263,14 @@ Statuses: ✅ 📄 🆕 ◐ 🔮 ❓ as defined. Priority reflects launch critic
 | F-41 | Distribution-channel enforcement (BuildConfig flags from signed approval; blocks all gates when unapproved)                                                                                      | ✅ 🆕  | P0         | validate-distribution-evidence.mjs; gradle flavor blocks                                                                                                                                             |
 | F-42 | Clock-trust system (untrusted-clock blocking, 5-min tolerance)                                                                                                                                   | ✅ 🆕  | P0         | clock-trust entity; clock-untrusted code                                                                                                                                                             |
 | F-43 | Reset-safety replay protection (contact-derived resets)                                                                                                                                          | ✅ 🆕  | P1         | resetContactDerivedState; reset-safety entities                                                                                                                                                      |
-| F-44 | Standby/hibernation diagnostics (diagnose-only)                                                                                                                        | ✅ 🆕   | P1         | AppStandbyBucketDiagnosticPolicy; hibernation-status-unsafe codes                                                                                                                                    |
-| F-45 | Battery-optimization exemption request flow (guide users through system settings; **no programmatic request**)                                                              | 📄     | P1         | Settings intent opened on detection (LifecycleController); **no guided UX flow** (v1.0 JOURNEY-09/UI-013)                                                                                                                                                             |
+| F-44 | Standby/hibernation diagnostics (diagnose-only)                                                                                                                                                  | ✅ 🆕  | P1         | AppStandbyBucketDiagnosticPolicy; hibernation-status-unsafe codes                                                                                                                                    |
+| F-45 | Battery-optimization exemption request flow (guide users through system settings; **no programmatic request**)                                                                                   | 📄     | P1         | Settings intent opened on detection (LifecycleController); **no guided UX flow** (v1.0 JOURNEY-09/UI-013)                                                                                            |
 | F-46 | Free-form user SIM selection picker                                                                                                                                                              | 📄     | P1         | superseded by F-21 fail-closed default-SIM policy                                                                                                                                                    |
 | F-47 | Late-send next-morning option                                                                                                                                                                    | 📄     | P2         | actual policy enum: none \| same-day-grace only                                                                                                                                                      |
 | F-48 | Product analytics event stream (v1.0 §21 catalog)                                                                                                                                                | 📄     | P2         | **zero analytics SDK in repo** (grep-verified)                                                                                                                                                       |
 | F-49 | Crash reporting / FCM push                                                                                                                                                                       | 📄 ❓  | P2         | none found; docs ambiguous ("FCM for cloud events")                                                                                                                                                  |
 | F-50 | iOS Companion Edition (reminders + composer handoff)                                                                                                                                             | ◐      | 🔮 Phase 3 | client protocol present (DeliveryPlatform.IOS_COMANION\*, composer activity kinds, IOS_COMPOSER_RESERVED hourly recheck, 72 h reservation constant); no iOS app; server reservation callables absent |
-| F-51 | Offline degraded mode                                                                                                                                                                            | ✅      | P2         | local-first reads work offline; network-offline reason codes; safe fail-closed behavior; user-friendly offline messages (EN/HI)                                                                                                            |
+| F-51 | Offline degraded mode                                                                                                                                                                            | ✅     | P2         | local-first reads work offline; network-offline reason codes; safe fail-closed behavior; user-friendly offline messages (EN/HI)                                                                      |
 | F-52 | Custom-scheme deep links (`wishwell://*`)                                                                                                                                                        | 📄     | P3         | not found in live stack                                                                                                                                                                              |
 | F-53 | Manual web-deletion fallback without Google login                                                                                                                                                | 📄     | P2         | actual: reauth popup mandatory, fails closed                                                                                                                                                         |
 
@@ -280,6 +281,7 @@ Statuses: ✅ 📄 🆕 ◐ 🔮 ❓ as defined. Priority reflects launch critic
 ## 6.2 DETAILED FEATURE SPECIFICATIONS
 
 Each feature specification below follows this structure:
+
 - **Ideal Behavior**: How the feature should work when fully functional (product requirement)
 - **Current Implementation**: What is actually implemented (verified from code)
 - **Gaps**: Differences between ideal and current state
@@ -295,6 +297,7 @@ Due to the extensive number of features (53 total), this section provides detail
 
 **Ideal Behavior:**
 The app must verify device capability before allowing setup to proceed. Users should see clear eligibility issues with actionable resolution paths. The system checks:
+
 - Android API level (minimum 29)
 - Telephony hardware availability
 - SMS capability
@@ -308,6 +311,7 @@ All eligibility checks implemented in `domain/setup/model.ts` with `refreshCompa
 **Gaps:** None — fully implemented.
 
 **Evidence:**
+
 - `src/domain/setup/model.ts` — eligibility model, issue taxonomy
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/setup/DeviceEligibilityChecker.kt` — native checks
 - `src/features/setup/LiveSetupScreen.tsx` — UI integration (step 1)
@@ -321,6 +325,7 @@ All eligibility checks implemented in `domain/setup/model.ts` with `refreshCompa
 
 **Ideal Behavior:**
 Users authenticate via Google using Android Credential Manager for seamless sign-in. The system must:
+
 - Present Google account chooser
 - Obtain ID token with explicit user consent
 - Bind to Firebase Auth via `signInWithCustomToken()`
@@ -334,6 +339,7 @@ Full flow implemented using `androidx.credentials` library. Firebase binding via
 **Gaps:** None — fully implemented.
 
 **Evidence:**
+
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/auth/AndroidGoogleIdentityCoordinator.kt` — Credential Manager orchestration
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/auth/FirebaseAccountBindingProvider.kt` — Firebase token exchange
 - `src/infrastructure/native/NativeBirthday.ts` — bridge contract
@@ -347,6 +353,7 @@ Full flow implemented using `androidx.credentials` library. Firebase binding via
 
 **Ideal Behavior:**
 Fully automated birthday SMS delivery:
+
 1. **Claim**: Server claims occurrence for user
 2. **Arm**: Schedule send within spacing constraints (≥5 min)
 3. **Submit**: Send via SmsManager at appointed time
@@ -359,6 +366,7 @@ Fully automated birthday SMS delivery:
 **Gaps:** None — fully implemented.
 
 **Evidence:**
+
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/orchestration/AndroidAutomationOrchestrator.kt`
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/sms/SmsGateway.kt`
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/outcome/SmsOutcomeNetworkProcessor.kt`
@@ -371,10 +379,11 @@ Fully automated birthday SMS delivery:
 
 **Ideal Behavior:**
 Prevent duplicate sends via:
+
 - **Occurrence keys**: Unique per birthday instance
 - **Destination guards**: Block duplicate destination+occurrence combos
 - **Budgets**: 20 birthday arms/day UTC, 3 test arms/day UTC
-Server enforces at-most-one submission guarantee.
+  Server enforces at-most-one submission guarantee.
 
 **Current Implementation:**
 `decisions.ts` implements occurrence key generation and destination guard checks. Budget caps enforced in callables. Schema asserts zero duplicate submissions.
@@ -382,6 +391,7 @@ Server enforces at-most-one submission guarantee.
 **Gaps:** None — fully implemented.
 
 **Evidence:**
+
 - `backend/functions/src/decisions.ts`
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/contracts/CoordinationContracts.kt`
 - `backend/functions/src/model.ts` — budget caps
@@ -394,6 +404,7 @@ Server enforces at-most-one submission guarantee.
 
 **Ideal Behavior:**
 Detect and report battery optimization restrictions that would block automation:
+
 - Identify app standby bucket status
 - Detect OEM-specific hibernation policies
 - Report diagnostic codes for support evidence
@@ -402,6 +413,7 @@ Detect and report battery optimization restrictions that would block automation:
 Diagnostics fully implemented with comprehensive diagnostic codes. `AppStandbyBucketDiagnostic.kt` reads current bucket status. OEM-specific codes present in readiness evaluation. Diagnostic codes exposed to frontend via native module.
 
 **Implemented:**
+
 - App standby bucket reading (`AndroidAppStandbyBucketDiagnosticReader`)
 - Policy-based evaluation (`AppStandbyBucketDiagnosticPolicy`)
 - 13 diagnostic codes (EXEMPTED, ACTIVE, WORKING_SET, FREQUENT, RARE, RESTRICTED, NEVER, UNKNOWN, API_UNSUPPORTED, SERVICE_UNAVAILABLE, ACCESS_DENIED, RUNTIME_UNAVAILABLE, PLATFORM_UNAVAILABLE, READ_FAILED)
@@ -410,9 +422,11 @@ Diagnostics fully implemented with comprehensive diagnostic codes. `AppStandbyBu
 - Settings intent opened automatically on detection
 
 **Missing:**
+
 - None (diagnose-only requirement met)
 
 **Evidence:**
+
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/readiness/AppStandbyBucketDiagnostic.kt` — diagnosis implementation
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/readiness/AndroidReadinessProbe.kt:111-114` — dozeAllowlisted check
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/readiness/DistributionEligibility.kt:116` — eligibility enforcement
@@ -426,6 +440,7 @@ Diagnostics fully implemented with comprehensive diagnostic codes. `AppStandbyBu
 
 **Ideal Behavior:**
 Guide users through battery optimization exemption process:
+
 - Detect when exemption is needed
 - Present step-by-step OEM-specific instructions
 - Open system settings for user to grant exemption
@@ -436,11 +451,13 @@ Guide users through battery optimization exemption process:
 **Minimal implementation exists:** When `doze-exemption-missing` reason code is detected, the system opens the battery optimization settings screen (`Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`). However, there is **no guided UX flow**, no step-by-step instructions, no status tracking after user returns, and no persistence of exemption state.
 
 **Implemented:**
+
 - Settings intent triggered on detection (`AndroidLifecycleController.kt:2376`)
 - Reason code mapped to correct system action
 - Included in actionable codes list for UI remediation
 
 **Missing:**
+
 - Guided UX flow with step-by-step instructions
 - Pre-exemption explanation screen
 - Post-exemption verification check
@@ -450,12 +467,14 @@ Guide users through battery optimization exemption process:
 - Integration with onboarding journey (JOURNEY-09)
 
 **Gaps:**
+
 - No dedicated UI screen for exemption flow (UI-013 not implemented)
 - No status tracking entity in Room database
 - No integration with v1.0 JOURNEY-09 onboarding sequence
 - User must manually navigate back; no automatic re-evaluation
 
 **Evidence:**
+
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/lifecycle/AndroidLifecycleController.kt:2376` — settings intent only
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/lifecycle/AndroidLifecycleController.kt:2529` — listed in ACTIONABLE_CODES
 - Gap: No guided UX flow found
@@ -468,6 +487,7 @@ Guide users through battery optimization exemption process:
 
 **Ideal Behavior:**
 iOS companion app that:
+
 - Receives birthday reminders from server
 - Acquires composer reservation (72-hour hold)
 - Presents Messages.app composer handoff
@@ -476,6 +496,7 @@ iOS companion app that:
 
 **Current Implementation:**
 **Protocol scaffolding only:**
+
 - `DeliveryPlatform.IOS_COMPANION` enum present in Android codebase
 - Composer activity kinds defined
 - `IOS_COMPOSER_RESERVED` hourly recheck in orchestrator
@@ -483,26 +504,30 @@ iOS companion app that:
 - `iosComposerReservations` TTL collection exists in docs
 
 **Missing:**
+
 - iOS app build (removed commit `61882f9`)
 - Server callables: `acquireIOSComposerReservation`, `commitIOSComposerReservation`, `releaseIOSComposerReservation`
 - `companionStatus` whitelisted but unimplemented in FirebaseCoordinationClient.kt
 
 **Gaps:**
+
 - Complete server-side reservation management system absent
 - No iOS source code in repository
 - Protocol half-built creates roadmap confusion
 
 **Evidence:**
+
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/core/model/DeliveryPlatform.kt` — enum exists
 - `backend/functions/src/functions/index.ts` — NO iOS callables found
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/automation/orchestration/AndroidAutomationOrchestrator.kt` — hourly recheck logic
 - Gap: No iOS source directory exists
-- Gap: No callable implementations for reservation management**
+- Gap: No callable implementations for reservation management\*\*
 - Server-side reservation management absent
 - iOS app removed from repository
 - Phase 3 future work
 
 **Evidence:**
+
 - `android/app/src/main/java/com/yashsomani/birthdayautopilot/orchestration/DeliveryPlatform.kt` — IOS_COMPANION enum
 - Gap: No server callables found in `backend/functions/src/callables/`
 - Gap: No iOS source code (workflows deleted `2b3a3b4`)
@@ -718,7 +743,7 @@ Notification quiet-hours policy · theme persistence semantics · widget/shortcu
 | ------------------------------------------------ | -------- | ------------------------------------------------------------------------------- |
 | `runBlocking` in BirthdayNativeModule (ANR risk) | High     | Code fix needed; ANR budget already in perf evidence                            |
 | No crash telemetry blinds field diagnosis        | High     | Interim: Play Vitals + opt-in scrubbed counters [R]; then minimal SDK w/ review |
-| OEM aggressive killers delay sends               | High     | Diagnostics codes shipped ✅; guided exemption UX not implemented (F-45 📄)         |
+| OEM aggressive killers delay sends               | High     | Diagnostics codes shipped ✅; guided exemption UX not implemented (F-45 📄)     |
 | iOS protocol half-build confuses roadmap         | Med      | Explicit Phase-3 gate BO-7; remove dead client whitelist entry or implement     |
 | Docs drift misleads contributors/support         | Med      | BR-15 parity pass; adopt doc-drift checklist                                    |
 | Signing-authority key loss/compromise            | High     | Out-of-band custody process ❓; pin rotation procedure needed                   |
