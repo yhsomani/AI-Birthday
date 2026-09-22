@@ -1,48 +1,42 @@
-```
 # Dependencies
 node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+dist/
+build/
+target/
+.gradle/
 
-# Build artifacts
-*.js.map
-*.d.ts.map
-*.d.ts
+# Compiled files
+*.pyc
+*.class
+*.o
+*.exe
+*.dll
+*.so
+*.a
+*.obj
+*.out
 
-# iOS build files
-*.mm
-*.h
-
-# Android build files
-*.java
-*.aar
-
-# React Native specific
-*.xcodeproj/
-*.xcworkspace/
-*.sln
-*.vcxproj
-*.vcxproj.filters
-
-# Temporary files
-*.tmp
-*.temp
-
-# Logs
-*.log
-
-# Environment variables
-.env
-
-# IDE files
+# Editor/IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
+*.tmp
 
-# OS generated files
+# System files
 .DS_Store
 Thumbs.db
+.env
+.env.local
+*.env.*
 
-# Coverage reports
+# Logs and coverage
+*.log
 coverage/
 htmlcov/
 .coverage
@@ -70,5 +64,3 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-
-```

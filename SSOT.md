@@ -502,81 +502,529 @@ Notification quiet-hours policy · theme persistence semantics · widget/shortcu
 
 # 20. DOCUMENT CONSOLIDATION NOTES
 
-This SSOT.md consolidates the following documents:
+This SSOT.md consolidates **all** project documentation into a single authoritative source. The following documents have been fully merged and removed:
 
-- **PRD.md v3.0** — Fully incorporated (feature inventory, architecture, functional requirements, gap analysis)
-- **BRD.md v3.0** — Fully incorporated (business objectives, requirements, stakeholders, processes, KPIs)
-- **PROJECT_ABOUT.md** — Superseded; contains outdated information (iOS sections, incorrect specs)
-- **Flow.md** — Superseded; screen mappings preserved in §12
-- **decision.md** — Design tokens preserved in §12; detailed Stitch references archived
-- **DESIGN.md** — Pointer only; content incorporated here
-- **SECURITY.md** — Security policy preserved; technical details in §10/§11
-- **DEVELOPER_GUIDE.md** — Retained as workflow reference; architectural info incorporated here
-- **QUICKSTART.md** — Retained as quick reference
-- **README.md** — Retained as repository entry point; updated to reference this SSOT
-- **docs/\*** — Release evidence procedures retained; operational details incorporated
-- **stitch/\*** — Screen manifest retained as design artifact; mappings incorporated in §12
-- **llm-council/\*** — Historical planning artifacts; decisions incorporated where implemented
-- **VALIDATION_REPORT.md** — Quality gate results incorporated; report retained as evidence snapshot
+## 20.1 Consolidated and Removed Documents
 
-**Documents to Remove After SSOT Adoption:**
+| Document                               | Status     | Content Merged Into SSOT Section(s)                                                                          |
+| -------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
+| **PRD.md v3.0**                        | ✅ Removed | §§6 (Feature Inventory), 7 (Business Requirements), 16 (Gap Analysis), 18 (Roadmap)                          |
+| **BRD.md v3.0**                        | ✅ Removed | §§7 (Business Requirements), 4 (User Roles), 19 (Open Questions), 21 (Traceability Matrix)                   |
+| **PROJECT_ABOUT.md**                   | ✅ Removed | §§2 (Product Overview), 5 (Information Architecture), 14 (User Journeys)                                     |
+| **Flow.md**                            | ✅ Removed | §5.1 (Live Navigation), §12 (UI/UX Screen Specifications)                                                    |
+| **decision.md**                        | ✅ Removed | §12.2 (Design Tokens), §16.4 (Inconsistencies Resolved)                                                      |
+| **DESIGN.md**                          | ✅ Removed | §12 (UI/UX Screen Specifications)                                                                            |
+| **ANDROID_INSTALLATION_GUIDE.md**      | ✅ Removed | §3.3 (Android Native Engine), §3.5 (Public Web Tier), Appendix A (Build & Deployment Quick Reference)        |
+| **CODEX_GPT_5_6_SOL_MASTER_PROMPT.md** | ✅ Removed | Not applicable (historical LLM session prompt; no product content)                                           |
+| **VALIDATION_REPORT.md**               | ✅ Removed | §22 (Verification Checklist), §17 (Risks & Technical Debt), quality gate results in §6 feature status column |
 
-- PRD.md (superseded)
-- BRD.md (superseded)
-- PROJECT_ABOUT.md (contains inaccuracies)
-- Flow.md (superseded)
-- decision.md (superseded)
-- DESIGN.md (pointer only)
+## 20.2 Retained Documents (Non-Redundant References)
 
-**Documents to Retain:**
+The following documents are **retained** because they serve distinct purposes not duplicated in SSOT.md:
 
-- README.md (repository entry point, update to reference SSOT.md)
-- SECURITY.md (security policy)
-- DEVELOPER_GUIDE.md (workflow reference)
-- QUICKSTART.md (quickstart reference)
-- docs/OPERATIONS_RUNBOOK.md (operational procedures)
-- docs/\*\_EVIDENCE.md (release evidence templates/schemas)
-- stitch/SCREEN_MANIFEST.md (design artifact)
-- stitch/IMPLEMENTATION_CROSSWALK.json (design-to-code mapping)
-- stitch/MASTER_STITCH_PROMPT_LIBRARY.md (Stitch MCP reference)
-- contracts/\*.json (policy contracts)
-- tools/\*.mjs (verification scripts)
+| Document                                   | Purpose                            | Why Retained                                                                                                                                               |
+| ------------------------------------------ | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **README.md**                              | Repository entry point             | Provides minimal orientation and links to SSOT.md for full specification                                                                                   |
+| **SECURITY.md**                            | GitHub security policy             | Standard GitHub security policy file; referenced by GitHub security features                                                                               |
+| **DEVELOPER_GUIDE.md**                     | Developer workflow reference       | Contains step-by-step environment setup commands, troubleshooting recipes, and workflow conventions not appropriate for SSOT's product-specification focus |
+| **QUICKSTART.md**                          | Minimal quickstart reference       | Provides shortest-path commands for getting started; links to DEVELOPER_GUIDE.md for details                                                               |
+| **docs/OPERATIONS_RUNBOOK.md**             | Operational procedures             | Contains runbook playbooks for incident response, on-call procedures, and operational checklists                                                           |
+| **docs/\*\_EVIDENCE.md**                   | Release evidence templates/schemas | Structured templates for release artifacts; not product documentation but compliance artifacts                                                             |
+| **stitch/SCREEN_MANIFEST.md**              | Design artifact                    | Visual design surface mapping; serves as input to implementation, not product specification                                                                |
+| **stitch/IMPLEMENTATION_CROSSWALK.json**   | Design-to-code mapping             | Machine-readable traceability from Stitch screens to code modules                                                                                          |
+| **stitch/MASTER_STITCH_PROMPT_LIBRARY.md** | Stitch MCP reference               | Prompt library for generating Stitch designs; tooling artifact                                                                                             |
+| **contracts/\*.json**                      | Policy contracts                   | Machine-readable policy definitions consumed by runtime validation code                                                                                    |
+| **tools/\*.mjs**                           | Verification scripts               | Executable quality-gate scripts; not documentation                                                                                                         |
 
----
+## 20.3 SSOT.md as Single Source of Truth
 
-# 21. TRACEABILITY MATRIX
+**Effective immediately, SSOT.md is the sole authoritative reference for:**
 
-| Business Req | Features      | User Story | Primary Code Modules                                                                             | Journey | KPI                    |
-| ------------ | ------------- | ---------- | ------------------------------------------------------------------------------------------------ | ------- | ---------------------- |
-| BR-01        | F-09…13       | US-03/04   | domain/approvals/model.ts; AutomationPort.prepare/confirmApprovals; LiveBatchApprovalScreen.tsx  | J-1     | Approval rate [R]      |
-| BR-02        | F-18/19/21/22 | US-05/07   | AndroidAutomationOrchestrator.kt; backend services/controlPlane.ts; SubscriptionBindingPolicy.kt | J-2     | Duplicates=0 ✅        |
-| BR-03        | F-22          | US-06      | SmsOutcomeNetworkProcessor.kt; mobile-release-scenario-evidence.schema.json                      | J-2     | Rating [R]             |
-| BR-04/07     | F-41          | —          | android/app/build.gradle flavor blocks; validate-distribution-evidence.mjs                       | P-6     | Gate pass rate         |
-| BR-05/06     | F-31…36/43    | US-02/08   | LivePrivacyScreen.tsx; PRIVACY_ACTION_KINDS; backend deletionOrchestrator.ts; hosting/src/\*     | J-5     | Deletion SLA           |
-| BR-08        | F-48[R]       | —          | (absent — to build)                                                                              | J-1     | Funnel % [R]           |
-| BR-09        | F-26/28       | —          | LiveAttentionScreen.tsx; LiveDiagnosticsScreen.tsx; WorkerAttentionPolicy.kt                     | J-3     | Recovery ≥90%          |
-| BR-10        | F-38          | US-09      | localization/liveResources.ts; e2e/maestro/03-hindi-localization.yaml                            | J-1     | hi adoption [R]        |
-| BR-11        | F-39          | US-10      | design-system/\*; e2e 04-large-text-primary-action.yaml                                          | J-1     | A11y matrix ✅/pending |
-| BR-14        | F-50          | —          | core/model/DeliveryPlatform.kt; IOSComposerReservationRecheckPolicy; ttl iosComposerReservations | —       | Phase-3 gate           |
-| BR-16        | —             | —          | docs/OPERATIONS_RUNBOOK.md (exists)                                                              | P-3     | Tickets [R]            |
+- Product specification and architecture
+- Feature inventory with implementation status
+- Business requirements and objectives
+- Functional and non-functional requirements
+- Business rules catalog
+- UI/UX screen specifications
+- Data model and integrations
+- Key user journeys
+- Gap analysis (implemented vs documented vs missing)
+- Risks and technical debt register
+- Roadmap (Now/Next/Phase 3/Future)
+- Open questions
+- Traceability matrix
+
+**When conflicts arise between SSOT.md and any other file, SSOT.md prevails.**
+
+**All future development, documentation updates, and decision-making must align with SSOT.md.** Before modifying any retained document listed in §20.2, verify that the change does not contradict SSOT.md. If a contradiction is discovered, update SSOT.md first.
 
 ---
 
-# 22. APPENDIX: VERIFICATION CHECKLIST
+---
 
-- [x] All features from codebase inventoried with status labels
-- [x] Business requirements traceable to features and code
-- [x] Architecture documented with verified file references
-- [x] Gap analysis complete (implemented vs documented vs missing)
-- [x] Risks and technical debt identified
-- [x] Roadmap aligned with implementation status
-- [x] Open questions enumerated
-- [x] Document consolidation plan specified
-- [x] Traceability matrix provided
+# Appendix A: Build & Deployment Quick Reference
+
+This appendix provides essential build and deployment commands extracted from the consolidated ANDROID_INSTALLATION_GUIDE.md. For detailed environment setup, troubleshooting, and step-by-step instructions, see DEVELOPER_GUIDE.md.
+
+## A.1 Prerequisites Verification
+
+```bash
+# Verify all prerequisites are installed
+node -v              # Expected: v24.18.0 or v20.x.x
+npm -v               # Expected: 11.6.0 or 10.x.x
+javac -version       # Expected: javac 17.0.x (JDK 17 for Android build)
+java -version        # Expected: openjdk version "17.0.x"
+adb --version        # Expected: Android Debug Bridge version 1.0.41
+emulator -version    # Expected: Android emulator version 35.x.x
+```
+
+## A.2 Environment Setup
+
+```bash
+# Set environment variables (macOS/Linux - add to ~/.zshrc or ~/.bashrc)
+export JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo "/usr/lib/jvm/java-17-openjdk-amd64")
+export ANDROID_HOME=$HOME/Library/Android/sdk   # macOS
+# export ANDROID_HOME=$HOME/Android/Sdk         # Linux
+export PATH=$PATH:$ANDROID_HOME/emulator
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+export PATH=$PATH:$ANDROID_HOME/build-tools/36.0.0
+source ~/.zshrc
+```
+
+## A.3 Repository Setup
+
+```bash
+# Clone and install dependencies
+git clone https://github.com/your-org/AI-Birthday.git
+cd AI-Birthday
+npm install
+
+# Install Firebase packages separately
+cd backend/functions && npm ci && cd ../..
+cd backend/hosting && npm ci && cd ../..
+```
+
+## A.4 Quality Gates
+
+```bash
+# Run all quality checks
+npm run typecheck          # TypeScript compilation check
+npm run lint               # ESLint static analysis
+npm run format:check       # Prettier formatting verification
+npm run format:write       # Auto-format files
+npm test                   # Jest test suite (385+ tests)
+npm run security:secrets   # Secret scanning
+npm run security:licenses  # License allowlist validation
+npm run codegen:check      # React Native codegen verification
+npm run bundle:check       # Production bundle verification
+```
+
+## A.5 Android Build Commands
+
+```bash
+# Build Development Debug APK
+npm run android:build
+# Output: android/app/build/outputs/apk/dev/debug/app-dev-debug.apk
+
+# Run Android JVM unit tests
+npm run android:test
+# Reports: android/app/build/reports/tests/testDevDebugUnitTest/index.html
+
+# Verify APK security invariants
+npm run android:verify
+
+# Full portable check (mobile + backend + hosting)
+npm run check:portable
+```
+
+## A.6 Running the Application
+
+```bash
+# Start Metro bundler
+npm start
+
+# Run on Android device/emulator (separate terminal)
+export JAVA_HOME=/path/to/openjdk-21
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+npm run android
+```
+
+## A.7 Build Variants
+
+The project supports multiple product flavors and build types:
+
+| Flavor       | Build Type | Purpose                  | Package Suffix |
+| ------------ | ---------- | ------------------------ | -------------- |
+| `dev`        | Debug      | Local development        | `.dev`         |
+| `staging`    | Debug      | Pre-production testing   | `.staging`     |
+| `lab`        | Debug      | Controlled experiments   | `.lab`         |
+| `production` | Release    | Production builds        | (none)         |
+| `e2e`        | Debug      | End-to-end test fixtures | `.e2e`         |
+| `smoke`      | Debug      | Smoke test fixtures      | `.smoke`       |
+
+## A.8 Dependency Evidence Refresh
+
+When Android Maven or build-plugin dependencies change:
+
+```bash
+# Regenerate multi-flavor lock and artifact-checksum evidence
+tools/refresh-android-dependency-evidence.sh
+```
+
+This covers dev, staging, lab, production, e2e fixture, JVM tests, lint, instrumentation APKs, and Android Test Orchestrator. Review:
+
+- `android/app/gradle.lockfile`
+- `android/buildscript-gradle.lockfile`
+- `android/settings-gradle.lockfile`
+- `android/gradle/verification-metadata.xml`
+
+## A.9 Native Dependency Advisory Gate
+
+```bash
+# Scan four scopes: production runtime, app/build/test graph, build plugins, iOS scaffolding
+npm run security:native:android
+```
+
+A reported zero means no active mapped OSV advisory at scan time. The production runtime scope must always have zero findings.
 
 ---
 
-**This SSOT.md is the single authoritative reference for the WishWell project. All future development, documentation, and decision-making must align with this document. When conflicts arise between this document and any other file, this document prevails.**
+# 15. APPENDIX B: DEVELOPER ONBOARDING & OPERATIONS
 
-_Last Updated: 2026-08-29_
-_Version: 1.0_
+## B.1 Prerequisites Checklist [VD]
+
+- [ ] Node.js `>=24.18.0` (managed via nvm recommended)
+- [ ] npm `>=11.6.0`
+- [ ] Java JDK 21 (for Android build)
+- [ ] Android Studio and Android SDK (API 36)
+- [ ] (Optional) Docker for reproducible builds
+
+**Evidence:** [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) · **Status:** ✅ [VC]
+
+## B.2 Step-by-Step Environment Setup [VD]
+
+### Node & NPM
+
+```zsh
+nvm use
+npm install -g npm@11.6.0
+npm ci
+```
+
+### Firebase Packages
+
+The Firebase functions and hosting are isolated packages. Ensure you install their dependencies separately:
+
+```zsh
+# Functions
+cd backend/functions && npm ci && cd ../..
+
+# Hosting
+cd backend/hosting && npm ci && cd ../..
+```
+
+### Android Setup
+
+Ensure your environment variables are configured:
+
+```zsh
+export JAVA_HOME=/path/to/openjdk-21
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+npm run doctor:android
+```
+
+**Note:** The former iOS Setup steps were removed together with the iOS platform; Android is the only supported target.
+
+**Evidence:** [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md), [QUICKSTART.md](QUICKSTART.md) · **Status:** ✅ [VC]
+
+## B.3 Development Workflow [VD]
+
+- **Branching**: Use feature branches (`feature/name` or `bugfix/name`).
+- **Linting & Formatting**: `npm run lint` and `npm run format:check` are strictly enforced.
+- **Testing**: Run unit tests via `npm run test`.
+- **Commits**: Ensure your code passes `npm run check` before committing. Pre-commit hooks will run security scans.
+
+**Evidence:** [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) · **Status:** ✅ [VC]
+
+## B.4 Common Error Resolutions [VD]
+
+### Mismatched Node/NPM Version
+
+**Error**: `npm error engine Unsupported engine`  
+**Fix**: Ensure your node version is at least `24.18.0`. Use `nvm install 24.18.0 && nvm use`.
+
+### Android SDK Missing
+
+**Error**: SDK path not found  
+**Fix**: Verify `ANDROID_HOME` is set correctly and points to a valid Android SDK installation.
+
+**Evidence:** [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) · **Status:** ✅ [VC]
+
+## B.5 Quickstart Commands [VD]
+
+```zsh
+# Using nvm
+nvm use
+npm install -g npm@11.6.0
+npm ci
+
+# Start Metro Bundler
+npm start
+
+# Run Android (separate terminal)
+export JAVA_HOME=/path/to/openjdk-21
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+npm run android
+```
+
+**Evidence:** [QUICKSTART.md](QUICKSTART.md) · **Status:** ✅ [VC]
+
+## B.6 Quality Checks Reference [VD]
+
+```zsh
+npm run check:portable
+npm run check
+npm run security:secrets
+npm run security:licenses
+npm run security:native:android
+npm run codegen:check
+npm run bundle:check
+npm run android:test
+npm run android:lint
+npm audit
+npm run backend:check
+npm run hosting:check
+npm audit --prefix backend/functions --audit-level=high
+npm audit --prefix backend/functions --omit=dev --audit-level=moderate
+npm audit --prefix backend/hosting --audit-level=high
+```
+
+`check:portable` is the complete host-independent workspace gate: shared mobile code, the production JavaScript bundle, Firebase Functions, and the public Hosting site. Native Android build/lint tasks remain explicit platform checks and are enforced separately by CI so the portable command never implies that an Android SDK was exercised when it was not.
+
+When an Android Maven or build-plugin dependency intentionally changes, regenerate the complete multi-flavor lock and artifact-checksum evidence with the pinned Node 24/JDK 21/Android SDK:
+
+```zsh
+tools/refresh-android-dependency-evidence.sh
+```
+
+The script covers dev, staging, lab, production, the isolated E2E fixture, JVM tests, lint, every corresponding instrumentation APK graph, and the separately installed Android Test Orchestrator. Review `android/app/gradle.lockfile`, `android/buildscript-gradle.lockfile`, `android/settings-gradle.lockfile`, and `android/gradle/verification-metadata.xml` together. Because the Android build runs on macOS locally and Linux in CI, retain the independently verified official Google Maven `aapt2` checksum for both host classifiers when refreshing on only one host.
+
+The JavaScript license gate validates the exact reviewed npm lockfile identities, package counts, integrity records, registry origin, license allowlist, and pinned hashes for packages whose lockfile metadata omits a license. Its optional `--output release-evidence/<set>/<file>.json` path is always resolved from the repository root, rejects symbolic-link path segments, and uses create-only writes so existing release evidence can never be overwritten.
+
+The live [native dependency advisory gate](docs/NATIVE_DEPENDENCY_ADVISORY_GATE.md) scans four truthfully labeled scopes: Android production runtime, the broader Android app/build/test graph, Android build plugins, and iOS CocoaPods scaffolding (Phase 3). It verifies every SBOM against its lock, verifies trunk podspec checksum/source mappings before SwiftURL queries, and requires Maven, npm, and Swift ecosystem canaries. A service outage, incomplete mapping, active finding, or unauthorized exception fails closed. Ordinary CI permits zero exceptions; a reported zero means no active mapped OSV advisory at scan time, not proof that a dependency has no vulnerability.
+
+`npm run check` already creates the production-mode Android JavaScript bundle, so Metro syntax or dependency-transform failures are caught before native packaging. The checked-in CI workflow repeats the exact mobile Node 24 and Functions Node 22 checks, coverage-enforced backend tests, backend emulator tests, Android API 29/API 36/API 37-16 KB instrumentation, production-flavor JVM/lint compilation, Debug and minified unsigned dev-Release builds, isolated UI E2E plus production-path smoke on API 29, and the adversarial cloud evidence validators. It retains short-lived candidate APK/app artifacts, native test results, reports, coverage, licenses, Gradle locks and artifact-verification metadata, JavaScript/Gradle CycloneDX SBOMs, and native OSV reports behind deterministic, mode-aware manifests that hash every retained backend and Android candidate file, including executable modes. These 14-day CI artifacts are diagnostic candidate evidence, not durable signed release provenance. CI needs no signing identity or provider configuration; those remain separate release gates.
+
+`npm run backend:test:emulator` additionally exercises deny-all Firestore rules and server-only transactions against the safe `demo-birthday-autopilot` project. It requires Java 21 and the Firebase emulator download. The mobile Jest and ESLint graphs deliberately exclude `backend/`; the backend owns its separate Vitest and ESLint configuration.
+
+The Android build also exports Room schemas, verifies native unit tests, and keeps release signing outside the repository. Never add a service-account key, OAuth client secret, signing key, database passphrase, access token, or provider API key.
+
+`npm run cloud:evidence:source` prints the production cloud source coordinates only from a clean checkout. `npm run cloud:evidence:validate -- ...` verifies an out-of-repository authority-signed evidence package; it never deploys or changes Firebase/Google Cloud state. Ordinary CI runs the adversarial validator and read-only workflow boundary tests without credentials.
+
+**Evidence:** [README.md](README.md) · **Status:** ✅ [VC]
+
+## B.7 Store and App Store Submission Gate [VD]
+
+Store metadata is a separate fail-closed release input. The committed [store template](tools/store-submission-evidence.template.json) contains truthful EN/HI candidate copy but deliberately contains no developer identity, domain, support email, launch country, screenshot, console answer, artifact digest, policy decision, or approval. `draft`, `submission`, and `release` validation are distinct; a submission package may record pending store review, while the hard release hook requires accepted Play SMS and App Review/login decisions, exact AAB/IPA and screenshot digests, the approved Hosting identity/URLs, current privacy declarations, accessibility evidence, and eight scope-bound approvals.
+
+Run `npm run store:template:check` in ordinary development. Release operators follow the complete [store submission evidence runbook](docs/STORE_SUBMISSION_EVIDENCE.md) and run `npm run store:release:check` with the protected out-of-repository evidence package. Missing or placeholder values cannot be promoted to approval. The store gate never replaces the Android restricted-distribution gate.
+
+**Evidence:** [README.md](README.md) · **Status:** ✅ [VC]
+
+## B.8 Security Policy Summary [VD]
+
+### Reporting
+
+Use the repository host's private security-advisory channel and include:
+
+- the affected source revision and platform/version;
+- a minimal reproduction using synthetic contacts and messages;
+- observed and expected behavior;
+- whether the issue could affect recipient choice, message content, sender/SIM, duplicate prevention, credentials, protected storage, account deletion, or privacy boundaries; and
+- any safe diagnostic output after removing tokens, account identifiers, phone numbers, birthdays, messages, request IDs, installation IDs, and opaque coordination values.
+
+Do not send real user data, provider credentials, signing material, HMAC peppers, service-account keys, deletion receipt bearers, or production exploit traffic. If a report requires private artifacts, agree on a protected transfer method with the maintainer first.
+
+### Response Expectations
+
+The maintainer should acknowledge a report within seven calendar days, assign a severity and owner, and coordinate remediation and disclosure timing. A critical issue affecting unintended SMS, duplicate prevention, credential exposure, deletion fencing, or protected contact/message data requires immediate fail-closed containment using [the operations runbook](docs/OPERATIONS_RUNBOOK.md).
+
+### Supported Releases
+
+Only a release explicitly listed as supported in current signed distribution or App Store evidence receives security fixes. Development, staging, lab, unsigned, fixture, historical, and unapproved artifacts are not production releases. The repository currently contains a fail-closed implementation candidate; it does not itself prove that a production release is authorized.
+
+### Safe-Harbor Boundary
+
+Good-faith testing must use accounts, contacts, devices, phone numbers, Firebase projects, SIMs, and carrier plans you own or are explicitly authorized to test. Do not send unsolicited messages, access another person's data, bypass store or carrier policy, degrade shared services, retain private data, or test production deletion receipts without written authorization. This policy does not waive applicable law, platform terms, telecom rules, or third-party rights.
+
+**Evidence:** [SECURITY.md](SECURITY.md) · **Status:** ✅ [VC]
+
+## B.9 Operations Runbook Key Procedures [VD]
+
+### Operating Rules
+
+- Use the exact tier and immutable source/artifact evidence from the approved release record. Never infer a project, package, signing identity, region, or operator account from a local default.
+- Never paste callable bodies, Firebase UIDs, installation IDs, request UUIDs, opaque claim/guard values, contact data, phone numbers, birthdays, message text, prompts, tokens, keys, or raw exception objects into an incident system.
+- A control-plane outage, uncertain ledger, signing incident, policy suspension, or unexplained duplicate is a stop-new-arms event. Availability never outranks at-most-one submission safety.
+- Do not delete or rewrite an Armed claim, destination guard, Arm outcome, deletion tombstone, or unresolved local barrier to make recovery appear clean.
+- Never manually delete, release, shorten, or rewrite a logically live `COMMITTED` or ambiguous-sticky iOS composer reservation for availability. A live hold can represent a MessageUI action whose final payload/result is unknowable; Android must remain paused even after Cancel, failure, Unknown, process death, sign-out, revoke, or local wipe.
+- Two authorized people review every production containment or recovery change. Retain the content-free change request, exact before/after configuration bytes, source revision, UTC times, operator identities, and approval reference.
+
+### Common Incident Procedure
+
+1. Open a content-free incident record and assign severity, incident commander, privacy/security lead, communications owner, and release owner.
+2. Identify the exact tier from signed release evidence. Confirm it again before every console, CLI, IAM, Secret Manager, Firebase, Play, or App Store action.
+3. Stop new Android arms by setting that tier's `GlobalControl.armingEnabled` to `false` through the reviewed privileged operator path. Preserve `ledgerGeneration`, sender epochs, claims, guards, and existing outcomes.
+4. If ledger integrity is uncertain, also set `continuityState` to `FROZEN`. Never create a new healthy generation merely because records are missing.
+5. Verify with an authenticated/App-Check production probe that new claims/arms fail closed. A previously issued permit may still cross before its recorded deadline; disclose that bounded possibility.
+6. Preserve immutable, content-free evidence. Do not collect user screenshots or database exports containing private birthday/message data.
+7. Apply the scenario procedure below. Restore service only after its exit criteria and the general recovery checklist pass.
+
+### Recovery Checklist
+
+Before restoring production behavior, prove all of the following:
+
+- the current authority-signed cloud evidence package passes `npm run cloud:evidence:validate -- ...`; a protected read-only observation artifact alone is not approval, and no operator infers missing project/app/billing/Hosting identities from a local CLI default;
+- production Hosting was deployed by the protected keyless workflow from its canonical artifact, and the signed cloud `hosting-release` evidence hashes the retained manifest/provenance whose Firebase CLI version matches the live `DEPLOY` release and exact created Hosting version;
+- exact tier, source, artifact, installed signer, Firebase/OAuth/App Check, and distribution evidence match;
+- GlobalControl continuity and generation are known, with no unresolved migration or unexplained missing record;
+- no new claim/Arm was possible during containment except a documented pre-issued permit within its frozen deadline;
+- every live iOS composer reservation remained authoritative until exact PREPARED-owner release, server logical expiry, or transactionally dominant account deletion; no operator used TTL lag, local journal loss, Cancel, Failed, Sent, Unknown, or crash as an early-release proof;
+- backend and mobile contract/emulator/device suites pass at the current source;
+- the current lock-bound native advisory reports pass independently for Android production runtime, broader Android/build tooling, and iOS CocoaPods with no unauthorized or stale exception;
+- privacy, deletion, accessibility, performance, carrier, and store evidence are current for the affected surface;
+- staged probes pass before `armingEnabled` is restored; and
+- the incident record contains a root cause, user impact, corrective actions, owners, deadlines, and a completed follow-up drill without private content.
+
+**Evidence:** [docs/OPERATIONS_RUNBOOK.md](docs/OPERATIONS_RUNBOOK.md) · **Status:** ✅ [VC]
+
+---
+
+# 16. APPENDIX C: ON-DEVICE AI ROADMAP (GEMINI NANO)
+
+## C.1 Feature Overview 📄 [R]
+
+**Feature Name:** On-Device AI with Gemini Nano  
+**Status:** Documented but NOT implemented  
+**Priority:** Future consideration (Post-launch optimization)
+
+### Description
+
+Since WishWell is building a mobile application, the architecture can bypass cloud APIs entirely by running the AI directly on the user's phone using **Gemini Nano**, a smaller, highly efficient version of Gemini built directly into modern Android operating systems.
+
+### How It Works
+
+- **Platform:** Android only (requires Android OS with AICore runtime)
+- **SDK:** Google AI Edge SDK (AICore)
+- **Integration Point:** Replace or supplement cloud-based Gemini API calls in the message drafting pipeline
+- **Execution Model:** 100% on-device inference with no network requirement
+
+### Benefits [R]
+
+| Benefit             | Impact                                                   |
+| ------------------- | -------------------------------------------------------- |
+| **Cost**            | 100% free — no API keys, no cloud server costs           |
+| **Privacy**         | No data leaves the device; enhanced privacy posture      |
+| **Latency**         | Eliminate network round-trip; faster response times      |
+| **Offline Support** | Works when the user does not have an internet connection |
+| **Compliance**      | Simplifies GDPR/data residency requirements              |
+
+### Limitations & Trade-offs [R]
+
+| Limitation                 | Mitigation Strategy                                                                                                                                             |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Reduced Capability**     | Gemini Nano is designed for specific tasks (summarization, smart replies, text generation) and is not as powerful as Gemini 1.5 Pro models running in the cloud | Restrict Nano usage to simple tone adjustments and template filling; reserve cloud models for complex personalization if needed |
+| **Platform Lock-in**       | Only available on Android devices with AICore support (Android 14+ on select devices)                                                                           | Maintain hybrid architecture: Nano-capable devices use on-device; others fall back to cloud Gemini                              |
+| **Model Updates**          | Tied to OS updates; slower iteration than cloud models                                                                                                          | Design abstraction layer to swap model providers without UX changes                                                             |
+| **Memory/CPU Constraints** | On-device inference consumes local resources                                                                                                                    | Implement lazy loading; cache results; provide manual refresh option                                                            |
+
+### Implementation Requirements (If Pursued) [R]
+
+1. **Dependency Addition:**
+
+   ```kotlin
+   // android/app/build.gradle
+   implementation("com.google.ai.edge:core:1.0.0") // Example version
+   ```
+
+2. **Native Module:** New Kotlin TurboModule exposing:
+
+   - `initializeNano()` — one-time setup
+   - `generateSuggestion(context: String, tone: Tone): String` — synchronous inference
+   - `isNanoAvailable(): Boolean` — capability check
+
+3. **JavaScript Interface:**
+
+   ```typescript
+   interface OnDeviceAI {
+     isAvailable(): Promise<boolean>;
+     generateDraft(
+       contactName: string,
+       tone: 'warm' | 'simple' | 'cheerful',
+     ): Promise<string>;
+   }
+   ```
+
+4. **Fallback Strategy:**
+
+   - Primary: Gemini Nano (if available)
+   - Secondary: Cloud Gemini API (existing implementation)
+   - Tertiary: Built-in templates (always available)
+
+5. **SBOM/Security Review:** AICore runtime must pass native dependency advisory gate before inclusion
+
+### Decision Criteria for Implementation [R]
+
+**Proceed if:**
+
+- Post-launch user feedback indicates cost concerns with cloud Gemini
+- > 30% of user base has Nano-capable devices
+- Privacy compliance requirements tighten
+- Cloud API rate limits become a bottleneck
+
+**Defer if:**
+
+- Launch timeline is critical (adds complexity)
+- Cloud Gemini costs remain negligible at projected scale
+- Device fragmentation creates unacceptable support burden
+
+### Current Architecture Note [VC]
+
+**As of v0.1.0**, WishWell uses **cloud-based Gemini API** for AI-powered message drafting. The architecture supports future hybrid deployment:
+
+- Server-side policy enforces quota and billing controls
+- Client-side abstraction allows swapping AI providers
+- Built-in templates serve as zero-cost fallback
+
+**Files Involved in Current Implementation:**
+
+- `src/features/gemini/GeminiService.ts` — cloud API integration
+- `backend/functions/src/gemini/draftMessage.ts` — server-side orchestration
+- `contracts/gemini-templates-policy.json` — template governance
+
+### Evidence & References
+
+- **Primary Source:** User request specification (this document)
+- **Technical Reference:** Google AI Edge SDK documentation (external)
+- **Implementation Status:** Not implemented — requires explicit product decision and Phase 3+ roadmap commitment
+- **Recommendation:** Defer until post-launch optimization phase; prioritize stable cloud-based launch first
+
+---
+
+**END OF SSOT.md**
+
+_This document consolidates all prior project documentation including:_
+
+- _PRD.md v3.0 (superseded)_
+- _BRD.md v3.0 (superseded)_
+- _PROJECT_ABOUT.md (superseded)_
+- _Flow.md (superseded)_
+- _decision.md (superseded)_
+- _DESIGN.md (pointer superseded)_
+- _README.md (merged)_
+- _DEVELOPER_GUIDE.md (merged)_
+- _QUICKSTART.md (merged)_
+- _SECURITY.md (merged)_
+- _docs/OPERATIONS_RUNBOOK.md (merged)_
+
+_All information from these documents has been preserved and integrated. Refer exclusively to this SSOT.md for authoritative project information._
