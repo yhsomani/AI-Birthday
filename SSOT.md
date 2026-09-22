@@ -51,7 +51,7 @@ Features should progress through these verification states before being consider
 
 WishWell is an **Android-first autonomous birthday-SMS system** whose defining business asset is a _verified trust architecture_: human approval of exact payloads, server-enforced single-send guarantees, honest delivery language, deletion-grade privacy, and a fail-closed release-admission chain.
 
-**Current State:** Code-complete for Android launch, pending runtime verification, infrastructure deployment, and production validation. The full setup→approve→deliver pipeline, cloud control plane (16 callables + 2 scheduled sweeps, region asia-south1), sender transfer, deletion saga with receipts, bilingual EN/HI UX, accessibility E2E, and Ed25519-signed distribution-evidence regime are all **implemented** but **NOT_RUNTIME_VERIFIED** and **NOT_DEPLOYED**.
+**Current State:** Code-complete for Android launch, pending runtime verification, infrastructure deployment, and production validation. The full setup→approve→deliver pipeline, cloud control plane (16 callables + 2 scheduled sweeps, region asia-south1), sender transfer, deletion saga with receipts, bilingual EN/HI UX, accessibility E2E, Ed25519-signed distribution-evidence regime, and **native Android Gemini AI integration** are all **implemented** but **NOT_RUNTIME_VERIFIED** and **NOT_DEPLOYED**. Dead JavaScript AI code (1,164 lines) removed 2026-08-29.
 
 **Principal Gaps:**
 
@@ -60,6 +60,7 @@ WishWell is an **Android-first autonomous birthday-SMS system** whose defining b
 - Documentation debt in legacy files (README, PROJECT_ABOUT misstate behaviors)
 - Support model undefined pre-launch
 - Battery-optimization exemption request flow not implemented (diagnose-only)
+- **AI runtime verification pending** — native Gemini integration not tested on real devices
 
 ---
 
@@ -1273,26 +1274,32 @@ Since WishWell is building a mobile application, the architecture can bypass clo
 - Cloud Gemini costs remain negligible at projected scale
 - Device fragmentation creates unacceptable support burden
 
-### Current Architecture Note [VC]
+### Current Architecture [VC] — Native Android Gemini (Device-Only)
 
-**As of v0.1.0**, WishWell uses **cloud-based Gemini API** for AI-powered message drafting. The architecture supports future hybrid deployment:
+**As of v0.1.0**, WishWell uses **on-device native Android Gemini API** for AI-powered message drafting via `firebase-ai` SDK. This is a privacy-preserving, device-only architecture:
 
-- Server-side policy enforces quota and billing controls
-- Client-side abstraction allows swapping AI providers
-- Built-in templates serve as zero-cost fallback
+- **Native Implementation:** `android/app/src/main/java/.../gemini/AndroidGeminiSuggestionGateway.kt`
+- **Firebase AI SDK:** `firebase-ai` 17.13.0, client-side only
+- **Privacy Boundary:** Prompts exclude PII, generation unreachable from send workers
+- **Rate Limiting:** Max 8 retained rate scopes, 15s timeout
+- **Fallback States:** Template-based suggestions when Gemini unavailable
+- **No Backend AI:** Server functions contain zero Gemini code (verified)
+- **Dead Code Removed:** JavaScript AI layer (AIGateway.ts, GoogleAIProviderAdapter.ts, AIProviderPort.ts — 1,164 lines) deleted 2026-08-29
 
 **Files Involved in Current Implementation:**
 
-- `src/features/gemini/GeminiService.ts` — cloud API integration
-- `backend/functions/src/gemini/draftMessage.ts` — server-side orchestration
-- `contracts/gemini-templates-policy.json` — template governance
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/gemini/AndroidGeminiSuggestionGateway.kt` — native gateway
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/gemini/AndroidGeminiOperationalGate.kt` — operational gate
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/gemini/GeminiCandidateProvenanceRegistry.kt` — provenance tracking
+- `contracts/gemini-prompt-policy-v2.json` — prompt governance
+- `src/infrastructure/native/BirthdayNativeAdapter.ts` — React Native bridge port
 
 ### Evidence & References
 
-- **Primary Source:** User request specification (this document)
-- **Technical Reference:** Google AI Edge SDK documentation (external)
-- **Implementation Status:** Not implemented — requires explicit product decision and Phase 3+ roadmap commitment
-- **Recommendation:** Defer until post-launch optimization phase; prioritize stable cloud-based launch first
+- **Implementation Status:** ✅ IMPLEMENTED, ⚠️ NOT_RUNTIME_VERIFIED, 🚫 NOT_DEPLOYED
+- **Architecture:** Device-only Gemini via native Android bridge
+- **Verification Required:** Runtime testing on real Android devices with Gemini API enabled
+- **Recommendation:** Proceed with runtime verification before considering backend AI or iOS expansion
 
 ---
 
