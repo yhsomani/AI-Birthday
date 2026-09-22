@@ -14,6 +14,8 @@
 
 Every feature/requirement carries one **Implementation Status** and one **Evidence** label:
 
+### Implementation Status
+
 | Status | Meaning                                          |
 | ------ | ------------------------------------------------ |
 | ✅     | Implemented — fully implemented and working      |
@@ -22,8 +24,26 @@ Every feature/requirement carries one **Implementation Status** and one **Eviden
 | 🆕     | Implemented but missing from prior documentation |
 | 🔮     | Planned / future                                 |
 | ❓     | Unclear — requires confirmation                  |
+| ⚠️     | **NOT_RUNTIME_VERIFIED** — code exists but not verified in runtime environment |
+| 🚫     | **NOT_DEPLOYED** — implementation complete but not deployed to production infrastructure |
 
-**Evidence:** **[VC]** verified from codebase (file cited) · **[VD]** verified from documentation · **[I]** inferred · **[A]** assumption · **[R]** recommendation · **[U]** unknown.
+### Verification States (for tracking progress)
+
+Features should progress through these verification states before being considered production-ready:
+
+| State                  | Meaning                          |
+| ---------------------- | -------------------------------- |
+| `PLANNED`              | Requirement exists               |
+| `IMPLEMENTED`          | Code exists                      |
+| `UNIT_VERIFIED`        | Unit tests prove it              |
+| `INTEGRATION_VERIFIED` | Component integration proven     |
+| `E2E_VERIFIED`         | Full workflow proven             |
+| `PRODUCTION_VERIFIED`  | Real deployed environment proven |
+| `BLOCKED`              | External dependency              |
+| `PARTIAL`              | Some required behavior missing   |
+| `NOT_IMPLEMENTED`      | No functional implementation     |
+
+**Evidence:** **[VC]** verified from codebase (file cited) · **[VD]** verified from documentation · **[I]** inferred · **[A]** assumption · **[R]** recommendation · **[U]** unknown · **[RV]** runtime verified · **[PV]** production verified.
 
 ---
 
@@ -31,7 +51,7 @@ Every feature/requirement carries one **Implementation Status** and one **Eviden
 
 WishWell is an **Android-first autonomous birthday-SMS system** whose defining business asset is a _verified trust architecture_: human approval of exact payloads, server-enforced single-send guarantees, honest delivery language, deletion-grade privacy, and a fail-closed release-admission chain.
 
-**Current State:** The product is production-ready for Android launch. The full setup→approve→deliver pipeline, cloud control plane (16 callables + 2 scheduled sweeps, region asia-south1), sender transfer, deletion saga with receipts, bilingual EN/HI UX, accessibility E2E, and Ed25519-signed distribution-evidence regime are all implemented and tested.
+**Current State:** Code-complete for Android launch, pending runtime verification, infrastructure deployment, and production validation. The full setup→approve→deliver pipeline, cloud control plane (16 callables + 2 scheduled sweeps, region asia-south1), sender transfer, deletion saga with receipts, bilingual EN/HI UX, accessibility E2E, and Ed25519-signed distribution-evidence regime are all **implemented** but **NOT_RUNTIME_VERIFIED** and **NOT_DEPLOYED**.
 
 **Principal Gaps:**
 
