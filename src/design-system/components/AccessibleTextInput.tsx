@@ -27,9 +27,16 @@ export const AccessibleTextInput = forwardRef<
     );
   }
 
+  const isDisabled = inputProps.editable === false;
+  const mergedAccessibilityState = {
+    ...inputProps.accessibilityState,
+    ...(isDisabled ? { disabled: true } : {}),
+  };
+
   return (
     <TextInput
       {...inputProps}
+      accessibilityState={mergedAccessibilityState}
       accessibilityLabel={normalizedLabel}
       allowFontScaling
       maxFontSizeMultiplier={2}
