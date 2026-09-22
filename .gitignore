@@ -1,1 +1,45 @@
-Nothing should be ignored in this case, as the changes only include markdown documentation files (.md) which are source files and not build artifacts, dependencies, or temporary files.
+```
+# Coverage reports
+coverage/
+*.info
+
+# Build artifacts
+build/
+dist/
+target/
+
+# Dependencies
+node_modules/
+vendor/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Python specific
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Test coverage
+.coverage
+htmlcov/
+```

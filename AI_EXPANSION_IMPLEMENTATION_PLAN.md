@@ -4,7 +4,8 @@
 
 **Goal:** Expand AI usage from single message suggestions to "AI everywhere" throughout the app workflow.
 
-**Current State:** 
+**Current State:**
+
 - ✅ Native Android Gemini integration implemented (device-only)
 - ✅ Dead JavaScript AI code removed (1,164 lines)
 - ✅ 387 tests passing
@@ -20,6 +21,7 @@
 ### 0.1 Update All Documentation ✅ COMPLETED
 
 - [x] SSOT.md updated with:
+
   - Dead code removal details (file names)
   - AI architecture clarification (native-only)
   - AI expansion roadmap added to Principal Gaps
@@ -31,6 +33,7 @@
 ### 0.2 Runtime Verification Checklist
 
 **Prerequisites:**
+
 - [ ] Firebase project created with Vertex AI enabled
 - [ ] `google-services.json` configured for test device
 - [ ] API key configured in `local.properties` or Secrets Manager
@@ -57,6 +60,7 @@ adb install -r app/build/outputs/apk/lab/debug/app-lab-debug.apk
 ```
 
 **Expected Results:**
+
 - ✅ Suggestion appears within 5-10 seconds
 - ✅ No crashes or ANR
 - ✅ Fallback templates show if Gemini unavailable
@@ -64,6 +68,7 @@ adb install -r app/build/outputs/apk/lab/debug/app-lab-debug.apk
 - ✅ Rate limiting works (test 8+ rapid requests)
 
 **Documentation:**
+
 - [ ] Create RUNTIME_VERIFICATION_REPORT.md with:
   - Device specs (model, Android version)
   - Network conditions
@@ -105,10 +110,10 @@ suspend fun generateSuggestions(
     // Single prompt requesting 3 variations
     val prompt = buildPrompt(relationship, tone, milestone, language)
     val response = generativeModel.generateContent(prompt)
-    
+
     // Parse 3 variations from response
     val candidates = parseCandidates(response.text, count = 3)
-    
+
     return GeminiSuggestionResult(
         candidates = candidates,
         provenance = registry.record(...),
@@ -128,7 +133,7 @@ export interface NativeBirthdayInterface {
     relationship: RelationshipType;
     tone: Tone;
     milestone?: Milestone;
-  }): Promise<string[]>;  // Already returns array!
+  }): Promise<string[]>; // Already returns array!
 }
 
 // Implementation already supports multiple candidates
@@ -146,42 +151,47 @@ File: `src/features/live/messages/MessageCreationScreen.tsx`
 const MessageCreationScreen = () => {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  
+
   useEffect(() => {
     // Auto-trigger on screen mount
     setLoading(true);
     try {
-      const result = await BirthdayNative.executeUserIntent('generate-suggestions', {
-        relationship: selectedRelationship,
-        tone: selectedTone,
-        milestone: selectedMilestone
-      });
+      const result = await BirthdayNative.executeUserIntent(
+        'generate-suggestions',
+        {
+          relationship: selectedRelationship,
+          tone: selectedTone,
+          milestone: selectedMilestone,
+        },
+      );
       setSuggestions(result.candidates || []); // Expect 3 items
     } finally {
       setLoading(false);
     }
   }, []);
-  
+
   return (
     <View>
       {loading && <LoadingSpinner />}
       {!loading && suggestions.length === 0 && (
         <Text>No suggestions available. Try manual editing.</Text>
       )}
-      {!loading && suggestions.map((text, index) => (
-        <SuggestionCard
-          key={index}
-          text={text}
-          toneLabel={getToneLabel(index)} // "Warm", "Simple", "Cheerful"
-          onSelect={() => selectSuggestion(text)}
-        />
-      ))}
+      {!loading &&
+        suggestions.map((text, index) => (
+          <SuggestionCard
+            key={index}
+            text={text}
+            toneLabel={getToneLabel(index)} // "Warm", "Simple", "Cheerful"
+            onSelect={() => selectSuggestion(text)}
+          />
+        ))}
     </View>
   );
 };
 ```
 
 **Files to Modify:**
+
 1. `android/app/src/main/java/.../gemini/AndroidGeminiSuggestionGateway.kt`
 2. `android/app/src/main/java/.../gemini/GeminiPromptBuilder.kt` (if exists)
 3. `src/features/live/messages/MessageCreationScreen.tsx`
@@ -190,6 +200,7 @@ const MessageCreationScreen = () => {
 **Time Estimate:** 4-6 hours
 
 **Testing:**
+
 - [ ] Unit test: prompt builder generates correct multi-variation request
 - [ ] Unit test: parser extracts exactly 3 candidates
 - [ ] Integration test: gateway returns 3 distinct variations
@@ -197,6 +208,7 @@ const MessageCreationScreen = () => {
 - [ ] Performance test: response time < 10s for 3 variations
 
 **Risk Assessment:** LOW
+
 - Single API call (not 3x cost)
 - Backward compatible (UI handles 1-3 items)
 - Fallback to templates if parsing fails
@@ -234,7 +246,7 @@ suspend fun checkAIStatus(): AIStatus {
         checkRateLimitRemaining(),
         checkGeminiEndpointReachable()
     )
-    
+
     return when {
         checks.all { it.ok } -> AIStatus(AIState.READY, null, [...])
         checks.any { it.critical } -> AIStatus(AIState.UNAVAILABLE, ...)
@@ -261,30 +273,30 @@ File: `src/design-system/components/AIStatusBadge.tsx` (new)
 ```tsx
 export const AIStatusBadge: React.FC = () => {
   const [status, setStatus] = useState<AIStatus | null>(null);
-  
+
   useEffect(() => {
     // Check on app foreground
-    const unsubscribe = AppState.addEventListener('change', async (state) => {
+    const unsubscribe = AppState.addEventListener('change', async state => {
       if (state === 'active') {
         const s = await BirthdayNative.executeUserIntent('check-ai-status');
         setStatus(s);
       }
     });
-    
+
     // Initial check
     BirthdayNative.executeUserIntent('check-ai-status').then(setStatus);
-    
+
     return () => unsubscribe.remove();
   }, []);
-  
+
   if (!status) return null;
-  
+
   const config = {
     READY: { icon: '🟢', color: '#22c55e', label: 'AI Ready' },
     LIMITED: { icon: '🟡', color: '#eab308', label: 'AI Limited' },
-    UNAVAILABLE: { icon: '🔴', color: '#ef4444', label: 'AI Unavailable' }
+    UNAVAILABLE: { icon: '🔴', color: '#ef4444', label: 'AI Unavailable' },
   }[status.state];
-  
+
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8 }}>
       <Text style={{ fontSize: 12 }}>{config.icon}</Text>
@@ -302,11 +314,13 @@ export const AIStatusBadge: React.FC = () => {
 ```
 
 **Integration Points:**
+
 - Add to `MessageCreationScreen` header
 - Add to `SettingsScreen` AI section
 - Add to onboarding flow (if AI-first setup)
 
 **Files to Create/Modify:**
+
 1. `android/app/src/main/java/.../gemini/AndroidGeminiOperationalGate.kt` (add `checkAIStatus()`)
 2. `src/design-system/components/AIStatusBadge.tsx` (new)
 3. `src/features/live/messages/MessageCreationScreen.tsx` (integrate badge)
@@ -315,12 +329,14 @@ export const AIStatusBadge: React.FC = () => {
 **Time Estimate:** 3-4 hours
 
 **Testing:**
+
 - [ ] Unit test: status checks return correct states
 - [ ] Integration test: network toggle changes status
 - [ ] UI test: badge updates in real-time
 - [ ] Accessibility test: screen reader announces status
 
 **Risk Assessment:** LOW
+
 - Read-only operation
 - Graceful degradation
 - No breaking changes
@@ -334,12 +350,14 @@ export const AIStatusBadge: React.FC = () => {
 **User Story:** As a user, I want the app to suggest relationships and tones based on contact names, so I can enroll people faster.
 
 **Flow:**
+
 1. User syncs contacts
 2. AI scans names (e.g., "Mom", "Dr. Smith", "Gym Buddy")
 3. AI suggests: Relationship="Parent", Tone="Warm" for "Mom"
 4. User confirms with one tap
 
 **Implementation Considerations:**
+
 - Privacy: Process names locally, never send to server
 - Batch processing: Analyze all contacts in single request
 - Confidence scores: Only show suggestions above threshold
@@ -348,6 +366,7 @@ export const AIStatusBadge: React.FC = () => {
 **Time Estimate:** 8-12 hours
 
 **Risk Assessment:** MEDIUM
+
 - Privacy concerns (names are PII)
 - Accuracy expectations
 - Cultural name variations
@@ -359,12 +378,14 @@ export const AIStatusBadge: React.FC = () => {
 **User Story:** As a user with 10 pending birthday messages, I want to know which ones need attention first, so I can focus on what matters.
 
 **Flow:**
+
 1. User opens "Pending Approvals" screen
 2. AI analyzes: relationship + draft quality + days until birthday
 3. AI flags: "⚠️ Boss message too casual — review recommended"
 4. AI sorts: High priority (family, close friends, <3 days) first
 
 **Implementation:**
+
 - Scoring algorithm: urgency × relationship × quality
 - Explainable: show why each is prioritized
 - Override: allow manual reordering
@@ -372,6 +393,7 @@ export const AIStatusBadge: React.FC = () => {
 **Time Estimate:** 6-8 hours
 
 **Risk Assessment:** LOW-MEDIUM
+
 - Subjective prioritization
 - User trust in AI sorting
 
@@ -415,13 +437,13 @@ File: `.maestro/ai-features.yaml`
 appId: com.yashsomani.birthdayautopilot
 ---
 - launchApp
-- assertVisible: "AI Ready"  # Status badge
-- tapOn: "Create Message"
-- assertVisible: "Warm"  # Tone variation 1
-- assertVisible: "Simple"  # Tone variation 2
-- assertVisible: "Cheerful"  # Tone variation 3
-- tapOn: "Simple"
-- assertVisible: "Message saved"
+- assertVisible: 'AI Ready' # Status badge
+- tapOn: 'Create Message'
+- assertVisible: 'Warm' # Tone variation 1
+- assertVisible: 'Simple' # Tone variation 2
+- assertVisible: 'Cheerful' # Tone variation 3
+- tapOn: 'Simple'
+- assertVisible: 'Message saved'
 ```
 
 ### Real Device Tests
@@ -439,29 +461,34 @@ appId: com.yashsomani.birthdayautopilot
 ## Rollout Plan
 
 ### Week 1: Foundation
+
 - [ ] Runtime verify current single-tone AI
 - [ ] Document results in RUNTIME_VERIFICATION_REPORT.md
 - [ ] Fix any issues discovered
 
 ### Week 2: Feature 1 (Multiple Variations)
+
 - [ ] Implement Kotlin gateway changes
 - [ ] Implement UI components
 - [ ] Unit + integration tests
 - [ ] QA on 2-3 devices
 
 ### Week 3: Feature 2 (Status Indicator)
+
 - [ ] Implement status checks
 - [ ] Add badge component
 - [ ] Integrate into screens
 - [ ] Test network transitions
 
 ### Week 4: Stabilization
+
 - [ ] Bug fixes
 - [ ] Performance optimization
 - [ ] Documentation updates
 - [ ] Prepare for release
 
 ### Month 2+: Advanced Features
+
 - [ ] Contact enrollment (Feature 3)
 - [ ] Approval prioritization (Feature 4)
 - [ ] User feedback analysis
@@ -471,31 +498,32 @@ appId: com.yashsomani.birthdayautopilot
 
 ## Success Metrics
 
-| Metric | Baseline | Target | Measurement |
-|--------|----------|--------|-------------|
-| AI suggestion acceptance rate | TBD | >60% | Analytics event |
-| Time to create message | TBD | <2 min | Session duration |
-| User satisfaction (NPS) | TBD | >7 | In-app survey |
-| AI availability uptime | N/A | >95% | Status badge logs |
-| Response time (p95) | TBD | <10s | Performance monitoring |
+| Metric                        | Baseline | Target | Measurement            |
+| ----------------------------- | -------- | ------ | ---------------------- |
+| AI suggestion acceptance rate | TBD      | >60%   | Analytics event        |
+| Time to create message        | TBD      | <2 min | Session duration       |
+| User satisfaction (NPS)       | TBD      | >7     | In-app survey          |
+| AI availability uptime        | N/A      | >95%   | Status badge logs      |
+| Response time (p95)           | TBD      | <10s   | Performance monitoring |
 
 ---
 
 ## Risks & Mitigations
 
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| Gemini API cost overrun | Medium | High | Rate limits, batch requests, caching |
-| Poor suggestion quality | Medium | Medium | User feedback loop, template fallback |
-| Privacy concerns | Low | High | Keep PII local, audit prompts, document |
-| Network dependency | High | Medium | Offline fallbacks, status indicator |
-| Battery drain | Low | Medium | Background throttling, efficient polling |
+| Risk                    | Probability | Impact | Mitigation                               |
+| ----------------------- | ----------- | ------ | ---------------------------------------- |
+| Gemini API cost overrun | Medium      | High   | Rate limits, batch requests, caching     |
+| Poor suggestion quality | Medium      | Medium | User feedback loop, template fallback    |
+| Privacy concerns        | Low         | High   | Keep PII local, audit prompts, document  |
+| Network dependency      | High        | Medium | Offline fallbacks, status indicator      |
+| Battery drain           | Low         | Medium | Background throttling, efficient polling |
 
 ---
 
 ## Architectural Decisions
 
 ### ✅ DO:
+
 - Keep AI native-only (no backend gateway)
 - Process PII locally (never send to Gemini)
 - Provide clear fallback states
@@ -503,6 +531,7 @@ appId: com.yashsomani.birthdayautopilot
 - Rate limit aggressively
 
 ### ❌ DON'T:
+
 - Re-introduce JavaScript AI layer
 - Send contact names/numbers to Gemini
 - Block UI while waiting for AI
@@ -510,6 +539,7 @@ appId: com.yashsomani.birthdayautopilot
 - Build iOS AI before iOS app exists
 
 ### ⏸ DEFER:
+
 - Backend AI orchestration
 - Cross-device AI preferences
 - Preference learning (on-device OK)
@@ -520,12 +550,14 @@ appId: com.yashsomani.birthdayautopilot
 ## Appendix: File Inventory
 
 ### Files to Create
+
 1. `src/design-system/components/AIStatusBadge.tsx`
 2. `src/design-system/components/SuggestionCard.tsx`
 3. `RUNTIME_VERIFICATION_REPORT.md` (template)
 4. `.maestro/ai-features.yaml`
 
 ### Files to Modify
+
 1. `android/app/src/main/java/.../gemini/AndroidGeminiSuggestionGateway.kt`
 2. `android/app/src/main/java/.../gemini/AndroidGeminiOperationalGate.kt`
 3. `src/infrastructure/native/BirthdayNativeAdapter.ts`
@@ -533,6 +565,7 @@ appId: com.yashsomani.birthdayautopilot
 5. `src/features/live/settings/SettingsScreen.tsx`
 
 ### Files Already Correct
+
 1. `contracts/gemini-prompt-policy-v2.json` (supports multi-candidate)
 2. `src/application/ports/BirthdayNativePort.ts` (already returns array)
 3. Test infrastructure (ready for new tests)

@@ -42,6 +42,7 @@ Release rollback or unsafe build
 **Trigger:** Defective release candidate, failed security scan, unsafe build configuration detected
 
 **Procedure:**
+
 1. Set `GlobalControl.armingEnabled = false` immediately
 2. Set `continuityState = FROZEN` if build integrity uncertain
 3. Document exact source revision, build artifacts, and failure mode
@@ -54,6 +55,7 @@ Android signing-key incident
 **Trigger:** Signing key compromise, keystore corruption, certificate mismatch
 
 **Procedure:**
+
 1. Set `GlobalControl.armingEnabled = false` and `continuityState = FROZEN`
 2. Revoke compromised credentials via Google Play Console
 3. Generate new signing key using secure key management
@@ -67,6 +69,7 @@ HMAC pepper rotation
 **Trigger:** Key compromise suspicion, scheduled rotation, security audit requirement
 
 **Procedure:**
+
 1. Maintain both current and previous HMAC keys in Cloud KMS `COORDINATION_HMAC_KEYRING`
 2. Update keyring with new primary key, demote old key to secondary
 3. Deploy Functions update with new key references
@@ -79,6 +82,7 @@ Functions, Firestore, or regional outage
 **Trigger:** asia-south1 regional failure, Firebase service degradation
 
 **Procedure:**
+
 1. Set `GlobalControl.armingEnabled = false` (fail-closed)
 2. Communicate outage status via web tier
 3. Await Firebase status dashboard resolution
@@ -90,6 +94,7 @@ Ledger corruption, disaster recovery, or duplicate report
 **Trigger:** Conflicting claim records, duplicate SMS report, Firestore inconsistency
 
 **Procedure:**
+
 1. **IMMEDIATE:** Set `GlobalControl.armingEnabled = false` and `continuityState = FROZEN`
 2. Export content-free ledger state (no PII)
 3. Analyze claim epochs, occurrence keys, destination guards
@@ -104,6 +109,7 @@ Account-deletion failure
 **Trigger:** Deletion saga stall, incomplete child deletion, receipt generation failure
 
 **Procedure:**
+
 1. Verify deletion tombstone exists and is properly fenced
 2. Drain any pending operations before proceeding
 3. Ensure children deletion completes atomically
@@ -116,8 +122,9 @@ Gemini safety, privacy, or cost incident
 **Trigger:** Prompt injection, PII leakage, unexpected cost spike, safety filter bypass
 
 **Procedure:**
+
 1. Disable Gemini gateway via operational gate
-2. Fall back to template-based suggestions only
+2. Fall back to built-in templates only
 3. Review prompt logs for PII exposure (redact immediately)
 4. Audit rate scopes and provenance registry
 5. Adjust timeout/rate limits if cost-related
@@ -128,6 +135,7 @@ OAuth, Google People, or Firebase identity incident
 **Trigger:** Auth token compromise, contacts sync failure, session invalidation
 
 **Procedure:**
+
 1. Revoke affected OAuth tokens via Google Cloud Console
 2. Force session invalidation via Firebase Auth
 3. Verify incremental contacts.readonly scope enforcement
@@ -140,6 +148,7 @@ SEND_SMS policy, installer, carrier, or legal suspension
 **Trigger:** Carrier blocking, policy violation notice, legal cease-and-desist
 
 **Procedure:**
+
 1. **IMMEDIATE:** Set `GlobalControl.armingEnabled = false` globally
 2. Document exact trigger (carrier code, legal notice reference)
 3. Suspend affected sender installations
