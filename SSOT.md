@@ -51,7 +51,7 @@ Features should progress through these verification states before being consider
 
 WishWell is an **Android-first autonomous birthday-SMS system** whose defining business asset is a _verified trust architecture_: human approval of exact payloads, server-enforced single-send guarantees, honest delivery language, deletion-grade privacy, and a fail-closed release-admission chain.
 
-**Current State:** Code-complete for Android launch, pending runtime verification, infrastructure deployment, and production validation. The full setup→approve→deliver pipeline, cloud control plane (16 callables + 2 scheduled sweeps, region asia-south1), sender transfer, deletion saga with receipts, bilingual EN/HI UX, accessibility E2E, Ed25519-signed distribution-evidence regime, and **native Android Gemini AI integration** are all **implemented** but **NOT_RUNTIME_VERIFIED** and **NOT_DEPLOYED**. Dead JavaScript AI code (1,164 lines) removed 2026-08-29.
+**Current State:** Code-complete for Android launch, pending runtime verification, infrastructure deployment, and production validation. The full setup→approve→deliver pipeline, cloud control plane (16 callables + 2 scheduled sweeps, region asia-south1), sender transfer, deletion saga with receipts, bilingual EN/HI UX, accessibility E2E, Ed25519-signed distribution-evidence regime, and **native Android Gemini AI integration** are all **implemented** but **NOT_RUNTIME_VERIFIED** and **NOT_DEPLOYED**. Dead JavaScript AI code (1,164 lines: AIGateway.ts, GoogleAIProviderAdapter.ts, AIProviderPort.ts) removed 2026-08-29. AI architecture cleaned up: native-only, no backend AI gateway.
 
 **Principal Gaps:**
 
@@ -61,9 +61,9 @@ WishWell is an **Android-first autonomous birthday-SMS system** whose defining b
 - Support model undefined pre-launch
 - Battery-optimization exemption request flow not implemented (diagnose-only)
 - **AI runtime verification pending** — native Gemini integration not tested on real devices
+- **AI expansion roadmap defined** — 4 features planned: auto-generate 3 variations, AI status indicator, smart contact enrollment, approval prioritization
 
 ---
-
 # 2. PRODUCT OVERVIEW
 
 ## 2.1 Purpose [VC]
