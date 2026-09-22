@@ -6,7 +6,9 @@ WishWell is a React Native mobile app for Android.
 
 The former iOS Companion Edition has been fully removed from the repository; Android is the only supported platform.
 
-The authoritative product and safety contract is [`PROJECT_ABOUT.md`](PROJECT_ABOUT.md). Generated Stitch work is a visual input only; [`stitch/SCREEN_MANIFEST.md`](stitch/SCREEN_MANIFEST.md) maps the required surfaces and states.
+**The authoritative single source of truth for this project is [`SSOT.md`](SSOT.md).** This document contains the complete product specification, architecture, feature inventory with implementation status, business requirements, gap analysis, roadmap, and traceability matrix. Where conflicts arise between any documentation file and SSOT.md, SSOT.md prevails.
+
+Generated Stitch work is a visual input only; [`stitch/SCREEN_MANIFEST.md`](stitch/SCREEN_MANIFEST.md) maps the required surfaces and states.
 
 This remains a React Native application even though the repository contains Kotlin. TypeScript/React Native owns the shared UI and product workflows. The native folder is the required TurboModule/OS boundary: Kotlin owns Android background work, SIM SMS, permissions, encrypted Room state, and callbacks. A JavaScript-only build cannot provide those operating-system capabilities or the requested unattended Android behavior.
 
