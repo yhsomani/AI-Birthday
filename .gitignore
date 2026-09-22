@@ -1,45 +1,35 @@
 ```
 # Coverage reports
 coverage/
+*.lcov
 *.info
+clover.xml
+coverage-final.json
 
 # Build artifacts
 build/
 dist/
-target/
+*.pyc
+__pycache__/
 
 # Dependencies
 node_modules/
-vendor/
-
-# Logs
-*.log
-
-# Environment
+venv/
+.venv/
 .env
 .env.local
-*.env.*
 
-# Editor/IDE
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 *.tmp
 
-# OS generated
-.DS_Store
-Thumbs.db
+# Logs
+*.log
 
-# Python specific
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-
-# Test coverage
-.coverage
-htmlcov/
+# Test and coverage
+.nyc_output/
+istanbul/
 ```
