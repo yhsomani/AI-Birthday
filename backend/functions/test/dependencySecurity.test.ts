@@ -44,7 +44,7 @@ describe('Firebase uuid advisory containment', () => {
     expectOnlyNoArgumentV4('node_modules/gaxios/build/src/gaxios.js');
     expectOnlyNoArgumentV4('node_modules/teeny-request/build/src/index.js');
     expectOnlyNoArgumentV4(
-      'node_modules/google-gax/build/src/util.js',
+      'node_modules/@google-cloud/firestore/node_modules/google-gax/build/src/util.js',
     );
   });
 });
