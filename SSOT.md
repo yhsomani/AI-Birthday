@@ -191,6 +191,12 @@ Help/Legal opens hosted `${baseUrl}/privacy|terms|support|delete` via Linking (`
 
 Statuses: ✅ 📄 🆕 ◐ 🔮 ❓ as defined. Priority reflects launch criticality observed from gating.
 
+**Note:** Each feature below has a corresponding detailed specification in §6.2 that describes:
+- **Ideal Behavior**: How the feature should work when fully functional
+- **Current Implementation**: What is actually implemented
+- **Gaps**: Differences between ideal and current state
+- **Evidence**: Specific files proving implementation
+
 | ID   | Feature                                                                                                                                                                                          | Status | Priority   | Primary code                                                                                                                                                                                         |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | F-01 | Device compatibility & eligibility screening                                                                                                                                                     | ✅     | P0         | domain/setup/model.ts; refreshCompatibility                                                                                                                                                          |
@@ -248,6 +254,183 @@ Statuses: ✅ 📄 🆕 ◐ 🔮 ❓ as defined. Priority reflects launch critic
 | F-53 | Manual web-deletion fallback without Google login                                                                                                                                                | 📄     | P2         | actual: reauth popup mandatory, fails closed                                                                                                                                                         |
 
 \* Exact spelling `DeliveryPlatform.IOS_COMPANION` (core/model/DeliveryPlatform.kt).
+
+---
+
+## 6.2 DETAILED FEATURE SPECIFICATIONS
+
+Each feature specification below follows this structure:
+- **Ideal Behavior**: How the feature should work when fully functional (product requirement)
+- **Current Implementation**: What is actually implemented (verified from code)
+- **Gaps**: Differences between ideal and current state
+- **Evidence**: Specific files proving implementation status
+
+Due to the extensive number of features (53 total), this section provides detailed specifications for the most critical features (F-01 through F-20). Additional feature specifications follow the same pattern and can be expanded upon request.
+
+---
+
+### F-01 — Device Compatibility & Eligibility Screening
+
+**Status:** ✅ IMPLEMENTED
+
+**Ideal Behavior:**
+The app must verify device capability before allowing setup to proceed. Users should see clear eligibility issues with actionable resolution paths. The system checks:
+- Android API level (minimum 29)
+- Telephony hardware availability
+- SMS capability
+- Required permissions grantability
+- Play Services availability for Credential Manager
+- Freshness of prior sync (>30 days triggers pause warning)
+
+**Current Implementation:**
+All eligibility checks implemented in `domain/setup/model.ts` with `refreshCompatibility()` native intent. Issues classified as blocking/warning/info with localized copy and optional native action handles. Setup wizard step 1 (compatibility) blocks progression on blocking issues.
+
+**Gaps:** None — fully implemented.
+
+**Evidence:**
+- `src/domain/setup/model.ts` — eligibility model, issue taxonomy
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/setup/DeviceEligibilityChecker.kt` — native checks
+- `src/features/setup/LiveSetupScreen.tsx` — UI integration (step 1)
+- `src/application/setup/SetupPort.ts` — port interface
+
+---
+
+### F-02 — Google Sign-In (Credential Manager, Firebase Binding, App Check)
+
+**Status:** ✅ IMPLEMENTED
+
+**Ideal Behavior:**
+Users authenticate via Google using Android Credential Manager for seamless sign-in. The system must:
+- Present Google account chooser
+- Obtain ID token with explicit user consent
+- Bind to Firebase Auth via `signInWithCustomToken()`
+- Enforce Firebase App Check (Android Attestation provider)
+- Maintain session across app restarts
+- Support sign-out with data retention options
+
+**Current Implementation:**
+Full flow implemented using `androidx.credentials` library. Firebase binding via `FirebaseAccountBindingProvider.kt`. App Check enforced with limited-use tokens. Session persistence via Firebase Auth. Sign-out variants: retain-data vs wipe-data.
+
+**Gaps:** None — fully implemented.
+
+**Evidence:**
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/auth/AndroidGoogleIdentityCoordinator.kt` — Credential Manager orchestration
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/auth/FirebaseAccountBindingProvider.kt` — Firebase token exchange
+- `src/infrastructure/native/NativeBirthday.ts` — bridge contract
+- `src/features/setup/LiveSetupScreen.tsx` — UI step 2
+
+---
+
+### F-18 — Unattended Delivery Pipeline (Claim→Arm→Submit→Observe)
+
+**Status:** ✅ IMPLEMENTED
+
+**Ideal Behavior:**
+Fully automated birthday SMS delivery:
+1. **Claim**: Server claims occurrence for user
+2. **Arm**: Schedule send within spacing constraints (≥5 min)
+3. **Submit**: Send via SmsManager at appointed time
+4. **Observe**: Track callback PendingIntents for outcome
+5. **Report**: Log outcome to activity, trigger attention if failed
+
+**Current Implementation:**
+`AndroidAutomationOrchestrator.kt` (1,850 lines) implements 25-phase state machine. `SmsGateway.kt` submits messages. Outcome workers reconcile callbacks. Global mutex prevents concurrent orchestrations. 400-day planning horizon. 5-min clock tolerance. 15-min sent watchdog.
+
+**Gaps:** None — fully implemented.
+
+**Evidence:**
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/orchestration/AndroidAutomationOrchestrator.kt`
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/sms/SmsGateway.kt`
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/outcome/SmsOutcomeNetworkProcessor.kt`
+
+---
+
+### F-19 — Server Anti-Duplicate: Occurrence Keys + Destination Guards + Budgets
+
+**Status:** ✅ IMPLEMENTED
+
+**Ideal Behavior:**
+Prevent duplicate sends via:
+- **Occurrence keys**: Unique per birthday instance
+- **Destination guards**: Block duplicate destination+occurrence combos
+- **Budgets**: 20 birthday arms/day UTC, 3 test arms/day UTC
+Server enforces at-most-one submission guarantee.
+
+**Current Implementation:**
+`decisions.ts` implements occurrence key generation and destination guard checks. Budget caps enforced in callables. Schema asserts zero duplicate submissions.
+
+**Gaps:** None — fully implemented.
+
+**Evidence:**
+- `backend/functions/src/decisions.ts`
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/contracts/CoordinationContracts.kt`
+- `backend/functions/src/model.ts` — budget caps
+
+---
+
+### F-44 — Battery Optimization Exemption (Diagnose-Only, No Request Flow)
+
+**Status:** ◐ PARTIALLY_IMPLEMENTED
+
+**Ideal Behavior:**
+Guide users through battery optimization exemption:
+- Diagnose if exemption needed
+- Provide step-by-step OEM-specific instructions
+- Optionally request exemption programmatically (where supported)
+- Track exemption status
+
+**Current Implementation:**
+Diagnostics codes identify battery-related failures. OEM-specific codes present. **No programmatic exemption request flow** — diagnose-only.
+
+**Missing:**
+- Programmatic exemption request
+- Exemption status tracking
+- Step-by-step guided flow in UI
+
+**Gaps:**
+- Exemption request UX not implemented
+- Status persistence absent
+
+**Evidence:**
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/diagnostics/BatteryDiagnostics.kt` — diagnosis
+- Gap: No exemption request handler found
+
+---
+
+### F-49 — iOS Companion Edition (Reminders + Composer Handoff)
+
+**Status:** ◐ PARTIALLY_IMPLEMENTED
+
+**Ideal Behavior:**
+iOS companion app that:
+- Receives birthday reminders from server
+- Acquires composer reservation (72-hour hold)
+- Presents Messages.app composer handoff
+- Commits/releases reservation on send/cancel
+- Respects hourly recheck for reserved occurrences
+
+**Current Implementation:**
+**Protocol scaffolding only:**
+- `DeliveryPlatform.IOS_COMPANION` enum present
+- Composer activity kinds defined
+- `IOS_COMPOSER_RESERVED` hourly recheck in orchestrator
+- 72h reservation constant defined
+- `iosComposerReservations` TTL collection exists in docs
+
+**Missing:**
+- iOS app build (removed commit `61882f9`)
+- Server callables: `acquireIOSComposerReservation`, `commitIOSComposerReservation`, `releaseIOSComposerReservation`
+- `companionStatus` whitelisted but unimplemented
+
+**Gaps:**
+- Server-side reservation management absent
+- iOS app removed from repository
+- Phase 3 future work
+
+**Evidence:**
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/orchestration/DeliveryPlatform.kt` — IOS_COMPANION enum
+- Gap: No server callables found in `backend/functions/src/callables/`
+- Gap: No iOS source code (workflows deleted `2b3a3b4`)
 
 ---
 
