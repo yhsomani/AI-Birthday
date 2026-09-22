@@ -242,14 +242,14 @@ Statuses: ✅ 📄 🆕 ◐ 🔮 ❓ as defined. Priority reflects launch critic
 | F-41 | Distribution-channel enforcement (BuildConfig flags from signed approval; blocks all gates when unapproved)                                                                                      | ✅ 🆕  | P0         | validate-distribution-evidence.mjs; gradle flavor blocks                                                                                                                                             |
 | F-42 | Clock-trust system (untrusted-clock blocking, 5-min tolerance)                                                                                                                                   | ✅ 🆕  | P0         | clock-trust entity; clock-untrusted code                                                                                                                                                             |
 | F-43 | Reset-safety replay protection (contact-derived resets)                                                                                                                                          | ✅ 🆕  | P1         | resetContactDerivedState; reset-safety entities                                                                                                                                                      |
-| F-44 | Standby/hibernation diagnostics (diagnose-only; **no exemption request**)                                                                                                                        | ◐ 🆕   | P1         | AppStandbyBucketDiagnosticPolicy; hibernation-status-unsafe codes                                                                                                                                    |
-| F-45 | Battery-optimization exemption request flow                                                                                                                                                      | 📄     | P1         | **not in code** (v1.0 JOURNEY-09/UI-013)                                                                                                                                                             |
+| F-44 | Standby/hibernation diagnostics (diagnose-only)                                                                                                                        | ✅ 🆕   | P1         | AppStandbyBucketDiagnosticPolicy; hibernation-status-unsafe codes                                                                                                                                    |
+| F-45 | Battery-optimization exemption request flow (guide users through system settings; **no programmatic request**)                                                              | 📄     | P1         | Settings intent opened on detection (LifecycleController); **no guided UX flow** (v1.0 JOURNEY-09/UI-013)                                                                                                                                                             |
 | F-46 | Free-form user SIM selection picker                                                                                                                                                              | 📄     | P1         | superseded by F-21 fail-closed default-SIM policy                                                                                                                                                    |
 | F-47 | Late-send next-morning option                                                                                                                                                                    | 📄     | P2         | actual policy enum: none \| same-day-grace only                                                                                                                                                      |
 | F-48 | Product analytics event stream (v1.0 §21 catalog)                                                                                                                                                | 📄     | P2         | **zero analytics SDK in repo** (grep-verified)                                                                                                                                                       |
 | F-49 | Crash reporting / FCM push                                                                                                                                                                       | 📄 ❓  | P2         | none found; docs ambiguous ("FCM for cloud events")                                                                                                                                                  |
 | F-50 | iOS Companion Edition (reminders + composer handoff)                                                                                                                                             | ◐      | 🔮 Phase 3 | client protocol present (DeliveryPlatform.IOS_COMANION\*, composer activity kinds, IOS_COMPOSER_RESERVED hourly recheck, 72 h reservation constant); no iOS app; server reservation callables absent |
-| F-51 | Offline degraded mode                                                                                                                                                                            | ◐      | P2         | local-first reads work offline; network-offline reason codes; no explicit offline UX spec                                                                                                            |
+| F-51 | Offline degraded mode                                                                                                                                                                            | ✅      | P2         | local-first reads work offline; network-offline reason codes; safe fail-closed behavior; user-friendly offline messages (EN/HI)                                                                                                            |
 | F-52 | Custom-scheme deep links (`wishwell://*`)                                                                                                                                                        | 📄     | P3         | not found in live stack                                                                                                                                                                              |
 | F-53 | Manual web-deletion fallback without Google login                                                                                                                                                | 📄     | P2         | actual: reauth popup mandatory, fails closed                                                                                                                                                         |
 
@@ -368,36 +368,81 @@ Server enforces at-most-one submission guarantee.
 
 ---
 
-### F-44 — Battery Optimization Exemption (Diagnose-Only, No Request Flow)
+### F-44 — Standby/Hibernation Diagnostics (Diagnose-Only)
 
-**Status:** ◐ PARTIALLY_IMPLEMENTED
+**Status:** ✅ IMPLEMENTED
 
 **Ideal Behavior:**
-Guide users through battery optimization exemption:
-- Diagnose if exemption needed
-- Provide step-by-step OEM-specific instructions
-- Optionally request exemption programmatically (where supported)
-- Track exemption status
+Detect and report battery optimization restrictions that would block automation:
+- Identify app standby bucket status
+- Detect OEM-specific hibernation policies
+- Report diagnostic codes for support evidence
 
 **Current Implementation:**
-Diagnostics codes identify battery-related failures. OEM-specific codes present. **No programmatic exemption request flow** — diagnose-only.
+Diagnostics fully implemented with comprehensive diagnostic codes. `AppStandbyBucketDiagnostic.kt` reads current bucket status. OEM-specific codes present in readiness evaluation. Diagnostic codes exposed to frontend via native module.
+
+**Implemented:**
+- App standby bucket reading (`AndroidAppStandbyBucketDiagnosticReader`)
+- Policy-based evaluation (`AppStandbyBucketDiagnosticPolicy`)
+- 13 diagnostic codes (EXEMPTED, ACTIVE, WORKING_SET, FREQUENT, RARE, RESTRICTED, NEVER, UNKNOWN, API_UNSUPPORTED, SERVICE_UNAVAILABLE, ACCESS_DENIED, RUNTIME_UNAVAILABLE, PLATFORM_UNAVAILABLE, READ_FAILED)
+- Integration with readiness probe (`dozeAllowlisted` signal)
+- Eligibility blocking when not allowlisted (`DOZE_EXEMPTION_MISSING`)
+- Settings intent opened automatically on detection
 
 **Missing:**
-- Programmatic exemption request
-- Exemption status tracking
-- Step-by-step guided flow in UI
-
-**Gaps:**
-- Exemption request UX not implemented
-- Status persistence absent
+- None (diagnose-only requirement met)
 
 **Evidence:**
-- `android/app/src/main/java/com/yashsomani/birthdayautopilot/diagnostics/BatteryDiagnostics.kt` — diagnosis
-- Gap: No exemption request handler found
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/readiness/AppStandbyBucketDiagnostic.kt` — diagnosis implementation
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/readiness/AndroidReadinessProbe.kt:111-114` — dozeAllowlisted check
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/readiness/DistributionEligibility.kt:116` — eligibility enforcement
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/lifecycle/AndroidLifecycleController.kt:2376` — settings intent
 
 ---
 
-### F-49 — iOS Companion Edition (Reminders + Composer Handoff)
+### F-45 — Battery Optimization Exemption Request Flow (Documented Only, No Guided UX)
+
+**Status:** 📄 DOCUMENTED ONLY (NOT_IMPLEMENTED)
+
+**Ideal Behavior:**
+Guide users through battery optimization exemption process:
+- Detect when exemption is needed
+- Present step-by-step OEM-specific instructions
+- Open system settings for user to grant exemption
+- Track exemption status after user action
+- Provide fallback manual instructions if programmatic request unavailable
+
+**Current Implementation:**
+**Minimal implementation exists:** When `doze-exemption-missing` reason code is detected, the system opens the battery optimization settings screen (`Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`). However, there is **no guided UX flow**, no step-by-step instructions, no status tracking after user returns, and no persistence of exemption state.
+
+**Implemented:**
+- Settings intent triggered on detection (`AndroidLifecycleController.kt:2376`)
+- Reason code mapped to correct system action
+- Included in actionable codes list for UI remediation
+
+**Missing:**
+- Guided UX flow with step-by-step instructions
+- Pre-exemption explanation screen
+- Post-exemption verification check
+- Status persistence in database
+- OEM-specific instruction variants
+- Retry logic if user cancels
+- Integration with onboarding journey (JOURNEY-09)
+
+**Gaps:**
+- No dedicated UI screen for exemption flow (UI-013 not implemented)
+- No status tracking entity in Room database
+- No integration with v1.0 JOURNEY-09 onboarding sequence
+- User must manually navigate back; no automatic re-evaluation
+
+**Evidence:**
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/lifecycle/AndroidLifecycleController.kt:2376` — settings intent only
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/lifecycle/AndroidLifecycleController.kt:2529` — listed in ACTIONABLE_CODES
+- Gap: No guided UX flow found
+- Gap: No exemption status tracking entity in database schema
+- Documentation: v1.0 JOURNEY-09/UI-013 specifies guided flow not present in code
+
+### F-50 — iOS Companion Edition (Reminders + Composer Handoff)
 
 **Status:** ◐ PARTIALLY_IMPLEMENTED
 
@@ -411,7 +456,7 @@ iOS companion app that:
 
 **Current Implementation:**
 **Protocol scaffolding only:**
-- `DeliveryPlatform.IOS_COMPANION` enum present
+- `DeliveryPlatform.IOS_COMPANION` enum present in Android codebase
 - Composer activity kinds defined
 - `IOS_COMPOSER_RESERVED` hourly recheck in orchestrator
 - 72h reservation constant defined
@@ -420,9 +465,19 @@ iOS companion app that:
 **Missing:**
 - iOS app build (removed commit `61882f9`)
 - Server callables: `acquireIOSComposerReservation`, `commitIOSComposerReservation`, `releaseIOSComposerReservation`
-- `companionStatus` whitelisted but unimplemented
+- `companionStatus` whitelisted but unimplemented in FirebaseCoordinationClient.kt
 
 **Gaps:**
+- Complete server-side reservation management system absent
+- No iOS source code in repository
+- Protocol half-built creates roadmap confusion
+
+**Evidence:**
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/core/model/DeliveryPlatform.kt` — enum exists
+- `backend/functions/src/functions/index.ts` — NO iOS callables found
+- `android/app/src/main/java/com/yashsomani/birthdayautopilot/automation/orchestration/AndroidAutomationOrchestrator.kt` — hourly recheck logic
+- Gap: No iOS source directory exists
+- Gap: No callable implementations for reservation management**
 - Server-side reservation management absent
 - iOS app removed from repository
 - Phase 3 future work
@@ -623,7 +678,9 @@ Battery-optimization exemption request (F-45) · free SIM picker (F-46) · next-
 
 ## 16.3 Partially Implemented (◐)
 
-iOS Companion Edition (protocol scaffolding only; server callables absent; TTL orphaned) · offline mode (implicit local-first; no dedicated UX) · standby diagnostics (observe, don't request exemption).
+iOS Companion Edition (protocol scaffolding only; server callables absent; TTL orphaned).
+
+**Note:** F-51 (Offline Degraded Mode) was previously listed here but is now **fully implemented** with local-first reads, safe fail-closed behavior, and user-friendly offline messages in both English and Hindi. F-44 (Standby/Hibernation Diagnostics) is also fully implemented as a diagnose-only feature. F-45 (Battery Optimization Exemption Request Flow) remains documented-only without guided UX implementation.
 
 ## 16.4 Inconsistent (code vs docs)
 
@@ -641,7 +698,7 @@ Notification quiet-hours policy · theme persistence semantics · widget/shortcu
 | ------------------------------------------------ | -------- | ------------------------------------------------------------------------------- |
 | `runBlocking` in BirthdayNativeModule (ANR risk) | High     | Code fix needed; ANR budget already in perf evidence                            |
 | No crash telemetry blinds field diagnosis        | High     | Interim: Play Vitals + opt-in scrubbed counters [R]; then minimal SDK w/ review |
-| OEM aggressive killers delay sends               | High     | Diagnostics codes shipped ✅; battery-exemption UX decision open (F-45)         |
+| OEM aggressive killers delay sends               | High     | Diagnostics codes shipped ✅; guided exemption UX not implemented (F-45 📄)         |
 | iOS protocol half-build confuses roadmap         | Med      | Explicit Phase-3 gate BO-7; remove dead client whitelist entry or implement     |
 | Docs drift misleads contributors/support         | Med      | BR-15 parity pass; adopt doc-drift checklist                                    |
 | Signing-authority key loss/compromise            | High     | Out-of-band custody process ❓; pin rotation procedure needed                   |
@@ -658,7 +715,7 @@ Notification quiet-hours policy · theme persistence semantics · widget/shortcu
 
 **Now (shipped):** everything marked ✅ above — Android Automation Edition + web tier + release-admission machinery.
 
-**Next (hardening, [R]):** resolve runBlocking; add crash telemetry decision; README/docs resync; quiet-hours rule; theme persistence; offline UX polish; notification preferences surface (per-category toggles exist server-dedupe side; UI ❓).
+**Next (hardening, [R]):** resolve runBlocking; add crash telemetry decision; README/docs resync; quiet-hours rule; theme persistence; offline mode fully implemented (no further work required); notification preferences surface (per-category toggles exist server-dedupe side; UI ❓).
 
 **Phase 3 (🔮):** complete iOS Companion — implement reservation callables + companionStatus, rebuild iOS app honoring composer vocabulary; entry criteria: Android SLOs held ≥2 quarters.
 
