@@ -1,12 +1,12 @@
 # WishWell (Birthday Autopilot) — Single Source of Truth (SSOT)
 
-|                     |                                                                                                                                                                                                  |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Document**        | Single Source of Truth — v1.0 (Consolidated from PRD.md v3.0, BRD.md v3.0, PROJECT_ABOUT.md, and codebase verification)                                                                          |
-| **Product**         | WishWell · package `birthday-autopilot` v0.1.0 · appId `com.yashsomani.birthdayautopilot`                                                                                                        |
-| **Source of truth** | This document is the authoritative reference for the entire project. All other documentation files are subordinate or historical.                                                                |
-| **Status**          | Consolidated 2026-08-29. Supersedes PROJECT_ABOUT.md, PRD.md, BRD.md, Flow.md, decision.md, DESIGN.md where conflicts exist.                                                                     |
-| **Next Review**     | Before any major feature addition, platform expansion, or store submission                                                                                                                       |
+|                     |                                                                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Document**        | Single Source of Truth — v1.0 (Consolidated from PRD.md v3.0, BRD.md v3.0, PROJECT_ABOUT.md, and codebase verification)           |
+| **Product**         | WishWell · package `birthday-autopilot` v0.1.0 · appId `com.yashsomani.birthdayautopilot`                                         |
+| **Source of truth** | This document is the authoritative reference for the entire project. All other documentation files are subordinate or historical. |
+| **Status**          | Consolidated 2026-08-29. Supersedes PROJECT_ABOUT.md, PRD.md, BRD.md, Flow.md, decision.md, DESIGN.md where conflicts exist.      |
+| **Next Review**     | Before any major feature addition, platform expansion, or store submission                                                        |
 
 ---
 
@@ -33,7 +33,8 @@ WishWell is an **Android-first autonomous birthday-SMS system** whose defining b
 
 **Current State:** The product is production-ready for Android launch. The full setup→approve→deliver pipeline, cloud control plane (16 callables + 2 scheduled sweeps, region asia-south1), sender transfer, deletion saga with receipts, bilingual EN/HI UX, accessibility E2E, and Ed25519-signed distribution-evidence regime are all implemented and tested.
 
-**Principal Gaps:** 
+**Principal Gaps:**
+
 - No analytics telemetry (deliberate privacy choice, but blocks funnel measurement)
 - iOS companion protocol half-built (server callables absent)
 - Documentation debt in legacy files (README, PROJECT_ABOUT misstate behaviors)
@@ -61,6 +62,7 @@ Make thoughtful birthday communication effortless without feeling automated.
 > Set it once. Approve what matters. Never miss a birthday.
 
 **Verified differentiators:**
+
 - Human approval of exact payload before any send (✅ enforced server+client)
 - Structural duplicate-send prevention via server-issued occurrence keys and destination guards (✅)
 - Truthful outcome copy ("Sent from this phone; delivery not confirmed") (✅)
@@ -76,6 +78,7 @@ Make thoughtful birthday communication effortless without feeling automated.
 ## 2.6 Product Scope (as implemented)
 
 **In scope ✅:**
+
 - Android Automation Edition (flavors e2e/smoke/dev/staging/lab/prod)
 - Google sign-in + read-only contacts
 - Enrollment & approvals
@@ -91,6 +94,7 @@ Make thoughtful birthday communication effortless without feeling automated.
 - Public web tier (/ , /delete/, /privacy/, /terms/, /support/) bilingual EN/HI
 
 **Out of scope ✅:**
+
 - iOS app build (removed; commit `61882f9`, workflows deleted `2b3a3b4`) though client-side companion _protocol_ remains (§7.12)
 - Contact writes
 - Multi-account
@@ -131,7 +135,7 @@ Single TurboModule `specs/native/NativeBirthday.ts`:
 - Hand-wired DI (`AppGraph.kt`), Fabric `MainActivity`, WorkManager eager init with custom factory; startup coordinator guards one-time scheduling.
 - **Orchestrator** (`AndroidAutomationOrchestrator.kt`, 1,850 ln): register installation → renew lease → claim occurrence/test → arm (≥5 min spacing) → barrier → submit via `SmsGateway` → observe callback PendingIntents → report. Global mutex; **400-day planning horizon**; **5-min clock tolerance**; **15-min sent watchdog**; distribution channel derived from `BuildConfig.APP_ENV` + `APPROVED_DISTRIBUTION_CHANNEL`.
 - **Persistence**: Room, **37 entities**, SQLCipher (passphrase wrapped by hardware-Keystore AES-GCM key stored in `noBackupFilesDir` via AtomicFile; fail-closed codes `keystore-key-missing`/`wrapped-key-missing`); schemas 1–5 exported, auto-migrations.
-- **Workers**: 15-min periodic `ReconcileWorker` (+ heartbeat lease, 30 s successor floor), `PeopleSyncWorker` (≤3 attempts), `DataRetentionWorker`, SMS outcome workers. `AutomationReconcileReceiver` maps BOOT_COMPLETED / TIME(_ZONE)_CHANGED / DATE_CHANGED / MY_PACKAGE_REPLACED / LOCALE_CHANGED / DEFAULT_SMS_SUBSCRIPTION_CHANGED → reconcile triggers.
+- **Workers**: 15-min periodic `ReconcileWorker` (+ heartbeat lease, 30 s successor floor), `PeopleSyncWorker` (≤3 attempts), `DataRetentionWorker`, SMS outcome workers. `AutomationReconcileReceiver` maps BOOT_COMPLETED / TIME(\_ZONE)\_CHANGED / DATE_CHANGED / MY_PACKAGE_REPLACED / LOCALE_CHANGED / DEFAULT_SMS_SUBSCRIPTION_CHANGED → reconcile triggers.
 - **SMS boundary**: `SmsPlatformSubmitter` accepts single or ≤ **2-part** multipart plans only (rejects cardinality mismatch/empty parts/joined-text drift); `SubscriptionBindingPolicy` allows sending **only** on the plan kind `SYSTEM_DEFAULT` subscription that equals the current default-SMS subscription and is active (dual-SIM fail-closed; changes trigger fingerprint-recorded reconcile).
 - **Retry**: exactly **one** server-authorized retry (`authorizeSafeRetry`: attempt==2, RETRY_CLAIMED, identical claim id/epoch/reset-generation/retryRequestId/window; server clock within tolerance). Retry permit bounded inside immutable approved window.
 - **Identity**: Credential Manager Google sign-in; **incremental OAuth `contacts.readonly` only**, explicitly rejects server auth codes/offline access (no refresh token ever on device); Firebase session + Play-Integrity App Check required; JIT sequential READ_PHONE_STATE → SEND_SMS requests with permanent-denial classification.
@@ -161,7 +165,7 @@ The app has no multi-user roles; roles derive from **device/installation state**
 | **Owner on STANDBY device**         | Same account, second Android                            | View projections, privacy ops, can _begin_ sender transfer                                                   | Cannot arm/send; activation blocked (`active-sender-other-device`)             |
 | **Pre-auth user**                   | Before `continueWithGoogle()`                           | Welcome/compatibility, initiate sign-in, view eligibility issues                                             | Nothing else                                                                   |
 | **Web visitor**                     | Browser at /delete/                                     | Re-authenticated deletion of own account; receipt lookup                                                     | No other data access; fail-closed without runtime config                       |
-| **Release authority (external)**    | Holder of Ed25519 pin `distribution-authority-pin.json` | Signs/denies distribution approvals unlocking restricted-SMS BuildConfig flags                                      | Out-of-repo key; approvals expire (`validUntil`)                               |
+| **Release authority (external)**    | Holder of Ed25519 pin `distribution-authority-pin.json` | Signs/denies distribution approvals unlocking restricted-SMS BuildConfig flags                               | Out-of-repo key; approvals expire (`validUntil`)                               |
 
 ---
 
@@ -266,7 +270,7 @@ Statuses: ✅ 📄 🆕 ◐ 🔮 ❓ as defined. Priority reflects launch critic
 | BR-13 | Free core forever                                                                  | Brand promise                               | P0       | ✅ policy                       |
 | BR-14 | iOS companion only after Android stability window                                  | Risk sequencing                             | P2       | 🔮                              |
 | BR-15 | Documentation parity with code                                                     | Contributor/support accuracy                | P1       | 📄 debt open                    |
-| BR-16 | Support operating model defined pre-launch                                         | BO-6/BR-16 dependency                        | P0       | ❓                              |
+| BR-16 | Support operating model defined pre-launch                                         | BO-6/BR-16 dependency                       | P0       | ❓                              |
 
 ---
 
@@ -386,6 +390,7 @@ Empty/loading/error/success states exist across live screens via shared `LivePro
 **Server collections:** accounts/{uid} (+installations, occurrenceClaims, testClaims, occurrenceKeys, destinationGuards, claimRequests, armOutcomes, armBudgets), deletionTombstones, coordinationPresence, coordinationOperationFences, coordinationOperationReceipts(+Latest), globalControl/current; TTL `cleanupAt` ×13 groups; zero composite indexes.
 
 **Integrations:**
+
 - Google People API (read)
 - Credential Manager OAuth (contacts.readonly incremental)
 - Firebase Auth + App Check (Android attestation provider only — the backend consumes App Check tokens, it does **not** verify Play Integrity itself) + Callables (16 + 2 scheduled sweeps, region asia-south1)
@@ -449,20 +454,20 @@ Notification quiet-hours policy · theme persistence semantics · widget/shortcu
 
 # 17. RISKS & TECHNICAL DEBT
 
-| Risk/Debt Item                                      | Severity | Mitigation Status                                                                 |
-| --------------------------------------------------- | -------- | --------------------------------------------------------------------------------- |
-| `runBlocking` in BirthdayNativeModule (ANR risk)    | High     | Code fix needed; ANR budget already in perf evidence                              |
-| No crash telemetry blinds field diagnosis           | High     | Interim: Play Vitals + opt-in scrubbed counters [R]; then minimal SDK w/ review   |
-| OEM aggressive killers delay sends                  | High     | Diagnostics codes shipped ✅; battery-exemption UX decision open (F-45)           |
-| iOS protocol half-build confuses roadmap            | Med      | Explicit Phase-3 gate BO-7; remove dead client whitelist entry or implement       |
-| Docs drift misleads contributors/support            | Med      | BR-15 parity pass; adopt doc-drift checklist                                      |
-| Signing-authority key loss/compromise               | High     | Out-of-band custody process ❓; pin rotation procedure needed                     |
-| Carrier filtering in new markets                    | Med      | Budgets/pacing ✅; per-country matrix evidence required before launch             |
-| Gemini terms shift                                  | Low-Med  | policy-suspended fallback + operational gate ✅; contract watch                   |
-| Web tier misconfiguration                           | Low      | Fail-closed runtime-config gate ✅                                                |
-| Dev/staging flavors lack source sets                | Low      | Silent main inheritance — intentional ❓                                          |
-| Settings theme persistence unclear                  | Low      | UX polish needed                                                                  |
-| Single retry may under-deliver on flaky networks    | Med      | Deliberate anti-spam tradeoff; consider user-initiated "send again" affordance    |
+| Risk/Debt Item                                   | Severity | Mitigation Status                                                               |
+| ------------------------------------------------ | -------- | ------------------------------------------------------------------------------- |
+| `runBlocking` in BirthdayNativeModule (ANR risk) | High     | Code fix needed; ANR budget already in perf evidence                            |
+| No crash telemetry blinds field diagnosis        | High     | Interim: Play Vitals + opt-in scrubbed counters [R]; then minimal SDK w/ review |
+| OEM aggressive killers delay sends               | High     | Diagnostics codes shipped ✅; battery-exemption UX decision open (F-45)         |
+| iOS protocol half-build confuses roadmap         | Med      | Explicit Phase-3 gate BO-7; remove dead client whitelist entry or implement     |
+| Docs drift misleads contributors/support         | Med      | BR-15 parity pass; adopt doc-drift checklist                                    |
+| Signing-authority key loss/compromise            | High     | Out-of-band custody process ❓; pin rotation procedure needed                   |
+| Carrier filtering in new markets                 | Med      | Budgets/pacing ✅; per-country matrix evidence required before launch           |
+| Gemini terms shift                               | Low-Med  | policy-suspended fallback + operational gate ✅; contract watch                 |
+| Web tier misconfiguration                        | Low      | Fail-closed runtime-config gate ✅                                              |
+| Dev/staging flavors lack source sets             | Low      | Silent main inheritance — intentional ❓                                        |
+| Settings theme persistence unclear               | Low      | UX polish needed                                                                |
+| Single retry may under-deliver on flaky networks | Med      | Deliberate anti-spam tradeoff; consider user-initiated "send again" affordance  |
 
 ---
 
@@ -480,18 +485,18 @@ Notification quiet-hours policy · theme persistence semantics · widget/shortcu
 
 # 19. OPEN QUESTIONS
 
-| ID    | Question                                                                                              | Owner       |
-| ----- | ----------------------------------------------------------------------------------------------------- | ----------- |
-| OQ-01 | Final brand/store identity                                                                            | Product     |
-| OQ-02 | Crash-reporting vendor/threshold decision                                                             | Eng         |
-| OQ-03 | Gemini terms written confirmation (policy-suspended kill-switch verified in code)                     | Legal/Eng   |
-| OQ-04 | Launch countries/carrier matrix                                                                       | Product     |
-| OQ-05 | Minimum-age declaration                                                                               | Legal       |
-| OQ-06 | Support channel staffing                                                                              | Ops         |
-| OQ-07 | Deletion-SLA marketing number vs drain-window reality                                                 | Legal/Ops   |
-| OQ-08 | Dev/staging source-set intentionality                                                                 | Eng         |
-| OQ-09 | Settings theme persistence                                                                            | Eng/UX      |
-| OQ-10 | Notification preference UI scope                                                                      | Product/UX  |
+| ID    | Question                                                                          | Owner      |
+| ----- | --------------------------------------------------------------------------------- | ---------- |
+| OQ-01 | Final brand/store identity                                                        | Product    |
+| OQ-02 | Crash-reporting vendor/threshold decision                                         | Eng        |
+| OQ-03 | Gemini terms written confirmation (policy-suspended kill-switch verified in code) | Legal/Eng  |
+| OQ-04 | Launch countries/carrier matrix                                                   | Product    |
+| OQ-05 | Minimum-age declaration                                                           | Legal      |
+| OQ-06 | Support channel staffing                                                          | Ops        |
+| OQ-07 | Deletion-SLA marketing number vs drain-window reality                             | Legal/Ops  |
+| OQ-08 | Dev/staging source-set intentionality                                             | Eng        |
+| OQ-09 | Settings theme persistence                                                        | Eng/UX     |
+| OQ-10 | Notification preference UI scope                                                  | Product/UX |
 
 ---
 
@@ -515,6 +520,7 @@ This SSOT.md consolidates the following documents:
 - **VALIDATION_REPORT.md** — Quality gate results incorporated; report retained as evidence snapshot
 
 **Documents to Remove After SSOT Adoption:**
+
 - PRD.md (superseded)
 - BRD.md (superseded)
 - PROJECT_ABOUT.md (contains inaccuracies)
@@ -523,35 +529,36 @@ This SSOT.md consolidates the following documents:
 - DESIGN.md (pointer only)
 
 **Documents to Retain:**
+
 - README.md (repository entry point, update to reference SSOT.md)
 - SECURITY.md (security policy)
 - DEVELOPER_GUIDE.md (workflow reference)
 - QUICKSTART.md (quickstart reference)
 - docs/OPERATIONS_RUNBOOK.md (operational procedures)
-- docs/*_EVIDENCE.md (release evidence templates/schemas)
+- docs/\*\_EVIDENCE.md (release evidence templates/schemas)
 - stitch/SCREEN_MANIFEST.md (design artifact)
 - stitch/IMPLEMENTATION_CROSSWALK.json (design-to-code mapping)
 - stitch/MASTER_STITCH_PROMPT_LIBRARY.md (Stitch MCP reference)
-- contracts/*.json (policy contracts)
-- tools/*.mjs (verification scripts)
+- contracts/\*.json (policy contracts)
+- tools/\*.mjs (verification scripts)
 
 ---
 
 # 21. TRACEABILITY MATRIX
 
-| Business Req | Features      | User Story | Primary Code Modules                                                                                                    | Journey | KPI                  |
-| ------------ | ------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------- | ------- | -------------------- |
-| BR-01        | F-09…13       | US-03/04   | domain/approvals/model.ts; AutomationPort.prepare/confirmApprovals; LiveBatchApprovalScreen.tsx                         | J-1     | Approval rate [R]    |
-| BR-02        | F-18/19/21/22 | US-05/07   | AndroidAutomationOrchestrator.kt; backend services/controlPlane.ts; SubscriptionBindingPolicy.kt                        | J-2     | Duplicates=0 ✅      |
-| BR-03        | F-22          | US-06      | SmsOutcomeNetworkProcessor.kt; mobile-release-scenario-evidence.schema.json                                             | J-2     | Rating [R]           |
-| BR-04/07     | F-41          | —          | android/app/build.gradle flavor blocks; validate-distribution-evidence.mjs                                              | P-6     | Gate pass rate       |
-| BR-05/06     | F-31…36/43    | US-02/08   | LivePrivacyScreen.tsx; PRIVACY_ACTION_KINDS; backend deletionOrchestrator.ts; hosting/src/\*                            | J-5     | Deletion SLA         |
-| BR-08        | F-48[R]       | —          | (absent — to build)                                                                                                     | J-1     | Funnel % [R]         |
-| BR-09        | F-26/28       | —          | LiveAttentionScreen.tsx; LiveDiagnosticsScreen.tsx; WorkerAttentionPolicy.kt                                            | J-3     | Recovery ≥90%        |
-| BR-10        | F-38          | US-09      | localization/liveResources.ts; e2e/maestro/03-hindi-localization.yaml                                                   | J-1     | hi adoption [R]      |
-| BR-11        | F-39          | US-10      | design-system/\*; e2e 04-large-text-primary-action.yaml                                                                 | J-1     | A11y matrix ✅/pending |
-| BR-14        | F-50          | —          | core/model/DeliveryPlatform.kt; IOSComposerReservationRecheckPolicy; ttl iosComposerReservations                        | —       | Phase-3 gate         |
-| BR-16        | —             | —          | docs/OPERATIONS_RUNBOOK.md (exists)                                                                                     | P-3     | Tickets [R]          |
+| Business Req | Features      | User Story | Primary Code Modules                                                                             | Journey | KPI                    |
+| ------------ | ------------- | ---------- | ------------------------------------------------------------------------------------------------ | ------- | ---------------------- |
+| BR-01        | F-09…13       | US-03/04   | domain/approvals/model.ts; AutomationPort.prepare/confirmApprovals; LiveBatchApprovalScreen.tsx  | J-1     | Approval rate [R]      |
+| BR-02        | F-18/19/21/22 | US-05/07   | AndroidAutomationOrchestrator.kt; backend services/controlPlane.ts; SubscriptionBindingPolicy.kt | J-2     | Duplicates=0 ✅        |
+| BR-03        | F-22          | US-06      | SmsOutcomeNetworkProcessor.kt; mobile-release-scenario-evidence.schema.json                      | J-2     | Rating [R]             |
+| BR-04/07     | F-41          | —          | android/app/build.gradle flavor blocks; validate-distribution-evidence.mjs                       | P-6     | Gate pass rate         |
+| BR-05/06     | F-31…36/43    | US-02/08   | LivePrivacyScreen.tsx; PRIVACY_ACTION_KINDS; backend deletionOrchestrator.ts; hosting/src/\*     | J-5     | Deletion SLA           |
+| BR-08        | F-48[R]       | —          | (absent — to build)                                                                              | J-1     | Funnel % [R]           |
+| BR-09        | F-26/28       | —          | LiveAttentionScreen.tsx; LiveDiagnosticsScreen.tsx; WorkerAttentionPolicy.kt                     | J-3     | Recovery ≥90%          |
+| BR-10        | F-38          | US-09      | localization/liveResources.ts; e2e/maestro/03-hindi-localization.yaml                            | J-1     | hi adoption [R]        |
+| BR-11        | F-39          | US-10      | design-system/\*; e2e 04-large-text-primary-action.yaml                                          | J-1     | A11y matrix ✅/pending |
+| BR-14        | F-50          | —          | core/model/DeliveryPlatform.kt; IOSComposerReservationRecheckPolicy; ttl iosComposerReservations | —       | Phase-3 gate           |
+| BR-16        | —             | —          | docs/OPERATIONS_RUNBOOK.md (exists)                                                              | P-3     | Tickets [R]            |
 
 ---
 
