@@ -162,3 +162,9 @@ SEND_SMS policy, installer, carrier, or legal suspension
 ## Full Documentation
 
 Complete operating procedures, recovery checklists, and scenario details are maintained in [`SSOT.md`](SSOT.md) section B.9 (Operations Runbook Key Procedures).
+
+## Native dependency advisory or scan-service incident
+
+1. Treat any native dependency advisory or scan-service incident as a stop-new-arms event if it applies to an active release tier.
+2. Confirm whether the advisory impacts iOS, Android, or both, and pause the affected platform(s).
+3. Do not assume zero reported vulnerabilities means the system is fully secure.
