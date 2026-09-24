@@ -1,7 +1,0 @@
-{
-  "$schema": "./mobile-release-scenario-evidence.schema.json",
-  "schemaVersion": 2,
-  "evidenceKind": "replace-before-release",
-  "evidenceSetId": "replace-before-release",
-  "rows": []
-}
