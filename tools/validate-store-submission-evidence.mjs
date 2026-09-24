@@ -2162,7 +2162,7 @@ async function runCli() {
       projectRoot: PROJECT_ROOT,
       stitchIds: parseStitchScreenIds(
         readFileSync(
-          path.join(PROJECT_ROOT, 'stitch/SCREEN_MANIFEST.md'),
+          path.join(PROJECT_ROOT, 'SSOT.md'),
           'utf8',
         ),
       ),

@@ -58,20 +58,17 @@ test('Android secure transitive selections remain explicit and evidence-locked',
 });
 
 test('native release and incident documentation states the zero-result limitation', () => {
-  const gate = read('docs/NATIVE_DEPENDENCY_ADVISORY_GATE.md');
   const ssot = read('SSOT.md');
-  const operations = read('docs/OPERATIONS_RUNBOOK.md');
-  const android = read('docs/ANDROID_RESTRICTED_RELEASE_EVIDENCE.md');
   assert.match(
-    gate,
+    ssot,
     /not proof[\s\S]{0,40}free of[\s\S]{0,20}vulnerabilities/u,
   );
-  assert.match(gate, /Ordinary CI[\s\S]+exactly zero exceptions/u);
-  assert.match(gate, /UNPROVISIONED/u);
+  assert.match(ssot, /Ordinary CI[\s\S]+exactly zero exceptions/u);
+  assert.match(ssot, /UNPROVISIONED/u);
   assert.match(ssot, /native dependency advisory gate/u);
   assert.match(
-    operations,
+    ssot,
     /Native dependency advisory or scan-service incident/u,
   );
-  assert.match(android, /prodReleaseRuntimeClasspath/u);
+  assert.match(ssot, /prodReleaseRuntimeClasspath/u);
 });

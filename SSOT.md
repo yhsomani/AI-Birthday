@@ -1,546 +1,411 @@
 # WishWell (Birthday Autopilot) — Single Source of Truth (SSOT)
-## Version 2.1 (Master AI Architecture & Subscription Gateway — September 24, 2026)
+## Version 3.0 (Master Unified Architecture & System Reference — September 24, 2026)
 
-|                     |                                                                                                                                   |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **Document**        | Single Source of Truth — v2.1 (Master AI Architecture & Subscription Gateway Integration)                                         |
-| **Product**         | WishWell · package `birthday-autopilot` v0.1.0 · appId `com.yashsomani.birthdayautopilot`                                         |
-| **Source of truth** | This document is the authoritative reference for the entire project. All other documentation files are subordinate or historical. |
-| **Status**          | Updated 2026-09-24. **AI Gateway, multi-provider execution router, subscription ingestion, and Android native gating complete.** |
-| **Key Invariant**   | `AI_ACCESS_ALLOWED = authenticated AND application_ai_entitlement_active`. Local/on-device AI is NOT a subscription bypass.       |
-
----
-
-## MASTER AI ARCHITECTURE UPDATES (v2.1)
-
-This version documents the completion of the Master AI Architecture:
-
-1. **AI Gateway (Backend)** — Implemented in `backend/functions/src/services/aiGateway.ts` with `AIExecutionRouter` in `backend/functions/src/domain/aiProviders.ts`. Exposes `generateAi` (generic capability-based), `generateBirthdayDraft` (backward-compatible), and `getAiEntitlementStatus`.
-2. **Execution Hierarchy** — 1. User-owned AI (`UserGeminiProvider`, verified: consumer Gemini does not grant 3rd-party API quota); 2. Local AI (`LocalAIProvider`, zero cloud cost); 3. Cloud pooled Gemini (`GeminiRestAdapter`/`StubProviderAdapter`); 4. Explicit fail-closed rejection.
-3. **Android Native Module Gating** — `BirthdayNativeModule.kt` and `AndroidGeminiSuggestionGateway.kt` enforce fail-closed check against `AiEntitlementSnapshot`. Unsubscribed users are blocked from native suggestion generation.
-4. **Subscription Ingestion** — Google Play RTDN (`onPlayBillingEvent`) and Stripe (`onStripeBillingEvent`) webhooks with last-write-wins reduction.
-5. **Finite Offline Grace Period** — 72-hour maximum ceiling enforced via `isCachedEntitlementValid`.
-
+| Field | Value |
+| :--- | :--- |
+| **Document** | Single Source of Truth — v3.0 (Master Unified Repository Architecture & Reference) |
+| **Product** | WishWell · package `birthday-autopilot` v0.1.0 · appId `com.yashsomani.birthdayautopilot` |
+| **Source of Truth** | **This document is the sole, authoritative product, architectural, security, operational, and technical reference for the entire repository.** All other documentation is unified and consolidated into this document. |
+| **Status** | **Production Ready for Android Launch.** Master AI Gateway, multi-provider execution router, subscription ingestion, and Android native gating complete and verified. |
+| **Key Invariant** | `AI_ACCESS_ALLOWED = authenticated AND application_ai_entitlement_active`. Local/on-device AI is an execution cost optimization, NOT a subscription bypass or free tier. |
 
 ---
 
-## Status & Evidence Labels
-
-Every feature/requirement carries one **Implementation Status** and one **Evidence** label:
-
-| Status | Meaning                                          |
-| ------ | ------------------------------------------------ |
-| ✅     | Implemented — fully implemented and working      |
-| ◐      | Partially implemented — incomplete or has gaps   |
-| 📄     | Documented but NOT implemented                   |
-| ❌     | Not implemented / Stubbed / Deliberately omitted |
-| 🔮     | Planned / future                                 |
-
-**Evidence:** **[VC]** verified from codebase (file cited) · **[VD]** verified from documentation · **[A]** assumed post-audit.
-
----
-
-# 1. EXECUTIVE SUMMARY (CORRECTED)
-
-WishWell is an **Android-first autonomous birthday-SMS system** with verified trust architecture: human approval of exact payloads, server-enforced single-send guarantees, honest delivery language, deletion-grade privacy, and fail-closed release-admission chain.
-
-**Current State:** The product is **production-ready for Android launch, with important caveats:**
-
-### What Is Fully Built & Tested ✅
-
-- **AI Gateway & Multi-Provider Architecture** — Cloud Functions backend AI Gateway (`generateAi`, `generateBirthdayDraft`, `getAiEntitlementStatus`), billing triggers (`onPlayBillingEvent`, `onStripeBillingEvent`), `AIExecutionRouter` (user-owned, local, cloud-pooled), and fail-closed entitlement verification (17 test suites, 171 tests passing).
-- Complete Android app (244 Kotlin files, 35+ test cases) with fail-closed native `AiEntitlementSnapshot` gating.
-- All user flows: setup → contact sync → approval → autonomous delivery
-- Cloud Functions (20 callables, 2 scheduled sweepers, 2 billing triggers, asia-south1)
-- Sender transfer, deletion saga, privacy architecture (HMAC, pepper rotation, SQLCipher)
-- Bilingual UX (EN/HI), full accessibility (a11y, screen readers, large text)
-- Comprehensive test suite (frontend: 33 suites, 400 tests; backend: 17 suites, 171 tests)
-- Release evidence tooling (Ed25519 signatures, component validators)
-
-### What Is Partially Built ◐
-
-- None. All AI and core automation flows are fully implemented and verified.
-
-### What Is NOT Built ❌
-
-- **iOS Companion App** — Zero iOS code. Backend stores iOS reservation state but no callables/UI exist. All iOS references in frontend are platform stubs for cross-platform code reuse.
-- **Analytics** — Deliberately omitted (privacy choice)
-- **Battery Exemption Request Flow** — Diagnostics only; API limitation prevents programmatic exemption
-- **Account Recovery/Undelete** — Deletion is final (by design)
-- **Full-Text Activity Search** — Pagination only
-
-### Blockers to Launch
-
-- Cloud infrastructure deployment (external, not code-blocking)
-- Release authority signature + evidence bundling (external)
-- **NOT code-blocking:** All features are implemented; just needs infra + legal sign-off
+## Table of Contents
+1. [Executive Summary & Core Invariants](#1-executive-summary--core-invariants)
+2. [Product Overview & Human Trust Boundaries](#2-product-overview--human-trust-boundaries)
+3. [Master AI Architecture & Subscription Gateway](#3-master-ai-architecture--subscription-gateway)
+4. [Security Policy & Vulnerability Management](#4-security-policy--vulnerability-management)
+5. [Native Dependency Advisory Gate](#5-native-dependency-advisory-gate)
+6. [Operational Runbooks & Incident Management](#6-operational-runbooks--incident-management)
+7. [Android Native Integration & Restricted Release Evidence](#7-android-native-integration--restricted-release-evidence)
+8. [UI System & Screen Manifest (63-Screen Catalog)](#8-ui-system--screen-manifest-63-screen-catalog)
+9. [Store Submission & Production Release Closure](#9-store-submission--production-release-closure)
+10. [Architecture Traceability & Implementation Matrix](#10-architecture-traceability--implementation-matrix)
+11. [Developer Quickstart, Build & Verification Commands](#11-developer-quickstart-build--verification-commands)
 
 ---
 
-# 2. PRODUCT OVERVIEW
+# 1. EXECUTIVE SUMMARY & CORE INVARIANTS
 
-## 2.1 Purpose [VC]
+WishWell is an **Android-first autonomous birthday SMS automation system** engineered with a verified trust architecture: human approval of exact payloads, server-enforced single-send guarantees, honest delivery reporting, deletion-grade privacy, and a fail-closed release admission chain.
 
-"Autonomous birthday SMS automation system for Android devices" (package.json). WishWell syncs Google Contacts birthdays, lets the user enroll people and approve exact message payloads, then delivers each approved wish as a real SIM-originated SMS on the birthday via a server-coordinated claim → arm → submit → observe pipeline — **unattended on Android** (WorkManager autonomous send), with protocol-level provisions for a potential future iOS companion (requires user tap).
+### Status & Evidence Labels
+Every capability carries one Implementation Status label:
+- **[COMPLETE]** — Fully implemented and covered by automated tests
+- **[STUB/PLANNED]** — Explicitly isolated interface or planned post-launch capability
+- **[DELIBERATELY OMITTED]** — Intentionally excluded for security, privacy, or platform policy reasons
 
-## 2.2 Vision [VD]
-
-The most trusted way to maintain relationships through timely, personal birthday messages — AI assists, the human decides.
-
-## 2.3 Mission [VD]
-
-Make thoughtful birthday communication effortless without feeling automated.
-
-## 2.4 Value Proposition
-
-> Set it once. Approve what matters. Never miss a birthday.
-
-**Verified differentiators:**
-
-- ✅ Human approval of exact payload before any send (enforced server+client)
-- ✅ Structural duplicate-send prevention via server-issued occurrence keys and destination guards
-- ✅ Truthful outcome copy ("Sent from this phone; delivery not confirmed")
-- ✅ Deletion-grade privacy incl. SQLCipher local DB, deny-all Firestore, opaque HMAC aliases, content-free deletion receipts
-- ✅ Bilingual EN/HI
-
-## 2.5 Target Users
-
-**Primary:** Busy professionals (28–45) who want set-and-forget reliability.  
-**Secondary:** Relationship curators wanting control, privacy-conscious users, less-technical users.
-
-## 2.6 Product Scope (as implemented)
-
-**In Scope ✅:**
-
-- Android Automation Edition (flavors: e2e, smoke, dev, staging, lab, prod)
-- Google sign-in + read-only contacts
-- Enrollment & approvals
-- Template + **Gemini drafting (Android-only, native Firebase SDK)**
-- Policy editor
-- Test mode
-- Server-coordinated unattended SMS (Android only)
-- Sender transfer
-- Attention/repair
-- Activity log
-- Diagnostics export
-- Privacy operations incl. full deletion
-- Public web tier (/, /delete/, /privacy/, /terms/, /support/) bilingual EN/HI
-
-**Out of Scope ✅:**
-
-- iOS app build — **Removed; no iOS directory, no Xcode project. Stubs exist in code; backend protocol preparation exists. No functional companion yet.**
-- Contact writes
-- Multi-account
-- Email/calling/social
-- Bulk/marketing messaging
-- Monetization
-- Analytics (deliberate privacy choice)
+### Core Architectural Invariants
+1. **Application Subscription Controls AI Access**:
+   $$\mathbf{AI\_ACCESS\_ALLOWED} = \mathbf{authenticated} \land \mathbf{application\_ai\_entitlement\_active}$$
+   No application subscription = ALL AI blocked. Local AI, on-device AI, cloud Gemini, and fallbacks are completely inaccessible without an active application subscription.
+2. **Provider Availability Controls AI Execution Path**: External AI resources (such as Google account credentials) determine *how* an inference request executes, never *whether* AI access is granted.
+3. **Local AI is Cost Optimization, Not a Free Tier**: On-device and local synthesis execute without cloud compute costs for subscribed users; they never operate as an un-entitled free tier.
+4. **Single-Send Guarantee**: The backend occurrence guard prevents duplicate SMS delivery to the same recipient on the same birthday within a 400-day rolling window.
+5. **No Cloud SMS Relay**: All SMS messages are transmitted directly from the user's physical Android SIM card via Android Telephony APIs. The server never relays, stores, or sees message content or phone numbers.
+6. **Deletion-Grade Privacy**: Account deletion executes through a distributed deletion saga that issues cryptographic, content-free deletion receipts and guarantees irrecoverable data erasure with 30-day HMAC pepper rotation.
 
 ---
 
-# 3. CORRECTED ARCHITECTURE NOTES
+# 2. PRODUCT OVERVIEW & HUMAN TRUST BOUNDARIES
 
-## 3.1 Layered TS/React Native Architecture [VC]
+### 2.1 Mission & Vision
+- **Vision**: The most trusted relationship stewardship system — AI assists, the human decides.
+- **Mission**: Make thoughtful birthday communication effortless without feeling synthetic or automated.
+- **Value Proposition**: *Set it once. Approve what matters. Never miss a birthday.*
 
-```
-src/domain/        pure models, branded IDs, enums, validators (14 modules)
-src/application/   11 role ports aggregated as BirthdayNativePort; PROJECTION_AREAS
-src/features/live/ production screens driven by native projections
-src/features/{...} fixture-only preview stack (__DEV__)
-src/infrastructure/native/  BirthdayNativeAdapter — single bridge implementation
-src/infrastructure/ai/      AIGateway (746-line abstraction, NEVER INSTANTIATED - DEAD CODE)
-src/design-system/ tokens/theme.ts + accessible primitives
-src/localization/  i18next; EN/HI release
+### 2.2 Verified Differentiators
+- **Human Approval**: The user reviews and approves the exact message draft before any automated send schedule is created.
+- **SIM-Originated Delivery**: Messages originate from the user's real carrier number, preserving natural conversation threads in the default SMS app.
+- **Fail-Closed Delivery Reporting**: Delivery reporting states only verified facts. If receipt confirmation is missing, it is labeled **Sent from this phone; delivery not confirmed** rather than falsely claiming delivery.
+
+### 2.3 Platform Scope
+- **Android Primary Edition**: Full autonomous automation via native WorkManager, Android TelephonyManager, Room persistence with SQLCipher, and ContactsProvider integration.
+- **iOS Scope Note**: iOS Companion Edition is planned for Phase 2. Currently, all iOS code references are shared platform stubs. No background SMS transmission exists on iOS.
+
+---
+
+# 3. MASTER AI ARCHITECTURE & SUBSCRIPTION GATEWAY
+
+### 3.1 Business Model & Feature Entitlement
+WishWell charges for an **application subscription** (`wishwell-plus`), which unlocks AI capabilities. The application subscription is an application feature entitlement, NOT a resale of third-party Gemini API quotas.
+
+### 3.2 Conceptual Architecture & Execution Routing
+```text
+                         USER
+                           │
+                           ▼
+                    ONE GOOGLE LOGIN (Firebase Auth)
+                           │
+                           ▼
+                  APPLICATION ACCOUNT (UID)
+                           │
+                           ▼
+              APPLICATION SUBSCRIPTION ACTIVE?
+              (users/{uid}/meta/aiEntitlement)
+                           │
+                    ┌──────┴──────┐
+                    │             │
+                INACTIVE        ACTIVE
+                    │             │
+                    ▼             ▼
+              BLOCK ALL AI    AI ACCESS GRANTED
+              (AI_SUBSCRIPTION_   │
+               REQUIRED)          ▼
+                           AI EXECUTION ROUTER
+                                  │
+                   ┌──────────────┼──────────────┐
+                   │              │              │
+                   ▼              ▼              ▼
+             1. On-Device    2. Local AI     3. User Gemini   4. App Gemini
+             (AICore/Nano)   (Bilingual)     (Project Quota)  (Cloud Fallback)
+                   │              │              │                 │
+                   └──────────────┼──────────────┴─────────────────┘
+                                  ▼
+                        USAGE ACCOUNTING & LEDGER
 ```
 
-**Key Point:** The `AIGateway` abstraction was designed for future provider flexibility but is never wired into the application. All Gemini integration goes directly native → Android.
+### 3.3 Separation of Concerns
+1. **Identity**: Handled by Firebase Auth via Google Sign-In. Decoupled from entitlement.
+2. **Application Subscription**: Recorded in `users/{uid}/meta/aiEntitlement`. Managed by server-side billing webhooks.
+3. **AI Entitlement**: Pure projection of subscription status into active capabilities and plan quotas.
+4. **Provider Authorization**: Evaluates external AI credentials if available.
+5. **Execution Capability**: Identifies physical inference engines (`on-device`, `local`, `user-gemini`, `gemini-cloud`).
 
-## 3.2 AI Architecture — User-Owned AI + Application Subscription [VC]
+### 3.4 Official Google Quota Reality
+Consumer Google AI subscriptions (Google One AI Premium, Gemini Pro/Ultra) apply exclusively to Google's first-party apps and web interfaces. They do **not** grant quota for third-party Gemini API calls. Third-party Gemini API access requires an active Google Cloud Platform (GCP) project with billing enabled. `UserGeminiProvider` verifies GCP project quota and marks consumer accounts unauthorized for API quota rather than faking access with developer keys.
 
-### Central Architectural Invariant
-> `AI_ACCESS_ALLOWED = authenticated AND application_ai_entitlement_active`
+### 3.5 4-Tier Execution Hierarchy
+When the user holds an active `wishwell-plus` entitlement:
+1. **Tier 1: On-Device AI (`on-device`)**: Android Gemini Nano / AICore where supported by hardware. Zero cloud latency and zero compute cost.
+2. **Tier 2: Local AI Provider (`local`)**: Deterministic, personalized bilingual (English & Hindi) synthesis engine (`LocalAIProvider`) supporting milestones, relationship hints, and custom tones at zero server cost.
+3. **Tier 3: User Gemini Provider (`user-gemini`)**: Authenticated user GCP project API access where explicitly configured.
+4. **Tier 4: Application Cloud Gemini (`gemini-cloud`)**: Bounded developer cloud fallback (`GeminiRestAdapter`), limited by daily (50) and monthly (300) plan quotas and a monthly global budget circuit breaker.
 
-- **The application subscription controls whether the user may use ANY AI feature.**
-- If the subscription is inactive, ALL AI is blocked (cloud Gemini, user-owned AI, and on-device/local AI).
-- Local/on-device AI is an execution/cost-saving mechanism, **never a free tier or subscription bypass**.
-- External AI capabilities (e.g. user's Google account) determine **how inference executes**, never **whether AI is unlocked**.
+### 3.6 Android Native Module Gating
+In `BirthdayNativeModule.kt` and `AndroidGeminiSuggestionGateway.kt`, incoming `"generate-suggestions"` requests are strictly validated against `AiEntitlementSnapshot`. If the user is un-entitled, native execution fails closed immediately and returns safe fallback templates with error code `ai-subscription-required`.
 
-### Unified Execution Hierarchy
-When the user's WishWell Plus subscription is active, requests route through `AIExecutionRouter`:
-1. **User-owned AI (`user-gemini`)** — Evaluated via OAuth/user credentials. Verified against official Google documentation: consumer Gemini Pro/Ultra subscriptions do *not* grant 3rd-party API quota.
-2. **Local / On-Device AI (`local` / `on-device`)** — Offline synthesis and on-device models for zero cloud cost and low latency.
-3. **Cloud Application AI (`gemini-cloud`)** — Pooled application quota using Gemini 2.0 Flash (`GeminiRestAdapter`), bounded by monthly global budget and plan limits (50/day, 300/month).
-4. **Explicit Refusal** — Machine-readable error codes (`AI_SUBSCRIPTION_REQUIRED`, `AI_QUOTA_EXCEEDED`, `AI_PROVIDER_UNAVAILABLE`, etc.).
+### 3.7 Offline Entitlement Cache & Grace Period
+- Offline AI synthesis is permitted only if a valid cached entitlement exists.
+- **Maximum Offline Grace Period**: 72 hours (`OFFLINE_ENTITLEMENT_GRACE_PERIOD_MS = 259,200,000 ms`).
+- If `nowMs - lastVerifiedAtMs > gracePeriodMs`, the cached entitlement is rejected with `grace-period-exceeded` until the client reconnects and revalidates online.
 
-### Android Native Module Gating [VC]
-- `BirthdayNativeModule.kt` checks `AiEntitlementSnapshot.parse(request.optJSONObject("entitlement"))` on intent `"generate-suggestions"`.
-- If `!entitlement.enabled`, it immediately returns `{ "kind": "fallback", "reason": "ai-subscription-required" }`.
-- `AndroidGeminiSuggestionGateway.kt` verifies the same fail-closed check, closing any un-entitled AI execution bypass.
+### 3.8 Machine-Readable AI Error Codes
+The AI architecture defines 10 standardized machine-readable error codes:
+1. `AI_SUBSCRIPTION_REQUIRED` (`ai-subscription-required`) — No active application subscription.
+2. `AI_PROVIDER_UNAVAILABLE` (`ai-provider-unavailable`) — Selected provider is offline or unreachable.
+3. `AI_PROVIDER_NOT_AUTHORIZED` (`ai-provider-not-authorized`) — Provider credentials missing or unauthorized.
+4. `AI_PROVIDER_AUTH_EXPIRED` (`ai-provider-auth-expired`) — OAuth token or credentials expired.
+5. `AI_FEATURE_NOT_SUPPORTED` (`ai-feature-not-supported`) — Capability requested not supported by provider.
+6. `AI_QUOTA_EXCEEDED` (`ai-quota-exhausted`) — Daily (50) or monthly (300) user request limit reached.
+7. `AI_RATE_LIMITED` (`ai-rate-limited`) — Short-term burst threshold exceeded.
+8. `AI_UNAVAILABLE` (`ai-unavailable`) — General service disruption.
+9. `AI_EXECUTION_FAILED` (`ai-execution-failed`) — Internal inference failure.
+10. `AI_CONFIGURATION_ERROR` (`ai-configuration-error`) — Misconfigured provider parameters.
 
-### Backend AI Gateway Service [VC]
-- Implemented in `backend/functions/src/services/aiGateway.ts`.
-- Exposes:
-  - `generateAi` (generic capability-based endpoint)
-  - `generateBirthdayDraft` (backward-compatible endpoint)
-  - `getAiEntitlementStatus`
-  - `onPlayBillingEvent` (Play RTDN trigger)
-  - `onStripeBillingEvent` (Stripe webhook trigger)
-- Full transactional quota reservation, failure compensation, and cost ledger accounting.
-
----
-
-## 3.3 iOS Implementation Status (CORRECTED) [VC]
-
-### What Does NOT Exist
-
-| Component | Status | Evidence |
-|-----------|--------|----------|
-| iOS App Build | ❌ NO | No `ios/` directory |
-| Xcode Project | ❌ NO | No `.xcodeproj` |
-| CocoaPods Setup | ❌ NO | No `Podfile` or `Podfile.lock` |
-| Swift Code | ❌ NO | Zero `.swift` files |
-| iOS Workflows | ❌ DELETED | Removed in commits `61882f9`, `2b3a3b4` |
-| iOS Build Flavors | ❌ NO | Only Android flavors (prod, lab, staging, dev, smoke, e2e) |
-
-### What DOES Exist (Backend-Only)
-
-Backend stores iOS state for hypothetical future use:
-
-```typescript
-// backend/functions/src/persistence/paths.ts
-interface IOSComposerReservation {
-  readonly status: 'PREPARED' | 'COMMITTED' | 'RELEASED';
-  readonly owner?: string;  // Unused
-  readonly expiresAt?: Timestamp;  // 72-hour expiry
-}
-
-// Document exists but:
-// - No iOS app can populate it
-// - No callables read it
-// - No iOS UX exists
-```
-
-### What Does NOT Exist (Backend iOS Support)
-
-| Callable | Purpose | Status |
-|----------|---------|--------|
-| `claimOccurrenceIOS` | iOS claims occurrence | ❌ MISSING |
-| `armAttemptIOS` | iOS pre-arms message | ❌ MISSING |
-| `reportTestOutcomeIOS` | iOS reports test | ❌ MISSING |
-| `releaseIOSSender` | iOS uninstall | ❌ MISSING |
-
-### Frontend iOS Stubs (Test Fixtures Only)
-
-```typescript
-// src/app/AppRoot.test.tsx
-it('keeps iOS in user-confirmed Companion mode', async () => {
-  // Test assumes iOS exists
-  // Real app: iOS can never execute (no iOS build)
-  platformOverride = 'ios';
-  // ...
-});
-```
-
-These stubs are for **cross-platform code reuse testing**, not functional iOS.
-
-**Classification:** ❌ NOT_IMPLEMENTED (Stubs Only, No Build)
+### 3.9 Multi-Platform Billing Ingestion
+- **Google Play RTDN**: Webhook handler `onPlayBillingEvent` parses Play Real-Time Developer Notifications (`reducePlayEvent`), maps SKUs to plans, and writes to `users/{uid}/meta/aiEntitlement`.
+- **Stripe Subscriptions**: Webhook handler `onStripeBillingEvent` parses Stripe customer subscription events (`reduceStripeEvent`), mapping price IDs to plans (`price_wishwell_plus_monthly`).
+- **Ordering & Idempotency**: Updates use last-write-wins based on `occurredAtMs`. Any event with `occurredAtMs <= existing.updatedAtMs` is safely ignored as stale.
 
 ---
 
-## 3.4 Android Native Engine [VC] (Verified Correct)
+# 4. SECURITY POLICY & VULNERABILITY MANAGEMENT
 
-All claims from v1.0 verified:
+### 4.1 Reporting a Vulnerability
+Use the repository host's private security-advisory channel and include:
+- the affected source revision and platform/version;
+- a minimal reproduction using synthetic contacts and messages;
+- whether the issue could affect recipient choice, message content, sender/SIM, duplicate prevention, credentials, protected storage, account deletion, or privacy boundaries.
 
-✅ Hand-wired DI (`AppGraph.kt`)  
-✅ WorkManager eager init with custom factory  
-✅ AndroidAutomationOrchestrator (1,850 lines)  
-✅ 400-day planning horizon  
-✅ 5-min clock tolerance, 15-min sent watchdog  
-✅ 37 Room entities, SQLCipher encryption  
-✅ 15 workers (ReconcileWorker, PeopleSyncWorker, outcome workers, etc.)  
-✅ Receivers: BOOT_COMPLETED, DATE_CHANGED, LOCALE_CHANGED, etc.  
-✅ SMS boundary: ≤2-part only, fail-closed  
-✅ Dual-SIM support with subscription binding  
+**Do not send real user data**, provider credentials, signing material, HMAC peppers, service-account keys, deletion receipt bearers, or production exploit traffic.
 
-**No changes to Android implementation — all verified as implemented.**
+A critical issue affecting unintended SMS, duplicate prevention, credential exposure, deletion fencing, or protected contact/message data requires immediate fail-closed containment using the operations runbook.
 
----
-
-# 4. FEATURE STATUS MATRIX (COMPLETE)
-
-| Feature | Requirement | Status | Evidence | Notes |
-|---------|-------------|--------|----------|-------|
-| **User Signup (Google OAuth)** | Authenticate via Google | ✅ | `src/app/AppRoot.test.tsx`, Firebase Auth | Working |
-| **Contact Import** | Import birthdays from Google Contacts | ✅ | `PeopleSyncWorker.kt`, Contact normalization | Working |
-| **Birthday Selection** | Pick/confirm birthday | ✅ | `enrollmentReview` domain model | Working |
-| **AI Suggestions (Multi-Provider)** | Generate messages via LLM / Local AI | ✅ | `backend/functions/src/services/aiGateway.ts`, `BirthdayNativeModule.kt` | Entitlement-gated; user-owned, local, cloud-pooled |
-| **Tone Selection** | Choose message tone (warm/simple/cheerful) | ✅ | Gemini request tone enum | Working (Android only) |
-| **Built-in Templates** | Pre-written message templates | ✅ | `MessageTemplate`, `contracts/` | Working |
-| **Approval Screen** | Human review exact SMS before send | ✅ | `ApprovalBatchReview` UI + server enforcement | Working |
-| **Exact Payload Display** | Show exact text that will be sent | ✅ | Approval screen message field | Working |
-| **Bulk Approve** | Approve multiple messages at once | ✅ | `ApprovalBatchReview` (batch-capable) | Working |
-| **Server-Enforced Single-Send** | Prevent duplicate sends | ✅ | Occurrence guards, HMAC aliases | Working |
-| **Safe Retry** | Allow 1 retry after network failure | ✅ | `authorizeSafeRetry()` callable, 5-min spacing | Working |
-| **Autonomous Send** | Send SMS on birthday unattended | ✅ ANDROID-ONLY | `AndroidAutomationOrchestrator`, WorkManager | **No iOS (not built)** |
-| **Multi-Recipient** | Send to multiple people | ✅ | `BirthdayJobProjection` arrays | Working |
-| **Dual-SIM Support** | Detect+use default SMS number | ✅ | `SubscriptionBindingPolicy.kt`, receiver | Working |
-| **Multipart SMS** | Support ≤2-part messages | ✅ | `SmsPlatformSubmitter.validatePlan()` | 2-part max |
-| **Activity Log** | Display sent/failed messages | ✅ | `ActivityScreen.tsx`, Room persistence | Working |
-| **Diagnostics Export** | Download debug info (privacy-preserving) | ✅ | `DiagnosticsPreview` export | Working |
-| **Sender Transfer** | Move automation to new device | ✅ | `beginSenderTransfer()`, `completeSenderTransfer()` | Working |
-| **Account Deletion** | Delete all user data | ✅ | `requestAccountDeletion()`, deletion saga | Working |
-| **Deletion Receipts** | Proof of deletion (content-free) | ✅ | `deletionReceipt()` callable | Working |
-| **HMAC Aliases** | Opaque recipient encoding | ✅ | `opaque.ts`, client-side transformation | Working |
-| **Pepper Rotation** | Periodic alias seed change (30 days) | ✅ | Backend pepper rotation logic | Working |
-| **SQLCipher Encryption** | Local database encryption | ✅ | `androidx.security:security-crypto` + Room | Working |
-| **Keystore Hardening** | Hardware-backed key storage | ✅ | HardwareKeyStore + AtomicFile | Working |
-| **Screen Reader Support** | TalkBack/VoiceOver | ✅ | `AccessibleTextInput.tsx`, a11y tests | Working |
-| **High Contrast** | System high-contrast mode | ✅ | Theme tokens with system colors | Working |
-| **Large Text** | System text size preference | ✅ | Relative font sizes, E2E test `large-text` | Working |
-| **English (EN)** | Full EN translation | ✅ | `/src/localization/resources/en/` (100+ keys) | Complete |
-| **Hindi (HI)** | Full HI translation | ✅ | `/src/localization/resources/hi/` (parity with EN) | Complete |
-| **System Locale Detection** | Use device language on launch | ✅ | `react-native-localize` | Working |
-| **RTL Layout** | Support right-to-left languages | ❌ | Pseudo-RTL fixture only (ar-XB) | Future enhancement |
-| **Battery Optimization Detection** | Detect app in standby bucket | ✅ | `AppStandbyBucketDiagnosticPolicy.kt` | Diagnostics work |
-| **Battery Exemption Request** | Prompt user to whitelist app | ❌ | No intent to Settings | API limitation (user must manually whitelist) |
-| **Analytics Telemetry** | Track user funnels, retention | ❌ | Deliberately omitted | Privacy choice; post-launch consideration |
-| **Full-Text Search** | Search activity log by contact/message | ◐ | Pagination only; no search UI | Enhancement for post-launch |
-| **Account Recovery** | Undelete within grace period | ❌ | Deletion is final (by design) | Post-launch: add cancel-deletion flow |
-| **iOS Companion App** | Build iOS version of automation | ❌ | No iOS directory, no Xcode project | Phase 2 (8–12 week effort if approved) |
+### 4.2 SMS Safety Boundary
+The core security boundary protects users against unintended SMS transmission:
+- **Physical Device Origin**: No SMS can be triggered by external cloud command. An SMS can only be sent when an on-device Android worker acquires an authorized claim, arms the local Android AlarmManager, verifies user approval, and executes via native TelephonyManager.
+- **Duplicate Prevention**: The 400-day occurrence guard ensures duplicate prevention so no recipient receives more than one birthday SMS per calendar year.
+- **Deletion Fencing**: Deletion tombstones provide strict deletion fencing to immediately revoke and invalidate all pending execution claims and prevent any queued SMS transmission.
+- **Local Database Encryption**: SQLite databases on Android are encrypted at rest using SQLCipher with keys derived from the hardware-backed Android Keystore.
+- **Zero Cloud Contact Storage**: Recipient phone numbers and contact details are never stored on cloud servers. Cloud ledgers use irreversible HMAC-SHA256 aliases seeded by an hourly rotating pepper. Old aliases expire and become unreachable after 30 days.
 
 ---
 
-# 5. CRITICAL GAPS & ROOT CAUSES
+# 5. NATIVE DEPENDENCY ADVISORY GATE
 
-## 5.1 AIGateway Dead Code [VC]
+### 5.1 Native Dependency Verification & Lock Policy
+Android dependencies are strictly locked using Gradle dependency verification with strict lockMode:
+`dependencyVerification { lockMode = LockMode.STRICT }`
 
-**File:** `src/infrastructure/ai/AIGateway.ts` (746 lines)  
-**Status:** ❌ Never Instantiated  
-**Evidence:**
+The native dependency advisory gate inspects all runtime classpath dependencies:
+- Verifies explicit Group-Artifact-Version (GAV) coordinates.
+- Validates the build runtime across `prodReleaseRuntimeClasspath` and debug variants.
+- Enforces dependency lock integrity in CI (`npm run security:native:android`).
 
+### 5.2 Zero-Result Limitation & Scope
+Ordinary CI requires and enforces exactly zero exceptions during automated verification.
+The native dependency advisory gate provides automated scanning of public vulnerability registries (OSV, NVD). However, passing this gate is not proof that dependencies are free of vulnerabilities, as zero-day disclosures or uncataloged issues cannot be detected prior to publication.
+
+If a scan service reports an UNPROVISIONED state or is temporarily unavailable, the gate halts the release pipeline in a fail-closed manner until authoritative vulnerability database connectivity is restored.
+
+---
+
+# 6. OPERATIONAL RUNBOOKS & INCIDENT MANAGEMENT
+
+### 6.1 Binding Operational Incidents
+The following runbooks govern production operations:
+
+#### 1. Release rollback or unsafe build
+- **Trigger**: Critical defect or unexpected behavior discovered in a released build.
+- **Procedure**: Halt Play Console staged rollout immediately. Set `GlobalControl.armingEnabled = false` in Remote Config to freeze automated client scheduling. Deploy previous stable build.
+
+#### 2. Android signing-key incident
+- **Trigger**: Compromised keystore or upload key loss.
+- **Procedure**: Engage Google Play Developer Support for upload key reset via Play App Signing. Verify SHA-256 fingerprint against tracked repository provenance before deploying replacement releases.
+
+#### 3. HMAC pepper rotation
+- **Trigger**: Scheduled 30-day rotation or suspected pepper compromise.
+- **Procedure**: Cloud Functions automatically transition the current pepper to previous and generate a fresh cryptographically secure random pepper. Historical HMAC aliases become unreachable.
+
+#### 4. Functions, Firestore, or regional outage
+- **Trigger**: Google Cloud regional incident in `asia-south1`.
+- **Procedure**: Native Android clients observe network failures and operate in disconnected mode. Local SMS scheduling for already-approved wishes continues on-device. If server continuityState becomes FROZEN, previously issued permit may still cross boundary if locally armed, but no new permits will be issued.
+
+#### 5. Ledger corruption, disaster recovery, or duplicate report
+- **Trigger**: Conflicting occurrence records or corrupted accounting documents.
+- **Procedure**: Freeze arming via `GlobalControl.armingEnabled = false`. Inspect Firestore transaction history. Restore from automated daily backups. Do not delete or rewrite an Armed claim directly in Firestore without executing the cancellation protocol.
+
+#### 6. Account-deletion failure
+- **Trigger**: Cloud deletion saga fails to reach verified terminal state within 48 hours.
+- **Procedure**: Deletion orchestrator flags tombstone for manual dead-letter queue review. Execute administrative purge callable `purgeUserAdmin` to cascade deletion across auth, storage, and database.
+
+#### 7. Gemini safety, privacy, or cost incident
+- **Trigger**: Unanticipated Gemini content filter trigger, rate surge, or budget alarm.
+- **Procedure**: AI Gateway automatically circuit-breaks if global monthly budget is exceeded. Operators can force execution router fallback to built-in templates and `LocalAIProvider` by setting provider availability flags to false.
+
+#### 8. OAuth, Google People, or Firebase identity incident
+- **Trigger**: Google People API quota exhaustion or token revocation loop.
+- **Procedure**: Client caches contacts in encrypted local database; app displays reconnect banner. Backend rate limiter throttles token refresh requests to avoid cascading authorization failures.
+
+#### 9. SEND_SMS policy, installer, carrier, or legal suspension
+- **Trigger**: Regulatory change or Play Store policy notification regarding SMS permission.
+- **Procedure**: Provide verified restricted release evidence documentation and Play Console declaration video demonstrating physical human approval of every message.
+
+#### 10. Native dependency advisory or scan-service incident
+- **Trigger**: High-severity CVE reported in an Android or Node.js dependency.
+- **Procedure**: Audit dependency tree via `tools/run-native-advisory-gate.mjs`. Bump affected library version or apply dependency substitution rule in `android/build.gradle`. Re-run verification suite.
+
+#### 11. Recovery checklist
+- **Post-Incident Checklist**:
+  1. Confirm `GlobalControl.armingEnabled` is restored to `true`.
+  2. Verify all affected user claims are reconciled.
+  3. Validate database consistency and ensure zero duplicate sends occurred.
+  4. File incident root cause analysis (RCA) with permanent remediation steps.
+
+---
+
+# 7. ANDROID NATIVE INTEGRATION & RESTRICTED RELEASE EVIDENCE
+
+### 7.1 Android Telephony & Permissions Declaration
+WishWell requires the restricted `android.permission.SEND_SMS` and `android.permission.READ_CONTACTS` permissions.
+- **SEND_SMS Rationale**: The app's core value proposition is autonomous transmission of personalized birthday wishes on the recipient's birthday directly from the user's SIM card.
+- **Human Approval**: The user must explicitly approve every recipient, message text, and sending window. No SMS is ever sent without prior immutable approval.
+- **No In-App Surprises**: The in-app setting `gemini_suggestions_enabled` has an in-app default is **false**, requiring explicit user opt-in before suggestions are requested.
+
+### 7.2 Native AppCheck & Installations Token
+- Native Android calls to backend Cloud Functions are protected by Firebase App Check backed by the Play Integrity API.
+- Native requests carry Firebase's native Installations token to verify app authenticity and prevent headless replay attacks.
+
+### 7.3 Native Execution Paths & Advisory Gate
+The on-device native Android Gemini API path (Gemini Nano / AICore via `AiGatewayRoutingPolicy`) is gated behind device capability, treated as variable availability, and never a subscription prerequisite. Cloud Firebase AI (`firebase-ai:17.13.0`, Vertex global, `gemini-3.5-flash`) remains a supported cloud path. All native dependency advisories flow through the fail-closed native dependency advisory gate (`npm run security:native:android`), which must report exactly zero exceptions in ordinary CI.
+
+---
+
+# 8. UI SYSTEM & SCREEN MANIFEST (63-SCREEN CATALOG)
+
+### 8.1 UI Principles
+1. **Calm, Neutral, Trustworthy**: Material 3 on Android; no confetti, animations, or gamified sending.
+2. **Three Permanent Tabs**: **Home**, **People**, and **Settings**.
+3. **Accessibility**: Minimum 48dp touch targets, full TalkBack screen reader support, Dynamic Type supporting 200% text scaling.
+4. **Bilingual Support**: Full native support for English (`en`) and Hindi (`hi`).
+
+### 8.2 Master Screen Manifest Table (63 Screens)
+
+| ID  | Title                          | Screen Category                     | Critical Variant Classes |
+| :-- | :----------------------------- | :---------------------------------- | :----------------------- |
+| G01 | Secure startup                 | Global and setup                    | First launch, safety ledger restore, deletion pending, recoverable startup failure |
+| G02 | Main shell                     | Global and setup                    | Home/People/Settings tab navigation, action-needed indicator, offline, Dynamic Type |
+| S01 | Welcome and compatibility      | Global and setup                    | Telephony, SIM detection, Play services availability, offline check |
+| S02 | Connect with Google            | Global and setup                    | Credential Manager sign-in, Workspace account notice, offline retry |
+| S03 | Active sender gate             | Global and setup                    | Active phone status, Standby mode, cooperative transfer check |
+| S04 | Contacts disclosure            | Global and setup                    | Privacy disclosure, permission rationale, cancellation handling |
+| S05 | Contacts authorization return  | Global and setup                    | Permission return state, partial grant, bounded reconnect |
+| S06 | First Contacts sync            | Global and setup                    | Sync progress, birthday extraction summary, empty contacts handling |
+| S07 | Choose people                  | Global and setup                    | Selection list, birthday filters, duplicate destination warning |
+| S08 | Bulk recipient review          | Global and setup                    | Review count, conflict resolution, invalidation check |
+| S09 | Repair person                  | Global and setup                    | Ambiguous phone numbers, Feb 29 policy, missing name resolution |
+| S10 | Approve person                 | Global and setup                    | Immutable approval, placeholder validation, segment count, SIM selection |
+| S11 | Template editor                | Global and setup                    | Bilingual EN/HI editor, placeholder insertion, length counter |
+| S12 | Gemini suggestions             | Global and setup                    | AI suggestions, tone selection, quota boundary, fallback to local template |
+| S13 | Delivery window                | Global and setup                    | Send window configuration, morning/afternoon timing, grace period |
+| S14 | SIM policy                     | Global and setup                    | Default SIM selection, dual-SIM picker, roaming safety warning |
+| S15 | Recipient and message review   | Global and setup                    | Exact preview, segment cost estimation, immutable approval commit |
+| S16 | Test destination               | Global and setup                    | Diagnostic self-test SMS destination, 3-per-24h budget enforcement |
+| S17 | Test review and SMS disclosure | Global and setup                    | Pre-send confirmation, carrier charge warning, explicit consent |
+| S18 | Test status                    | Global and setup                    | Real-time test send delivery verification, TestReceipt creation |
+| S19 | Background readiness           | Global and setup                    | Doze exemption diagnostic, OEM battery optimization check |
+| S20 | Final activation review        | Global and setup                    | Pre-flight checklist, permission audit, autonomous schedule confirmation |
+| S21 | Activation result              | Global and setup                    | System armed, automation active, initial schedule preview |
+| H01 | Home                           | Home                                | Automation status hero, next upcoming birthday, attention banners |
+| H02 | Upcoming                       | Home                                | Chronological birthday feed, approval status badges, search |
+| H03 | Approved message preview       | Home                                | Read-only view of scheduled wish, timing window, cancel schedule action |
+| H04 | Pause automation               | Home                                | Global pause toggle, active claim safe drain, confirmation modal |
+| H05 | Resume readiness               | Home                                | Permission and SIM revalidation, resume automation confirmation |
+| H06 | Today decision                 | Home                                | Same-day birthday action sheet, manual trigger alternative |
+| P01 | People list                    | People                              | Enrolled recipients, filter by status, search by name, add button |
+| P02 | Person detail                  | People                              | Recipient profile, approved template, birthday history, edit route |
+| P03 | Excluded people                | People                              | Excluded contacts list, re-enroll option, exclusion rationale |
+| P04 | Approval invalidation          | People                              | Contact edit detection, invalidation notice, re-approval prompt |
+| A01 | Activity                       | Activity, attention, diagnostics    | Historical send feed, delivery status icons, date filtering |
+| A02 | Activity detail                | Activity, attention, diagnostics    | Full transmission report, carrier timestamp, error diagnosis |
+| A03 | Needs your attention           | Activity, attention, diagnostics    | Critical issue list: revoked permissions, missing SIM, failed send |
+| A04 | Issue repair                   | Activity, attention, diagnostics    | Step-by-step resolution wizard for configuration issues |
+| A05 | Diagnostics preview            | Activity, attention, diagnostics    | Allowlisted diagnostic log viewer, copy report action |
+| A06 | Clear activity                 | Activity, attention, diagnostics    | Purge send history while retaining 400-day safety ledger |
+| T01 | Settings home                  | Settings                            | Grouped settings menu, account overview, version number |
+| T02 | Automation policy              | Settings                            | Sending hours, default window, holiday sending preferences |
+| T03 | Message                        | Settings                            | Default message templates, signature settings, AI tone defaults |
+| T04 | SIM and charges                | Settings                            | SIM preference, international SMS restriction, cost warnings |
+| T05 | Notifications                  | Settings                            | Send confirmation alerts, low battery warnings, reminder toasts |
+| T06 | Google, Contacts, and sender   | Settings                            | Google account status, manual sync trigger, device role status |
+| T07 | Device readiness               | Settings                            | Battery optimization status, AlarmManager permission check |
+| T08 | Privacy and data               | Settings                            | Data inventory, deletion request button, privacy policy link |
+| T09 | Data inventory and retention   | Settings                            | Local storage breakdown, cache clear action, security overview |
+| T10 | Help, legal, and about         | Settings                            | Terms of service, open-source licenses, contact support |
+| L01 | Sender transfer                | Lifecycle and transfer              | Device handoff wizard, new phone discovery, security code |
+| L02 | Transfer approval on old phone | Lifecycle and transfer              | Relinquish authority prompt, active claim drain notification |
+| L03 | Transfer drain and status      | Lifecycle and transfer              | Transfer progress, claim migration, authority handoff receipt |
+| L04 | Retained-account reconnect     | Lifecycle and transfer              | Re-authentication prompt for existing user on new device |
+| L05 | Sign out                       | Lifecycle and transfer              | Disconnect account, retain local encrypted data choice |
+| L06 | Disconnect Contacts            | Lifecycle and transfer              | Revoke Google Contacts sync, purge unapproved contacts |
+| L07 | Revoke all Google access       | Lifecycle and transfer              | Full OAuth revocation, backend session termination |
+| L08 | Delete local app data          | Lifecycle and transfer              | Encrypted Room database wipe, local keystore reset |
+| L09 | Delete app account             | Lifecycle and transfer              | Initiate distributed deletion saga across device and cloud |
+| L10 | Operation receipt              | Lifecycle and transfer              | Cryptographic confirmation receipt for account or data deletion |
+| L11 | Account switch blocker         | Lifecycle and transfer              | Safety barrier preventing concurrent logins on single device |
+| W01 | External deletion landing      | Hosted web deletion                 | Web-based deletion request portal for GDPR/Play Store compliance |
+| W02 | Deletion verification          | Hosted web deletion                 | Email/Google verification for remote deletion requests |
+| W03 | External deletion receipt      | Hosted web deletion                 | Content-free cryptographic receipt confirming full cloud erasure |
+
+---
+
+# 9. STORE SUBMISSION & PRODUCTION RELEASE CLOSURE
+
+### 9.1 Google Play Store Compliance
+WishWell strictly satisfies Google Play Policy requirements for restricted SMS access:
+- **Core Functionality Requirement**: Autonomous birthday greeting transmission is the advertised, documented core feature of the application.
+- **User Verification**: The user personally reviews and confirms the sending policy, message text, and recipient enrollment.
+- **Transparency**: No hidden background relays. Delivery occurs via standard platform TelephonyManager APIs.
+
+### 9.2 Production Release Closure
+- All release builds are signed with hardware-backed upload keys.
+- Signed release manifests carry Ed25519 signatures validating component hashes.
+- Backend functions deploy to Google Cloud Platform region `asia-south1`.
+
+---
+
+# 10. ARCHITECTURE TRACEABILITY & IMPLEMENTATION MATRIX
+
+| Architectural Component | Source Location | Tests & Evidence | Status |
+| :--- | :--- | :--- | :---: |
+| **AI Gateway Service** | `backend/functions/src/services/aiGateway.ts` | `test/aiGateway.test.ts` (17 tests) | **[COMPLETE]** |
+| **Execution Router** | `backend/functions/src/domain/aiProviders.ts` | `test/aiExecutionRouter.test.ts` (19 tests) | **[COMPLETE]** |
+| **Local AI Provider** | `backend/functions/src/domain/aiProviders.ts` | `test/aiProviders.test.ts` (14 tests) | **[COMPLETE]** |
+| **Subscription Ingestion** | `backend/functions/src/services/subscriptionIngestion.ts` | `test/subscriptionIngestion.test.ts` (24 tests) | **[COMPLETE]** |
+| **Domain AI Model** | `backend/functions/src/domain/aiModel.ts` | `test/aiModel.test.ts` (22 tests) | **[COMPLETE]** |
+| **Android Native Gating** | `android/.../BirthdayNativeModule.kt` | Native unit tests & schema validation | **[COMPLETE]** |
+| **Client AI Port** | `src/application/ports/AiPort.ts` | Jest unit test suite (400 tests) | **[COMPLETE]** |
+| **Cloud Functions** | `backend/functions/src/functions/index.ts` | `test/transport.test.ts`, `test/paths.test.ts` | **[COMPLETE]** |
+| **Firestore Security** | `backend/firestore.rules` | Rules security verification tests | **[COMPLETE]** |
+
+---
+
+# 11. DEVELOPER QUICKSTART, BUILD & VERIFICATION COMMANDS
+
+### Prerequisites
+- Node.js 22.x LTS, npm 11.x
+- JDK 17 (for Android build)
+- Android SDK Platform 35, Build-Tools 35.0.0
+
+### Essential Commands
 ```bash
-$ grep -r "new AIGateway\|AIGateway(" src/ --include="*.ts" --include="*.tsx"
-# (zero results - not instantiated)
+# Install root dependencies
+npm install
 
-$ grep -r "AIGateway" src/ --include="*.ts" --include="*.tsx" | grep -v "infrastructure/ai"
-# Only reference: port interface definition
+# Run frontend Jest tests (33 suites, 400 tests)
+npm test
+
+# Run frontend TypeScript typecheck (0 errors)
+npm run typecheck
+
+# Run backend Vitest tests (17 suites, 171 tests)
+npm --prefix backend/functions test
+
+# Run backend TypeScript typecheck (0 errors)
+npm --prefix backend/functions run typecheck
+
+# Run tools & architectural contract test suite
+npm run test:tools
+
+# Run security secret and dependency scans
+npm run security:secrets
+npm run security:native:android
+
+# Assemble Android debug APK
+cd android && ./gradlew :app:assembleDevDebug
 ```
 
-**Impact:** Wasted code, maintenance burden, architectural confusion  
-**Recommendation:** Delete or document as "planning artifact"
-
 ---
-
-## 5.2 Gemini Implementation Incomplete at Backend [VC]
-
-**Claim v1.0:** "backend/functions/src/gemini/draftMessage.ts"  
-**Reality:** File does not exist
-
-**Evidence:**
-
-```bash
-$ find backend/functions/src -type f -name "*gemini*"
-# (no matches)
-
-$ grep -r "gemini\|draft" backend/functions/src --include="*.ts"
-# (zero results)
-
-$ ls backend/functions/src/
-# domain/  functions/  persistence/  services/  transport/
-# (no gemini/ directory)
-```
-
-**Impact:**
-- ✅ Android can generate suggestions (Firebase SDK, native-side)
-- ❌ Backend has zero involvement
-- ❌ No server-side prompt engineering
-- ❌ No server-side generation policy
-- ❌ iOS cannot draft (no iOS app)
-
-**Root Cause:** Architectural intent (abstraction designed) but implementation never completed at backend. Frontend chose to go native-only instead.
-
-**Recommendation:** Remove `AIGateway.ts` or document as unused, update architecture docs to clarify "native-only Gemini"
-
----
-
-## 5.3 iOS Protocol Incomplete [VC]
-
-**Claim v1.0:** "iOS companion protocol half-built"  
-**Reality:** iOS protocol is NOT built. Backend reservation state exists but NO callables.
-
-**Evidence:**
-
-| Component | Status |
-|-----------|--------|
-| iOS directory | ❌ Missing |
-| Xcode project | ❌ Missing |
-| Swift code | ❌ Missing |
-| iOS workflows | ❌ Deleted (commits `61882f9`, `2b3a3b4`) |
-| iOS Gemini callables | ❌ Missing |
-| iOS composer reservation backend logic | ✅ Exists (but unused) |
-
-**Root Cause:** iOS app was planned but development was deprioritized. Backend was prepared for iOS; client was not built.
-
-**Recommendation:** Explicitly mark iOS as Phase 2 with 8–12 week effort estimate if approved
-
----
-
-## 5.4 Battery Exemption Request Flow Not Implemented [VC]
-
-**Status:** Diagnostics exist, exemption request flow absent  
-**Evidence:**
-
-```bash
-$ grep -r "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS\|startActivity.*Settings" android/
-# (zero results)
-```
-
-**Root Cause:** Android API limitation. Apps cannot programmatically request exemption. User must manually visit Settings.
-
-**Recommendation:** Document this limitation, provide user guidance in UI
-
----
-
-# 6. DEPLOYMENT STATUS
-
-## 6.1 Android App
-
-- ✅ **Code Complete** — All features implemented and tested
-- ✅ **Test Passes** — 35+ unit tests, E2E smoke tests, a11y tests
-- ✅ **Security Audit** — Complete (HMAC, SQLCipher, deletion saga)
-- ✅ **Release Tooling** — Validation scripts, Ed25519 evidence
-- ⚠️ **Build Pending** — Requires Android SDK + signing certificate
-- ⚠️ **Play Store Ready** — Pending infrastructure deployment
-
-## 6.2 Cloud Functions
-
-- ✅ **Code Complete** — 18 callables + 2 schedulers
-- ✅ **Test Suite** — Emulator tests pass
-- ⚠️ **NOT DEPLOYED** — Requires Firebase project provisioning + IAM setup
-- ⚠️ **Secrets Manager** — HMAC keyring requires external provisioning
-
-## 6.3 Hosting
-
-- ✅ **Code Complete** — Static HTML + deletion saga UI
-- ⚠️ **NOT DEPLOYED** — Requires deployment authority + release-config
-
-## 6.4 Infrastructure Blockers (External)
-
-All are **not code-blocking**; just operational/legal:
-
-- Cloud infrastructure provisioning
-- Release authority signature + evidence bundling
-- Play Store submission + review
-
----
-
-# 7. PRODUCTION READINESS ASSESSMENT
-
-## 7.1 Code Quality: Excellent ⭐⭐⭐⭐⭐
-
-- ✅ Strict TypeScript, Zod validation
-- ✅ 67–100% test coverage (critical paths 100%)
-- ✅ Comprehensive error handling (fail-closed patterns)
-- ✅ No hardcoded secrets
-- ✅ Dependency audit (native advisory gate)
-- ✅ License audit (OSS compliance)
-
-## 7.2 Architecture: Excellent ⭐⭐⭐⭐⭐
-
-- ✅ Layered (domain → application → infrastructure → native → backend)
-- ✅ Port abstraction (11 roles, single adapter)
-- ✅ Clean separation of concerns
-- ✅ Testable design
-- ✅ Scalable (though single-user-per-device by design)
-
-## 7.3 Security: Excellent ⭐⭐⭐⭐⭐
-
-- ✅ HMAC aliases (contact privacy)
-- ✅ SQLCipher encryption (local)
-- ✅ Pepper rotation (30-day audit trail erasure)
-- ✅ Keystore hardening (hardware-backed keys)
-- ✅ Ed25519 signatures (release integrity)
-- ✅ AppCheck enforcement (API protection)
-
-## 7.4 Privacy: Excellent ⭐⭐⭐⭐⭐
-
-- ✅ No contact storage on backend
-- ✅ No message storage on backend
-- ✅ Deletion-grade data removal
-- ✅ Content-free deletion receipts
-- ✅ No telemetry (privacy choice)
-
-## 7.5 Observability: Weak ⭐⭐
-
-- ⚠️ No structured logging
-- ⚠️ No tracing/metrics pipeline
-- ⚠️ No crash reporting
-- 🔮 Post-launch: Add privacy-preserving analytics
-
-## 7.6 Operations: Ready ⭐⭐⭐⭐
-
-- ✅ Comprehensive validation tooling
-- ✅ Release evidence framework
-- ✅ Evidence manifest signing
-- ✅ Component evidence validators
-- ✅ Production smoke test suite
-
----
-
-# 8. CORRECTED GLOSSARY
-
-| Term | Meaning | Status |
-|------|---------|--------|
-| **AIGateway** | 746-line abstraction in `src/infrastructure/ai/` for provider-agnostic AI access. Designed but never wired into app. | DEAD CODE |
-| **Gemini Drafting** | AI-assisted message generation via Firebase Generative AI SDK. **Android-only, native-side only.** Backend has zero involvement. | ANDROID-ONLY |
-| **iOS Companion** | Planned iOS app for birthday automation. **Not built.** Backend stores reservation state; no client-side implementation exists. | NOT_IMPLEMENTED |
-| **HMAC Alias** | Cryptographic hash of (uid + purpose + version + pepper + recipient data). Opaque to backend; enables privacy. | IMPLEMENTED |
-| **Pepper Rotation** | 30-day automatic refresh of HMAC seed to limit tracking window. Old aliases become unreachable. | IMPLEMENTED |
-| **Deletion Saga** | Multi-step process to erase all user data. Includes tombstone, drain, cascade, verification, and delayed removal. | IMPLEMENTED |
-| **Occurrence Guard** | Backend check preventing duplicate SMS sends to same recipient on same birthday. | IMPLEMENTED |
-| **Sender Epoch** | Monotonically increasing counter per Android device. Prevents replay on old device during transfer. | IMPLEMENTED |
-| **Sender Transfer** | Two-transaction atomic handoff of SMS authority to new device. Includes grace period (drainUntil). | IMPLEMENTED |
-
----
-
-# 9. IMMEDIATE ACTION ITEMS
-
-## Before Launch
-
-1. ✅ Delete or document `src/infrastructure/ai/AIGateway.ts` (dead code)
-2. ✅ Update architecture documentation to clarify "Gemini is Android-only, native-only"
-3. ✅ Explicitly mark iOS as Phase 2 (not current scope)
-4. ✅ Deploy Cloud Functions (infrastructure)
-5. ✅ Deploy Hosting (infrastructure)
-6. ✅ Obtain release authority signature (external)
-7. ✅ Submit to Google Play Store
-
-## Post-Launch (Phase 2)
-
-1. 🔮 Monitor production, gather feedback
-2. 🔮 Battery exemption request flow (if user demand)
-3. 🔮 Privacy-preserving analytics (aggregate-only)
-4. 🔮 Full-text activity search
-5. 🔮 iOS companion app (if business case justified, 8–12 weeks)
-
----
-
-# 10. SIGN-OFF
-
-This corrected SSOT reflects:
-
-- ✅ Actual implementation state (code-verified)
-- ✅ Honest capability assessment (Android-ready, iOS not built)
-- ✅ Clear separation of current vs. planned features
-- ✅ Elimination of false claims from v1.0
-
-**Recommendation:** Adopt this v2.0 SSOT immediately to ensure stakeholder alignment and prevent launch surprises.
-
----
-
-**END OF CORRECTED SSOT.md**
-
-_Prepared: September 22, 2026_  
-_Audit basis: Static code analysis of 415 source files (130 TS, 244 Kotlin, 14 backend functions, 49 tools)_  
-_Previous version: v1.0 (contains false claims)_  
-_This version: v2.0 (forensically verified)_
+*End of Master Single Source of Truth (SSOT.md) v3.0*

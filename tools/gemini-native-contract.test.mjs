@@ -38,9 +38,7 @@ const androidProvenance = read(
 );
 const liveMessage = read('src/features/live/LiveMessageScreen.tsx');
 const messageModel = read('src/domain/messages/model.ts');
-const androidReleaseRunbook = read(
-  'docs/ANDROID_RESTRICTED_RELEASE_EVIDENCE.md',
-);
+const androidReleaseRunbook = read('SSOT.md');
 
 test('Android implements the exact canonical Gemini v2 prompt and account-scope contract', () => {
   assert.equal(promptContract.schemaVersion, 1);

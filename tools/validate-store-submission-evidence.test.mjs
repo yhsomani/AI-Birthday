@@ -28,7 +28,7 @@ const TEMPLATE = JSON.parse(
   ),
 );
 const STITCH_IDS = parseStitchScreenIds(
-  readFileSync(path.join(ROOT, 'stitch/SCREEN_MANIFEST.md'), 'utf8'),
+  readFileSync(path.join(ROOT, 'SSOT.md'), 'utf8'),
 );
 const SHA = value => createHash('sha256').update(value).digest('hex');
 const SOURCE_REVISION = '0123456789abcdef0123456789abcdef01234567';

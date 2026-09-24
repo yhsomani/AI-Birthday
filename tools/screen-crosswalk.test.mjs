@@ -44,7 +44,7 @@ const reachableProductionModules = root => {
 
 test('every Stitch screen ID maps exactly once to production ownership and nearby contracts', () => {
   const manifestIds = [
-    ...read('stitch/SCREEN_MANIFEST.md').matchAll(/^\| ([A-Z][0-9]{2}) \|/gmu),
+    ...read('SSOT.md').matchAll(/^\| ([A-Z][0-9]{2}) \|/gmu),
   ].map(match => match[1]);
   const crosswalk = JSON.parse(read('stitch/IMPLEMENTATION_CROSSWALK.json'));
   const entries = crosswalk.entries;

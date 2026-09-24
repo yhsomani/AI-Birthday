@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const read = relative => readFileSync(`${root}${relative}`, 'utf8');
 
 test('security reporting stays private and names the SMS safety boundary', () => {
-  const policy = read('SECURITY.md');
+  const policy = read('SSOT.md');
   assert.match(policy, /private security-advisory channel/u);
   assert.match(policy, /unintended SMS/u);
   assert.match(policy, /duplicate prevention/u);
@@ -17,7 +17,7 @@ test('security reporting stays private and names the SMS safety boundary', () =>
 });
 
 test('the incident runbook covers every binding operational incident', () => {
-  const runbook = read('docs/OPERATIONS_RUNBOOK.md');
+  const runbook = read('SSOT.md');
   for (const required of [
     'Release rollback or unsafe build',
     'Android signing-key incident',
