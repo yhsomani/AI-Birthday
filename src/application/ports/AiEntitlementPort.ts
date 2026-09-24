@@ -37,7 +37,9 @@ export interface AiEntitlementPort {
   connectAiProvider(input: {
     provider: AiSignInProvider;
     expectedRevision: NativeRevision;
-  }): Promise<NativeResult<{ result: AiSignInResult; connectionState: AiConnectionState }>>;
+  }): Promise<
+    NativeResult<{ result: AiSignInResult; connectionState: AiConnectionState }>
+  >;
   disconnectAiProvider(input: {
     provider: AiSignInProvider;
     expectedRevision: NativeRevision;

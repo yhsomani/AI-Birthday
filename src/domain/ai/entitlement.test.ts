@@ -28,12 +28,22 @@ function entitlement(
 }
 
 function usage(overrides: Partial<AiUsageSnapshot> = {}): AiUsageSnapshot {
-  return { period: 'calendar-month', usedToday: 0, usedInPeriod: 0, ...overrides };
+  return {
+    period: 'calendar-month',
+    usedToday: 0,
+    usedInPeriod: 0,
+    ...overrides,
+  };
 }
 
 describe('decideAiEntitlement (app subscription is the ONLY gate)', () => {
   it('blocks free-plan accounts with ai-subscription-required', () => {
-    expect(decideAiEntitlement(entitlement({ plan: 'free', enabled: false }), usage())).toEqual({
+    expect(
+      decideAiEntitlement(
+        entitlement({ plan: 'free', enabled: false }),
+        usage(),
+      ),
+    ).toEqual({
       kind: 'blocked',
       reason: 'ai-subscription-required',
     });
@@ -44,11 +54,17 @@ describe('decideAiEntitlement (app subscription is the ONLY gate)', () => {
       entitlement({ capabilities: [] }),
       usage(),
     );
-    expect(decision).toEqual({ kind: 'blocked', reason: 'ai-subscription-required' });
+    expect(decision).toEqual({
+      kind: 'blocked',
+      reason: 'ai-subscription-required',
+    });
   });
 
   it('allows an active Plus subscription within quota', () => {
-    const decision = decideAiEntitlement(entitlement(), usage({ usedToday: 1, usedInPeriod: 2 }));
+    const decision = decideAiEntitlement(
+      entitlement(),
+      usage({ usedToday: 1, usedInPeriod: 2 }),
+    );
     expect(decision.kind).toBe('allowed');
     if (decision.kind === 'allowed') {
       expect(decision.quota).toEqual(aiQuotaForPlan('wishwell-plus'));
@@ -68,7 +84,9 @@ describe('decideAiEntitlement (app subscription is the ONLY gate)', () => {
     expect(
       decideAiEntitlement(
         entitlement(),
-        usage({ usedInPeriod: aiQuotaForPlan('wishwell-plus').requestsPerMonth }),
+        usage({
+          usedInPeriod: aiQuotaForPlan('wishwell-plus').requestsPerMonth,
+        }),
       ),
     ).toEqual({ kind: 'blocked', reason: 'ai-quota-exhausted' });
   });
@@ -87,7 +105,11 @@ describe('decideAiEntitlement (app subscription is the ONLY gate)', () => {
   it('never consults external provider state: a connected sign-in changes nothing', () => {
     const withSignIn = entitlement({
       providers: [
-        { provider: 'gemini-cloud', authorizationMode: 'provider-sign-in', connectionState: 'connected' },
+        {
+          provider: 'gemini-cloud',
+          authorizationMode: 'provider-sign-in',
+          connectionState: 'connected',
+        },
       ],
     });
     expect(decideAiEntitlement(withSignIn, usage()).kind).toBe('allowed');
