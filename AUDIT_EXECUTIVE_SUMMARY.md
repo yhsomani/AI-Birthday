@@ -73,7 +73,7 @@ $ grep -r "gemini\|draft" backend/functions/src
 - User taps "Generate Suggestion" in Android app
 - Native `AndroidGeminiSuggestionGateway` calls Firebase Generative AI SDK
 - **Backend: zero involvement**
-- JavaScript `AIGateway` abstraction exists (746 lines) but is **never instantiated** (dead code)
+- JavaScript `AIGateway` abstraction (746 lines, never instantiated) — **UPDATE 2026-09-24: deleted from the repository**; no JS AI layer remains
 - iOS cannot generate suggestions (no iOS app to call native gateway)
 
 **Classification:** ❌ FALSE CLAIM
@@ -234,7 +234,7 @@ $ ls -la | grep -i project
 
 ## Critical Decisions
 
-### Decision #1: Delete AIGateway Dead Code?
+### Decision #1: Delete AIGateway Dead Code? — ✅ DONE (2026-09-24)
 
 **Current:** 746-line abstraction never used  
 **Options:**
@@ -305,7 +305,7 @@ C) Aggregate-only analytics (balance privacy + insights)
 ### Immediate (Before Launch)
 
 1. ✅ **Replace SSOT.md** with corrected version
-2. ✅ **Delete AIGateway.ts** (dead code, 746 lines)
+2. ✅ ~~**Delete AIGateway.ts** (dead code, 746 lines)~~ — **DONE**: removed from tree, verified 2026-09-24
 3. ✅ **Document Gemini architecture** clarifying "Android-only, native Firebase SDK"
 4. ✅ **Explicitly mark iOS as Phase 2** with effort estimate (8–12 weeks)
 5. ✅ **Deploy infrastructure** (Cloud Functions, Hosting)

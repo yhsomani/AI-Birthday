@@ -2766,3 +2766,52 @@ _Document prepared: September 22, 2026_
 _Method: Static code analysis, no runtime execution_  
 _Confidence: HIGH for code-based claims, MEDIUM for runtime behavior (not tested)_  
 _Next Step: Integrate corrections into SSOT.md, proceed with infrastructure deployment_
+
+
+---
+
+# APPENDIX K — v2.1 RE-VERIFICATION ADDENDUM (2026-09-24)
+
+This addendum reconciles the 2026-09-22 audit against the live repository two days later. Three findings changed; all other conclusions stand.
+
+## K.1 AIGateway dead code — RESOLVED (deleted)
+
+The audit reported `src/infrastructure/ai/AIGateway.ts` (746 lines) as never-instantiated dead code and recommended deletion. Re-verification on 2026-09-24 confirms the recommendation has been carried out:
+
+```bash
+$ ls src/infrastructure/
+native/            # ai/ directory no longer exists
+
+$ grep -rn "AIGateway" src/ tests/ backend/functions/src/
+# (zero results)
+```
+
+**Action item closed.** Technical-debt estimate revised: the "AIGateway dead code" component of Low-to-Medium debt is eliminated; remaining items are iOS stubs and pepper-rotation hardcoding.
+
+## K.2 Swift file count corrected
+
+The audit's claim "Zero `.swift` files" (repeated in SSOT v2.0 §3.3) was inaccurate. The repository contains **nine standalone Swift policy-contract tests** under `tests/ios/`:
+
+CompanionCapacityFoundationTests · CompanionMessagePlaceholderPolicyTests · CompanionPersistedDraftRecoveryTests · ComposerReservationPolicyTests · ContactsFreshnessPolicyTests · GeminiOperationalPolicyTests · GeminiPromptAndRatePolicyTests · IOSNativeBoundaryPolicyTests · PeopleParserContractTests (.swift each)
+
+These reference iOS types (e.g. `IOSGeminiOperationalPolicy`, `CompanionComposerOutcome`) that have **no implementation anywhere in this repository**, so they cannot compile or run against product code. They are forward-looking contract scaffolding for a future iOS companion. **Core conclusion unchanged: iOS is not built.** Only the phrasing ("zero Swift code") required correction.
+
+## K.3 Cloud Functions inventory verified
+
+`backend/functions/src/functions/index.ts` exports exactly **16 functions**: 14 callables + 2 schedulers (`sweepDeletionDrains`, `sweepCoordinationOperations`; both `Etc/UTC`). Verified export list:
+
+accountDeletionReceipt · armAttempt · authorizeSafeRetry · beginSenderTransfer · changeAccountMode · claimOccurrence · claimTest · completeSenderTransfer · coordinationLifecycleStatus · getArmStatus · registerAndroidInstallation · releaseAndroidSender · renewSenderLease · reportTestOutcome · requestAccountDeletion · resetContactDerivedState (+ 2 sweeps)
+
+Note: `deletionReceipt` appears only as a transport **schema** name (`backend/functions/src/transport/schemas.ts`); the callable path is `accountDeletionReceipt`. Any documentation citing an `18-callable` figure should be read as the 16-export inventory above.
+
+## K.4 Status
+
+| Audit finding | 2026-09-22 status | 2026-09-24 status |
+|---|---|---|
+| Backend Gemini false claim | Open | Closed (SSOT corrected) |
+| iOS "half-built" false claim | Open | Closed (SSOT corrected; Swift-test nuance added) |
+| Legacy-docs false claim | Open | Closed (SSOT corrected) |
+| AIGateway dead code | Recommended deletion | Deleted |
+| Infrastructure deployment | Pending | Pending |
+
+*Addendum prepared by automated forensic re-check; evidence commands reproducible from repository root.*
