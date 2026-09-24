@@ -11,13 +11,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { Firestore } from 'firebase-admin/firestore';
 
-import { AI_SCHEMA_VERSION, type AiSubscriptionRecord } from '../src/domain/aiModel.js';
+import { AI_SCHEMA_VERSION, type AiSubscriptionRecord, type AIResult } from '../src/domain/aiModel.js';
 import {
   AiProviderError,
   StubProviderAdapter,
+  type AIProvider,
   type AiGenerationRequest,
-  type AiGenerationResult,
-  type AiProviderAdapter,
+  type LegacyAiProviderAdapter,
 } from '../src/domain/aiProviders.js';
 import { AiGatewayService, GatewayBlockedError } from '../src/services/aiGateway.js';
 
@@ -121,16 +121,27 @@ function request(overrides: Partial<AiGenerationRequest> = {}): AiGenerationRequ
   };
 }
 
-class FixedAdapter implements AiProviderAdapter {
+class FixedAdapter implements AIProvider {
   calls = 0;
-  constructor(private readonly result: Partial<AiGenerationResult> = {}) {}
-  readonly provider = 'gemini-cloud' as const;
+  readonly id = 'gemini-cloud' as const;
+  readonly executionMode = 'stub' as const;
   readonly model = 'gemini-2.0-flash';
-  generate(req: AiGenerationRequest): Promise<AiGenerationResult> {
+  constructor(private readonly result: Partial<AIResult> = {}) {}
+
+  capabilities() {
+    return {
+      supportedCapabilities: ['message-drafting'] as const,
+      supportsStreaming: false,
+      maxContextTokens: 4096,
+    };
+  }
+
+  generate(req: AiGenerationRequest): Promise<AIResult> {
     void req;
     this.calls += 1;
     return Promise.resolve({
-      provider: this.provider,
+      provider: this.id,
+      executionMode: this.executionMode,
       model: this.model,
       text: 'Happy birthday Ana!',
       inputTokens: 1000,
@@ -141,25 +152,39 @@ class FixedAdapter implements AiProviderAdapter {
   }
 }
 
-class ThrowingAdapter implements AiProviderAdapter {
+class ThrowingAdapter implements AIProvider {
   calls = 0;
-  readonly provider = 'gemini-cloud' as const;
+  readonly id = 'gemini-cloud' as const;
+  readonly executionMode = 'stub' as const;
   readonly model = 'stub';
-  generate(req: AiGenerationRequest): Promise<AiGenerationResult> {
+
+  capabilities() {
+    return {
+      supportedCapabilities: ['message-drafting'] as const,
+      supportsStreaming: false,
+      maxContextTokens: 4096,
+    };
+  }
+
+  generate(req: AiGenerationRequest): Promise<AIResult> {
     void req;
     this.calls += 1;
     return Promise.reject(new AiProviderError('unavailable', 'boom'));
   }
 }
 
+function getAdapterId(adapter: AIProvider | LegacyAiProviderAdapter): string {
+  return 'id' in adapter ? adapter.id : adapter.provider;
+}
+
 function makeService(
   db: FakeDb,
-  adapter: AiProviderAdapter,
+  adapter: AIProvider | LegacyAiProviderAdapter,
   budgetMicros = 10_000_000,
 ): AiGatewayService {
   return new AiGatewayService(
     db.asFirestore(),
-    new Map([[adapter.provider, adapter]]),
+    new Map([[getAdapterId(adapter), adapter]]),
     {
       globalMonthlyBudgetMicros: budgetMicros,
       nowMs: () => NOW_MS,
@@ -386,7 +411,7 @@ describe('AiGatewayService.generate — failure compensation', () => {
   it('non-AiProviderError failures still map to provider-unavailable', async () => {
     const db = new FakeDb();
     db.docs.set(`users/${UID}/meta/aiEntitlement`, new FakeDoc(entitlementRecord()));
-    const evil: AiProviderAdapter = {
+    const evil: LegacyAiProviderAdapter = {
       provider: 'gemini-cloud',
       model: 'evil',
       generate: () => Promise.reject(new Error('unexpected')),
@@ -432,7 +457,7 @@ describe('AiGatewayService.generate — defensive edges', () => {
   it('never lets a compensation failure mask the original provider error', async () => {
     const db = new FakeDb();
     db.docs.set(`users/${UID}/meta/aiEntitlement`, new FakeDoc(entitlementRecord()));
-    const evil: AiProviderAdapter = {
+    const evil: LegacyAiProviderAdapter = {
       provider: 'gemini-cloud',
       model: 'evil',
       generate: () => Promise.reject(new Error('unexpected')),

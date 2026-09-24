@@ -30,17 +30,23 @@ import {
   projectAiEntitlement,
   usagePeriodKey,
   AI_SCHEMA_VERSION,
+  type AIRequest,
+  type AIResult,
   type AiCapabilityId,
   type AiEntitlementDecision,
   type AiEntitlementProjection,
+  type AiErrorCode,
+  type AiProviderId,
   type AiSubscriptionRecord,
   type AiUsageEntry,
 } from '../domain/aiModel.js';
 import {
+  AIExecutionRouter,
   AiProviderError,
+  asAiProvider,
   estimateCostMicros,
+  type AIProvider,
   type AiGenerationRequest,
-  type AiGenerationResult,
   type AiProviderAdapter,
 } from '../domain/aiProviders.js';
 import {
@@ -51,6 +57,8 @@ import {
 } from '../persistence/paths.js';
 
 export class GatewayBlockedError extends Error {
+  readonly errorCode: AiErrorCode;
+
   constructor(
     readonly reason:
       | 'ai-subscription-required'
@@ -58,14 +66,24 @@ export class GatewayBlockedError extends Error {
       | 'ai-usage-period-mismatch'
       | 'ai-provider-unavailable'
       | 'ai-budget-exhausted',
+    errorCode?: AiErrorCode,
   ) {
     super(reason);
     this.name = 'GatewayBlockedError';
+    this.errorCode =
+      errorCode ??
+      (reason === 'ai-subscription-required'
+        ? 'AI_SUBSCRIPTION_REQUIRED'
+        : reason === 'ai-quota-exhausted' || reason === 'ai-budget-exhausted'
+        ? 'AI_QUOTA_EXCEEDED'
+        : reason === 'ai-usage-period-mismatch'
+        ? 'AI_CONFIGURATION_ERROR'
+        : 'AI_PROVIDER_UNAVAILABLE');
   }
 }
 
 export interface GenerateOutcome {
-  readonly result: AiGenerationResult;
+  readonly result: AIResult;
   readonly usageEntryId: string;
   readonly remainingToday: number;
   readonly remainingInPeriod: number;
@@ -128,7 +146,8 @@ function readSubscriptionRecord(
     status !== 'trialing' &&
     status !== 'past_due' &&
     status !== 'cancelled' &&
-    status !== 'expired'
+    status !== 'expired' &&
+    status !== 'revoked'
   ) {
     return null;
   }
@@ -168,16 +187,29 @@ function civilDateUTC(nowMs: number): string {
 export interface AiGatewayOptions {
   /** Monthly global cloud-cost ceiling in micro-rupees (₹ × 1e6). */
   readonly globalMonthlyBudgetMicros: number;
+  readonly applicationId?: string;
+  readonly priorityOrder?: readonly AiProviderId[];
   readonly nowMs?: () => number;
   readonly idFactory?: () => string;
 }
 
 export class AiGatewayService {
+  private readonly router: AIExecutionRouter;
+
   constructor(
     private readonly db: Firestore,
-    private readonly adapters: ReadonlyMap<string, AiProviderAdapter>,
+    adapters: ReadonlyMap<string, AIProvider | AiProviderAdapter>,
     private readonly options: AiGatewayOptions,
-  ) {}
+  ) {
+    const normalizedAdapters = new Map<string, AIProvider>();
+    for (const [id, adapter] of adapters.entries()) {
+      normalizedAdapters.set(id, asAiProvider(adapter));
+    }
+    this.router = new AIExecutionRouter(
+      normalizedAdapters,
+      this.options.priorityOrder,
+    );
+  }
 
   private nowMs(): number {
     return this.options.nowMs?.() ?? Date.now();
@@ -211,14 +243,6 @@ export class AiGatewayService {
     );
   }
 
-  private selectAdapter(providerId: string): AiProviderAdapter {
-    const adapter = this.adapters.get(providerId);
-    if (adapter === undefined) {
-      throw new GatewayBlockedError('ai-provider-unavailable');
-    }
-    return adapter;
-  }
-
   /**
    * Full generate pipeline. Throws GatewayBlockedError with a stable reason
    * code on any gate failure; provider failures map to
@@ -226,7 +250,7 @@ export class AiGatewayService {
    */
   async generate(
     uid: string,
-    request: AiGenerationRequest,
+    request: AIRequest | AiGenerationRequest,
   ): Promise<GenerateOutcome> {
     const nowMs = this.nowMs();
     const entitlement = await this.entitlementFor(uid);
@@ -252,14 +276,21 @@ export class AiGatewayService {
         request.capability,
       );
       if (decision.kind === 'blocked') {
-        throw new GatewayBlockedError(decision.reason);
+        throw new GatewayBlockedError(
+          decision.reason,
+          decision.reason === 'ai-subscription-required'
+            ? 'AI_SUBSCRIPTION_REQUIRED'
+            : decision.reason === 'ai-quota-exhausted'
+            ? 'AI_QUOTA_EXCEEDED'
+            : 'AI_CONFIGURATION_ERROR',
+        );
       }
 
       const budget = readSummary(
         budgetSnap.data(),
       );
       if (budget.costMicros >= this.options.globalMonthlyBudgetMicros) {
-        throw new GatewayBlockedError('ai-budget-exhausted');
+        throw new GatewayBlockedError('ai-budget-exhausted', 'AI_QUOTA_EXCEEDED');
       }
 
       tx.set(
@@ -276,13 +307,25 @@ export class AiGatewayService {
       );
     });
 
-    // Phase 2: execute outside the transaction (network I/O).
-    const providerId =
-      entitlement.providers.find((p) => p.available)?.provider ??
-      'gemini-cloud';
-    const adapter = this.selectAdapter(providerId);
+    // Phase 2: Route via AIExecutionRouter outside transaction (only after entitlement validated)
+    let adapter: AIProvider;
+    try {
+      adapter = await this.router.route(entitlement, request);
+    } catch (routeError) {
+      await this.compensateReservation(uid, periodKey, today).catch(
+        () => undefined,
+      );
+      if (
+        routeError instanceof AiProviderError &&
+        routeError.message.includes('AI_SUBSCRIPTION_REQUIRED')
+      ) {
+        throw new GatewayBlockedError('ai-subscription-required', 'AI_SUBSCRIPTION_REQUIRED');
+      }
+      throw new GatewayBlockedError('ai-provider-unavailable', 'AI_PROVIDER_UNAVAILABLE');
+    }
+
     const startedAt = Date.now();
-    let result: AiGenerationResult;
+    let result: AIResult;
     try {
       result = await adapter.generate(request);
     } catch (error) {
@@ -291,8 +334,8 @@ export class AiGatewayService {
         () => undefined,
       );
       throw error instanceof AiProviderError
-        ? new GatewayBlockedError('ai-provider-unavailable')
-        : new GatewayBlockedError('ai-provider-unavailable');
+        ? new GatewayBlockedError('ai-provider-unavailable', 'AI_PROVIDER_UNAVAILABLE')
+        : new GatewayBlockedError('ai-provider-unavailable', 'AI_PROVIDER_UNAVAILABLE');
     }
     const latencyMs = Math.max(0, Date.now() - startedAt);
 

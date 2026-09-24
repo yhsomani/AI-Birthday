@@ -369,10 +369,28 @@ class BirthdayNativeModule(
         "resume" -> promise.resolve(
           handleActivationIntent(request, expectedRevision, resume = true),
         )
-        "pause-all" -> promise.resolve(handlePauseAll(request, expectedRevision))
-        "generate-suggestions" -> promise.resolve(
-          successResponse(runBlocking { appGraph.geminiSuggestionGateway.generate(request) }),
-        )
+        "generate-suggestions" -> {
+          val entitlement = if (request.has("entitlement")) {
+            com.yashsomani.birthdayautopilot.ai.AiEntitlementSnapshot.parse(
+              request.optJSONObject("entitlement"),
+            )
+          } else {
+            null
+          }
+          if (entitlement != null && !entitlement.enabled) {
+            promise.resolve(
+              successResponse(
+                org.json.JSONObject()
+                  .put("kind", "fallback")
+                  .put("reason", "ai-subscription-required"),
+              ),
+            )
+          } else {
+            promise.resolve(
+              successResponse(runBlocking { appGraph.geminiSuggestionGateway.generate(request) }),
+            )
+          }
+        }
         "prepare-today-occurrence" -> promise.resolve(
           handleConfigurationOutcome(
             expectedRevision.configurationRevisionOrNull()?.let {

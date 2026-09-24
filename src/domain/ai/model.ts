@@ -27,8 +27,70 @@ export type AiPlanId = (typeof AI_PLAN_IDS)[number];
 // Adapter ids name the EXECUTION target, not how the user authenticates to
 // it — provider sign-in (OAuth) is an authorization-mode concern layered on
 // top of these ids (see AI_AUTHORIZATION_MODES).
-export const AI_PROVIDER_IDS = ['gemini-cloud', 'on-device'] as const;
+export const AI_PROVIDER_IDS = [
+  'gemini-cloud',
+  'on-device',
+  'local',
+  'user-gemini',
+  'stub',
+] as const;
 export type AiProviderId = (typeof AI_PROVIDER_IDS)[number];
+
+export const AI_EXECUTION_MODES = [
+  'cloud-pooled',
+  'user-owned',
+  'on-device',
+  'local-offline',
+  'stub',
+] as const;
+export type AiExecutionMode = (typeof AI_EXECUTION_MODES)[number];
+
+export const AI_ERROR_CODES = [
+  'AI_SUBSCRIPTION_REQUIRED',
+  'AI_AUTHENTICATION_REQUIRED',
+  'AI_QUOTA_EXCEEDED',
+  'AI_PROVIDER_UNAVAILABLE',
+  'AI_PROVIDER_NOT_AUTHORIZED',
+  'AI_PROVIDER_AUTH_EXPIRED',
+  'AI_FEATURE_NOT_SUPPORTED',
+  'AI_RATE_LIMITED',
+  'AI_EXECUTION_FAILED',
+  'AI_CONFIGURATION_ERROR',
+] as const;
+export type AiErrorCode = (typeof AI_ERROR_CODES)[number];
+
+// --- Generic AI Request / Result contracts ------------------------------------
+
+export interface AIRequest {
+  readonly capability: AiCapabilityId;
+  readonly input: {
+    readonly recipientDisplayName?: string;
+    readonly tone?: string;
+    readonly relationshipHint?: string;
+    readonly additionalContext?: string;
+    readonly language?: string;
+    readonly placeholderMode?: string;
+    readonly requestedSegmentCap?: number;
+    readonly [key: string]: unknown;
+  };
+  readonly prompt?: string;
+  readonly systemInstruction?: string;
+  readonly maxOutputTokens?: number;
+  readonly temperature?: number;
+  readonly options?: Record<string, unknown>;
+}
+
+export interface AIResult {
+  readonly provider: AiProviderId;
+  readonly executionMode: AiExecutionMode;
+  readonly model: string;
+  readonly text: string;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  /** Estimated cost in integer microcurrency units (₹ × 1,000,000). */
+  readonly estimatedCostMicros: number;
+  readonly latencyMs?: number;
+}
 
 export const AI_CAPABILITY_IDS = ['message-drafting'] as const;
 export type AiCapabilityId = (typeof AI_CAPABILITY_IDS)[number];
@@ -186,3 +248,39 @@ export function isAiSignInProvider(value: unknown): value is AiSignInProvider {
     (AI_SIGNIN_PROVIDERS as readonly string[]).includes(value)
   );
 }
+
+// --- Offline Entitlement Cache & Grace Period Policy ---------------------------
+
+export interface CachedAiEntitlement {
+  readonly uid: string;
+  readonly plan: AiPlanId;
+  readonly status: 'active' | 'trialing' | 'past_due' | 'cancelled' | 'expired' | 'revoked';
+  readonly enabled: boolean;
+  readonly lastVerifiedAtMs: number;
+  readonly expiresAtMs: number | null;
+  /** Max allowed offline grace period in ms (default: 72 hours). */
+  readonly gracePeriodMs?: number;
+}
+
+export const MAX_OFFLINE_GRACE_PERIOD_MS = 72 * 60 * 60 * 1000; // 72 hours strict ceiling
+
+/**
+ * Evaluates whether an offline entitlement snapshot is currently valid.
+ * Finite grace period applies (default 72h max).
+ * If subscription has expired or grace period has elapsed, returns false.
+ */
+export function isCachedEntitlementValid(
+  cached: CachedAiEntitlement | null | undefined,
+  nowMs: number,
+): boolean {
+  if (!cached) return false;
+  if (!cached.enabled) return false;
+  if (cached.expiresAtMs !== null && nowMs >= cached.expiresAtMs) return false;
+  const graceLimit = Math.min(
+    cached.gracePeriodMs ?? MAX_OFFLINE_GRACE_PERIOD_MS,
+    MAX_OFFLINE_GRACE_PERIOD_MS,
+  );
+  if (nowMs - cached.lastVerifiedAtMs > graceLimit) return false;
+  return true;
+}
+

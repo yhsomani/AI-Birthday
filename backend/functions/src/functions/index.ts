@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
@@ -24,8 +25,11 @@ import {
 } from '../domain/aiModel.js';
 import {
   GeminiRestAdapter,
+  LocalAIProvider,
+  OnDeviceAIProvider,
   StubProviderAdapter,
-  type AiProviderAdapter,
+  UserGeminiProvider,
+  type AIProvider,
 } from '../domain/aiProviders.js';
 import { CoordinationOperationOrchestrator } from '../services/coordinationOperationOrchestrator.js';
 import { ControlPlaneService } from '../services/controlPlane.js';
@@ -34,7 +38,10 @@ import {
   AiGatewayService,
   GatewayBlockedError,
 } from '../services/aiGateway.js';
-import { applyPlayBillingEvent } from '../services/subscriptionIngestion.js';
+import {
+  applyPlayBillingEvent,
+  applyStripeBillingEvent,
+} from '../services/subscriptionIngestion.js';
 import {
   aiEntitlementPath,
   aiUsageSummary,
@@ -44,6 +51,7 @@ import {
   accountModeSchema,
   aiEntitlementStatusSchema,
   aiGenerateDraftSchema,
+  aiGenerateSchema,
   birthdayClaimSchema,
   contactDerivedResetSchema,
   coordinationLifecycleStatusSchema,
@@ -99,7 +107,11 @@ const aiGatewayOptions = {
 };
 
 function buildAiGateway(): AiGatewayService {
-  const adapters = new Map<string, AiProviderAdapter>();
+  const adapters = new Map<string, AIProvider>();
+  adapters.set('user-gemini', new UserGeminiProvider());
+  adapters.set('local', new LocalAIProvider());
+  adapters.set('on-device', new OnDeviceAIProvider());
+
   if (AI_PROVIDER_MODE.value() === 'gemini-rest') {
     const apiKey = GEMINI_API_KEY.value();
     if (apiKey !== '') {
@@ -115,6 +127,7 @@ function buildAiGateway(): AiGatewayService {
   return new AiGatewayService(db, adapters, {
     globalMonthlyBudgetMicros:
       Number.isSafeInteger(budgetRaw) && budgetRaw > 0 ? budgetRaw : 5_000_000_000,
+    priorityOrder: ['user-gemini', 'local', 'on-device', 'gemini-cloud'],
   });
 }
 
@@ -418,24 +431,20 @@ function buildDraftPrompt(input: {
 
 function gatewayBlockedToHttps(error: unknown): HttpsError {
   if (error instanceof GatewayBlockedError) {
+    const details = {
+      reason: error.reason,
+      errorCode: error.errorCode,
+    };
     switch (error.reason) {
       case 'ai-subscription-required':
-        return new HttpsError('failed-precondition', 'AI_SUBSCRIPTION_REQUIRED', {
-          reason: error.reason,
-        });
+        return new HttpsError('failed-precondition', error.errorCode, details);
       case 'ai-quota-exhausted':
       case 'ai-budget-exhausted':
-        return new HttpsError('resource-exhausted', 'AI_QUOTA_EXHAUSTED', {
-          reason: error.reason,
-        });
+        return new HttpsError('resource-exhausted', error.errorCode, details);
       case 'ai-usage-period-mismatch':
-        return new HttpsError('failed-precondition', 'AI_USAGE_PERIOD_MISMATCH', {
-          reason: error.reason,
-        });
+        return new HttpsError('failed-precondition', error.errorCode, details);
       default:
-        return new HttpsError('unavailable', 'AI_PROVIDER_UNAVAILABLE', {
-          reason: error.reason,
-        });
+        return new HttpsError('unavailable', error.errorCode, details);
     }
   }
   throw error;
@@ -480,6 +489,46 @@ export const getAiEntitlementStatus = onCall(
   },
 );
 
+export const generateAi = onCall(
+  aiGatewayOptions,
+  async request => {
+    const uid = requireAuthenticated(request);
+    const payload = parseRequest(aiGenerateSchema, request.data);
+    const gateway = buildAiGateway();
+    const requestId = payload.requestId ?? randomUUID();
+    const prompt = buildDraftPrompt({
+      recipientDisplayName: payload.input.recipientDisplayName,
+      tone: payload.input.tone,
+      relationshipHint: payload.input.relationshipHint,
+      additionalContext: payload.input.additionalContext,
+    });
+    try {
+      const outcome = await gateway.generate(uid, {
+        capability: payload.capability,
+        prompt,
+        systemInstruction: AI_SYSTEM_INSTRUCTION,
+        maxOutputTokens: 300,
+        temperature: 0.7,
+        input: payload.input,
+        options: payload.options,
+      });
+      return {
+        contractVersion: 1,
+        requestId,
+        text: outcome.result.text,
+        draft: outcome.result.text,
+        provider: outcome.result.provider,
+        executionMode: outcome.result.executionMode,
+        model: outcome.result.model,
+        remainingToday: outcome.remainingToday,
+        remainingInPeriod: outcome.remainingInPeriod,
+      };
+    } catch (error) {
+      throw gatewayBlockedToHttps(error);
+    }
+  },
+);
+
 export const generateBirthdayDraft = onCall(
   aiGatewayOptions,
   async request => {
@@ -493,12 +542,14 @@ export const generateBirthdayDraft = onCall(
         systemInstruction: AI_SYSTEM_INSTRUCTION,
         maxOutputTokens: 300,
         temperature: 0.7,
+        input,
       });
       return {
         contractVersion: 1,
         requestId: input.requestId,
         draft: outcome.result.text,
         provider: outcome.result.provider,
+        executionMode: outcome.result.executionMode,
         model: outcome.result.model,
         remainingToday: outcome.remainingToday,
         remainingInPeriod: outcome.remainingInPeriod,
@@ -589,3 +640,73 @@ export const onPlayBillingEvent = onDocumentCreated(
     );
   },
 );
+
+export const onStripeBillingEvent = onDocumentCreated(
+  {
+    region: REGION,
+    timeoutSeconds: 30,
+    memory: '256MiB',
+    serviceAccount: SERVICE_ACCOUNT,
+    document: 'users/{uid}/events/stripeBilling/{eventId}',
+  },
+  async (
+    event: FirestoreEvent<
+      QueryDocumentSnapshot | undefined,
+      BillingEventParams
+    >,
+  ) => {
+    const uid: string = event.params.uid;
+    if (typeof uid !== 'string' || uid.length === 0) {
+      return;
+    }
+    await applyStripeBillingEvent(
+      async (targetUid, record) => {
+        await aiEntitlementPath(db, targetUid).set(
+          record as unknown as Record<string, unknown>,
+          { merge: false },
+        );
+      },
+      async (targetUid) => {
+        const snap = await aiEntitlementPath(db, targetUid).get();
+        const data = snap.data() as Record<string, unknown> | undefined;
+        if (data === undefined) {
+          return null;
+        }
+        const plan = data.plan;
+        const status = data.status;
+        const updatedAtMs = data.updatedAtMs;
+        const expiresAtMs = data.expiresAtMs;
+        const purchasedAtMs = data.purchasedAtMs;
+        const cancelledAtMs = data.cancelledAtMs;
+        const externalId = data.externalSubscriptionId;
+        const billingProvider = data.billingProvider;
+        if (
+          (plan !== 'free' && plan !== 'wishwell-plus') ||
+          typeof status !== 'string' ||
+          typeof updatedAtMs !== 'number'
+        ) {
+          return null;
+        }
+        return {
+          schemaVersion: AI_SCHEMA_VERSION,
+          uid: targetUid,
+          plan,
+          status: status as AiSubscriptionStatus,
+          billingProvider:
+            typeof billingProvider === 'string' ? billingProvider : 'unknown',
+          externalSubscriptionId:
+            typeof externalId === 'string' ? externalId : null,
+          purchasedAtMs:
+            typeof purchasedAtMs === 'number' ? purchasedAtMs : null,
+          expiresAtMs: typeof expiresAtMs === 'number' ? expiresAtMs : null,
+          cancelledAtMs:
+            typeof cancelledAtMs === 'number' ? cancelledAtMs : null,
+          updatedAtMs,
+        };
+      },
+      uid,
+      event.data,
+    );
+  },
+);
+

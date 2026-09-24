@@ -209,7 +209,7 @@ export type CoordinationLifecycleStatusRequest = z.infer<
 // --- AI Gateway request schemas ------------------------------------------------
 
 const aiCapability = z.enum(['message-drafting']);
-const tone = z.enum(['warm', 'formal', 'playful', 'sincere']);
+const tone = z.enum(['warm', 'simple', 'cheerful', 'formal', 'playful', 'sincere']);
 
 export const aiEntitlementStatusSchema = z
   .object({
@@ -230,7 +230,28 @@ export const aiGenerateDraftSchema = z
   })
   .strict();
 
+export const aiGenerateSchema = z
+  .object({
+    contractVersion: contractVersion.optional(),
+    applicationId: z.string().min(1).max(64).default('ai-birthday'),
+    requestId: stableRequestId.optional(),
+    capability: aiCapability.default('message-drafting'),
+    input: z.object({
+      recipientDisplayName: z.string().min(1).max(120),
+      tone: z.string().default('warm'),
+      relationshipHint: z.string().max(80).optional(),
+      additionalContext: z.string().max(500).optional(),
+      language: z.string().max(10).default('en'),
+      milestone: z.string().max(40).optional(),
+      placeholderMode: z.string().max(40).optional(),
+      requestedSegmentCap: z.number().int().min(1).max(2).optional(),
+    }),
+    options: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+
 export type AiEntitlementStatusRequest = z.infer<
   typeof aiEntitlementStatusSchema
 >;
 export type AiGenerateDraftRequest = z.infer<typeof aiGenerateDraftSchema>;
+export type AiGenerateRequest = z.infer<typeof aiGenerateSchema>;

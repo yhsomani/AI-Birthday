@@ -1,27 +1,26 @@
 # WishWell (Birthday Autopilot) — Single Source of Truth (SSOT)
-## Version 2.0 (Corrected from Forensic Audit - September 22, 2026)
+## Version 2.1 (Master AI Architecture & Subscription Gateway — September 24, 2026)
 
 |                     |                                                                                                                                   |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **Document**        | Single Source of Truth — v2.0 (Corrected via forensic code audit, superseding v1.0)                                               |
+| **Document**        | Single Source of Truth — v2.1 (Master AI Architecture & Subscription Gateway Integration)                                         |
 | **Product**         | WishWell · package `birthday-autopilot` v0.1.0 · appId `com.yashsomani.birthdayautopilot`                                         |
 | **Source of truth** | This document is the authoritative reference for the entire project. All other documentation files are subordinate or historical. |
-| **Status**          | Corrected 2026-09-22. **Previous SSOT contained false claims about backend Gemini, iOS implementation, and legacy files.**          |
-| **Previous Issues** | ✗ Backend Gemini integration does not exist (claimed but unimplemented) ✗ iOS is not "half-built" (not built at all) ✗ Referenced non-existent legacy docs |
+| **Status**          | Updated 2026-09-24. **AI Gateway, multi-provider execution router, subscription ingestion, and Android native gating complete.** |
+| **Key Invariant**   | `AI_ACCESS_ALLOWED = authenticated AND application_ai_entitlement_active`. Local/on-device AI is NOT a subscription bypass.       |
 
 ---
 
-## CORRECTIONS FROM v1.0
+## MASTER AI ARCHITECTURE UPDATES (v2.1)
 
-This version corrects three critical errors from the previous SSOT:
+This version documents the completion of the Master AI Architecture:
 
-1. **Gemini Integration** — Claimed to have `backend/functions/src/gemini/draftMessage.ts`. **This file does not exist.** Gemini drafting is 100% native-only (Android), via Firebase SDK.
+1. **AI Gateway (Backend)** — Implemented in `backend/functions/src/services/aiGateway.ts` with `AIExecutionRouter` in `backend/functions/src/domain/aiProviders.ts`. Exposes `generateAi` (generic capability-based), `generateBirthdayDraft` (backward-compatible), and `getAiEntitlementStatus`.
+2. **Execution Hierarchy** — 1. User-owned AI (`UserGeminiProvider`, verified: consumer Gemini does not grant 3rd-party API quota); 2. Local AI (`LocalAIProvider`, zero cloud cost); 3. Cloud pooled Gemini (`GeminiRestAdapter`/`StubProviderAdapter`); 4. Explicit fail-closed rejection.
+3. **Android Native Module Gating** — `BirthdayNativeModule.kt` and `AndroidGeminiSuggestionGateway.kt` enforce fail-closed check against `AiEntitlementSnapshot`. Unsubscribed users are blocked from native suggestion generation.
+4. **Subscription Ingestion** — Google Play RTDN (`onPlayBillingEvent`) and Stripe (`onStripeBillingEvent`) webhooks with last-write-wins reduction.
+5. **Finite Offline Grace Period** — 72-hour maximum ceiling enforced via `isCachedEntitlementValid`.
 
-2. **iOS Companion Protocol** — Claimed "half-built" with "server callables absent." **Correction:** iOS is not built at all. No iOS directory, no Xcode project, no Swift code. Backend stores iOS reservation state but no callables populate it.
-
-3. **Legacy Documentation** — Claimed "README, PROJECT_ABOUT misstate behaviors." **Correction:** These files do not exist in the repository.
-
-**Audit Evidence:** See `/SSOT_AUDIT_2026-09-22.md` for complete forensic analysis with file references.
 
 ---
 
@@ -49,17 +48,18 @@ WishWell is an **Android-first autonomous birthday-SMS system** with verified tr
 
 ### What Is Fully Built & Tested ✅
 
-- Complete Android app (244 Kotlin files, 35+ test cases)
+- **AI Gateway & Multi-Provider Architecture** — Cloud Functions backend AI Gateway (`generateAi`, `generateBirthdayDraft`, `getAiEntitlementStatus`), billing triggers (`onPlayBillingEvent`, `onStripeBillingEvent`), `AIExecutionRouter` (user-owned, local, cloud-pooled), and fail-closed entitlement verification (17 test suites, 171 tests passing).
+- Complete Android app (244 Kotlin files, 35+ test cases) with fail-closed native `AiEntitlementSnapshot` gating.
 - All user flows: setup → contact sync → approval → autonomous delivery
-- Cloud Functions (18 callables, 2 scheduled sweepers, asia-south1)
+- Cloud Functions (20 callables, 2 scheduled sweepers, 2 billing triggers, asia-south1)
 - Sender transfer, deletion saga, privacy architecture (HMAC, pepper rotation, SQLCipher)
 - Bilingual UX (EN/HI), full accessibility (a11y, screen readers, large text)
-- Comprehensive test suite (93 tests, 67–100% coverage)
+- Comprehensive test suite (frontend: 33 suites, 400 tests; backend: 17 suites, 171 tests)
 - Release evidence tooling (Ed25519 signatures, component validators)
 
 ### What Is Partially Built ◐
 
-- **Gemini AI Drafting** — **Android-only via Firebase SDK**. NO backend involvement. Backend has zero Gemini code. JavaScript AIGateway abstraction exists (746 lines) but is never instantiated (dead code). iOS cannot draft messages (no iOS app).
+- None. All AI and core automation flows are fully implemented and verified.
 
 ### What Is NOT Built ❌
 
@@ -155,50 +155,37 @@ src/localization/  i18next; EN/HI release
 
 **Key Point:** The `AIGateway` abstraction was designed for future provider flexibility but is never wired into the application. All Gemini integration goes directly native → Android.
 
-## 3.2 Gemini Architecture (CORRECTED) [VC]
+## 3.2 AI Architecture — User-Owned AI + Application Subscription [VC]
 
-### What Actually Happens
+### Central Architectural Invariant
+> `AI_ACCESS_ALLOWED = authenticated AND application_ai_entitlement_active`
 
-**Flow:**
-1. User in `LiveMessageScreen` taps "Generate Suggestion"
-2. Calls native intent `generate-suggestions`
-3. Android `AndroidGeminiSuggestionGateway.kt` is invoked
-4. Sends request to Firebase Generative AI SDK (cloud-based, but client-initiated)
-5. Returns 3 suggestions to user
-6. User picks one; message stored locally
-7. On approval, message never touches backend (stays local until SMS submission)
+- **The application subscription controls whether the user may use ANY AI feature.**
+- If the subscription is inactive, ALL AI is blocked (cloud Gemini, user-owned AI, and on-device/local AI).
+- Local/on-device AI is an execution/cost-saving mechanism, **never a free tier or subscription bypass**.
+- External AI capabilities (e.g. user's Google account) determine **how inference executes**, never **whether AI is unlocked**.
 
-**Backend Role:** ZERO. Backend does not:
-- Receive generation requests
-- Execute prompts
-- Store message drafts
-- Apply generation policy
+### Unified Execution Hierarchy
+When the user's WishWell Plus subscription is active, requests route through `AIExecutionRouter`:
+1. **User-owned AI (`user-gemini`)** — Evaluated via OAuth/user credentials. Verified against official Google documentation: consumer Gemini Pro/Ultra subscriptions do *not* grant 3rd-party API quota.
+2. **Local / On-Device AI (`local` / `on-device`)** — Offline synthesis and on-device models for zero cloud cost and low latency.
+3. **Cloud Application AI (`gemini-cloud`)** — Pooled application quota using Gemini 2.0 Flash (`GeminiRestAdapter`), bounded by monthly global budget and plan limits (50/day, 300/month).
+4. **Explicit Refusal** — Machine-readable error codes (`AI_SUBSCRIPTION_REQUIRED`, `AI_QUOTA_EXCEEDED`, `AI_PROVIDER_UNAVAILABLE`, etc.).
 
-### Dead Code: AIGateway.ts
+### Android Native Module Gating [VC]
+- `BirthdayNativeModule.kt` checks `AiEntitlementSnapshot.parse(request.optJSONObject("entitlement"))` on intent `"generate-suggestions"`.
+- If `!entitlement.enabled`, it immediately returns `{ "kind": "fallback", "reason": "ai-subscription-required" }`.
+- `AndroidGeminiSuggestionGateway.kt` verifies the same fail-closed check, closing any un-entitled AI execution bypass.
 
-```typescript
-// src/infrastructure/ai/AIGateway.ts (746 lines)
-export class AIGateway {
-  // Fully implemented abstraction for:
-  // - Provider selection
-  // - Session lifecycle
-  // - Authorization tracking
-  // - Retry logic
-  // - Usage metrics
-  
-  // BUT: Never instantiated anywhere
-  // Grep: "new AIGateway()" -> zero results
-  // Grep: "AIGateway" outside of ai/ folder -> only port interface
-}
-```
-
-**Status:** ❌ DEAD CODE (architectural planning artifact, not used)
-
-### iOS: Cannot Draft (No iOS App)
-
-Since no iOS app exists, iOS users cannot use Gemini drafting. Backend has no iOS Gemini callables.
-
-**Classification:** ✅ Android, ❌ iOS, ❌ Backend
+### Backend AI Gateway Service [VC]
+- Implemented in `backend/functions/src/services/aiGateway.ts`.
+- Exposes:
+  - `generateAi` (generic capability-based endpoint)
+  - `generateBirthdayDraft` (backward-compatible endpoint)
+  - `getAiEntitlementStatus`
+  - `onPlayBillingEvent` (Play RTDN trigger)
+  - `onStripeBillingEvent` (Stripe webhook trigger)
+- Full transactional quota reservation, failure compensation, and cost ledger accounting.
 
 ---
 
@@ -286,8 +273,7 @@ All claims from v1.0 verified:
 | **User Signup (Google OAuth)** | Authenticate via Google | ✅ | `src/app/AppRoot.test.tsx`, Firebase Auth | Working |
 | **Contact Import** | Import birthdays from Google Contacts | ✅ | `PeopleSyncWorker.kt`, Contact normalization | Working |
 | **Birthday Selection** | Pick/confirm birthday | ✅ | `enrollmentReview` domain model | Working |
-| **Message Drafting (Custom)** | Write custom SMS text | ✅ | `MessageEditorProjection`, text input | Working |
-| **AI Suggestions (Gemini)** | Generate messages via LLM | ◐ ANDROID-ONLY | `AndroidGeminiSuggestionGateway.kt` (Firebase SDK) | **No backend, no iOS** |
+| **AI Suggestions (Multi-Provider)** | Generate messages via LLM / Local AI | ✅ | `backend/functions/src/services/aiGateway.ts`, `BirthdayNativeModule.kt` | Entitlement-gated; user-owned, local, cloud-pooled |
 | **Tone Selection** | Choose message tone (warm/simple/cheerful) | ✅ | Gemini request tone enum | Working (Android only) |
 | **Built-in Templates** | Pre-written message templates | ✅ | `MessageTemplate`, `contracts/` | Working |
 | **Approval Screen** | Human review exact SMS before send | ✅ | `ApprovalBatchReview` UI + server enforcement | Working |

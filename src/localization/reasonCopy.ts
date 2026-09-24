@@ -13,6 +13,7 @@ export const safeReasonMessageKeys: Record<SafeReasonCode, TranslationKey> = {
   'account-mismatch': 'live.reason.accountMismatch',
   'account-reconnect-required': 'live.reason.accountReconnect',
   'active-sender-other-device': 'live.reason.activeSenderOtherDevice',
+  'ai-provider-unavailable': 'live.reason.aiProviderUnavailable',
   'ai-quota-exhausted': 'live.reason.aiQuotaExhausted',
   'ai-subscription-required': 'live.reason.aiSubscriptionRequired',
   'ai-usage-period-mismatch': 'live.reason.internalContractInvalid',

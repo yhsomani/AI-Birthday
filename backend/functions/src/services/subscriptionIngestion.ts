@@ -130,3 +130,110 @@ export async function applyPlayBillingEvent(
   await write(uid, next);
   return 'applied';
 }
+
+// --- Stripe Billing Ingestion --------------------------------------------------
+
+/** Maps Stripe Price IDs onto WishWell plans. */
+export const STRIPE_PRICE_TO_PLAN: Readonly<Record<string, AiPlanId>> = {
+  'price_wishwell_plus_monthly': 'wishwell-plus',
+  'price_wishwell_plus_yearly': 'wishwell-plus',
+  'price_wishwell_plus_test': 'wishwell-plus',
+};
+
+export interface StripeSubscriptionEvent {
+  readonly uid: string;
+  readonly subscriptionId: string;
+  readonly priceId: string;
+  readonly expiresAtMs: number | null;
+  readonly status: AiSubscriptionStatus;
+  readonly occurredAtMs: number;
+}
+
+export function reduceStripeEvent(
+  previous: AiSubscriptionRecord | null,
+  event: StripeSubscriptionEvent,
+): AiSubscriptionRecord | null {
+  const plan = STRIPE_PRICE_TO_PLAN[event.priceId];
+  if (plan === undefined) {
+    return previous;
+  }
+  const isActive =
+    ACTIVE_STATUSES.includes(event.status) &&
+    (event.expiresAtMs === null || event.expiresAtMs > event.occurredAtMs);
+  return {
+    schemaVersion: AI_SCHEMA_VERSION,
+    uid: event.uid,
+    plan: isActive ? plan : 'free',
+    status: isActive
+      ? event.status
+      : event.status === 'past_due'
+      ? 'past_due'
+      : event.status === 'revoked'
+      ? 'revoked'
+      : 'expired',
+    billingProvider: 'stripe',
+    externalSubscriptionId: event.subscriptionId.slice(0, 32),
+    purchasedAtMs: previous?.purchasedAtMs ?? event.occurredAtMs,
+    expiresAtMs: event.expiresAtMs,
+    cancelledAtMs: isActive ? previous?.cancelledAtMs ?? null : event.occurredAtMs,
+    updatedAtMs: event.occurredAtMs,
+  };
+}
+
+/** Firestore-trigger entry point: `users/{uid}/events/stripeBilling/{eventId}`. */
+export async function applyStripeBillingEvent(
+  write: (uid: string, record: AiSubscriptionRecord) => Promise<void>,
+  read: (uid: string) => Promise<AiSubscriptionRecord | null>,
+  uid: string,
+  raw: BillingEventSnapshot | undefined,
+): Promise<'applied' | 'ignored'> {
+  const data = raw?.data();
+  if (data === undefined) {
+    return 'ignored';
+  }
+  const priceId = data.priceId;
+  const subscriptionId = data.subscriptionId;
+  const status = data.status;
+  const expiresAtMs = data.expiresAtMs;
+  const occurredAtMs = data.occurredAtMs;
+  if (
+    typeof priceId !== 'string' ||
+    typeof subscriptionId !== 'string' ||
+    typeof status !== 'string' ||
+    typeof occurredAtMs !== 'number' ||
+    !Number.isSafeInteger(occurredAtMs) ||
+    (expiresAtMs !== undefined &&
+      expiresAtMs !== null &&
+      !(typeof expiresAtMs === 'number' && Number.isSafeInteger(expiresAtMs)))
+  ) {
+    return 'ignored';
+  }
+  if (
+    status !== 'active' &&
+    status !== 'trialing' &&
+    status !== 'past_due' &&
+    status !== 'cancelled' &&
+    status !== 'expired' &&
+    status !== 'revoked'
+  ) {
+    return 'ignored';
+  }
+  const previous = await read(uid);
+  if (previous !== null && previous.updatedAtMs >= occurredAtMs) {
+    return 'ignored';
+  }
+  const next = reduceStripeEvent(previous, {
+    uid,
+    subscriptionId,
+    priceId,
+    expiresAtMs: typeof expiresAtMs === 'number' ? expiresAtMs : null,
+    status: status as AiSubscriptionStatus,
+    occurredAtMs,
+  });
+  if (next === null || (previous !== null && next.updatedAtMs === previous.updatedAtMs)) {
+    return 'ignored';
+  }
+  await write(uid, next);
+  return 'applied';
+}
+

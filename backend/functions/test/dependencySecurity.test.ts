@@ -43,8 +43,11 @@ describe('Firebase uuid advisory containment', () => {
 
     expectOnlyNoArgumentV4('node_modules/gaxios/build/src/gaxios.js');
     expectOnlyNoArgumentV4('node_modules/teeny-request/build/src/index.js');
-    expectOnlyNoArgumentV4(
-      'node_modules/google-gax/build/src/util.js',
-    );
+
+    const gaxUtilPath = path.join(packageRoot, 'node_modules/google-gax/build/src/util.js');
+    const gaxSource = readFileSync(gaxUtilPath, 'utf8');
+    // google-gax eliminates the uuid dependency entirely in favor of crypto.randomUUID
+    expect(gaxSource).toMatch(/randomUUID/u);
+    expect(gaxSource).not.toMatch(/require\(["']uuid["']\)/u);
   });
 });

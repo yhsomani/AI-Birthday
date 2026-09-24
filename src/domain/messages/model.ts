@@ -117,20 +117,28 @@ export type MessageMilestone =
   | 'new-baby'
   | 'milestone-age';
 
-export type GeminiRequest = Readonly<{
+export type AIMessageSuggestionRequest = Readonly<{
   language: MessageLanguage;
   tone: MessageTone;
   placeholderMode: PlaceholderMode;
   requestedSegmentCap: 1 | 2;
   relationship?: MessageRelationship | undefined;
   milestone?: MessageMilestone | undefined;
+  additionalContext?: string | undefined;
+  recipientDisplayName?: string | undefined;
 }>;
 
-export type GeminiSuggestionsProjection =
+/** Backward-compatible alias for AIMessageSuggestionRequest. */
+export type GeminiRequest = AIMessageSuggestionRequest;
+
+export type AIMessageSuggestionResult =
   | Readonly<{ kind: 'requesting' }>
   | Readonly<{
       kind: 'candidates';
       candidates: readonly PrivateMessageText[];
+      provider?: string | undefined;
+      executionMode?: string | undefined;
+      model?: string | undefined;
     }>
   | Readonly<{
       kind: 'fallback';
@@ -142,9 +150,13 @@ export type GeminiSuggestionsProjection =
         // app's own subscription/quota state, never an external provider
         // subscription. See AI_ENTITLEMENT_ARCHITECTURE.md.
         | 'ai-subscription-required'
-        | 'ai-quota-exhausted';
+        | 'ai-quota-exhausted'
+        | 'ai-provider-unavailable';
     }>
   | Readonly<{
       kind: 'failed';
       reason: 'unknown-native-value' | 'internal-contract-invalid';
     }>;
+
+/** Backward-compatible alias for AIMessageSuggestionResult. */
+export type GeminiSuggestionsProjection = AIMessageSuggestionResult;

@@ -287,6 +287,7 @@ export const geminiSuggestionsProjectionSchema = z.discriminatedUnion('kind', [
       // never an external provider subscription, decides these.
       'ai-subscription-required',
       'ai-quota-exhausted',
+      'ai-provider-unavailable',
     ]),
   }),
   strictObject({
@@ -294,6 +295,8 @@ export const geminiSuggestionsProjectionSchema = z.discriminatedUnion('kind', [
     reason: z.enum(['unknown-native-value', 'internal-contract-invalid']),
   }),
 ]);
+
+export const aiMessageSuggestionResultSchema = geminiSuggestionsProjectionSchema;
 
 // --- AI entitlement / provider-access projections ------------------------------
 // Provider-agnostic by construction: 'gemini-cloud' is one adapter id among

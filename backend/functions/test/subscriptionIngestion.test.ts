@@ -9,10 +9,14 @@ import { describe, expect, it } from 'vitest';
 import { AI_SCHEMA_VERSION, type AiSubscriptionRecord } from '../src/domain/aiModel.js';
 import {
   SKU_TO_PLAN,
+  STRIPE_PRICE_TO_PLAN,
   applyPlayBillingEvent,
+  applyStripeBillingEvent,
   reducePlayEvent,
+  reduceStripeEvent,
   type BillingEventSnapshot,
   type PlaySubscriptionEvent,
+  type StripeSubscriptionEvent,
 } from '../src/services/subscriptionIngestion.js';
 
 const T0 = Date.UTC(2026, 8, 1, 0, 0, 0);
@@ -212,3 +216,83 @@ describe('applyPlayBillingEvent (trigger entry point)', () => {
     expect(written?.expiresAtMs ?? null).toBeNull();
   });
 });
+
+describe('STRIPE_PRICE_TO_PLAN & reduceStripeEvent', () => {
+  it('maps Stripe monthly and yearly prices onto wishwell-plus', () => {
+    expect(STRIPE_PRICE_TO_PLAN.price_wishwell_plus_monthly).toBe('wishwell-plus');
+    expect(STRIPE_PRICE_TO_PLAN.price_wishwell_plus_yearly).toBe('wishwell-plus');
+  });
+
+  it('reduces active Stripe subscription event to active wishwell-plus record', () => {
+    const stripeEvent: StripeSubscriptionEvent = {
+      uid: 'uid-stripe-1',
+      subscriptionId: 'sub_1234567890abcdef',
+      priceId: 'price_wishwell_plus_monthly',
+      expiresAtMs: T0 + 30 * 24 * 3600_000,
+      status: 'active',
+      occurredAtMs: T0,
+    };
+    const record = reduceStripeEvent(null, stripeEvent);
+    expect(record).not.toBeNull();
+    expect(record?.plan).toBe('wishwell-plus');
+    expect(record?.status).toBe('active');
+    expect(record?.billingProvider).toBe('stripe');
+    expect(record?.externalSubscriptionId).toBe('sub_1234567890abcdef');
+  });
+
+  it('reduces cancelled or expired Stripe subscription to free plan', () => {
+    const stripeEvent: StripeSubscriptionEvent = {
+      uid: 'uid-stripe-1',
+      subscriptionId: 'sub_1234567890abcdef',
+      priceId: 'price_wishwell_plus_monthly',
+      expiresAtMs: T0 - 1000,
+      status: 'expired',
+      occurredAtMs: T0,
+    };
+    const record = reduceStripeEvent(null, stripeEvent);
+    expect(record).not.toBeNull();
+    expect(record?.plan).toBe('free');
+    expect(record?.status).toBe('expired');
+  });
+});
+
+describe('applyStripeBillingEvent', () => {
+  it('applies valid Stripe billing event and ignores stale events', async () => {
+    let writtenRecord: AiSubscriptionRecord | null = null;
+    const write = async (_uid: string, record: AiSubscriptionRecord) => {
+      writtenRecord = record;
+    };
+    const read = async () => null;
+
+    const snap = snapshot({
+      priceId: 'price_wishwell_plus_monthly',
+      subscriptionId: 'sub_stripe_abc',
+      status: 'active',
+      expiresAtMs: T0 + 30 * 24 * 3600_000,
+      occurredAtMs: T0,
+    });
+
+    const result = await applyStripeBillingEvent(write, read, 'uid-stripe-1', snap);
+    expect(result).toBe('applied');
+    const getWritten = (): AiSubscriptionRecord | null => writtenRecord;
+    const record = getWritten();
+    expect(record?.billingProvider).toBe('stripe');
+    expect(record?.plan).toBe('wishwell-plus');
+
+    // Stale replay with older occurredAtMs
+    const staleResult = await applyStripeBillingEvent(
+      write,
+      async () => writtenRecord,
+      'uid-stripe-1',
+      snapshot({
+        priceId: 'price_wishwell_plus_monthly',
+        subscriptionId: 'sub_stripe_abc',
+        status: 'active',
+        expiresAtMs: T0 + 30 * 24 * 3600_000,
+        occurredAtMs: T0 - 5000,
+      }),
+    );
+    expect(staleResult).toBe('ignored');
+  });
+});
+

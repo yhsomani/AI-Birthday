@@ -65,6 +65,15 @@ internal class AndroidGeminiSuggestionGateway internal constructor(
   )
 
   suspend fun generate(requestJson: JSONObject): JSONObject {
+    if (requestJson.has("entitlement")) {
+      val entitlement = com.yashsomani.birthdayautopilot.ai.AiEntitlementSnapshot.parse(
+        requestJson.optJSONObject("entitlement"),
+      )
+      if (!entitlement.enabled) {
+        provenanceRegistry.clear()
+        return fallbackProjection("ai-subscription-required")
+      }
+    }
     val request = GeminiSuggestionPolicy.parseRequest(requestJson) ?: run {
       provenanceRegistry.clear()
       return failedProjection()

@@ -1,4 +1,6 @@
 import type {
+  AIMessageSuggestionRequest,
+  AIMessageSuggestionResult,
   GeminiRequest,
   GeminiSuggestionsProjection,
   MessageDraft,
@@ -36,6 +38,6 @@ export interface MessagePort {
    * provider authorisation is OAuth sign-in only.
    */
   generateSuggestions(
-    request: GeminiRequest,
-  ): Promise<NativeResult<GeminiSuggestionsProjection>>;
+    request: AIMessageSuggestionRequest,
+  ): Promise<NativeResult<AIMessageSuggestionResult>>;
 }

@@ -1,1 +1,6 @@
-(empty)
+node_modules/
+coverage/
+android/app/build/
+android/build/
+.DS_Store
+*.log

@@ -4,6 +4,7 @@ export const SAFE_REASON_CODES = [
   'account-mismatch',
   'account-reconnect-required',
   'active-sender-other-device',
+  'ai-provider-unavailable',
   'ai-quota-exhausted',
   'ai-subscription-required',
   'ai-usage-period-mismatch',

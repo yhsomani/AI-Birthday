@@ -25,12 +25,26 @@ export const AI_SCHEMA_VERSION = 1 as const;
 export const AI_PLAN_IDS = ['free', 'wishwell-plus'] as const;
 export type AiPlanId = (typeof AI_PLAN_IDS)[number];
 
-/** Adapter ids name the EXECUTION target, not how the user authenticates. */
-export const AI_PROVIDER_IDS = ['gemini-cloud', 'on-device'] as const;
+export const AI_PROVIDER_IDS = [
+  'gemini-cloud',
+  'on-device',
+  'local',
+  'user-gemini',
+  'stub',
+] as const;
 export type AiProviderId = (typeof AI_PROVIDER_IDS)[number];
 
 export const AI_CAPABILITY_IDS = ['message-drafting'] as const;
 export type AiCapabilityId = (typeof AI_CAPABILITY_IDS)[number];
+
+export const AI_EXECUTION_MODES = [
+  'user-authorized',
+  'local',
+  'on-device',
+  'application-cloud',
+  'stub',
+] as const;
+export type AiExecutionMode = (typeof AI_EXECUTION_MODES)[number];
 
 export const AI_AUTHORIZATION_MODES = [
   /** Application-owned project credentials. Invisible to users. */
@@ -39,6 +53,8 @@ export const AI_AUTHORIZATION_MODES = [
   'provider-sign-in',
   /** No provider credential; inference runs entirely on the device. */
   'on-device',
+  /** Local model or generative synthesis on-device. */
+  'local',
 ] as const;
 export type AiAuthorizationMode =
   (typeof AI_AUTHORIZATION_MODES)[number];
@@ -52,8 +68,24 @@ export const AI_SUBSCRIPTION_STATUSES = [
   'past_due',
   'cancelled',
   'expired',
+  'revoked',
 ] as const;
 export type AiSubscriptionStatus = (typeof AI_SUBSCRIPTION_STATUSES)[number];
+
+/** Machine-readable error codes across the AI architecture. */
+export const AI_ERROR_CODES = [
+  'AI_SUBSCRIPTION_REQUIRED',
+  'AI_PROVIDER_UNAVAILABLE',
+  'AI_PROVIDER_NOT_AUTHORIZED',
+  'AI_PROVIDER_AUTH_EXPIRED',
+  'AI_FEATURE_NOT_SUPPORTED',
+  'AI_QUOTA_EXCEEDED',
+  'AI_RATE_LIMITED',
+  'AI_UNAVAILABLE',
+  'AI_EXECUTION_FAILED',
+  'AI_CONFIGURATION_ERROR',
+] as const;
+export type AiErrorCode = (typeof AI_ERROR_CODES)[number];
 
 /** Reason codes surfaced to clients. Closed vocabulary, stable strings. */
 export const AI_REASON_CODES = [
@@ -61,8 +93,51 @@ export const AI_REASON_CODES = [
   'ai-quota-exhausted',
   'ai-usage-period-mismatch',
   'ai-provider-unavailable',
+  'ai-provider-not-authorized',
+  'ai-provider-auth-expired',
+  'ai-feature-not-supported',
+  'ai-rate-limited',
+  'ai-unavailable',
+  'ai-execution-failed',
+  'ai-configuration-error',
 ] as const;
 export type AiReasonCode = (typeof AI_REASON_CODES)[number];
+
+// --- Generic AI Request / Result contracts ------------------------------------
+
+export interface AIRequest {
+  readonly capability: AiCapabilityId;
+  readonly preferredProvider?: AiProviderId | undefined;
+  readonly executionPreference?: AiExecutionMode | undefined;
+  readonly input: {
+    readonly recipientDisplayName?: string | undefined;
+    readonly tone?: string | undefined;
+    readonly relationshipHint?: string | undefined;
+    readonly additionalContext?: string | undefined;
+    readonly language?: string | undefined;
+    readonly milestone?: string | undefined;
+    readonly placeholderMode?: string | undefined;
+    readonly requestedSegmentCap?: number | undefined;
+    readonly [key: string]: unknown;
+  };
+  readonly prompt?: string | undefined;
+  readonly systemInstruction?: string | undefined;
+  readonly maxOutputTokens?: number | undefined;
+  readonly temperature?: number | undefined;
+  readonly options?: Record<string, unknown> | undefined;
+}
+
+export interface AIResult {
+  readonly provider: AiProviderId;
+  readonly executionMode: AiExecutionMode;
+  readonly model: string;
+  readonly text: string;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  /** Estimated cost in integer microcurrency units (₹ × 1,000,000). */
+  readonly estimatedCostMicros: number;
+  readonly latencyMs?: number | undefined;
+}
 
 // --- Quotas -------------------------------------------------------------------
 
@@ -196,6 +271,37 @@ export function projectAiEntitlement(
         ? new Date(record.expiresAtMs).toISOString().slice(0, 10)
         : null,
   };
+}
+
+// --- Offline Entitlement Cache & Grace Period Policy ---------------------------
+
+export interface CachedAiEntitlement {
+  readonly uid: string;
+  readonly plan: AiPlanId;
+  readonly status: AiSubscriptionStatus;
+  readonly enabled: boolean;
+  readonly lastVerifiedAtMs: number;
+  readonly expiresAtMs: number | null;
+  /** Max allowed offline grace period in ms (default: 72 hours). */
+  readonly gracePeriodMs: number;
+}
+
+export const OFFLINE_ENTITLEMENT_GRACE_PERIOD_MS = 72 * 60 * 60 * 1000; // 72h max
+
+export function isCachedEntitlementValid(
+  cached: CachedAiEntitlement | null,
+  nowMs: number,
+): { valid: boolean; reason?: 'no-cache' | 'expired' | 'grace-period-exceeded' | 'inactive' } {
+  if (!cached || !cached.enabled || (cached.status !== 'active' && cached.status !== 'trialing')) {
+    return { valid: false, reason: 'inactive' };
+  }
+  if (cached.expiresAtMs !== null && nowMs > cached.expiresAtMs) {
+    return { valid: false, reason: 'expired' };
+  }
+  if (nowMs - cached.lastVerifiedAtMs > cached.gracePeriodMs) {
+    return { valid: false, reason: 'grace-period-exceeded' };
+  }
+  return { valid: true };
 }
 
 function civilDateKeyUTC(nowMs: number): string {
