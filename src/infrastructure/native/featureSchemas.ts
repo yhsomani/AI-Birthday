@@ -324,7 +324,10 @@ export const aiEntitlementProjectionSchema = strictObject({
   capabilities: z.array(aiCapabilityIdSchema).max(AI_CAPABILITY_IDS.length),
   quota: aiQuotaSchema,
   providers: z.array(aiProviderAccessProjectionSchema).max(8),
-  renewsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).nullable(),
+  renewsOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/u)
+    .nullable(),
 });
 
 export const aiUsageSnapshotSchema = strictObject({

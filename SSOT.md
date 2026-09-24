@@ -1,17 +1,19 @@
 # WishWell (Birthday Autopilot) — Single Source of Truth (SSOT)
+
 ## Version 2.1 (Re-verified against live codebase - September 24, 2026; supersedes v2.0 of September 22, 2026)
 
 > **v2.1 re-verification notes:** Every claim below was re-checked against the actual repository on 2026-09-24. Three residual inaccuracies inherited from the 2026-09-22 audit were corrected:
+>
 > 1. The `AIGateway.ts` dead-code claim is **stale** — `src/infrastructure/ai/` does not exist in the current tree; no `AIGateway` symbol exists anywhere in `src/`, `tests/`, or backend. It has already been removed.
 > 2. "Zero `.swift` files" was **wrong** — nine standalone Swift policy-contract tests exist under `tests/ios/` (they reference iOS types that have no implementation in this repo, so they are contract scaffolding, not a built app).
 > 3. Callable inventory corrected to the verified list of **16 exported functions** (14 callables + 2 schedulers); `deletionReceipt` is a transport schema, not a callable — the receipt path is `accountDeletionReceipt`.
 
-|                     |                                                                                                                                   |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **Document**        | Single Source of Truth — v2.1 (Re-verified 2026-09-24; corrects residual errors in v2.0, which superseded v1.0)                   |
-| **Product**         | WishWell · package `birthday-autopilot` v0.1.0 · appId `com.yashsomani.birthdayautopilot`                                         |
-| **Source of truth** | This document is the authoritative reference for the entire project. All other documentation files are subordinate or historical. |
-| **Status**          | Corrected 2026-09-22. **Previous SSOT contained false claims about backend Gemini, iOS implementation, and legacy files.**          |
+|                     |                                                                                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Document**        | Single Source of Truth — v2.1 (Re-verified 2026-09-24; corrects residual errors in v2.0, which superseded v1.0)                                            |
+| **Product**         | WishWell · package `birthday-autopilot` v0.1.0 · appId `com.yashsomani.birthdayautopilot`                                                                  |
+| **Source of truth** | This document is the authoritative reference for the entire project. All other documentation files are subordinate or historical.                          |
+| **Status**          | Corrected 2026-09-22. **Previous SSOT contained false claims about backend Gemini, iOS implementation, and legacy files.**                                 |
 | **Previous Issues** | ✗ Backend Gemini integration does not exist (claimed but unimplemented) ✗ iOS is not "half-built" (not built at all) ✗ Referenced non-existent legacy docs |
 
 ---
@@ -20,7 +22,7 @@
 
 This version corrects three critical errors from the previous SSOT:
 
-1. **Gemini Integration** — Claimed to have `backend/functions/src/gemini/draftMessage.ts`. **This file does not exist.** Gemini drafting is 100% native-only (Android), via Firebase SDK. *(v2.1 note: the AIGateway dead-code follow-up from this correction has also been completed — the file is now deleted.)*
+1. **Gemini Integration** — Claimed to have `backend/functions/src/gemini/draftMessage.ts`. **This file does not exist.** Gemini drafting is 100% native-only (Android), via Firebase SDK. _(v2.1 note: the AIGateway dead-code follow-up from this correction has also been completed — the file is now deleted.)_
 
 2. **iOS Companion Protocol** — Claimed "half-built" with "server callables absent." **Correction:** iOS is not built at all. No iOS directory, no Xcode project, no Swift code. Backend stores iOS reservation state but no callables populate it.
 
@@ -164,6 +166,7 @@ src/localization/  i18next; EN/HI release
 ### What Actually Happens
 
 **Flow:**
+
 1. User in `LiveMessageScreen` taps "Generate Suggestion"
 2. Calls native intent `generate-suggestions`
 3. Android `AndroidGeminiSuggestionGateway.kt` is invoked
@@ -173,6 +176,7 @@ src/localization/  i18next; EN/HI release
 7. On approval, message never touches backend (stays local until SMS submission)
 
 **Backend Role:** ZERO. Backend does not:
+
 - Receive generation requests
 - Execute prompts
 - Store message drafts
@@ -190,6 +194,10 @@ $ grep -rn "AIGateway" src/ tests/ backend/functions/src/
 ```
 
 **Status:** ✅ RESOLVED — the 746-line `AIGateway` abstraction reported as dead code in the 2026-09-22 audit has since been removed from the repository. No JavaScript AI layer remains; Gemini access is exclusively native (Android).
+
+### Native execution paths and the advisory gate [VC]
+
+The on-device native Android Gemini API path (Gemini Nano / AICore via `AiGatewayRoutingPolicy`) is planned only: it is gated behind device capability, treated as variable availability (developer-preview per Google's Android docs), and never a subscription prerequisite. Cloud Firebase AI (`firebase-ai:17.13.0`, Vertex global, `gemini-3.5-flash`) remains the default cloud path today. All native dependency advisories for these SDKs flow through the fail-closed native dependency advisory gate (`npm run security:native:android`, see `docs/NATIVE_DEPENDENCY_ADVISORY_GATE.md`), which must report exactly zero exceptions in ordinary CI.
 
 ### iOS: Cannot Draft (No iOS App)
 
@@ -229,14 +237,14 @@ Key invariants now encoded in code:
 
 ### What Does NOT Exist
 
-| Component | Status | Evidence |
-|-----------|--------|----------|
-| iOS App Build | ❌ NO | No `ios/` directory |
-| Xcode Project | ❌ NO | No `.xcodeproj` |
-| CocoaPods Setup | ❌ NO | No `Podfile` or `Podfile.lock` |
-| Swift Code | ❌ NO app code | No `.swift` files under `ios/` (none exists). Nine standalone Swift **policy-contract tests** exist in `tests/ios/` but reference iOS types with no implementation in this repo — scaffolding, not an app. |
-| iOS Workflows | ❌ DELETED | Removed in commits `61882f9`, `2b3a3b4` |
-| iOS Build Flavors | ❌ NO | Only Android flavors (prod, lab, staging, dev, smoke, e2e) |
+| Component         | Status         | Evidence                                                                                                                                                                                                   |
+| ----------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS App Build     | ❌ NO          | No `ios/` directory                                                                                                                                                                                        |
+| Xcode Project     | ❌ NO          | No `.xcodeproj`                                                                                                                                                                                            |
+| CocoaPods Setup   | ❌ NO          | No `Podfile` or `Podfile.lock`                                                                                                                                                                             |
+| Swift Code        | ❌ NO app code | No `.swift` files under `ios/` (none exists). Nine standalone Swift **policy-contract tests** exist in `tests/ios/` but reference iOS types with no implementation in this repo — scaffolding, not an app. |
+| iOS Workflows     | ❌ DELETED     | Removed in commits `61882f9`, `2b3a3b4`                                                                                                                                                                    |
+| iOS Build Flavors | ❌ NO          | Only Android flavors (prod, lab, staging, dev, smoke, e2e)                                                                                                                                                 |
 
 ### What DOES Exist (Backend-Only)
 
@@ -246,8 +254,8 @@ Backend stores iOS state for hypothetical future use:
 // backend/functions/src/persistence/paths.ts
 interface IOSComposerReservation {
   readonly status: 'PREPARED' | 'COMMITTED' | 'RELEASED';
-  readonly owner?: string;  // Unused
-  readonly expiresAt?: Timestamp;  // 72-hour expiry
+  readonly owner?: string; // Unused
+  readonly expiresAt?: Timestamp; // 72-hour expiry
 }
 
 // Document exists but:
@@ -258,12 +266,12 @@ interface IOSComposerReservation {
 
 ### What Does NOT Exist (Backend iOS Support)
 
-| Callable | Purpose | Status |
-|----------|---------|--------|
-| `claimOccurrenceIOS` | iOS claims occurrence | ❌ MISSING |
-| `armAttemptIOS` | iOS pre-arms message | ❌ MISSING |
-| `reportTestOutcomeIOS` | iOS reports test | ❌ MISSING |
-| `releaseIOSSender` | iOS uninstall | ❌ MISSING |
+| Callable               | Purpose               | Status     |
+| ---------------------- | --------------------- | ---------- |
+| `claimOccurrenceIOS`   | iOS claims occurrence | ❌ MISSING |
+| `armAttemptIOS`        | iOS pre-arms message  | ❌ MISSING |
+| `reportTestOutcomeIOS` | iOS reports test      | ❌ MISSING |
+| `releaseIOSSender`     | iOS uninstall         | ❌ MISSING |
 
 ### Frontend iOS Stubs (Test Fixtures Only)
 
@@ -296,7 +304,7 @@ All claims from v1.0 verified:
 ✅ 15 workers (ReconcileWorker, PeopleSyncWorker, outcome workers, etc.)  
 ✅ Receivers: BOOT_COMPLETED, DATE_CHANGED, LOCALE_CHANGED, etc.  
 ✅ SMS boundary: ≤2-part only, fail-closed  
-✅ Dual-SIM support with subscription binding  
+✅ Dual-SIM support with subscription binding
 
 **No changes to Android implementation — all verified as implemented.**
 
@@ -304,46 +312,46 @@ All claims from v1.0 verified:
 
 # 4. FEATURE STATUS MATRIX (COMPLETE)
 
-| Feature | Requirement | Status | Evidence | Notes |
-|---------|-------------|--------|----------|-------|
-| **User Signup (Google OAuth)** | Authenticate via Google | ✅ | `src/app/AppRoot.test.tsx`, Firebase Auth | Working |
-| **Contact Import** | Import birthdays from Google Contacts | ✅ | `PeopleSyncWorker.kt`, Contact normalization | Working |
-| **Birthday Selection** | Pick/confirm birthday | ✅ | `enrollmentReview` domain model | Working |
-| **Message Drafting (Custom)** | Write custom SMS text | ✅ | `MessageEditorProjection`, text input | Working |
-| **AI Suggestions (Gemini)** | Generate messages via LLM | ◐ ANDROID-ONLY | `AndroidGeminiSuggestionGateway.kt` (Firebase SDK) | **No backend, no iOS** |
-| **Tone Selection** | Choose message tone (warm/simple/cheerful) | ✅ | Gemini request tone enum | Working (Android only) |
-| **Built-in Templates** | Pre-written message templates | ✅ | `MessageTemplate`, `contracts/` | Working |
-| **Approval Screen** | Human review exact SMS before send | ✅ | `ApprovalBatchReview` UI + server enforcement | Working |
-| **Exact Payload Display** | Show exact text that will be sent | ✅ | Approval screen message field | Working |
-| **Bulk Approve** | Approve multiple messages at once | ✅ | `ApprovalBatchReview` (batch-capable) | Working |
-| **Server-Enforced Single-Send** | Prevent duplicate sends | ✅ | Occurrence guards, HMAC aliases | Working |
-| **Safe Retry** | Allow 1 retry after network failure | ✅ | `authorizeSafeRetry()` callable, 5-min spacing | Working |
-| **Autonomous Send** | Send SMS on birthday unattended | ✅ ANDROID-ONLY | `AndroidAutomationOrchestrator`, WorkManager | **No iOS (not built)** |
-| **Multi-Recipient** | Send to multiple people | ✅ | `BirthdayJobProjection` arrays | Working |
-| **Dual-SIM Support** | Detect+use default SMS number | ✅ | `SubscriptionBindingPolicy.kt`, receiver | Working |
-| **Multipart SMS** | Support ≤2-part messages | ✅ | `SmsPlatformSubmitter.validatePlan()` | 2-part max |
-| **Activity Log** | Display sent/failed messages | ✅ | `ActivityScreen.tsx`, Room persistence | Working |
-| **Diagnostics Export** | Download debug info (privacy-preserving) | ✅ | `DiagnosticsPreview` export | Working |
-| **Sender Transfer** | Move automation to new device | ✅ | `beginSenderTransfer()`, `completeSenderTransfer()` | Working |
-| **Account Deletion** | Delete all user data | ✅ | `requestAccountDeletion()`, deletion saga | Working |
-| **Deletion Receipts** | Proof of deletion (content-free) | ✅ | `deletionReceipt()` callable | Working |
-| **HMAC Aliases** | Opaque recipient encoding | ✅ | `opaque.ts`, client-side transformation | Working |
-| **Pepper Rotation** | Periodic alias seed change (30 days) | ✅ | Backend pepper rotation logic | Working |
-| **SQLCipher Encryption** | Local database encryption | ✅ | `androidx.security:security-crypto` + Room | Working |
-| **Keystore Hardening** | Hardware-backed key storage | ✅ | HardwareKeyStore + AtomicFile | Working |
-| **Screen Reader Support** | TalkBack/VoiceOver | ✅ | `AccessibleTextInput.tsx`, a11y tests | Working |
-| **High Contrast** | System high-contrast mode | ✅ | Theme tokens with system colors | Working |
-| **Large Text** | System text size preference | ✅ | Relative font sizes, E2E test `large-text` | Working |
-| **English (EN)** | Full EN translation | ✅ | `/src/localization/resources/en/` (100+ keys) | Complete |
-| **Hindi (HI)** | Full HI translation | ✅ | `/src/localization/resources/hi/` (parity with EN) | Complete |
-| **System Locale Detection** | Use device language on launch | ✅ | `react-native-localize` | Working |
-| **RTL Layout** | Support right-to-left languages | ❌ | Pseudo-RTL fixture only (ar-XB) | Future enhancement |
-| **Battery Optimization Detection** | Detect app in standby bucket | ✅ | `AppStandbyBucketDiagnosticPolicy.kt` | Diagnostics work |
-| **Battery Exemption Request** | Prompt user to whitelist app | ❌ | No intent to Settings | API limitation (user must manually whitelist) |
-| **Analytics Telemetry** | Track user funnels, retention | ❌ | Deliberately omitted | Privacy choice; post-launch consideration |
-| **Full-Text Search** | Search activity log by contact/message | ◐ | Pagination only; no search UI | Enhancement for post-launch |
-| **Account Recovery** | Undelete within grace period | ❌ | Deletion is final (by design) | Post-launch: add cancel-deletion flow |
-| **iOS Companion App** | Build iOS version of automation | ❌ | No iOS directory, no Xcode project | Phase 2 (8–12 week effort if approved) |
+| Feature                            | Requirement                                | Status          | Evidence                                            | Notes                                         |
+| ---------------------------------- | ------------------------------------------ | --------------- | --------------------------------------------------- | --------------------------------------------- |
+| **User Signup (Google OAuth)**     | Authenticate via Google                    | ✅              | `src/app/AppRoot.test.tsx`, Firebase Auth           | Working                                       |
+| **Contact Import**                 | Import birthdays from Google Contacts      | ✅              | `PeopleSyncWorker.kt`, Contact normalization        | Working                                       |
+| **Birthday Selection**             | Pick/confirm birthday                      | ✅              | `enrollmentReview` domain model                     | Working                                       |
+| **Message Drafting (Custom)**      | Write custom SMS text                      | ✅              | `MessageEditorProjection`, text input               | Working                                       |
+| **AI Suggestions (Gemini)**        | Generate messages via LLM                  | ◐ ANDROID-ONLY  | `AndroidGeminiSuggestionGateway.kt` (Firebase SDK)  | **No backend, no iOS**                        |
+| **Tone Selection**                 | Choose message tone (warm/simple/cheerful) | ✅              | Gemini request tone enum                            | Working (Android only)                        |
+| **Built-in Templates**             | Pre-written message templates              | ✅              | `MessageTemplate`, `contracts/`                     | Working                                       |
+| **Approval Screen**                | Human review exact SMS before send         | ✅              | `ApprovalBatchReview` UI + server enforcement       | Working                                       |
+| **Exact Payload Display**          | Show exact text that will be sent          | ✅              | Approval screen message field                       | Working                                       |
+| **Bulk Approve**                   | Approve multiple messages at once          | ✅              | `ApprovalBatchReview` (batch-capable)               | Working                                       |
+| **Server-Enforced Single-Send**    | Prevent duplicate sends                    | ✅              | Occurrence guards, HMAC aliases                     | Working                                       |
+| **Safe Retry**                     | Allow 1 retry after network failure        | ✅              | `authorizeSafeRetry()` callable, 5-min spacing      | Working                                       |
+| **Autonomous Send**                | Send SMS on birthday unattended            | ✅ ANDROID-ONLY | `AndroidAutomationOrchestrator`, WorkManager        | **No iOS (not built)**                        |
+| **Multi-Recipient**                | Send to multiple people                    | ✅              | `BirthdayJobProjection` arrays                      | Working                                       |
+| **Dual-SIM Support**               | Detect+use default SMS number              | ✅              | `SubscriptionBindingPolicy.kt`, receiver            | Working                                       |
+| **Multipart SMS**                  | Support ≤2-part messages                   | ✅              | `SmsPlatformSubmitter.validatePlan()`               | 2-part max                                    |
+| **Activity Log**                   | Display sent/failed messages               | ✅              | `ActivityScreen.tsx`, Room persistence              | Working                                       |
+| **Diagnostics Export**             | Download debug info (privacy-preserving)   | ✅              | `DiagnosticsPreview` export                         | Working                                       |
+| **Sender Transfer**                | Move automation to new device              | ✅              | `beginSenderTransfer()`, `completeSenderTransfer()` | Working                                       |
+| **Account Deletion**               | Delete all user data                       | ✅              | `requestAccountDeletion()`, deletion saga           | Working                                       |
+| **Deletion Receipts**              | Proof of deletion (content-free)           | ✅              | `deletionReceipt()` callable                        | Working                                       |
+| **HMAC Aliases**                   | Opaque recipient encoding                  | ✅              | `opaque.ts`, client-side transformation             | Working                                       |
+| **Pepper Rotation**                | Periodic alias seed change (30 days)       | ✅              | Backend pepper rotation logic                       | Working                                       |
+| **SQLCipher Encryption**           | Local database encryption                  | ✅              | `androidx.security:security-crypto` + Room          | Working                                       |
+| **Keystore Hardening**             | Hardware-backed key storage                | ✅              | HardwareKeyStore + AtomicFile                       | Working                                       |
+| **Screen Reader Support**          | TalkBack/VoiceOver                         | ✅              | `AccessibleTextInput.tsx`, a11y tests               | Working                                       |
+| **High Contrast**                  | System high-contrast mode                  | ✅              | Theme tokens with system colors                     | Working                                       |
+| **Large Text**                     | System text size preference                | ✅              | Relative font sizes, E2E test `large-text`          | Working                                       |
+| **English (EN)**                   | Full EN translation                        | ✅              | `/src/localization/resources/en/` (100+ keys)       | Complete                                      |
+| **Hindi (HI)**                     | Full HI translation                        | ✅              | `/src/localization/resources/hi/` (parity with EN)  | Complete                                      |
+| **System Locale Detection**        | Use device language on launch              | ✅              | `react-native-localize`                             | Working                                       |
+| **RTL Layout**                     | Support right-to-left languages            | ❌              | Pseudo-RTL fixture only (ar-XB)                     | Future enhancement                            |
+| **Battery Optimization Detection** | Detect app in standby bucket               | ✅              | `AppStandbyBucketDiagnosticPolicy.kt`               | Diagnostics work                              |
+| **Battery Exemption Request**      | Prompt user to whitelist app               | ❌              | No intent to Settings                               | API limitation (user must manually whitelist) |
+| **Analytics Telemetry**            | Track user funnels, retention              | ❌              | Deliberately omitted                                | Privacy choice; post-launch consideration     |
+| **Full-Text Search**               | Search activity log by contact/message     | ◐               | Pagination only; no search UI                       | Enhancement for post-launch                   |
+| **Account Recovery**               | Undelete within grace period               | ❌              | Deletion is final (by design)                       | Post-launch: add cancel-deletion flow         |
+| **iOS Companion App**              | Build iOS version of automation            | ❌              | No iOS directory, no Xcode project                  | Phase 2 (8–12 week effort if approved)        |
 
 ---
 
@@ -367,7 +375,6 @@ $ grep -rn "AIGateway" src/ tests/ backend/functions/src/
 
 ---
 
-
 ## 5.2 Gemini Implementation Incomplete at Backend [VC]
 
 **Claim v1.0:** "backend/functions/src/gemini/draftMessage.ts"  
@@ -388,6 +395,7 @@ $ ls backend/functions/src/
 ```
 
 **Impact:**
+
 - ✅ Android can generate suggestions (Firebase SDK, native-side)
 - ❌ Backend has zero involvement
 - ❌ No server-side prompt engineering
@@ -407,14 +415,14 @@ $ ls backend/functions/src/
 
 **Evidence:**
 
-| Component | Status |
-|-----------|--------|
-| iOS directory | ❌ Missing |
-| Xcode project | ❌ Missing |
-| Swift code | ❌ Missing |
-| iOS workflows | ❌ Deleted (commits `61882f9`, `2b3a3b4`) |
-| iOS Gemini callables | ❌ Missing |
-| iOS composer reservation backend logic | ✅ Exists (but unused) |
+| Component                              | Status                                    |
+| -------------------------------------- | ----------------------------------------- |
+| iOS directory                          | ❌ Missing                                |
+| Xcode project                          | ❌ Missing                                |
+| Swift code                             | ❌ Missing                                |
+| iOS workflows                          | ❌ Deleted (commits `61882f9`, `2b3a3b4`) |
+| iOS Gemini callables                   | ❌ Missing                                |
+| iOS composer reservation backend logic | ✅ Exists (but unused)                    |
 
 **Root Cause:** iOS app was planned but development was deprioritized. Backend was prepared for iOS; client was not built.
 
@@ -526,17 +534,17 @@ All are **not code-blocking**; just operational/legal:
 
 # 8. CORRECTED GLOSSARY
 
-| Term | Meaning | Status |
-|------|---------|--------|
-| **AIGateway** | Former 746-line abstraction in `src/infrastructure/ai/` for provider-agnostic AI access. Never wired into the app; **deleted from the repository** (verified 2026-09-24). | REMOVED (formerly dead code) |
-| **Gemini Drafting** | AI-assisted message generation via Firebase Generative AI SDK. **Android-only, native-side only.** Backend has zero involvement. | ANDROID-ONLY |
-| **iOS Companion** | Planned iOS app for birthday automation. **Not built.** Backend stores reservation state; no client-side implementation exists. | NOT_IMPLEMENTED |
-| **HMAC Alias** | Cryptographic hash of (uid + purpose + version + pepper + recipient data). Opaque to backend; enables privacy. | IMPLEMENTED |
-| **Pepper Rotation** | 30-day automatic refresh of HMAC seed to limit tracking window. Old aliases become unreachable. | IMPLEMENTED |
-| **Deletion Saga** | Multi-step process to erase all user data. Includes tombstone, drain, cascade, verification, and delayed removal. | IMPLEMENTED |
-| **Occurrence Guard** | Backend check preventing duplicate SMS sends to same recipient on same birthday. | IMPLEMENTED |
-| **Sender Epoch** | Monotonically increasing counter per Android device. Prevents replay on old device during transfer. | IMPLEMENTED |
-| **Sender Transfer** | Two-transaction atomic handoff of SMS authority to new device. Includes grace period (drainUntil). | IMPLEMENTED |
+| Term                 | Meaning                                                                                                                                                                   | Status                       |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| **AIGateway**        | Former 746-line abstraction in `src/infrastructure/ai/` for provider-agnostic AI access. Never wired into the app; **deleted from the repository** (verified 2026-09-24). | REMOVED (formerly dead code) |
+| **Gemini Drafting**  | AI-assisted message generation via Firebase Generative AI SDK. **Android-only, native-side only.** Backend has zero involvement.                                          | ANDROID-ONLY                 |
+| **iOS Companion**    | Planned iOS app for birthday automation. **Not built.** Backend stores reservation state; no client-side implementation exists.                                           | NOT_IMPLEMENTED              |
+| **HMAC Alias**       | Cryptographic hash of (uid + purpose + version + pepper + recipient data). Opaque to backend; enables privacy.                                                            | IMPLEMENTED                  |
+| **Pepper Rotation**  | 30-day automatic refresh of HMAC seed to limit tracking window. Old aliases become unreachable.                                                                           | IMPLEMENTED                  |
+| **Deletion Saga**    | Multi-step process to erase all user data. Includes tombstone, drain, cascade, verification, and delayed removal.                                                         | IMPLEMENTED                  |
+| **Occurrence Guard** | Backend check preventing duplicate SMS sends to same recipient on same birthday.                                                                                          | IMPLEMENTED                  |
+| **Sender Epoch**     | Monotonically increasing counter per Android device. Prevents replay on old device during transfer.                                                                       | IMPLEMENTED                  |
+| **Sender Transfer**  | Two-transaction atomic handoff of SMS authority to new device. Includes grace period (drainUntil).                                                                        | IMPLEMENTED                  |
 
 ---
 

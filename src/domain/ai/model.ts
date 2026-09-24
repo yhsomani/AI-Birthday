@@ -115,7 +115,10 @@ export function decideAiEntitlement(
   entitlement: AiEntitlementProjection,
   usage: AiUsageSnapshot,
 ): AiEntitlementDecision {
-  if (!entitlement.enabled || !entitlement.capabilities.includes('message-drafting')) {
+  if (
+    !entitlement.enabled ||
+    !entitlement.capabilities.includes('message-drafting')
+  ) {
     return { kind: 'blocked', reason: 'ai-subscription-required' };
   }
   if (usage.period !== entitlement.quota.period) {

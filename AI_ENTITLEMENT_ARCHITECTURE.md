@@ -17,11 +17,11 @@
 
 ## 0.1 What was explicitly rejected
 
-| Rejected concept | Why | Verdict in this architecture |
-|---|---|---|
-| "If the user has Gemini Pro/Ultra, use their subscription for our app" | Google's public docs do not establish that a consumer Gemini subscription entitles third-party API usage; Gemini API quota/billing is governed by projects, credentials and billing tiers | ❌ Never encoded. No code path reads external provider subscription state |
-| Bring-your-own-key (BYOK): pasting provider API keys | User requirement (2026-09-24): *"I don't want to use API keys, I want to use login"* — keys are long-lived secrets users mishandle | ❌ Removed. `byok-*` provider ids and key-state vocabularies deleted from TS + Kotlin models |
-| Tying entitlement directly to Stripe | Not reusable across apps/payment providers | ❌ Replaced with Billing → Entitlement layering (§5) |
+| Rejected concept                                                       | Why                                                                                                                                                                                       | Verdict in this architecture                                                                 |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| "If the user has Gemini Pro/Ultra, use their subscription for our app" | Google's public docs do not establish that a consumer Gemini subscription entitles third-party API usage; Gemini API quota/billing is governed by projects, credentials and billing tiers | ❌ Never encoded. No code path reads external provider subscription state                    |
+| Bring-your-own-key (BYOK): pasting provider API keys                   | User requirement (2026-09-24): _"I don't want to use API keys, I want to use login"_ — keys are long-lived secrets users mishandle                                                        | ❌ Removed. `byok-*` provider ids and key-state vocabularies deleted from TS + Kotlin models |
+| Tying entitlement directly to Stripe                                   | Not reusable across apps/payment providers                                                                                                                                                | ❌ Replaced with Billing → Entitlement layering (§5)                                         |
 
 ---
 
@@ -44,12 +44,12 @@ SUBSCRIPTION ≠ AI PROVIDER ACCOUNT ≠ AI PROVIDER SUBSCRIPTION ≠ AI API BIL
 
 Code anchors:
 
-| Concept | Source of truth |
-|---|---|
-| B (entitlement decision) | `src/domain/ai/model.ts` → `decideAiEntitlement()` (pure) |
-| B/C/D wire contract | `src/infrastructure/native/featureSchemas.ts` (`ai*Schema`) |
-| Application boundary | `src/application/ports/AiEntitlementPort.ts`, `MessagePort.generateSuggestions` |
-| Routing policy (Kotlin mirror) | `android/.../ai/AiGatewayPort.kt` → `AiGatewayRoutingPolicy.route()` |
+| Concept                        | Source of truth                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------- |
+| B (entitlement decision)       | `src/domain/ai/model.ts` → `decideAiEntitlement()` (pure)                       |
+| B/C/D wire contract            | `src/infrastructure/native/featureSchemas.ts` (`ai*Schema`)                     |
+| Application boundary           | `src/application/ports/AiEntitlementPort.ts`, `MessagePort.generateSuggestions` |
+| Routing policy (Kotlin mirror) | `android/.../ai/AiGatewayPort.kt` → `AiGatewayRoutingPolicy.route()`            |
 
 ## 2. The business rule (the gate)
 
@@ -78,12 +78,12 @@ Code anchors:
 ```
 
 Provider sign-in state is a **routing input that sits BEHIND the entitlement
-gate**. Connecting your Google AI account can change *which adapter pays the
-provider*, never *whether AI is allowed*. This is unit-tested on both sides:
+gate**. Connecting your Google AI account can change _which adapter pays the
+provider_, never _whether AI is allowed_. This is unit-tested on both sides:
 
-* `src/domain/ai/entitlement.test.ts` — "never consults external provider
+- `src/domain/ai/entitlement.test.ts` — "never consults external provider
   state: a connected sign-in changes nothing"
-* `android/.../ai/AiGatewayRoutingPolicyTest.kt` — "entitlement gate blocks
+- `android/.../ai/AiGatewayRoutingPolicyTest.kt` — "entitlement gate blocks
   before any provider routing"
 
 ## 3. Provider authorisation without API keys — the recommended approach
@@ -104,8 +104,8 @@ For a native mobile app this is the industry-standard, key-free pattern:
    transparently; on `expired` prompt silent re-auth.
 
 Already present in the repo and reused as-is: Firebase Auth (Google provider)
-establishes *identity*; the new `connectAiProvider()/disconnectAiProvider()`
-port methods establish *provider authorisation*. Two different things — see §1.
+establishes _identity_; the new `connectAiProvider()/disconnectAiProvider()`
+port methods establish _provider authorisation_. Two different things — see §1.
 
 ### 3.2 Important caveat (documented, not assumed)
 
@@ -114,21 +114,21 @@ itself, guarantee a paid API quota for third-party use. Google documents OAuth
 for Gemini API access, while API rate limits/billing remain project-scoped.
 Therefore:
 
-* If the user's granted OAuth scope carries usable quota → route there
+- If the user's granted OAuth scope carries usable quota → route there
   (their login pays their provider).
-* Otherwise fall back to the **application-owned** path — still behind the
+- Otherwise fall back to the **application-owned** path — still behind the
   same entitlement + quota gates, so the app's economics stay bounded
   (₹499 ≠ unlimited Gemini).
-* The routing order in `AiGatewayRoutingPolicy.route()` encodes exactly this:
+- The routing order in `AiGatewayRoutingPolicy.route()` encodes exactly this:
   on-device → provider sign-in → application-owned.
 
 ### 3.3 Modes shipped in the vocabulary
 
-| `AiAuthorizationMode` | Credential source | User ever sees a key? |
-|---|---|---|
-| `application-owned` | App's Firebase/project credentials (production today) | No — invisible |
-| `provider-sign-in` | User's OAuth tokens from the login flow | **No — login only** |
-| `on-device` | None; local inference | No |
+| `AiAuthorizationMode` | Credential source                                     | User ever sees a key? |
+| --------------------- | ----------------------------------------------------- | --------------------- |
+| `application-owned`   | App's Firebase/project credentials (production today) | No — invisible        |
+| `provider-sign-in`    | User's OAuth tokens from the login flow               | **No — login only**   |
+| `on-device`           | None; local inference                                 | No                    |
 
 ## 4. Generic gateway surface (reusable across applications)
 
@@ -156,8 +156,13 @@ Stripe (or any PSP) → Billing Service → Entitlement Service → AI Gateway
 Entitlement read model (target shape for the backend callable; device mirrors it):
 
 ```json
-{ "enabled": true, "plan": "wishwell-plus",
-  "monthlyLimit": 300, "dailyLimit": 50, "remaining": 247 }
+{
+  "enabled": true,
+  "plan": "wishwell-plus",
+  "monthlyLimit": 300,
+  "dailyLimit": 50,
+  "remaining": 247
+}
 ```
 
 Payment success → webhook → subscription activated → entitlement activated →
@@ -169,10 +174,10 @@ AI access granted. Expiry/lapse reverses step-by-step; the fail-closed parser
 Per plan (`PLAN_QUOTAS` in `src/domain/ai/model.ts`; enforced pre-flight on
 device, mirrored server-side when the shared gateway ships):
 
-| Plan | requests/day | requests/month |
-|---|---|---|
-| free | 0 (AI disabled) | 0 |
-| wishwell-plus | 50 | 300 |
+| Plan          | requests/day    | requests/month |
+| ------------- | --------------- | -------------- |
+| free          | 0 (AI disabled) | 0              |
+| wishwell-plus | 50              | 300            |
 
 Plus: RPM/TPM ceilings at the provider adapter, model restrictions per plan,
 abuse protection, and on-device-first routing to cut cloud spend.
@@ -200,9 +205,9 @@ users never see contract jargon.
 
 ## 9. Verification
 
-* `npx tsc --noEmit` clean; `npm test` green incl. `src/domain/ai/entitlement.test.ts`
+- `npx tsc --noEmit` clean; `npm test` green incl. `src/domain/ai/entitlement.test.ts`
   (10 tests, 100 % coverage of `model.ts`) and `src/domain/shared/reasonCodes.test.ts`.
-* Kotlin: `./gradlew :app:testDevDebugUnitTest` runs
+- Kotlin: `./gradlew :app:testDevDebugUnitTest` runs
   `AiGatewayRoutingPolicyTest` (gate-before-routing, ordering, fail-closed parse,
   key-free vocabulary assertions).
-* Grep invariant (must stay empty): `grep -ri "byok\|api.?key" src/domain/ai android/app/src/*/java/com/yashsomani/birthdayautopilot/ai`
+- Grep invariant (must stay empty): `grep -ri "byok\|api.?key" src/domain/ai android/app/src/*/java/com/yashsomani/birthdayautopilot/ai`
