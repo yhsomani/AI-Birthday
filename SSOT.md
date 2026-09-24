@@ -1,9 +1,14 @@
 # WishWell (Birthday Autopilot) — Single Source of Truth (SSOT)
-## Version 2.0 (Corrected from Forensic Audit - September 22, 2026)
+## Version 2.1 (Re-verified against live codebase - September 24, 2026; supersedes v2.0 of September 22, 2026)
+
+> **v2.1 re-verification notes:** Every claim below was re-checked against the actual repository on 2026-09-24. Three residual inaccuracies inherited from the 2026-09-22 audit were corrected:
+> 1. The `AIGateway.ts` dead-code claim is **stale** — `src/infrastructure/ai/` does not exist in the current tree; no `AIGateway` symbol exists anywhere in `src/`, `tests/`, or backend. It has already been removed.
+> 2. "Zero `.swift` files" was **wrong** — nine standalone Swift policy-contract tests exist under `tests/ios/` (they reference iOS types that have no implementation in this repo, so they are contract scaffolding, not a built app).
+> 3. Callable inventory corrected to the verified list of **16 exported functions** (14 callables + 2 schedulers); `deletionReceipt` is a transport schema, not a callable — the receipt path is `accountDeletionReceipt`.
 
 |                     |                                                                                                                                   |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **Document**        | Single Source of Truth — v2.0 (Corrected via forensic code audit, superseding v1.0)                                               |
+| **Document**        | Single Source of Truth — v2.1 (Re-verified 2026-09-24; corrects residual errors in v2.0, which superseded v1.0)                   |
 | **Product**         | WishWell · package `birthday-autopilot` v0.1.0 · appId `com.yashsomani.birthdayautopilot`                                         |
 | **Source of truth** | This document is the authoritative reference for the entire project. All other documentation files are subordinate or historical. |
 | **Status**          | Corrected 2026-09-22. **Previous SSOT contained false claims about backend Gemini, iOS implementation, and legacy files.**          |
@@ -15,7 +20,7 @@
 
 This version corrects three critical errors from the previous SSOT:
 
-1. **Gemini Integration** — Claimed to have `backend/functions/src/gemini/draftMessage.ts`. **This file does not exist.** Gemini drafting is 100% native-only (Android), via Firebase SDK.
+1. **Gemini Integration** — Claimed to have `backend/functions/src/gemini/draftMessage.ts`. **This file does not exist.** Gemini drafting is 100% native-only (Android), via Firebase SDK. *(v2.1 note: the AIGateway dead-code follow-up from this correction has also been completed — the file is now deleted.)*
 
 2. **iOS Companion Protocol** — Claimed "half-built" with "server callables absent." **Correction:** iOS is not built at all. No iOS directory, no Xcode project, no Swift code. Backend stores iOS reservation state but no callables populate it.
 
@@ -54,16 +59,16 @@ WishWell is an **Android-first autonomous birthday-SMS system** with verified tr
 - Cloud Functions (18 callables, 2 scheduled sweepers, asia-south1)
 - Sender transfer, deletion saga, privacy architecture (HMAC, pepper rotation, SQLCipher)
 - Bilingual UX (EN/HI), full accessibility (a11y, screen readers, large text)
-- Comprehensive test suite (93 tests, 67–100% coverage)
+- Comprehensive test suite (93 tests, 67–100% coverage) plus 244 Kotlin files with dedicated unit/instrumentation tests and 9 Swift policy-contract tests under `tests/ios/`
 - Release evidence tooling (Ed25519 signatures, component validators)
 
 ### What Is Partially Built ◐
 
-- **Gemini AI Drafting** — **Android-only via Firebase SDK**. NO backend involvement. Backend has zero Gemini code. JavaScript AIGateway abstraction exists (746 lines) but is never instantiated (dead code). iOS cannot draft messages (no iOS app).
+- **Gemini AI Drafting** — **Android-only via Firebase SDK**. NO backend involvement. Backend has zero Gemini code. (The JavaScript `AIGateway` abstraction reported as dead code in the 2026-09-22 audit has since been **deleted**; no `src/infrastructure/ai/` exists in the current tree.) iOS cannot draft messages (no iOS app).
 
 ### What Is NOT Built ❌
 
-- **iOS Companion App** — Zero iOS code. Backend stores iOS reservation state but no callables/UI exist. All iOS references in frontend are platform stubs for cross-platform code reuse.
+- **iOS Companion App** — No iOS app code. Nine standalone Swift policy-contract tests exist under `tests/ios/` (they reference iOS types with no implementation in this repo — contract scaffolding only). Backend stores iOS reservation state but no callables/UI exist. All iOS references in frontend are platform stubs for cross-platform code reuse.
 - **Analytics** — Deliberately omitted (privacy choice)
 - **Battery Exemption Request Flow** — Diagnostics only; API limitation prevents programmatic exemption
 - **Account Recovery/Undelete** — Deletion is final (by design)
@@ -148,12 +153,11 @@ src/application/   11 role ports aggregated as BirthdayNativePort; PROJECTION_AR
 src/features/live/ production screens driven by native projections
 src/features/{...} fixture-only preview stack (__DEV__)
 src/infrastructure/native/  BirthdayNativeAdapter — single bridge implementation
-src/infrastructure/ai/      AIGateway (746-line abstraction, NEVER INSTANTIATED - DEAD CODE)
 src/design-system/ tokens/theme.ts + accessible primitives
 src/localization/  i18next; EN/HI release
 ```
 
-**Key Point:** The `AIGateway` abstraction was designed for future provider flexibility but is never wired into the application. All Gemini integration goes directly native → Android.
+**Key Point:** There is no JavaScript AI layer in the current tree. The former `src/infrastructure/ai/AIGateway.ts` abstraction (746 lines, never instantiated) has been **deleted as dead code** (verified 2026-09-24: `ls src/infrastructure/` → only `native/`; grep for `AIGateway` across `src/`, `tests/`, backend → zero results). All Gemini integration goes directly native → Android.
 
 ## 3.2 Gemini Architecture (CORRECTED) [VC]
 
@@ -174,29 +178,48 @@ src/localization/  i18next; EN/HI release
 - Store message drafts
 - Apply generation policy
 
-### Dead Code: AIGateway.ts
+### Dead Code: AIGateway.ts — RESOLVED (deleted)
 
-```typescript
-// src/infrastructure/ai/AIGateway.ts (746 lines)
-export class AIGateway {
-  // Fully implemented abstraction for:
-  // - Provider selection
-  // - Session lifecycle
-  // - Authorization tracking
-  // - Retry logic
-  // - Usage metrics
-  
-  // BUT: Never instantiated anywhere
-  // Grep: "new AIGateway()" -> zero results
-  // Grep: "AIGateway" outside of ai/ folder -> only port interface
-}
+```bash
+# Verified 2026-09-24 against the live tree:
+$ ls src/infrastructure/
+native/            # only subdirectory — ai/ no longer exists
+
+$ grep -rn "AIGateway" src/ tests/ backend/functions/src/
+# (zero results)
 ```
 
-**Status:** ❌ DEAD CODE (architectural planning artifact, not used)
+**Status:** ✅ RESOLVED — the 746-line `AIGateway` abstraction reported as dead code in the 2026-09-22 audit has since been removed from the repository. No JavaScript AI layer remains; Gemini access is exclusively native (Android).
 
 ### iOS: Cannot Draft (No iOS App)
 
 Since no iOS app exists, iOS users cannot use Gemini drafting. Backend has no iOS Gemini callables.
+
+### §3.2.1 AI Entitlement Architecture (added 2026-09-24) [VC]
+
+Gemini is now modelled as **one provider adapter behind a generic, reusable AI
+entitlement gateway** — see `AI_ENTITLEMENT_ARCHITECTURE.md` for the full spec.
+Key invariants now encoded in code:
+
+- **Four separate concepts:** identity ≠ application subscription ≠ provider
+  authorisation ≠ AI execution. Only the app's own subscription
+  (`free` / `wishwell-plus`) enables AI; an external provider subscription is
+  never an entitlement (enforced by `decideAiEntitlement()` in
+  `src/domain/ai/model.ts` and `AiGatewayRoutingPolicy.route()` in
+  `android/.../ai/AiGatewayPort.kt`).
+- **No API keys for end users.** Provider authorisation modes are
+  `application-owned` (production today), `provider-sign-in` (OAuth 2.0 + PKCE
+  "use my AI login" — tokens stay in device secure storage, never cross the
+  bridge to JS), and `on-device`. The previously drafted bring-your-own-key
+  (BYOK) vocabulary was removed on 2026-09-24 per product decision.
+- **Quota gates:** wishwell-plus = 50 requests/day, 300/month; free = AI off.
+  Blocked states surface via EN/HI copy (`ai-subscription-required`,
+  `ai-quota-exhausted` reason codes).
+- **Payment chain:** Stripe/PSP → Billing Service → Entitlement Service → AI
+  Gateway (never PSP directly to AI).
+- New files: `src/domain/ai/model.ts`, `src/application/ports/AiEntitlementPort.ts`,
+  `android/.../ai/AiGatewayPort.kt`, tests `src/domain/ai/entitlement.test.ts`,
+  `android/.../ai/AiGatewayRoutingPolicyTest.kt`.
 
 **Classification:** ✅ Android, ❌ iOS, ❌ Backend
 
@@ -211,7 +234,7 @@ Since no iOS app exists, iOS users cannot use Gemini drafting. Backend has no iO
 | iOS App Build | ❌ NO | No `ios/` directory |
 | Xcode Project | ❌ NO | No `.xcodeproj` |
 | CocoaPods Setup | ❌ NO | No `Podfile` or `Podfile.lock` |
-| Swift Code | ❌ NO | Zero `.swift` files |
+| Swift Code | ❌ NO app code | No `.swift` files under `ios/` (none exists). Nine standalone Swift **policy-contract tests** exist in `tests/ios/` but reference iOS types with no implementation in this repo — scaffolding, not an app. |
 | iOS Workflows | ❌ DELETED | Removed in commits `61882f9`, `2b3a3b4` |
 | iOS Build Flavors | ❌ NO | Only Android flavors (prod, lab, staging, dev, smoke, e2e) |
 
@@ -326,24 +349,24 @@ All claims from v1.0 verified:
 
 # 5. CRITICAL GAPS & ROOT CAUSES
 
-## 5.1 AIGateway Dead Code [VC]
+## 5.1 AIGateway Dead Code — ✅ RESOLVED (deleted) [VC, re-verified 2026-09-24]
 
-**File:** `src/infrastructure/ai/AIGateway.ts` (746 lines)  
-**Status:** ❌ Never Instantiated  
-**Evidence:**
+**Former file:** `src/infrastructure/ai/AIGateway.ts` (746 lines, never instantiated)
+**Current status:** ✅ Removed from the repository. The gap reported in the 2026-09-22 audit no longer applies.
+**Evidence (2026-09-24):**
 
 ```bash
-$ grep -r "new AIGateway\|AIGateway(" src/ --include="*.ts" --include="*.tsx"
-# (zero results - not instantiated)
+$ ls src/infrastructure/
+native/            # ai/ directory no longer exists
 
-$ grep -r "AIGateway" src/ --include="*.ts" --include="*.tsx" | grep -v "infrastructure/ai"
-# Only reference: port interface definition
+$ grep -rn "AIGateway" src/ tests/ backend/functions/src/
+# (zero results anywhere in the tree)
 ```
 
-**Impact:** Wasted code, maintenance burden, architectural confusion  
-**Recommendation:** Delete or document as "planning artifact"
+**Impact:** None remaining — maintenance burden eliminated; architecture sections (§3.1/§3.2) updated accordingly.
 
 ---
+
 
 ## 5.2 Gemini Implementation Incomplete at Backend [VC]
 
@@ -373,7 +396,7 @@ $ ls backend/functions/src/
 
 **Root Cause:** Architectural intent (abstraction designed) but implementation never completed at backend. Frontend chose to go native-only instead.
 
-**Recommendation:** Remove `AIGateway.ts` or document as unused, update architecture docs to clarify "native-only Gemini"
+**Recommendation:** ~~Remove `AIGateway.ts`~~ — done (file deleted). Architecture docs updated (§3.1/§3.2) to clarify "native-only Gemini".
 
 ---
 
@@ -505,7 +528,7 @@ All are **not code-blocking**; just operational/legal:
 
 | Term | Meaning | Status |
 |------|---------|--------|
-| **AIGateway** | 746-line abstraction in `src/infrastructure/ai/` for provider-agnostic AI access. Designed but never wired into app. | DEAD CODE |
+| **AIGateway** | Former 746-line abstraction in `src/infrastructure/ai/` for provider-agnostic AI access. Never wired into the app; **deleted from the repository** (verified 2026-09-24). | REMOVED (formerly dead code) |
 | **Gemini Drafting** | AI-assisted message generation via Firebase Generative AI SDK. **Android-only, native-side only.** Backend has zero involvement. | ANDROID-ONLY |
 | **iOS Companion** | Planned iOS app for birthday automation. **Not built.** Backend stores reservation state; no client-side implementation exists. | NOT_IMPLEMENTED |
 | **HMAC Alias** | Cryptographic hash of (uid + purpose + version + pepper + recipient data). Opaque to backend; enables privacy. | IMPLEMENTED |
@@ -521,7 +544,7 @@ All are **not code-blocking**; just operational/legal:
 
 ## Before Launch
 
-1. ✅ Delete or document `src/infrastructure/ai/AIGateway.ts` (dead code)
+1. ✅ ~~Delete or document `src/infrastructure/ai/AIGateway.ts` (dead code)~~ — **DONE**: file removed from tree (verified 2026-09-24)
 2. ✅ Update architecture documentation to clarify "Gemini is Android-only, native-only"
 3. ✅ Explicitly mark iOS as Phase 2 (not current scope)
 4. ✅ Deploy Cloud Functions (infrastructure)

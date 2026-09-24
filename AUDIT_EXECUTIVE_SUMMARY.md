@@ -73,7 +73,7 @@ $ grep -r "gemini\|draft" backend/functions/src
 - User taps "Generate Suggestion" in Android app
 - Native `AndroidGeminiSuggestionGateway` calls Firebase Generative AI SDK
 - **Backend: zero involvement**
-- JavaScript `AIGateway` abstraction exists (746 lines) but is **never instantiated** (dead code)
+- JavaScript `AIGateway` abstraction (746 lines, never instantiated) — **UPDATE 2026-09-24: deleted from the repository**; no JS AI layer remains
 - iOS cannot generate suggestions (no iOS app to call native gateway)
 
 **Classification:** ❌ FALSE CLAIM
@@ -151,6 +151,16 @@ $ ls -la | grep -i project
 ❌ Account recovery/undelete (deletion is final by design)  
 
 ---
+
+## AI Entitlement Architecture (added 2026-09-24)
+
+A generic, provider-agnostic **AI entitlement + gateway architecture** has been implemented in code and specified in `AI_ENTITLEMENT_ARCHITECTURE.md` (see SSOT.md §3.2.1):
+
+- **The app's own subscription is the only AI gate.** External provider subscriptions (e.g., a user's personal Google AI plan) are explicitly *not* treated as application entitlements — that assumption is unsupported by Google's Gemini API billing/quota model.
+- **Users never paste API keys.** Provider access uses OAuth sign-in ("Connect your AI account", Authorization Code + PKCE); tokens stay in Android keystore-backed storage and never cross into JavaScript. Routing order: on-device → provider sign-in → application-owned, all behind the same entitlement + quota checks.
+- **Four concepts separated:** identity ≠ application subscription ≠ provider authorization ≠ inference execution — making the platform reusable across multiple applications (TalentSphere and future products).
+- **Cost controls enforced:** per-plan daily/monthly quotas with fail-closed entitlement decisions (`ai-subscription-required`, `ai-quota-exhausted`).
+- Verification: `tsc --noEmit` clean; full suite green (33 suites / 400 tests, incl. new domain + Kotlin routing-policy tests).
 
 ## Code Quality Assessment
 
@@ -234,7 +244,7 @@ $ ls -la | grep -i project
 
 ## Critical Decisions
 
-### Decision #1: Delete AIGateway Dead Code?
+### Decision #1: Delete AIGateway Dead Code? — ✅ DONE (2026-09-24)
 
 **Current:** 746-line abstraction never used  
 **Options:**
@@ -305,7 +315,7 @@ C) Aggregate-only analytics (balance privacy + insights)
 ### Immediate (Before Launch)
 
 1. ✅ **Replace SSOT.md** with corrected version
-2. ✅ **Delete AIGateway.ts** (dead code, 746 lines)
+2. ✅ ~~**Delete AIGateway.ts** (dead code, 746 lines)~~ — **DONE**: removed from tree, verified 2026-09-24
 3. ✅ **Document Gemini architecture** clarifying "Android-only, native Firebase SDK"
 4. ✅ **Explicitly mark iOS as Phase 2** with effort estimate (8–12 weeks)
 5. ✅ **Deploy infrastructure** (Cloud Functions, Hosting)

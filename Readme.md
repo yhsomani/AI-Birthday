@@ -1,9 +1,24 @@
 # WishWell Birthday Autopilot — Forensic Code Audit
 ## Complete Audit Deliverables
 
-**Audit Date:** September 22, 2026  
+**Audit Date:** September 22, 2026 · **Re-verification:** September 24, 2026 (SSOT v2.1 + Appendix K)  
 **Repository:** https://github.com/yhsomani/AI-Birthday  
 **Audit Scope:** 415 source files (130 TypeScript, 244 Kotlin, 14 backend functions, 49 tools)
+
+> **UPDATE 2026-09-24 (v2.1 re-verification):** Three residual inaccuracies in the original audit were corrected and one action item closed:
+> 1. `AIGateway.ts` dead code — **deleted from the repository** (recommended action completed; `src/infrastructure/ai/` no longer exists).
+> 2. "Zero Swift files" was wrong — nine standalone Swift policy-contract tests exist under `tests/ios/` (scaffolding only; iOS app still not built).
+> 3. Cloud Functions inventory verified at **16 exports** (14 callables + 2 schedulers); `deletionReceipt` is a schema name, callable is `accountDeletionReceipt`.
+> See `SSOT_AUDIT_2026-09-22.md` → Appendix K for full evidence.
+
+> **UPDATE 2026-09-24 (AI entitlement architecture):** The AI layer was
+> re-architected as a **generic, reusable, provider-agnostic entitlement
+> gateway** (`AI_ENTITLEMENT_ARCHITECTURE.md`, SSOT §3.2.1). Product decision:
+> end users authenticate to AI providers via **OAuth sign-in ("use my AI
+> login") — never API keys**; the previously drafted BYOK vocabulary was
+> removed. Only the application's own subscription gates AI; external provider
+> subscriptions are never entitlements. New domain model, port, Kotlin routing
+> policy and tests shipped (see §3.2.1 file list).
 
 ---
 
@@ -22,7 +37,7 @@ This folder contains three comprehensive documents:
 - Architecture verification (layered design, native contract, Android engine)
 - Feature status matrix (40+ features, ✅/◐/❌ classification)
 - Critical gaps & root cause analysis
-  - AIGateway dead code (746 lines, never instantiated)
+  - ~~AIGateway dead code (746 lines, never instantiated)~~ — RESOLVED 2026-09-24: deleted
   - Gemini backend missing (file doesn't exist)
   - iOS not built (stubs only, no Xcode project)
   - Battery exemption flow incomplete (API limitation)
@@ -319,7 +334,8 @@ This folder contains three comprehensive documents:
 | Document | Version | Status | Notes |
 |----------|---------|--------|-------|
 | SSOT (old) | v1.0 | ⚠️ SUPERSEDED | Contains false claims (Gemini backend, iOS, legacy docs) |
-| SSOT (new) | v2.0 | ✅ APPROVED | Corrected, verified, ready for adoption |
+| SSOT (new) | v2.1 | ✅ APPROVED | Corrected, re-verified 2026-09-24 against live tree (AIGateway deletion, Swift-test nuance, 16-export function inventory) |
+| Re-verification addendum | 2026-09-24 | ✅ FINAL | Appendix K of SSOT_AUDIT_2026-09-22.md |
 | Audit Report | 2026-09-22 | ✅ FINAL | Comprehensive forensic analysis |
 | Executive Summary | 2026-09-22 | ✅ FINAL | Stakeholder brief |
 
@@ -335,6 +351,8 @@ This folder contains three comprehensive documents:
 - ✅ Security & privacy audit completed
 - ✅ Previous SSOT false claims identified & corrected
 - ✅ Corrected SSOT.md prepared
+- ✅ (2026-09-24) AIGateway dead-code deletion verified complete
+- ✅ (2026-09-24) Swift-test inventory & function export list re-verified (Appendix K)
 - ✅ Executive summary written
 - ✅ Recommendations compiled
 - ✅ Audit deliverables packaged

@@ -27,6 +27,14 @@ export interface MessagePort {
     handle: MessagePreviewHandle;
     expectedRevision: NativeRevision;
   }): Promise<NativeResult<SavedMessageProjection>>;
+  /**
+   * Provider-agnostic AI drafting entry point. The native gateway performs the
+   * entitlement check (app subscription + quota) BEFORE any provider call and
+   * routes to whichever provider adapter is authorised (application-owned
+   * Gemini today; provider sign-in / on-device adapters later). Callers never
+   * select a provider here, and users never handle API keys — end-user
+   * provider authorisation is OAuth sign-in only.
+   */
   generateSuggestions(
     request: GeminiRequest,
   ): Promise<NativeResult<GeminiSuggestionsProjection>>;
