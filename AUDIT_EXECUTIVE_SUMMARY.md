@@ -152,6 +152,16 @@ $ ls -la | grep -i project
 
 ---
 
+## AI Entitlement Architecture (added 2026-09-24)
+
+A generic, provider-agnostic **AI entitlement + gateway architecture** has been implemented in code and specified in `AI_ENTITLEMENT_ARCHITECTURE.md` (see SSOT.md §3.2.1):
+
+- **The app's own subscription is the only AI gate.** External provider subscriptions (e.g., a user's personal Google AI plan) are explicitly *not* treated as application entitlements — that assumption is unsupported by Google's Gemini API billing/quota model.
+- **Users never paste API keys.** Provider access uses OAuth sign-in ("Connect your AI account", Authorization Code + PKCE); tokens stay in Android keystore-backed storage and never cross into JavaScript. Routing order: on-device → provider sign-in → application-owned, all behind the same entitlement + quota checks.
+- **Four concepts separated:** identity ≠ application subscription ≠ provider authorization ≠ inference execution — making the platform reusable across multiple applications (TalentSphere and future products).
+- **Cost controls enforced:** per-plan daily/monthly quotas with fail-closed entitlement decisions (`ai-subscription-required`, `ai-quota-exhausted`).
+- Verification: `tsc --noEmit` clean; full suite green (33 suites / 400 tests, incl. new domain + Kotlin routing-policy tests).
+
 ## Code Quality Assessment
 
 | Dimension | Rating | Notes |

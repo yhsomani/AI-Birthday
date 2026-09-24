@@ -195,6 +195,32 @@ $ grep -rn "AIGateway" src/ tests/ backend/functions/src/
 
 Since no iOS app exists, iOS users cannot use Gemini drafting. Backend has no iOS Gemini callables.
 
+### §3.2.1 AI Entitlement Architecture (added 2026-09-24) [VC]
+
+Gemini is now modelled as **one provider adapter behind a generic, reusable AI
+entitlement gateway** — see `AI_ENTITLEMENT_ARCHITECTURE.md` for the full spec.
+Key invariants now encoded in code:
+
+- **Four separate concepts:** identity ≠ application subscription ≠ provider
+  authorisation ≠ AI execution. Only the app's own subscription
+  (`free` / `wishwell-plus`) enables AI; an external provider subscription is
+  never an entitlement (enforced by `decideAiEntitlement()` in
+  `src/domain/ai/model.ts` and `AiGatewayRoutingPolicy.route()` in
+  `android/.../ai/AiGatewayPort.kt`).
+- **No API keys for end users.** Provider authorisation modes are
+  `application-owned` (production today), `provider-sign-in` (OAuth 2.0 + PKCE
+  "use my AI login" — tokens stay in device secure storage, never cross the
+  bridge to JS), and `on-device`. The previously drafted bring-your-own-key
+  (BYOK) vocabulary was removed on 2026-09-24 per product decision.
+- **Quota gates:** wishwell-plus = 50 requests/day, 300/month; free = AI off.
+  Blocked states surface via EN/HI copy (`ai-subscription-required`,
+  `ai-quota-exhausted` reason codes).
+- **Payment chain:** Stripe/PSP → Billing Service → Entitlement Service → AI
+  Gateway (never PSP directly to AI).
+- New files: `src/domain/ai/model.ts`, `src/application/ports/AiEntitlementPort.ts`,
+  `android/.../ai/AiGatewayPort.kt`, tests `src/domain/ai/entitlement.test.ts`,
+  `android/.../ai/AiGatewayRoutingPolicyTest.kt`.
+
 **Classification:** ✅ Android, ❌ iOS, ❌ Backend
 
 ---

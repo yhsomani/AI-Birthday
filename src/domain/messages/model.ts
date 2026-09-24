@@ -137,7 +137,12 @@ export type GeminiSuggestionsProjection =
       reason:
         | 'network-offline'
         | 'coordination-unavailable'
-        | 'policy-suspended';
+        | 'policy-suspended'
+        // AI entitlement gate (src/domain/ai/model.ts): driven ONLY by the
+        // app's own subscription/quota state, never an external provider
+        // subscription. See AI_ENTITLEMENT_ARCHITECTURE.md.
+        | 'ai-subscription-required'
+        | 'ai-quota-exhausted';
     }>
   | Readonly<{
       kind: 'failed';

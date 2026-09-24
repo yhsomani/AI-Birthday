@@ -53,6 +53,10 @@ export const liveEnglish = {
     'Reconnect the same Google account before continuing.',
   'live.reason.activeSenderOtherDevice':
     'Another Android phone manages this account. Review that phone or start a protected transfer.',
+  'live.reason.aiQuotaExhausted':
+    "You've used all AI suggestions allowed by your plan for now. They'll be available again soon, or upgrade for more.",
+  'live.reason.aiSubscriptionRequired':
+    'AI message suggestions are part of WishWell Plus. Subscribe to turn them on — you can still write and send every wish yourself.',
   'live.reason.approvalMissing':
     'Review and approve the exact birthday message before continuing.',
   'live.reason.backgroundRestricted':
@@ -1368,6 +1372,10 @@ export const liveHindi: typeof liveEnglish = {
     'आगे बढ़ने से पहले वही Google खाता फिर जोड़ें।',
   'live.reason.activeSenderOtherDevice':
     'दूसरा Android फ़ोन इस खाते को संभाल रहा है। उस फ़ोन की जाँच करें या सुरक्षित ट्रांसफ़र शुरू करें।',
+  'live.reason.aiQuotaExhausted':
+    'आपकी प्लान के अनुसार AI सुझाव अभी समाप्त हो गए हैं। जल्दी फिर उपलब्ध होंगे, या अधिक के लिए अपग्रेड करें।',
+  'live.reason.aiSubscriptionRequired':
+    'AI संदेश-सुझाव WishWell Plus का हिस्सा हैं। चालू करने के लिए सब्सक्राइब करें — आप हर शुभकामना खुद भी लिख और भेज सकते हैं।',
   'live.reason.approvalMissing':
     'आगे बढ़ने से पहले सटीक जन्मदिन संदेश देखकर स्वीकृत करें।',
   'live.reason.backgroundRestricted':

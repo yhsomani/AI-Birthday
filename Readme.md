@@ -11,6 +11,15 @@
 > 3. Cloud Functions inventory verified at **16 exports** (14 callables + 2 schedulers); `deletionReceipt` is a schema name, callable is `accountDeletionReceipt`.
 > See `SSOT_AUDIT_2026-09-22.md` → Appendix K for full evidence.
 
+> **UPDATE 2026-09-24 (AI entitlement architecture):** The AI layer was
+> re-architected as a **generic, reusable, provider-agnostic entitlement
+> gateway** (`AI_ENTITLEMENT_ARCHITECTURE.md`, SSOT §3.2.1). Product decision:
+> end users authenticate to AI providers via **OAuth sign-in ("use my AI
+> login") — never API keys**; the previously drafted BYOK vocabulary was
+> removed. Only the application's own subscription gates AI; external provider
+> subscriptions are never entitlements. New domain model, port, Kotlin routing
+> policy and tests shipped (see §3.2.1 file list).
+
 ---
 
 ## 📋 Audit Deliverables

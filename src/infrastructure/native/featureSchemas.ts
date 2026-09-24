@@ -9,6 +9,15 @@ import {
   ANDROID_TEST_PHASES,
 } from '../../domain/automation/model';
 import { CONTACT_ISSUE_CODES } from '../../domain/contacts/model';
+import {
+  AI_AUTHORIZATION_MODES,
+  AI_CAPABILITY_IDS,
+  AI_CONNECTION_STATES,
+  AI_PLAN_IDS,
+  AI_PROVIDER_IDS,
+  AI_SIGNIN_PROVIDERS,
+  AI_USAGE_PERIODS,
+} from '../../domain/ai/model';
 import { MESSAGE_LANGUAGES, MESSAGE_TONES } from '../../domain/messages/model';
 import { PRIVACY_ACTION_KINDS } from '../../domain/privacy/model';
 import {
@@ -273,6 +282,11 @@ export const geminiSuggestionsProjectionSchema = z.discriminatedUnion('kind', [
       'network-offline',
       'coordination-unavailable',
       'policy-suspended',
+      // AI entitlement gate (see src/domain/ai/model.ts +
+      // AI_ENTITLEMENT_ARCHITECTURE.md): the app's own subscription state,
+      // never an external provider subscription, decides these.
+      'ai-subscription-required',
+      'ai-quota-exhausted',
     ]),
   }),
   strictObject({
@@ -280,6 +294,60 @@ export const geminiSuggestionsProjectionSchema = z.discriminatedUnion('kind', [
     reason: z.enum(['unknown-native-value', 'internal-contract-invalid']),
   }),
 ]);
+
+// --- AI entitlement / provider-access projections ------------------------------
+// Provider-agnostic by construction: 'gemini-cloud' is one adapter id among
+// others; adding OpenAI/on-device adapters must not change these shapes.
+
+export const aiPlanIdSchema = z.enum(AI_PLAN_IDS);
+export const aiProviderIdSchema = z.enum(AI_PROVIDER_IDS);
+export const aiCapabilityIdSchema = z.enum(AI_CAPABILITY_IDS);
+export const aiAuthorizationModeSchema = z.enum(AI_AUTHORIZATION_MODES);
+export const aiConnectionStateSchema = z.enum(AI_CONNECTION_STATES);
+export const aiUsagePeriodSchema = z.enum(AI_USAGE_PERIODS);
+
+export const aiQuotaSchema = strictObject({
+  period: aiUsagePeriodSchema,
+  requestsPerDay: boundedCount,
+  requestsPerMonth: boundedCount,
+});
+
+export const aiProviderAccessProjectionSchema = strictObject({
+  provider: aiProviderIdSchema,
+  authorizationMode: aiAuthorizationModeSchema,
+  connectionState: aiConnectionStateSchema.nullable(),
+});
+
+export const aiEntitlementProjectionSchema = strictObject({
+  enabled: z.boolean(),
+  plan: aiPlanIdSchema,
+  capabilities: z.array(aiCapabilityIdSchema).max(AI_CAPABILITY_IDS.length),
+  quota: aiQuotaSchema,
+  providers: z.array(aiProviderAccessProjectionSchema).max(8),
+  renewsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).nullable(),
+});
+
+export const aiUsageSnapshotSchema = strictObject({
+  period: aiUsagePeriodSchema,
+  usedToday: boundedCount,
+  usedInPeriod: boundedCount,
+});
+
+export const aiSettingsProjectionSchema = z.discriminatedUnion('kind', [
+  strictObject({ kind: z.literal('not-configured') }),
+  strictObject({
+    kind: z.literal('configured'),
+    entitlement: aiEntitlementProjectionSchema,
+    usage: aiUsageSnapshotSchema.nullable(),
+  }),
+]);
+
+export const aiSignInProviderSchema = z.enum(AI_SIGNIN_PROVIDERS);
+
+export const aiConnectionMutationProjectionSchema = strictObject({
+  provider: aiSignInProviderSchema,
+  connectionState: aiConnectionStateSchema,
+});
 
 export const latePolicySchema = z.discriminatedUnion('kind', [
   strictObject({ kind: z.literal('none') }),
