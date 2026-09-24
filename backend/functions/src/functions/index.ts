@@ -1,23 +1,49 @@
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { defineJsonSecret, defineString } from 'firebase-functions/params';
+import { defineSecret, defineJsonSecret, defineString } from 'firebase-functions/params';
 import {
   HttpsError,
   onCall,
   type CallableRequest,
 } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import {
+  onDocumentCreated,
+  type FirestoreEvent,
+  type QueryDocumentSnapshot,
+} from 'firebase-functions/v2/firestore';
 import type { z } from 'zod';
 
 import { parseKeyRing } from '../domain/opaque.js';
 import { deletionStartResponse } from '../domain/deletionReceipt.js';
+import {
+  usagePeriodKey,
+  AI_SCHEMA_VERSION,
+  type AiSubscriptionStatus,
+} from '../domain/aiModel.js';
+import {
+  GeminiRestAdapter,
+  StubProviderAdapter,
+  type AiProviderAdapter,
+} from '../domain/aiProviders.js';
 import { CoordinationOperationOrchestrator } from '../services/coordinationOperationOrchestrator.js';
 import { ControlPlaneService } from '../services/controlPlane.js';
 import { DeletionOrchestrator } from '../services/deletionOrchestrator.js';
 import {
+  AiGatewayService,
+  GatewayBlockedError,
+} from '../services/aiGateway.js';
+import { applyPlayBillingEvent } from '../services/subscriptionIngestion.js';
+import {
+  aiEntitlementPath,
+  aiUsageSummary,
+} from '../persistence/paths.js';
+import {
   armSchema,
   accountModeSchema,
+  aiEntitlementStatusSchema,
+  aiGenerateDraftSchema,
   birthdayClaimSchema,
   contactDerivedResetSchema,
   coordinationLifecycleStatusSchema,
@@ -40,6 +66,14 @@ if (getApps().length === 0) {
 const REGION = 'asia-south1';
 const HMAC_KEYRING = defineJsonSecret('COORDINATION_HMAC_KEYRING');
 const SERVICE_ACCOUNT = defineString('CONTROL_PLANE_SERVICE_ACCOUNT');
+const GEMINI_API_KEY = defineSecret('AI_GATEWAY_GEMINI_API_KEY');
+const AI_PROVIDER_MODE = defineString('AI_GATEWAY_PROVIDER_MODE', {
+  // 'stub' keeps the gateway offline-deterministic in dev/emulator deploys.
+  default: 'stub',
+});
+const AI_MONTHLY_BUDGET_MICROS = defineString('AI_GATEWAY_MONTHLY_BUDGET_MICROS', {
+  default: '5000000000', // ₹5,000/month global cloud-cost ceiling.
+});
 const db = getFirestore();
 
 const commonOptions = {
@@ -58,6 +92,31 @@ const secretOptions = {
   ...commonOptions,
   secrets: [HMAC_KEYRING],
 };
+
+const aiGatewayOptions = {
+  ...commonOptions,
+  secrets: [GEMINI_API_KEY],
+};
+
+function buildAiGateway(): AiGatewayService {
+  const adapters = new Map<string, AiProviderAdapter>();
+  if (AI_PROVIDER_MODE.value() === 'gemini-rest') {
+    const apiKey = GEMINI_API_KEY.value();
+    if (apiKey !== '') {
+      const adapter = new GeminiRestAdapter(apiKey);
+      adapters.set(adapter.provider, adapter);
+    }
+  }
+  if (!adapters.has('gemini-cloud')) {
+    const stub = new StubProviderAdapter('gemini-cloud');
+    adapters.set(stub.provider, stub);
+  }
+  const budgetRaw = Number.parseInt(AI_MONTHLY_BUDGET_MICROS.value(), 10);
+  return new AiGatewayService(db, adapters, {
+    globalMonthlyBudgetMicros:
+      Number.isSafeInteger(budgetRaw) && budgetRaw > 0 ? budgetRaw : 5_000_000_000,
+  });
+}
 
 function requireAuthenticated(request: CallableRequest<unknown>): string {
   if (request.auth === undefined || request.app === undefined) {
@@ -323,5 +382,210 @@ export const sweepCoordinationOperations = onSchedule(
       Timestamp.now().toMillis(),
     );
     await orchestrator.sweep();
+  },
+);
+
+
+// --- AI Gateway callables -------------------------------------------------------
+// These are ADDITIVE endpoints: no existing callable changes behaviour, and
+// the Android app's native Gemini path keeps working untouched. The gateway
+// is the entitlement-gated cloud execution lane described in
+// "Ai gateway architecture.md" / "Ai gateway integration guide.md".
+
+const AI_SYSTEM_INSTRUCTION =
+  'You draft short, sincere birthday messages for a personal contacts app. ' +
+  'Return only the message text. Never invent facts about the recipient, ' +
+  'never mention that you are an AI, and keep each draft under 280 characters.';
+
+function buildDraftPrompt(input: {
+  recipientDisplayName: string;
+  tone: string;
+  relationshipHint?: string | undefined;
+  additionalContext?: string | undefined;
+}): string {
+  const parts = [
+    `Write one birthday message for "${input.recipientDisplayName}".`,
+    `Tone: ${input.tone}.`,
+  ];
+  if (input.relationshipHint !== undefined) {
+    parts.push(`Relationship: ${input.relationshipHint}.`);
+  }
+  if (input.additionalContext !== undefined) {
+    parts.push(`Extra context from the sender: ${input.additionalContext}`);
+  }
+  return parts.join(' ');
+}
+
+function gatewayBlockedToHttps(error: unknown): HttpsError {
+  if (error instanceof GatewayBlockedError) {
+    switch (error.reason) {
+      case 'ai-subscription-required':
+        return new HttpsError('failed-precondition', 'AI_SUBSCRIPTION_REQUIRED', {
+          reason: error.reason,
+        });
+      case 'ai-quota-exhausted':
+      case 'ai-budget-exhausted':
+        return new HttpsError('resource-exhausted', 'AI_QUOTA_EXHAUSTED', {
+          reason: error.reason,
+        });
+      case 'ai-usage-period-mismatch':
+        return new HttpsError('failed-precondition', 'AI_USAGE_PERIOD_MISMATCH', {
+          reason: error.reason,
+        });
+      default:
+        return new HttpsError('unavailable', 'AI_PROVIDER_UNAVAILABLE', {
+          reason: error.reason,
+        });
+    }
+  }
+  throw error;
+}
+
+export const getAiEntitlementStatus = onCall(
+  aiGatewayOptions,
+  async request => {
+    const uid = requireAuthenticated(request);
+    parseRequest(aiEntitlementStatusSchema, request.data);
+    const gateway = buildAiGateway();
+    const nowMs = Timestamp.now().toMillis();
+    try {
+      const entitlement = await gateway.entitlementFor(uid);
+      const summarySnap = await aiUsageSummary(
+        db,
+        uid,
+        usagePeriodKey(nowMs),
+      ).get();
+      const data = summarySnap.data() as Record<string, unknown> | undefined;
+      const usedInPeriod =
+        typeof data?.requests === 'number' ? data.requests : 0;
+      const days = (data?.days ?? {}) as Record<string, number>;
+      const today = new Date(nowMs).toISOString().slice(0, 10);
+      return {
+        contractVersion: 1,
+        enabled: entitlement.enabled,
+        plan: entitlement.plan,
+        capabilities: entitlement.capabilities,
+        quota: entitlement.quota,
+        providers: entitlement.providers,
+        renewsOn: entitlement.renewsOn,
+        usage: {
+          period: 'calendar-month',
+          usedToday: days[today] ?? 0,
+          usedInPeriod,
+        },
+      };
+    } catch (error) {
+      throw gatewayBlockedToHttps(error);
+    }
+  },
+);
+
+export const generateBirthdayDraft = onCall(
+  aiGatewayOptions,
+  async request => {
+    const uid = requireAuthenticated(request);
+    const input = parseRequest(aiGenerateDraftSchema, request.data);
+    const gateway = buildAiGateway();
+    try {
+      const outcome = await gateway.generate(uid, {
+        capability: input.capability,
+        prompt: buildDraftPrompt(input),
+        systemInstruction: AI_SYSTEM_INSTRUCTION,
+        maxOutputTokens: 300,
+        temperature: 0.7,
+      });
+      return {
+        contractVersion: 1,
+        requestId: input.requestId,
+        draft: outcome.result.text,
+        provider: outcome.result.provider,
+        model: outcome.result.model,
+        remainingToday: outcome.remainingToday,
+        remainingInPeriod: outcome.remainingInPeriod,
+      };
+    } catch (error) {
+      throw gatewayBlockedToHttps(error);
+    }
+  },
+);
+
+
+// --- Billing ingestion (server-only) --------------------------------------------
+// RTDN-normalised events are written by a small ingester (Cloud Run/Functions
+// with Play Developer access) onto users/{uid}/events/playBilling/{eventId}.
+// This Firestore trigger is the ONLY writer of the entitlement record.
+// Unknown SKUs and replayed/out-of-order events are ignored — see
+// services/subscriptionIngestion.ts for the reduction rules.
+
+interface BillingEventParams { uid: string; eventId: string }
+
+export const onPlayBillingEvent = onDocumentCreated(
+  {
+    region: REGION,
+    timeoutSeconds: 30,
+    memory: '256MiB',
+    serviceAccount: SERVICE_ACCOUNT,
+    document: 'users/{uid}/events/playBilling/{eventId}',
+  },
+  async (
+    event: FirestoreEvent<
+      QueryDocumentSnapshot | undefined,
+      BillingEventParams
+    >,
+  ) => {
+    // Params are typed as always-defined, but validate defensively since the
+    // trigger fires on externally-authored documents.
+    const uid: string = event.params.uid;
+    if (typeof uid !== 'string' || uid.length === 0) {
+      return;
+    }
+    await applyPlayBillingEvent(
+      async (targetUid, record) => {
+        await aiEntitlementPath(db, targetUid).set(
+          record as unknown as Record<string, unknown>,
+          { merge: false },
+        );
+      },
+      async (targetUid) => {
+        const snap = await aiEntitlementPath(db, targetUid).get();
+        const data = snap.data() as Record<string, unknown> | undefined;
+        if (data === undefined) {
+          return null;
+        }
+        const plan = data.plan;
+        const status = data.status;
+        const updatedAtMs = data.updatedAtMs;
+        const expiresAtMs = data.expiresAtMs;
+        const purchasedAtMs = data.purchasedAtMs;
+        const cancelledAtMs = data.cancelledAtMs;
+        const externalId = data.externalSubscriptionId;
+        const billingProvider = data.billingProvider;
+        if (
+          (plan !== 'free' && plan !== 'wishwell-plus') ||
+          typeof status !== 'string' ||
+          typeof updatedAtMs !== 'number'
+        ) {
+          return null;
+        }
+        return {
+          schemaVersion: AI_SCHEMA_VERSION,
+          uid: targetUid,
+          plan,
+          status: status as AiSubscriptionStatus,
+          billingProvider:
+            typeof billingProvider === 'string' ? billingProvider : 'unknown',
+          externalSubscriptionId:
+            typeof externalId === 'string' ? externalId : null,
+          purchasedAtMs:
+            typeof purchasedAtMs === 'number' ? purchasedAtMs : null,
+          expiresAtMs: typeof expiresAtMs === 'number' ? expiresAtMs : null,
+          cancelledAtMs:
+            typeof cancelledAtMs === 'number' ? cancelledAtMs : null,
+          updatedAtMs,
+        };
+      },
+      uid,
+      event.data,
+    );
   },
 );
