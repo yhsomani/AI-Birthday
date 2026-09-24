@@ -1,26 +1,9 @@
 # WishWell Birthday Autopilot — Forensic Code Audit
-
 ## Complete Audit Deliverables
 
-**Audit Date:** September 22, 2026 · **Re-verification:** September 24, 2026 (SSOT v2.1 + Appendix K)  
+**Audit Date:** September 22, 2026  
 **Repository:** https://github.com/yhsomani/AI-Birthday  
 **Audit Scope:** 415 source files (130 TypeScript, 244 Kotlin, 14 backend functions, 49 tools)
-
-> **UPDATE 2026-09-24 (v2.1 re-verification):** Three residual inaccuracies in the original audit were corrected and one action item closed:
->
-> 1. `AIGateway.ts` dead code — **deleted from the repository** (recommended action completed; `src/infrastructure/ai/` no longer exists).
-> 2. "Zero Swift files" was wrong — nine standalone Swift policy-contract tests exist under `tests/ios/` (scaffolding only; iOS app still not built).
-> 3. Cloud Functions inventory verified at **16 exports** (14 callables + 2 schedulers); `deletionReceipt` is a schema name, callable is `accountDeletionReceipt`.
->    See `SSOT_AUDIT_2026-09-22.md` → Appendix K for full evidence.
-
-> **UPDATE 2026-09-24 (AI entitlement architecture):** The AI layer was
-> re-architected as a **generic, reusable, provider-agnostic entitlement
-> gateway** (`AI_ENTITLEMENT_ARCHITECTURE.md`, SSOT §3.2.1). Product decision:
-> end users authenticate to AI providers via **OAuth sign-in ("use my AI
-> login") — never API keys**; the previously drafted BYOK vocabulary was
-> removed. Only the application's own subscription gates AI; external provider
-> subscriptions are never entitlements. New domain model, port, Kotlin routing
-> policy and tests shipped (see §3.2.1 file list).
 
 ---
 
@@ -29,19 +12,17 @@
 This folder contains three comprehensive documents:
 
 ### 1. **SSOT_AUDIT_2026-09-22.md** (Comprehensive Forensic Report)
-
 **Purpose:** Complete technical audit with code-level evidence  
 **Length:** 300+ sections  
 **Audience:** Engineering team, architects, technical reviewers
 
 **Contents:**
-
 - Executive summary with key findings
 - Complete feature inventory with evidence paths
 - Architecture verification (layered design, native contract, Android engine)
 - Feature status matrix (40+ features, ✅/◐/❌ classification)
 - Critical gaps & root cause analysis
-  - ~~AIGateway dead code (746 lines, never instantiated)~~ — RESOLVED 2026-09-24: deleted
+  - AIGateway dead code (746 lines, never instantiated)
   - Gemini backend missing (file doesn't exist)
   - iOS not built (stubs only, no Xcode project)
   - Battery exemption flow incomplete (API limitation)
@@ -53,7 +34,6 @@ This folder contains three comprehensive documents:
 - Known bugs & edge cases
 
 **Key Findings:**
-
 - ❌ 3 false claims in previous SSOT.md (Gemini backend, iOS protocol, legacy docs)
 - ✅ Android app is production-ready
 - ◐ Gemini drafting Android-only (no backend)
@@ -62,13 +42,11 @@ This folder contains three comprehensive documents:
 ---
 
 ### 2. **SSOT_CORRECTED.md** (Updated Single Source of Truth)
-
 **Purpose:** Replace previous SSOT.md with accurate, verified information  
 **Length:** 50 sections  
 **Audience:** All stakeholders, product team, legal, operations
 
 **Contents:**
-
 - Corrections section highlighting false claims from v1.0
 - Product overview with honest capability assessment
 - Corrected architecture notes
@@ -87,13 +65,11 @@ This folder contains three comprehensive documents:
 ---
 
 ### 3. **AUDIT_EXECUTIVE_SUMMARY.md** (Stakeholder Brief)
-
 **Purpose:** High-level findings for decision-makers  
 **Length:** 30 sections  
 **Audience:** Product leadership, executives, board
 
 **Contents:**
-
 - TL;DR (Android ready, 3 false claims, infrastructure blockers)
 - Key findings (what works, what's partial, what doesn't exist)
 - Previous SSOT issues explained (with evidence)
@@ -172,19 +148,16 @@ This folder contains three comprehensive documents:
 ### ⚠️ Critical Issues Fixed in This Audit
 
 **Issue #1: Gemini Backend Claim**
-
 - **Previous SSOT said:** "backend/functions/src/gemini/draftMessage.ts exists"
 - **Reality:** File doesn't exist. Backend has zero Gemini code.
 - **Status:** ❌ FALSE CLAIM (corrected in this audit)
 
 **Issue #2: iOS Protocol Claim**
-
 - **Previous SSOT said:** "iOS companion protocol half-built (server callables absent)"
 - **Reality:** iOS is not built at all. No directory, no Xcode, no Swift. Stubs only.
 - **Status:** ❌ FALSE CLAIM (corrected in this audit)
 
 **Issue #3: Legacy Docs Reference**
-
 - **Previous SSOT said:** "README, PROJECT_ABOUT misstate behaviors"
 - **Reality:** These files don't exist in the repository.
 - **Status:** ❌ REFERENCE ERROR (corrected in this audit)
@@ -193,17 +166,17 @@ This folder contains three comprehensive documents:
 
 ## 📊 Project Status at a Glance
 
-| Component             | Status                   | Timeline                                      |
-| --------------------- | ------------------------ | --------------------------------------------- |
-| **Android App**       | ✅ Complete              | Ready for Play Store                          |
-| **Cloud Backend**     | ✅ Complete              | Awaiting infrastructure deployment (2–3 days) |
-| **Web Hosting**       | ✅ Complete              | Awaiting deployment authority (1–2 days)      |
-| **Gemini AI**         | ◐ Partial (Android-only) | No backend involvement; iOS N/A               |
-| **iOS App**           | ❌ Not Built             | Phase 2 (8–12 weeks if approved)              |
-| **Analytics**         | ❌ Omitted               | Post-launch (privacy choice)                  |
-| **Infrastructure**    | ⏳ Pending               | External provisioning (2–3 weeks)             |
-| **Release Authority** | ⏳ Pending               | External signing + evidence (1 week)          |
-| **Play Store**        | ⏳ Ready                 | Submit after infrastructure (2–3 weeks)       |
+| Component | Status | Timeline |
+|-----------|--------|----------|
+| **Android App** | ✅ Complete | Ready for Play Store |
+| **Cloud Backend** | ✅ Complete | Awaiting infrastructure deployment (2–3 days) |
+| **Web Hosting** | ✅ Complete | Awaiting deployment authority (1–2 days) |
+| **Gemini AI** | ◐ Partial (Android-only) | No backend involvement; iOS N/A |
+| **iOS App** | ❌ Not Built | Phase 2 (8–12 weeks if approved) |
+| **Analytics** | ❌ Omitted | Post-launch (privacy choice) |
+| **Infrastructure** | ⏳ Pending | External provisioning (2–3 weeks) |
+| **Release Authority** | ⏳ Pending | External signing + evidence (1 week) |
+| **Play Store** | ⏳ Ready | Submit after infrastructure (2–3 weeks) |
 
 **Overall:** **95% code-ready; awaiting external deployment & legal sign-off**
 
@@ -253,27 +226,23 @@ This folder contains three comprehensive documents:
 ### How This Audit Was Performed
 
 1. **Repository Analysis** (No execution, pure code inspection)
-
    - Cloned entire repository
    - Analyzed file tree structure (415 files)
    - Grep searches for keywords, patterns, missing files
    - Configuration inspection (gradle, package.json, tsconfig, firebase.json)
 
 2. **Code Review**
-
    - Traced feature flows end-to-end
    - Verified implementation vs. documentation claims
    - Cross-checked file references in SSOT.md
    - Examined test patterns & coverage config
 
 3. **Test Suite Analysis**
-
    - Counted test files (93 total: 44 TS/JS, 49 tools, 35+ Android)
    - Reviewed coverage thresholds (67–100%)
    - Analyzed test patterns (architecture, contracts, E2E)
 
 4. **Security & Privacy Audit**
-
    - HMAC implementation verification
    - SQLCipher encryption validation
    - Keystore hardening confirmation
@@ -288,21 +257,20 @@ This folder contains three comprehensive documents:
 
 ### Audit Confidence Level
 
-| Category                  | Confidence | Notes                                           |
-| ------------------------- | ---------- | ----------------------------------------------- |
-| **Code existence**        | 🟢 HIGH    | File-based verification (grep, find)            |
-| **Implementation status** | 🟢 HIGH    | Code inspection, test patterns                  |
-| **Architecture**          | 🟢 HIGH    | Structural analysis, contract inspection        |
-| **Security claims**       | 🟡 MEDIUM  | Code analysis only; not runtime-verified        |
-| **Runtime behavior**      | 🟡 MEDIUM  | Could not execute tests (Node version mismatch) |
-| **Performance**           | ⚫ UNKNOWN | No load testing performed                       |
+| Category | Confidence | Notes |
+|----------|------------|-------|
+| **Code existence** | 🟢 HIGH | File-based verification (grep, find) |
+| **Implementation status** | 🟢 HIGH | Code inspection, test patterns |
+| **Architecture** | 🟢 HIGH | Structural analysis, contract inspection |
+| **Security claims** | 🟡 MEDIUM | Code analysis only; not runtime-verified |
+| **Runtime behavior** | 🟡 MEDIUM | Could not execute tests (Node version mismatch) |
+| **Performance** | ⚫ UNKNOWN | No load testing performed |
 
 ---
 
 ## ⚠️ Audit Limitations
 
 1. **No Runtime Execution**
-
    - Node.js 22.22 available; project requires 24.18+
    - Could not run Jest test suite
    - Could not deploy to Firebase emulator
@@ -310,14 +278,12 @@ This folder contains three comprehensive documents:
    - Relied on static code inspection
 
 2. **No Mobile Device Testing**
-
    - Could not install/run Android app
    - Could not verify UX flows end-to-end
    - Could not test SMS gateway behavior
    - Could not test native contract (TurboModule)
 
 3. **No Cloud Environment**
-
    - Could not test Cloud Functions
    - Could not verify Firestore rules
    - Could not test deletion saga execution
@@ -335,32 +301,27 @@ This folder contains three comprehensive documents:
 ## 📞 Questions?
 
 ### For Technical Details
-
 → Consult `SSOT_AUDIT_2026-09-22.md` (Appendices A–J)
 
 ### For Architecture Decisions
-
 → Consult `SSOT_AUDIT_2026-09-22.md` (Section 4 & 12)
 
 ### For Business Impact
-
 → Consult `AUDIT_EXECUTIVE_SUMMARY.md` (All sections)
 
 ### For Updated Requirements
-
 → Use `SSOT_CORRECTED.md` (replace v1.0 SSOT)
 
 ---
 
 ## 📄 Document Versions
 
-| Document                 | Version    | Status        | Notes                                                                                                                     |
-| ------------------------ | ---------- | ------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| SSOT (old)               | v1.0       | ⚠️ SUPERSEDED | Contains false claims (Gemini backend, iOS, legacy docs)                                                                  |
-| SSOT (new)               | v2.1       | ✅ APPROVED   | Corrected, re-verified 2026-09-24 against live tree (AIGateway deletion, Swift-test nuance, 16-export function inventory) |
-| Re-verification addendum | 2026-09-24 | ✅ FINAL      | Appendix K of SSOT_AUDIT_2026-09-22.md                                                                                    |
-| Audit Report             | 2026-09-22 | ✅ FINAL      | Comprehensive forensic analysis                                                                                           |
-| Executive Summary        | 2026-09-22 | ✅ FINAL      | Stakeholder brief                                                                                                         |
+| Document | Version | Status | Notes |
+|----------|---------|--------|-------|
+| SSOT (old) | v1.0 | ⚠️ SUPERSEDED | Contains false claims (Gemini backend, iOS, legacy docs) |
+| SSOT (new) | v2.0 | ✅ APPROVED | Corrected, verified, ready for adoption |
+| Audit Report | 2026-09-22 | ✅ FINAL | Comprehensive forensic analysis |
+| Executive Summary | 2026-09-22 | ✅ FINAL | Stakeholder brief |
 
 ---
 
@@ -374,8 +335,6 @@ This folder contains three comprehensive documents:
 - ✅ Security & privacy audit completed
 - ✅ Previous SSOT false claims identified & corrected
 - ✅ Corrected SSOT.md prepared
-- ✅ (2026-09-24) AIGateway dead-code deletion verified complete
-- ✅ (2026-09-24) Swift-test inventory & function export list re-verified (Appendix K)
 - ✅ Executive summary written
 - ✅ Recommendations compiled
 - ✅ Audit deliverables packaged
