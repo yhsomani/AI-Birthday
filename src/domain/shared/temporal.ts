@@ -3,7 +3,6 @@ import type { Brand } from './brand';
 export type UtcInstant = Brand<string, 'UtcInstant'>;
 export type LocalDate = Brand<string, 'LocalDate'>;
 export type LocalTime = Brand<string, 'LocalTime'>;
-export type IanaTimeZone = Brand<string, 'IanaTimeZone'>;
 
 const LOCAL_DATE_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/;
 const LOCAL_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;

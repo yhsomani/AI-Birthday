@@ -24,7 +24,7 @@ export const resolveDeviceLanguage = (): AppLanguage => {
 
 export const appI18n = i18next.createInstance();
 
-export const appI18nReady = appI18n.use(initReactI18next).init({
+appI18n.use(initReactI18next).init({
   resources: productionResources,
   lng: resolveDeviceLanguage(),
   fallbackLng: 'en',
