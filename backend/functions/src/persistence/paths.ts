@@ -72,6 +72,32 @@ export function globalControlPath(db: Firestore): DocumentReference {
   return db.collection('globalControl').doc('current');
 }
 
+// --- AI Gateway paths -------------------------------------------------------
+// Server-only collections (firestore.rules denies all direct client access).
+// The AI entitlement is WishWell's OWN subscription record, materialised by
+// billing RTDN/webhooks. Usage entries are an append-only ledger; per-account
+// monthly aggregates live in aiUsageSummary for cheap quota reads.
+
+export function aiEntitlementPath(db: Firestore, uid: string): DocumentReference {
+  return db.collection('users').doc(uid).collection('meta').doc('aiEntitlement');
+}
+
+export function aiUsageLedger(db: Firestore, uid: string): CollectionReference {
+  return db.collection('users').doc(uid).collection('aiUsage');
+}
+
+export function aiUsageSummary(
+  db: Firestore,
+  uid: string,
+  periodKey: string,
+): DocumentReference {
+  return aiUsageLedger(db, uid).doc(`summary-${periodKey}`);
+}
+
+export function aiGlobalBudgetPath(db: Firestore): DocumentReference {
+  return db.collection('aiGlobalBudget').doc('current');
+}
+
 export function deletionReceiptPath(
   db: Firestore,
   receiptKey: string,

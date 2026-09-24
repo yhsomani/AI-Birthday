@@ -205,3 +205,32 @@ export type CoordinationLifecycleStatusRequest = z.infer<
   typeof coordinationLifecycleStatusSchema
 >;
 
+
+// --- AI Gateway request schemas ------------------------------------------------
+
+const aiCapability = z.enum(['message-drafting']);
+const tone = z.enum(['warm', 'formal', 'playful', 'sincere']);
+
+export const aiEntitlementStatusSchema = z
+  .object({
+    contractVersion,
+  })
+  .strict();
+
+export const aiGenerateDraftSchema = z
+  .object({
+    contractVersion,
+    requestId: stableRequestId,
+    capability: aiCapability,
+    recipientDisplayName: z.string().min(1).max(120),
+    occasion: z.literal('birthday'),
+    tone,
+    relationshipHint: z.string().max(80).optional(),
+    additionalContext: z.string().max(500).optional(),
+  })
+  .strict();
+
+export type AiEntitlementStatusRequest = z.infer<
+  typeof aiEntitlementStatusSchema
+>;
+export type AiGenerateDraftRequest = z.infer<typeof aiGenerateDraftSchema>;

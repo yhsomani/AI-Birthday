@@ -4,6 +4,18 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // The coordination ledger is server-only. Authenticated mobile clients use
     // callable Functions and never receive direct Firestore capability.
+    //
+    // This blanket deny intentionally covers the AI gateway collections too
+    // (users/{uid}/meta/aiEntitlement, users/{uid}/aiUsage/**,
+    // users/{uid}/events/playBilling/**, aiGlobalBudget/current): entitlements
+    // are materialised by billing webhooks/RTDN, usage is written by the
+    // gateway service account inside transactions, and clients observe quota
+    // remaining only through the aiGateway callable response. If a future
+    // product decision grants read access to any of these paths, it must be an
+    // explicit narrow match here — never a relaxation of this catch-all.
+    //
+    // Indexes: all gateway reads are single-document lookups by id/periodKey,
+    // so firestore.indexes.json needs no composite entries for them today.
     match /{document=**} {
       allow read, write: if false;
     }
