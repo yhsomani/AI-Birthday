@@ -33,9 +33,6 @@ export type AiProviderId = (typeof AI_PROVIDER_IDS)[number];
 export const AI_CAPABILITY_IDS = ['message-drafting'] as const;
 export type AiCapabilityId = (typeof AI_CAPABILITY_IDS)[number];
 
-export const AI_EXECUTION_TARGETS = ['cloud', 'on-device'] as const;
-export type AiExecutionTarget = (typeof AI_EXECUTION_TARGETS)[number];
-
 export const AI_AUTHORIZATION_MODES = [
   /** Application-owned project credentials. Invisible to users; never user-supplied. */
   'application-owned',

@@ -22,7 +22,6 @@ export type SenderTransferOperationId = Brand<
 
 export type EnrollmentReviewHandle = Brand<string, 'EnrollmentReviewHandle'>;
 export type MessagePreviewHandle = Brand<string, 'MessagePreviewHandle'>;
-export type ComposerProposalId = Brand<string, 'ComposerProposalId'>;
 export type PolicyReviewHandle = Brand<string, 'PolicyReviewHandle'>;
 export type ApprovalReviewHandle = Brand<string, 'ApprovalReviewHandle'>;
 export type TestReviewHandle = Brand<string, 'TestReviewHandle'>;

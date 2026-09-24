@@ -101,7 +101,7 @@ export const safeReasonMessageKeys: Record<SafeReasonCode, TranslationKey> = {
 export const safeReasonMessageKey = (reason: SafeReasonCode): TranslationKey =>
   safeReasonMessageKeys[reason];
 
-export const approvalInvalidationMessageKeys: Record<
+const approvalInvalidationMessageKeys: Record<
   ApprovalInvalidationReason,
   TranslationKey
 > = {

@@ -225,9 +225,12 @@ Key invariants now encoded in code:
   `ai-quota-exhausted` reason codes).
 - **Payment chain:** Stripe/PSP → Billing Service → Entitlement Service → AI
   Gateway (never PSP directly to AI).
-- New files: `src/domain/ai/model.ts`, `src/application/ports/AiEntitlementPort.ts`,
-  `android/.../ai/AiGatewayPort.kt`, tests `src/domain/ai/entitlement.test.ts`,
-  `android/.../ai/AiGatewayRoutingPolicyTest.kt`.
+- New files: `src/domain/ai/model.ts`, `android/.../ai/AiGatewayPort.kt`,
+  tests `src/domain/ai/entitlement.test.ts`,
+  `android/.../ai/AiGatewayRoutingPolicyTest.kt`. (The interim
+  `src/application/ports/AiEntitlementPort.ts` was removed as dead code on
+  2026-09-24 — no runtime consumer existed; the gateway entry point is
+  `MessagePort.generateSuggestions` plus the Kotlin routing policy.)
 
 **Classification:** ✅ Android, ❌ iOS, ❌ Backend
 

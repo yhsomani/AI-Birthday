@@ -7,7 +7,6 @@ import type {
   ApprovalReviewHandle,
   BirthdayChoiceId,
   ContactId,
-  ComposerProposalId,
   EnrollmentReviewHandle,
   IssueId,
   MessagePreviewHandle,
@@ -30,7 +29,6 @@ import type {
 } from '../../domain/shared/brand';
 import { SAFE_REASON_CODES } from '../../domain/shared/reasonCodes';
 import type {
-  IanaTimeZone,
   LocalDate,
   LocalTime,
   UtcInstant,
@@ -102,22 +100,6 @@ export const localTimeSchema = z
   .max(12)
   .refine(isLocalTime)
   .transform(value => value as LocalTime);
-export const ianaTimeZoneSchema = z
-  .string()
-  .min(1)
-  .max(255)
-  .refine(value => {
-    try {
-      return (
-        new Intl.DateTimeFormat('en', { timeZone: value }).resolvedOptions()
-          .timeZone.length > 0
-      );
-    } catch {
-      return false;
-    }
-  })
-  .transform(value => value as IanaTimeZone);
-
 export const contactIdSchema = opaqueString<ContactId>();
 export const phoneChoiceIdSchema = opaqueString<PhoneChoiceId>();
 export const birthdayChoiceIdSchema = opaqueString<BirthdayChoiceId>();
@@ -144,10 +126,6 @@ export const senderTransferOperationIdSchema = z
 export const enrollmentReviewHandleSchema =
   opaqueString<EnrollmentReviewHandle>();
 export const messagePreviewHandleSchema = opaqueString<MessagePreviewHandle>();
-export const composerProposalIdSchema = z
-  .string()
-  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u)
-  .transform(value => value as ComposerProposalId);
 export const policyReviewHandleSchema = opaqueString<PolicyReviewHandle>();
 export const approvalReviewHandleSchema = opaqueString<ApprovalReviewHandle>();
 export const testReviewHandleSchema = opaqueString<TestReviewHandle>();

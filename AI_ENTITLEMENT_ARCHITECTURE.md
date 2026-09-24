@@ -48,7 +48,7 @@ Code anchors:
 | ------------------------------ | ------------------------------------------------------------------------------- |
 | B (entitlement decision)       | `src/domain/ai/model.ts` → `decideAiEntitlement()` (pure)                       |
 | B/C/D wire contract            | `src/infrastructure/native/featureSchemas.ts` (`ai*Schema`)                     |
-| Application boundary           | `src/application/ports/AiEntitlementPort.ts`, `MessagePort.generateSuggestions` |
+| Application boundary           | `MessagePort.generateSuggestions` (single gateway entry point)                  |
 | Routing policy (Kotlin mirror) | `android/.../ai/AiGatewayPort.kt` → `AiGatewayRoutingPolicy.route()`            |
 
 ## 2. The business rule (the gate)
@@ -104,8 +104,12 @@ For a native mobile app this is the industry-standard, key-free pattern:
    transparently; on `expired` prompt silent re-auth.
 
 Already present in the repo and reused as-is: Firebase Auth (Google provider)
-establishes _identity_; the new `connectAiProvider()/disconnectAiProvider()`
-port methods establish _provider authorisation_. Two different things — see §1.
+establishes _identity_; the native connect/disconnect provider-sign-in flow
+(`AiConnectionState` lifecycle in `src/domain/ai/model.ts`, routed via
+`AiGatewayRoutingPolicy` on Android) establishes _provider authorisation_.
+Two different things — see §1. (The former JS-side `AiEntitlementPort` file
+was removed as dead code on 2026-09-24; its vocabulary survives in the domain
+model, schemas, and Kotlin gateway.)
 
 ### 3.2 Important caveat (documented, not assumed)
 
