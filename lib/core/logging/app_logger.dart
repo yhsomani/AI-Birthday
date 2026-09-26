@@ -54,11 +54,16 @@ const Set<String> _sensitiveKeyFragments = {
   'address',
 };
 
+/// Pre-normalized sensitive key fragments for faster redaction checking.
+final Set<String> _normalizedSensitiveKeyFragments = _sensitiveKeyFragments
+    .map((f) => f.toLowerCase().replaceAll('_', '').replaceAll('-', ''))
+    .toSet();
+
 /// Redacts values whose key suggests sensitive content.
 Object? _redactValue(String key, Object? value) {
   final normalized = key.toLowerCase().replaceAll('_', '').replaceAll('-', '');
-  for (final fragment in _sensitiveKeyFragments) {
-    if (normalized.contains(fragment.toLowerCase().replaceAll('_', ''))) {
+  for (final fragment in _normalizedSensitiveKeyFragments) {
+    if (normalized.contains(fragment)) {
       return '[REDACTED]';
     }
   }
