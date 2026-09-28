@@ -62,6 +62,16 @@ Object? _redactValue(String key, Object? value) {
       return '[REDACTED]';
     }
   }
+
+  // 🛡️ SECURITY: Recursively sanitize nested structures to ensure
+  // sensitive data (like API keys) buried inside Maps/Iterables
+  // doesn't leak into logs plaintext.
+  if (value is Map) {
+    return value.map((k, v) => MapEntry(k, _redactValue(k is String ? k : '', v)));
+  } else if (value is Iterable) {
+    return value.map((v) => _redactValue('', v)).toList();
+  }
+
   return value;
 }
 
