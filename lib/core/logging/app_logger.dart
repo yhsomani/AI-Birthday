@@ -40,6 +40,7 @@ class LogRecord {
 
 /// Sensitive parameter key fragments that must never appear in output.
 const Set<String> _sensitiveKeyFragments = {
+  // 🛡️ SECURITY: Prevent PII leakage of sensitive user data
   'credential',
   'secret',
   'token',
@@ -52,6 +53,7 @@ const Set<String> _sensitiveKeyFragments = {
   'phonenumber',
   'phone_number',
   'address',
+  'email',
 };
 
 /// Redacts values whose key suggests sensitive content.
