@@ -28,9 +28,9 @@ class InMemoryDraftsRepository implements DraftsRepository {
   @override
   Future<MessageDraft?> getDraftForBirthday(String birthdayId) async {
     return _store.values.cast<MessageDraft?>().firstWhere(
-          (d) => d?.birthdayId == birthdayId,
-          orElse: () => null,
-        );
+      (d) => d?.birthdayId == birthdayId,
+      orElse: () => null,
+    );
   }
 
   @override

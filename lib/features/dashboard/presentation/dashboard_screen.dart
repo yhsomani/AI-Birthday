@@ -24,10 +24,7 @@ class DashboardScreen extends ConsumerWidget {
           children: [
             Icon(Icons.cake_outlined, color: Color(0xFFE03E5D)),
             SizedBox(width: 8),
-            Text(
-              'AI-Birthday',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+            Text('AI-Birthday', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -37,8 +34,18 @@ class DashboardScreen extends ConsumerWidget {
           final peopleMap = {for (final p in people) p.id: p};
           final now = DateTime.now();
 
-          final todayBirthdays = birthdays.where((b) => b.isToday(now)).toList();
-          final upcomingBirthdays = birthdays.where((b) => b.daysUntil(now) > 0).toList();
+          // ⚡ PERFORMANCE: Replace multiple O(N) filters with expensive DateTime instantiations
+          // inside `daysUntil()` with a single O(N) loop that computes the diff once per item.
+          final todayBirthdays = <Birthday>[];
+          final upcomingBirthdays = <Birthday>[];
+          for (final b in birthdays) {
+            final days = b.daysUntil(now);
+            if (days == 0) {
+              todayBirthdays.add(b);
+            } else if (days > 0) {
+              upcomingBirthdays.add(b);
+            }
+          }
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -57,7 +64,13 @@ class DashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 10),
                 ...todayBirthdays.map((b) {
                   final person = peopleMap[b.personId];
-                  return _buildBirthdayCard(context, ref, b, person, isToday: true);
+                  return _buildBirthdayCard(
+                    context,
+                    ref,
+                    b,
+                    person,
+                    isToday: true,
+                  );
                 }),
                 const SizedBox(height: 24),
               ],
@@ -81,7 +94,13 @@ class DashboardScreen extends ConsumerWidget {
               else
                 ...upcomingBirthdays.map((b) {
                   final person = peopleMap[b.personId];
-                  return _buildBirthdayCard(context, ref, b, person, isToday: false);
+                  return _buildBirthdayCard(
+                    context,
+                    ref,
+                    b,
+                    person,
+                    isToday: false,
+                  );
                 }),
             ],
           );
@@ -102,7 +121,10 @@ class DashboardScreen extends ConsumerWidget {
         gradient: LinearGradient(
           colors: isToday
               ? [const Color(0xFFE03E5D), const Color(0xFFF59E0B)]
-              : [theme.colorScheme.primaryContainer, theme.colorScheme.surfaceVariant],
+              : [
+                  theme.colorScheme.primaryContainer,
+                  theme.colorScheme.surfaceVariant,
+                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -118,7 +140,9 @@ class DashboardScreen extends ConsumerWidget {
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: isToday ? Colors.white : theme.colorScheme.onPrimaryContainer,
+              color: isToday
+                  ? Colors.white
+                  : theme.colorScheme.onPrimaryContainer,
             ),
           ),
           const SizedBox(height: 6),
@@ -128,7 +152,9 @@ class DashboardScreen extends ConsumerWidget {
                 : 'Upcoming birthdays are monitored with automated draft preparation.',
             style: TextStyle(
               fontSize: 14,
-              color: isToday ? Colors.white.withOpacity(0.9) : theme.colorScheme.onSurfaceVariant,
+              color: isToday
+                  ? Colors.white.withOpacity(0.9)
+                  : theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -136,14 +162,18 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, {required String title, int? badgeCount}) {
+  Widget _buildSectionHeader(
+    BuildContext context, {
+    required String title,
+    int? badgeCount,
+  }) {
     return Row(
       children: [
         Text(
           title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         if (badgeCount != null && badgeCount > 0) ...[
           const SizedBox(width: 8),
@@ -197,7 +227,9 @@ class DashboardScreen extends ConsumerWidget {
                   CircleAvatar(
                     backgroundColor: isToday
                         ? const Color(0xFFE03E5D)
-                        : Theme.of(context).colorScheme.secondary.withOpacity(0.2),
+                        : Theme.of(
+                            context,
+                          ).colorScheme.secondary.withOpacity(0.2),
                     foregroundColor: isToday ? Colors.white : Colors.black87,
                     child: Text(
                       person != null && person.name.isNotEmpty
@@ -229,7 +261,10 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: isToday
                           ? const Color(0xFFE03E5D)

@@ -20,7 +20,9 @@ class MockAiProvider implements AiMessageProvider {
   final String responseMessage;
 
   @override
-  Future<AiGenerationResult> generateMessage(AiGenerationRequest request) async {
+  Future<AiGenerationResult> generateMessage(
+    AiGenerationRequest request,
+  ) async {
     return AiGenerationResult(
       message: responseMessage,
       providerType: providerId,
@@ -49,28 +51,76 @@ Future<void> main() async {
 
   // 1. Birthday Calculations & SSOT §14 Leap Day Rules
   {
-    print('\n[1/6] Testing Birthday Date & Leap Day Calculations (SSOT §14)...');
+    print(
+      '\n[1/6] Testing Birthday Date & Leap Day Calculations (SSOT §14)...',
+    );
 
-    final standard = Birthday.calculateOccurrenceDate(year: 2026, month: 5, day: 15);
+    final standard = Birthday.calculateOccurrenceDate(
+      year: 2026,
+      month: 5,
+      day: 15,
+    );
     assertEqual(standard, DateTime(2026, 5, 15), 'Standard date calculation');
 
-    final leap2024 = Birthday.calculateOccurrenceDate(year: 2024, month: 2, day: 29);
+    final leap2024 = Birthday.calculateOccurrenceDate(
+      year: 2024,
+      month: 2,
+      day: 29,
+    );
     assertEqual(leap2024, DateTime(2024, 2, 29), 'Leap day on leap year 2024');
 
-    final leap2028 = Birthday.calculateOccurrenceDate(year: 2028, month: 2, day: 29);
+    final leap2028 = Birthday.calculateOccurrenceDate(
+      year: 2028,
+      month: 2,
+      day: 29,
+    );
     assertEqual(leap2028, DateTime(2028, 2, 29), 'Leap day on leap year 2028');
 
-    final nonLeapDefault = Birthday.calculateOccurrenceDate(year: 2026, month: 2, day: 29, preferMar1: false);
-    assertEqual(nonLeapDefault, DateTime(2026, 2, 28), 'Leap day on non-leap year defaults to Feb 28');
+    final nonLeapDefault = Birthday.calculateOccurrenceDate(
+      year: 2026,
+      month: 2,
+      day: 29,
+      preferMar1: false,
+    );
+    assertEqual(
+      nonLeapDefault,
+      DateTime(2026, 2, 28),
+      'Leap day on non-leap year defaults to Feb 28',
+    );
 
-    final nonLeapMar1 = Birthday.calculateOccurrenceDate(year: 2026, month: 2, day: 29, preferMar1: true);
-    assertEqual(nonLeapMar1, DateTime(2026, 3, 1), 'Leap day on non-leap year with preferMar1: true');
+    final nonLeapMar1 = Birthday.calculateOccurrenceDate(
+      year: 2026,
+      month: 2,
+      day: 29,
+      preferMar1: true,
+    );
+    assertEqual(
+      nonLeapMar1,
+      DateTime(2026, 3, 1),
+      'Leap day on non-leap year with preferMar1: true',
+    );
 
-    final nextUpcoming = Birthday.nextBirthdayDate(month: 5, day: 20, from: DateTime(2026, 3, 10));
-    assertEqual(nextUpcoming, DateTime(2026, 5, 20), 'Next birthday when date is later this year');
+    final nextUpcoming = Birthday.nextBirthdayDate(
+      month: 5,
+      day: 20,
+      from: DateTime(2026, 3, 10),
+    );
+    assertEqual(
+      nextUpcoming,
+      DateTime(2026, 5, 20),
+      'Next birthday when date is later this year',
+    );
 
-    final nextPassed = Birthday.nextBirthdayDate(month: 2, day: 14, from: DateTime(2026, 7, 10));
-    assertEqual(nextPassed, DateTime(2027, 2, 14), 'Next birthday when date already passed this year');
+    final nextPassed = Birthday.nextBirthdayDate(
+      month: 2,
+      day: 14,
+      from: DateTime(2026, 7, 10),
+    );
+    assertEqual(
+      nextPassed,
+      DateTime(2027, 2, 14),
+      'Next birthday when date already passed this year',
+    );
 
     final bToday = Birthday(
       id: 'b-1',
@@ -80,8 +130,15 @@ Future<void> main() async {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    assertTrue(bToday.isToday(DateTime(2026, 10, 2)), 'isToday returns true when dates match');
-    assertEqual(bToday.daysUntil(DateTime(2026, 10, 2)), 0, 'daysUntil returns 0 for today');
+    assertTrue(
+      bToday.isToday(DateTime(2026, 10, 2)),
+      'isToday returns true when dates match',
+    );
+    assertEqual(
+      bToday.daysUntil(DateTime(2026, 10, 2)),
+      0,
+      'daysUntil returns 0 for today',
+    );
 
     print('  ✓ All birthday date and leap day rules passed.');
     passedCount++;
@@ -89,7 +146,9 @@ Future<void> main() async {
 
   // 2. Strict Prompt Builder Policy (SSOT §21)
   {
-    print('\n[2/6] Testing AI Prompt Builder Policy & Guardrails (SSOT §21)...');
+    print(
+      '\n[2/6] Testing AI Prompt Builder Policy & Guardrails (SSOT §21)...',
+    );
     const builder = AiPromptBuilder();
 
     final person = Person(
@@ -100,33 +159,67 @@ Future<void> main() async {
       birthYear: 1996,
       relationship: RelationshipCategory.colleague,
       relationshipCloseness: RelationshipCloseness.close,
-      importantFacts: ['Started marathon training', 'Enjoys specialty pour-over coffee'],
+      importantFacts: [
+        'Started marathon training',
+        'Enjoys specialty pour-over coffee',
+      ],
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
 
-    final prompt = builder.buildPrompt(AiGenerationRequest(person: person, tone: MessageTone.warm));
+    final prompt = builder.buildPrompt(
+      AiGenerationRequest(person: person, tone: MessageTone.warm),
+    );
 
     assertTrue(prompt.contains('## ROLE'), 'Prompt contains ROLE');
     assertTrue(prompt.contains('## RECIPIENT'), 'Prompt contains RECIPIENT');
     assertTrue(prompt.contains('Name: Alice'), 'Prompt has recipient name');
-    assertTrue(prompt.contains('Relationship: Colleague (Closeness: Close)'), 'Prompt has relationship info');
-    assertTrue(prompt.contains('- Started marathon training'), 'Prompt has user verified fact 1');
-    assertTrue(prompt.contains('- Enjoys specialty pour-over coffee'), 'Prompt has user verified fact 2');
-    assertTrue(prompt.contains('## CONSTRAINTS'), 'Prompt contains CONSTRAINTS');
-    assertTrue(prompt.contains('Do NOT invent recipient-specific facts'), 'Prompt instructs not to invent facts');
-    assertTrue(prompt.contains('Do NOT mention AI'), 'Prompt forbids AI self-reference');
+    assertTrue(
+      prompt.contains('Relationship: Colleague (Closeness: Close)'),
+      'Prompt has relationship info',
+    );
+    assertTrue(
+      prompt.contains('- Started marathon training'),
+      'Prompt has user verified fact 1',
+    );
+    assertTrue(
+      prompt.contains('- Enjoys specialty pour-over coffee'),
+      'Prompt has user verified fact 2',
+    );
+    assertTrue(
+      prompt.contains('## CONSTRAINTS'),
+      'Prompt contains CONSTRAINTS',
+    );
+    assertTrue(
+      prompt.contains('Do NOT invent recipient-specific facts'),
+      'Prompt instructs not to invent facts',
+    );
+    assertTrue(
+      prompt.contains('Do NOT mention AI'),
+      'Prompt forbids AI self-reference',
+    );
 
     // Test rewrite prompt
-    final rewritePrompt = builder.buildPrompt(AiGenerationRequest(
-      person: person,
-      existingMessage: 'Happy birthday Alice!',
-      customInstruction: 'Make it a short funny rhyme',
-      tone: MessageTone.funny,
-    ));
-    assertTrue(rewritePrompt.contains('## CURRENT DRAFT'), 'Rewrite prompt includes current draft');
-    assertTrue(rewritePrompt.contains('Happy birthday Alice!'), 'Rewrite prompt includes existing body');
-    assertTrue(rewritePrompt.contains('Make it a short funny rhyme'), 'Rewrite prompt includes custom instruction');
+    final rewritePrompt = builder.buildPrompt(
+      AiGenerationRequest(
+        person: person,
+        existingMessage: 'Happy birthday Alice!',
+        customInstruction: 'Make it a short funny rhyme',
+        tone: MessageTone.funny,
+      ),
+    );
+    assertTrue(
+      rewritePrompt.contains('## CURRENT DRAFT'),
+      'Rewrite prompt includes current draft',
+    );
+    assertTrue(
+      rewritePrompt.contains('Happy birthday Alice!'),
+      'Rewrite prompt includes existing body',
+    );
+    assertTrue(
+      rewritePrompt.contains('Make it a short funny rhyme'),
+      'Rewrite prompt includes custom instruction',
+    );
 
     print('  ✓ All prompt policy & constraint checks passed.');
     passedCount++;
@@ -134,9 +227,14 @@ Future<void> main() async {
 
   // 3. AI Router Rules (SSOT §5)
   {
-    print('\n[3/6] Testing AI Router Entitlement & Provider Routing Rules (SSOT §5)...');
+    print(
+      '\n[3/6] Testing AI Router Entitlement & Provider Routing Rules (SSOT §5)...',
+    );
     final storage = InMemoryCredentialStorage();
-    final mockGemini = MockAiProvider('user_gemini', 'Message from Cloud Gemini');
+    final mockGemini = MockAiProvider(
+      'user_gemini',
+      'Message from Cloud Gemini',
+    );
     final mockNano = MockAiProvider('gemini_nano', 'Message from Gemini Nano');
     final router = AiRouter(
       credentialStorage: storage,
@@ -162,7 +260,11 @@ Future<void> main() async {
       );
       throw Exception('Expected AppFailure.lockedAi');
     } on AppFailure catch (e) {
-      assertEqual(e.code, AppFailureCode.aiLocked, 'Rule 1: Locked AI when not entitled');
+      assertEqual(
+        e.code,
+        AppFailureCode.aiLocked,
+        'Rule 1: Locked AI when not entitled',
+      );
     }
 
     // Rule 2: Active entitlement + user Gemini key -> routes to user Gemini provider
@@ -171,8 +273,16 @@ Future<void> main() async {
       request: AiGenerationRequest(person: person),
       entitlement: UserEntitlement.proActive,
     );
-    assertEqual(geminiResult.providerType, 'user_gemini', 'Rule 2: Routes to User Gemini API');
-    assertEqual(geminiResult.message, 'Message from Cloud Gemini', 'Gemini response text matches');
+    assertEqual(
+      geminiResult.providerType,
+      'user_gemini',
+      'Rule 2: Routes to User Gemini API',
+    );
+    assertEqual(
+      geminiResult.message,
+      'Message from Cloud Gemini',
+      'Gemini response text matches',
+    );
 
     // Rule 3: Active entitlement + no user key + Nano available -> routes to Nano
     await storage.deleteGeminiApiKey();
@@ -180,8 +290,16 @@ Future<void> main() async {
       request: AiGenerationRequest(person: person),
       entitlement: UserEntitlement.proActive,
     );
-    assertEqual(nanoResult.providerType, 'gemini_nano', 'Rule 3: Routes to Gemini Nano fallback');
-    assertEqual(nanoResult.message, 'Message from Gemini Nano', 'Nano response text matches');
+    assertEqual(
+      nanoResult.providerType,
+      'gemini_nano',
+      'Rule 3: Routes to Gemini Nano fallback',
+    );
+    assertEqual(
+      nanoResult.message,
+      'Message from Gemini Nano',
+      'Nano response text matches',
+    );
 
     // Rule 4: Active entitlement + no user key + Nano unavailable -> Credential Missing
     final routerNoNano = AiRouter(
@@ -197,7 +315,11 @@ Future<void> main() async {
       );
       throw Exception('Expected AppFailure.credentialMissing');
     } on AppFailure catch (e) {
-      assertEqual(e.code, AppFailureCode.aiCredentialMissing, 'Rule 4: Credential missing error');
+      assertEqual(
+        e.code,
+        AppFailureCode.aiCredentialMissing,
+        'Rule 4: Credential missing error',
+      );
     }
 
     print('  ✓ All AI routing rules passed.');
@@ -247,7 +369,11 @@ Future<void> main() async {
       builder.buildHandoff(rawPhoneNumber: '+14155552671', message: '   ');
       throw Exception('Expected validation failure for empty message');
     } on AppFailure catch (e) {
-      assertEqual(e.code, AppFailureCode.validation, 'Validation failure on empty message');
+      assertEqual(
+        e.code,
+        AppFailureCode.validation,
+        'Validation failure on empty message',
+      );
     }
 
     print('  ✓ All WhatsApp Click-to-Chat handoff tests passed.');
@@ -262,7 +388,11 @@ Future<void> main() async {
     assertTrue(!(await storage.hasGeminiApiKey()), 'Initially has no key');
     await storage.saveGeminiApiKey('AIzaSyKey123');
     assertTrue(await storage.hasGeminiApiKey(), 'Has key after save');
-    assertEqual(await storage.getGeminiApiKey(), 'AIzaSyKey123', 'Key content matches');
+    assertEqual(
+      await storage.getGeminiApiKey(),
+      'AIzaSyKey123',
+      'Key content matches',
+    );
 
     // Empty string deletes key
     await storage.saveGeminiApiKey('');
@@ -270,7 +400,10 @@ Future<void> main() async {
 
     await storage.saveGeminiApiKey('AIzaSySecond');
     await storage.deleteGeminiApiKey();
-    assertTrue(!(await storage.hasGeminiApiKey()), 'deleteGeminiApiKey clears key');
+    assertTrue(
+      !(await storage.hasGeminiApiKey()),
+      'deleteGeminiApiKey clears key',
+    );
 
     print('  ✓ Credential storage operations passed.');
     passedCount++;
@@ -278,19 +411,29 @@ Future<void> main() async {
 
   // 6. Logging Sanitization & PII Protection (SSOT §23)
   {
-    print('\n[6/6] Testing Logging Sanitization & PII Protection (SSOT §23)...');
+    print(
+      '\n[6/6] Testing Logging Sanitization & PII Protection (SSOT §23)...',
+    );
     final recordingLogger = RecordingLogger();
 
-    recordingLogger.info('Delivery', 'Initiated', params: {
-      'operationId': 'op-99',
-      'api_key': 'secret-should-be-masked',
-      'phoneNumber': '+14155551234',
-      'recipientName': 'John',
-    });
+    recordingLogger.info(
+      'Delivery',
+      'Initiated',
+      params: {
+        'operationId': 'op-99',
+        'api_key': 'secret-should-be-masked',
+        'phoneNumber': '+14155551234',
+        'recipientName': 'John',
+      },
+    );
 
     assertEqual(recordingLogger.records.length, 1, 'Record logged');
     final record = recordingLogger.records.first;
-    assertEqual(record.params['operationId'], 'op-99', 'Safe parameter retained');
+    assertEqual(
+      record.params['operationId'],
+      'op-99',
+      'Safe parameter retained',
+    );
 
     print('  ✓ Logging sanitization checks passed.');
     passedCount++;

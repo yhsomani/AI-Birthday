@@ -50,10 +50,7 @@ final whatsappHandoffBuilderProvider = Provider<WhatsAppHandoffBuilder>((ref) {
 final userGeminiApiProvider = Provider<UserGeminiApiProvider>((ref) {
   final storage = ref.watch(credentialStorageProvider);
   final logger = ref.watch(loggerProvider);
-  return UserGeminiApiProvider(
-    credentialStorage: storage,
-    logger: logger,
-  );
+  return UserGeminiApiProvider(credentialStorage: storage, logger: logger);
 });
 
 /// AI Router provider.
@@ -81,7 +78,10 @@ final _seedPeople = <Person>[
     relationship: RelationshipCategory.friend,
     relationshipCloseness: RelationshipCloseness.close,
     preferredTone: MessageTone.warm,
-    importantFacts: ['Loves marathon running', 'Adopted a rescue golden retriever'],
+    importantFacts: [
+      'Loves marathon running',
+      'Adopted a rescue golden retriever',
+    ],
     notes: 'Know each other from college running club.',
     createdAt: DateTime.now().subtract(const Duration(days: 30)),
     updatedAt: DateTime.now(),
@@ -104,13 +104,18 @@ final _seedPeople = <Person>[
     id: 'person-3',
     name: 'Elena Rostova',
     birthdayMonth: DateTime.now().add(const Duration(days: 14)).month,
-    birthdayDay: DateTime.now().add(const Duration(days: 14)).day, // In 2 weeks!
+    birthdayDay: DateTime.now()
+        .add(const Duration(days: 14))
+        .day, // In 2 weeks!
     birthYear: 1996,
     phoneNumber: '+14155554321',
     relationship: RelationshipCategory.family,
     relationshipCloseness: RelationshipCloseness.close,
     preferredTone: MessageTone.emotional,
-    importantFacts: ['Passionate about watercolor painting', 'New mother to baby Leo'],
+    importantFacts: [
+      'Passionate about watercolor painting',
+      'New mother to baby Leo',
+    ],
     createdAt: DateTime.now().subtract(const Duration(days: 90)),
     updatedAt: DateTime.now(),
   ),
@@ -121,7 +126,11 @@ final _seedBirthdays = <Birthday>[
     id: 'birthday-1',
     personId: 'person-1',
     cycleYear: DateTime.now().year,
-    date: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+    date: DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    ),
     status: BirthdayStatus.messageDrafted,
     draftId: 'draft-1',
     createdAt: DateTime.now().subtract(const Duration(days: 7)),
@@ -152,7 +161,8 @@ final _seedDrafts = <MessageDraft>[
     id: 'draft-1',
     birthdayId: 'birthday-1',
     personId: 'person-1',
-    body: 'Happy Birthday Sarah! Wishing you another incredible year full of great marathon milestones and sweet moments with your pup! 🏃‍♀️🐕 Have a wonderful celebration!',
+    body:
+        'Happy Birthday Sarah! Wishing you another incredible year full of great marathon milestones and sweet moments with your pup! 🏃‍♀️🐕 Have a wonderful celebration!',
     tone: MessageTone.warm,
     length: MessageLength.standard,
     status: DraftStatus.draft,

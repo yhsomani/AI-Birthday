@@ -112,12 +112,14 @@ class Person {
       phoneNumber: phoneNumber ?? this.phoneNumber,
       email: email ?? this.email,
       relationship: relationship ?? this.relationship,
-      relationshipCloseness: relationshipCloseness ?? this.relationshipCloseness,
+      relationshipCloseness:
+          relationshipCloseness ?? this.relationshipCloseness,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       preferredTone: preferredTone ?? this.preferredTone,
       importantFacts: importantFacts ?? this.importantFacts,
       notes: notes ?? this.notes,
-      preferredDeliveryChannel: preferredDeliveryChannel ?? this.preferredDeliveryChannel,
+      preferredDeliveryChannel:
+          preferredDeliveryChannel ?? this.preferredDeliveryChannel,
       timezone: timezone ?? this.timezone,
       autoPrepare: autoPrepare ?? this.autoPrepare,
       createdAt: createdAt ?? this.createdAt,
@@ -127,26 +129,26 @@ class Person {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'birthdayMonth': birthdayMonth,
-        'birthdayDay': birthdayDay,
-        if (birthYear != null) 'birthYear': birthYear,
-        if (phoneNumber != null) 'phoneNumber': phoneNumber,
-        if (email != null) 'email': email,
-        'relationship': relationship.name,
-        'relationshipCloseness': relationshipCloseness.name,
-        'preferredLanguage': preferredLanguage,
-        'preferredTone': preferredTone.name,
-        'importantFacts': importantFacts,
-        if (notes != null) 'notes': notes,
-        'preferredDeliveryChannel': preferredDeliveryChannel.name,
-        if (timezone != null) 'timezone': timezone,
-        'autoPrepare': autoPrepare,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-        'version': version,
-      };
+    'id': id,
+    'name': name,
+    'birthdayMonth': birthdayMonth,
+    'birthdayDay': birthdayDay,
+    if (birthYear != null) 'birthYear': birthYear,
+    if (phoneNumber != null) 'phoneNumber': phoneNumber,
+    if (email != null) 'email': email,
+    'relationship': relationship.name,
+    'relationshipCloseness': relationshipCloseness.name,
+    'preferredLanguage': preferredLanguage,
+    'preferredTone': preferredTone.name,
+    'importantFacts': importantFacts,
+    if (notes != null) 'notes': notes,
+    'preferredDeliveryChannel': preferredDeliveryChannel.name,
+    if (timezone != null) 'timezone': timezone,
+    'autoPrepare': autoPrepare,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+    'version': version,
+  };
 
   factory Person.fromJson(Map<String, dynamic> json) {
     return Person(
@@ -157,13 +159,23 @@ class Person {
       birthYear: json['birthYear'] as int?,
       phoneNumber: json['phoneNumber'] as String?,
       email: json['email'] as String?,
-      relationship: RelationshipCategory.fromString(json['relationship'] as String?),
-      relationshipCloseness: RelationshipCloseness.fromString(json['relationshipCloseness'] as String?),
+      relationship: RelationshipCategory.fromString(
+        json['relationship'] as String?,
+      ),
+      relationshipCloseness: RelationshipCloseness.fromString(
+        json['relationshipCloseness'] as String?,
+      ),
       preferredLanguage: (json['preferredLanguage'] as String?) ?? 'en',
       preferredTone: MessageTone.fromString(json['preferredTone'] as String?),
-      importantFacts: (json['importantFacts'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      importantFacts:
+          (json['importantFacts'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       notes: json['notes'] as String?,
-      preferredDeliveryChannel: DeliveryChannel.fromString(json['preferredDeliveryChannel'] as String?),
+      preferredDeliveryChannel: DeliveryChannel.fromString(
+        json['preferredDeliveryChannel'] as String?,
+      ),
       timezone: json['timezone'] as String?,
       autoPrepare: (json['autoPrepare'] as bool?) ?? true,
       createdAt: DateTime.parse(json['createdAt'] as String),

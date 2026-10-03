@@ -16,12 +16,15 @@ class PeopleEntries extends Table {
   TextColumn get phoneNumber => text().nullable()();
   TextColumn get email => text().nullable()();
   TextColumn get relationship => text().withDefault(const Constant('other'))();
-  TextColumn get relationshipCloseness => text().withDefault(const Constant('casual'))();
-  TextColumn get preferredLanguage => text().withDefault(const Constant('en'))();
+  TextColumn get relationshipCloseness =>
+      text().withDefault(const Constant('casual'))();
+  TextColumn get preferredLanguage =>
+      text().withDefault(const Constant('en'))();
   TextColumn get preferredTone => text().withDefault(const Constant('warm'))();
   TextColumn get importantFacts => text().withDefault(const Constant('[]'))();
   TextColumn get notes => text().nullable()();
-  TextColumn get preferredDeliveryChannel => text().withDefault(const Constant('whatsapp'))();
+  TextColumn get preferredDeliveryChannel =>
+      text().withDefault(const Constant('whatsapp'))();
   TextColumn get timezone => text().nullable()();
   BoolColumn get autoPrepare => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime()();
@@ -76,12 +79,14 @@ class SyncTombstonesEntries extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [
-  PeopleEntries,
-  BirthdayEntries,
-  MessageDraftEntries,
-  SyncTombstonesEntries,
-])
+@DriftDatabase(
+  tables: [
+    PeopleEntries,
+    BirthdayEntries,
+    MessageDraftEntries,
+    SyncTombstonesEntries,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 

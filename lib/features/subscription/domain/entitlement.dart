@@ -11,20 +11,19 @@ enum EntitlementStatus {
 
   /// Whether the user is currently entitled to use AI capabilities.
   bool get isEntitled => switch (this) {
-        EntitlementStatus.active ||
-        EntitlementStatus.trial ||
-        EntitlementStatus.grace =>
-          true,
-        _ => false,
-      };
+    EntitlementStatus.active ||
+    EntitlementStatus.trial ||
+    EntitlementStatus.grace => true,
+    _ => false,
+  };
 
   String get displayName => switch (this) {
-        EntitlementStatus.active => 'Pro (Active)',
-        EntitlementStatus.trial => 'Free Trial',
-        EntitlementStatus.grace => 'Grace Period',
-        EntitlementStatus.expired => 'Expired',
-        EntitlementStatus.none => 'Free Tier',
-      };
+    EntitlementStatus.active => 'Pro (Active)',
+    EntitlementStatus.trial => 'Free Trial',
+    EntitlementStatus.grace => 'Grace Period',
+    EntitlementStatus.expired => 'Expired',
+    EntitlementStatus.none => 'Free Tier',
+  };
 }
 
 /// Entitlement details for the current user.

@@ -5,9 +5,5 @@ import 'package:ai_birthday/app/app.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(
-    const ProviderScope(
-      child: AiBirthdayApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: AiBirthdayApp()));
 }
