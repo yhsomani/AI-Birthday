@@ -38,47 +38,15 @@ class LogRecord {
   bool get isError => level == LogLevel.error;
 }
 
-/// Pre-compiled case-insensitive RegExp to match sensitive key fragments.
-/// This minimal set covers all overlapping fragments (e.g., 'key' covers 'api_key').
-final RegExp _sensitiveRegex = RegExp(
-  r'(credential|secret|token|password|key|phone|address)',
-/// Sensitive parameter key fragments that must never appear in output.
-const Set<String> _sensitiveKeyFragments = {
-  // 🛡️ SECURITY: Prevent PII leakage of sensitive user data
-  'credential',
-  'secret',
-  'token',
-  'apikey',
-  'api_key',
-  'api-key',
-  'password',
-  'key',
-  'phone',
-  'phonenumber',
-  'phone_number',
-  'address',
-  'email',
-};
-/// Sensitive parameter key pattern that must never appear in output.
-final RegExp _sensitivePattern = RegExp(
-  r'(credential|secret|token|apikey|password|key|phone|address)',
-/// Pre-compiled RegExp significantly improves string matching performance.
-final _sensitiveKeyRegExp = RegExp(
-  r'(credential|secret|token|apikey|password|key|phone|address)',
 // 🛡️ SECURITY: Explicitly include 'email' to prevent PII leakage.
 // ⚡ PERFORMANCE: Pre-compiled RegExp avoids looping and repeated string operations.
 final RegExp _sensitiveKeyRegExp = RegExp(
-  r'(credential|secret|token|apikey|password|key|phone|address|email)',
+  r'(credential|secret|token|apikey|api_key|api-key|password|key|phone|phonenumber|phone_number|address|email)',
   caseSensitive: false,
 );
 
 /// Redacts values whose key suggests sensitive content.
 Object? _redactValue(String key, Object? value) {
-  final normalized = key.replaceAll('_', '').replaceAll('-', '');
-  if (_sensitiveRegex.hasMatch(normalized)) {
-  if (_sensitivePattern.hasMatch(normalized)) {
-  // ⚡ Bolt optimization: using pre-compiled case-insensitive RegExp
-  // instead of loop + toLowerCase() + replaceAll() on constant fragments
   final normalized = key.replaceAll('_', '').replaceAll('-', '');
   if (_sensitiveKeyRegExp.hasMatch(normalized)) {
     return '[REDACTED]';
@@ -95,24 +63,6 @@ abstract interface class AppLogger {
   bool get isLevelEnabled;
   LogLevel get level;
 
-  void verbose(String category, String message,
-      {String? operationId, Map<String, Object?> params});
-  void debug(String category, String message,
-      {String? operationId, Map<String, Object?> params});
-  void info(String category, String message,
-      {String? operationId, Map<String, Object?> params});
-  void warning(String category, String message,
-      {String? operationId,
-      Map<String, Object?> params,
-      Object? error,
-      StackTrace? stackTrace,
-      String? errorCategory});
-  void error(String category, String message,
-      {String? operationId,
-      Map<String, Object?> params,
-      Object? error,
-      StackTrace? stackTrace,
-      String? errorCategory});
   void verbose(
     String category,
     String message, {
@@ -150,7 +100,8 @@ abstract interface class AppLogger {
     String? errorCategory,
   });
 
-  /// Returns a logger bound to [operationId] so all entries share an id.
+  /// Returns a new logger instance that automatically includes the
+  /// given [operationId] in all records emitted by it.
   AppLogger forOperation(String operationId);
 }
 
@@ -173,11 +124,6 @@ class ConsoleAppLogger implements AppLogger {
     final extra = params.isEmpty
         ? ''
         : ' ${params.entries.map((e) => '${e.key}=${e.value}').join(' ')}';
-    final opacity =
-        record.operationId == null ? '' : ' [op:${record.operationId}]';
-    // ignore: avoid_print
-    print(
-        '[${record.level.name}] ${record.category}$opacity: ${record.message}$extra');
     final opacity = record.operationId == null
         ? ''
         : ' [op:${record.operationId}]';
@@ -190,68 +136,6 @@ class ConsoleAppLogger implements AppLogger {
   void _log(LogRecord record) => _emit(record);
 
   @override
-  void verbose(String category, String message,
-          {String? operationId, Map<String, Object?> params = const {}}) =>
-      _log(LogRecord(
-          level: LogLevel.verbose,
-          category: category,
-          message: message,
-          operationId: operationId,
-          params: params));
-
-  @override
-  void debug(String category, String message,
-          {String? operationId, Map<String, Object?> params = const {}}) =>
-      _log(LogRecord(
-          level: LogLevel.debug,
-          category: category,
-          message: message,
-          operationId: operationId,
-          params: params));
-
-  @override
-  void info(String category, String message,
-          {String? operationId, Map<String, Object?> params = const {}}) =>
-      _log(LogRecord(
-          level: LogLevel.info,
-          category: category,
-          message: message,
-          operationId: operationId,
-          params: params));
-
-  @override
-  void warning(String category, String message,
-          {String? operationId,
-          Map<String, Object?> params = const {},
-          Object? error,
-          StackTrace? stackTrace,
-          String? errorCategory}) =>
-      _log(LogRecord(
-          level: LogLevel.warning,
-          category: category,
-          message: message,
-          operationId: operationId,
-          params: params,
-          error: error,
-          stackTrace: stackTrace,
-          errorCategory: errorCategory));
-
-  @override
-  void error(String category, String message,
-          {String? operationId,
-          Map<String, Object?> params = const {},
-          Object? error,
-          StackTrace? stackTrace,
-          String? errorCategory}) =>
-      _log(LogRecord(
-          level: LogLevel.error,
-          category: category,
-          message: message,
-          operationId: operationId,
-          params: params,
-          error: error,
-          stackTrace: stackTrace,
-          errorCategory: errorCategory));
   void verbose(
     String category,
     String message, {
@@ -361,49 +245,6 @@ class _OperationBoundLogger implements AppLogger {
   bool get isLevelEnabled => _inner.isLevelEnabled;
 
   @override
-  void verbose(String category, String message,
-          {String? operationId, Map<String, Object?> params = const {}}) =>
-      _inner.verbose(category, message,
-          operationId: _operationId, params: params);
-
-  @override
-  void debug(String category, String message,
-          {String? operationId, Map<String, Object?> params = const {}}) =>
-      _inner.debug(category, message,
-          operationId: _operationId, params: params);
-
-  @override
-  void info(String category, String message,
-          {String? operationId, Map<String, Object?> params = const {}}) =>
-      _inner.info(category, message, operationId: _operationId, params: params);
-
-  @override
-  void warning(String category, String message,
-          {String? operationId,
-          Map<String, Object?> params = const {},
-          Object? error,
-          StackTrace? stackTrace,
-          String? errorCategory}) =>
-      _inner.warning(category, message,
-          operationId: _operationId,
-          params: params,
-          error: error,
-          stackTrace: stackTrace,
-          errorCategory: errorCategory);
-
-  @override
-  void error(String category, String message,
-          {String? operationId,
-          Map<String, Object?> params = const {},
-          Object? error,
-          StackTrace? stackTrace,
-          String? errorCategory}) =>
-      _inner.error(category, message,
-          operationId: _operationId,
-          params: params,
-          error: error,
-          stackTrace: stackTrace,
-          errorCategory: errorCategory);
   void verbose(
     String category,
     String message, {
@@ -412,7 +253,7 @@ class _OperationBoundLogger implements AppLogger {
   }) => _inner.verbose(
     category,
     message,
-    operationId: _operationId,
+    operationId: operationId ?? this._operationId,
     params: params,
   );
 
@@ -425,7 +266,7 @@ class _OperationBoundLogger implements AppLogger {
   }) => _inner.debug(
     category,
     message,
-    operationId: _operationId,
+    operationId: operationId ?? this._operationId,
     params: params,
   );
 
@@ -435,8 +276,12 @@ class _OperationBoundLogger implements AppLogger {
     String message, {
     String? operationId,
     Map<String, Object?> params = const {},
-  }) =>
-      _inner.info(category, message, operationId: _operationId, params: params);
+  }) => _inner.info(
+    category,
+    message,
+    operationId: operationId ?? this._operationId,
+    params: params,
+  );
 
   @override
   void warning(
@@ -450,7 +295,7 @@ class _OperationBoundLogger implements AppLogger {
   }) => _inner.warning(
     category,
     message,
-    operationId: _operationId,
+    operationId: operationId ?? this._operationId,
     params: params,
     error: error,
     stackTrace: stackTrace,
@@ -469,7 +314,7 @@ class _OperationBoundLogger implements AppLogger {
   }) => _inner.error(
     category,
     message,
-    operationId: _operationId,
+    operationId: operationId ?? this._operationId,
     params: params,
     error: error,
     stackTrace: stackTrace,
@@ -492,32 +337,6 @@ class NoopLogger implements AppLogger {
   bool get isLevelEnabled => false;
 
   @override
-  void verbose(String category, String message,
-      {String? operationId, Map<String, Object?> params = const {}}) {}
-
-  @override
-  void debug(String category, String message,
-      {String? operationId, Map<String, Object?> params = const {}}) {}
-
-  @override
-  void info(String category, String message,
-      {String? operationId, Map<String, Object?> params = const {}}) {}
-
-  @override
-  void warning(String category, String message,
-      {String? operationId,
-      Map<String, Object?> params = const {},
-      Object? error,
-      StackTrace? stackTrace,
-      String? errorCategory}) {}
-
-  @override
-  void error(String category, String message,
-      {String? operationId,
-      Map<String, Object?> params = const {},
-      Object? error,
-      StackTrace? stackTrace,
-      String? errorCategory}) {}
   void verbose(
     String category,
     String message, {
@@ -580,12 +399,6 @@ class RecordingLogger implements AppLogger {
 
   final List<LogRecord> records = [];
 
-  LogRecord _record(LogLevel level, String category, String message,
-      {String? operationId,
-      Map<String, Object?> params = const {},
-      Object? error,
-      StackTrace? stackTrace,
-      String? errorCategory}) {
   LogRecord _record(
     LogLevel level,
     String category,
@@ -612,50 +425,6 @@ class RecordingLogger implements AppLogger {
   }
 
   @override
-  void verbose(String category, String message,
-          {String? operationId, Map<String, Object?> params = const {}}) =>
-      _record(LogLevel.verbose, category, message,
-          operationId: operationId, params: params);
-
-  @override
-  void debug(String category, String message,
-          {String? operationId, Map<String, Object?> params = const {}}) =>
-      _record(LogLevel.debug, category, message,
-          operationId: operationId, params: params);
-
-  @override
-  void info(String category, String message,
-          {String? operationId, Map<String, Object?> params = const {}}) =>
-      _record(LogLevel.info, category, message,
-          operationId: operationId, params: params);
-
-  @override
-  void warning(String category, String message,
-          {String? operationId,
-          Map<String, Object?> params = const {},
-          Object? error,
-          StackTrace? stackTrace,
-          String? errorCategory}) =>
-      _record(LogLevel.warning, category, message,
-          operationId: operationId,
-          params: params,
-          error: error,
-          stackTrace: stackTrace,
-          errorCategory: errorCategory);
-
-  @override
-  void error(String category, String message,
-          {String? operationId,
-          Map<String, Object?> params = const {},
-          Object? error,
-          StackTrace? stackTrace,
-          String? errorCategory}) =>
-      _record(LogLevel.error, category, message,
-          operationId: operationId,
-          params: params,
-          error: error,
-          stackTrace: stackTrace,
-          errorCategory: errorCategory);
   void verbose(
     String category,
     String message, {
