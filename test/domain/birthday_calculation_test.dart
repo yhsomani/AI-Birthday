@@ -28,53 +28,54 @@ void main() {
       expect(leapYearDate2028, DateTime(2028, 2, 29));
     });
 
-    test('Leap Day birthday on non-leap year defaults to Feb 28 per SSOT §14', () {
-      final nonLeapDate = Birthday.calculateOccurrenceDate(
-        year: 2026,
-        month: 2,
-        day: 29,
-        preferMar1: false,
-      );
-      expect(nonLeapDate, DateTime(2026, 2, 28));
-    });
+    test(
+      'Leap Day birthday on non-leap year defaults to Feb 28 per SSOT §14',
+      () {
+        final nonLeapDate = Birthday.calculateOccurrenceDate(
+          year: 2026,
+          month: 2,
+          day: 29,
+          preferMar1: false,
+        );
+        expect(nonLeapDate, DateTime(2026, 2, 28));
+      },
+    );
 
-    test('Leap Day birthday on non-leap year falls to Mar 1 if preferMar1 is chosen', () {
-      final nonLeapDateMar1 = Birthday.calculateOccurrenceDate(
-        year: 2026,
-        month: 2,
-        day: 29,
-        preferMar1: true,
-      );
-      expect(nonLeapDateMar1, DateTime(2026, 3, 1));
-    });
+    test(
+      'Leap Day birthday on non-leap year falls to Mar 1 if preferMar1 is chosen',
+      () {
+        final nonLeapDateMar1 = Birthday.calculateOccurrenceDate(
+          year: 2026,
+          month: 2,
+          day: 29,
+          preferMar1: true,
+        );
+        expect(nonLeapDateMar1, DateTime(2026, 3, 1));
+      },
+    );
 
     test('nextBirthdayDate returns current year if birthday is upcoming', () {
       final refDate = DateTime(2026, 3, 10);
-      final next = Birthday.nextBirthdayDate(
-        month: 5,
-        day: 20,
-        from: refDate,
-      );
+      final next = Birthday.nextBirthdayDate(month: 5, day: 20, from: refDate);
       expect(next, DateTime(2026, 5, 20));
     });
 
-    test('nextBirthdayDate returns next year if birthday has already passed this year', () {
-      final refDate = DateTime(2026, 7, 10);
-      final next = Birthday.nextBirthdayDate(
-        month: 2,
-        day: 14,
-        from: refDate,
-      );
-      expect(next, DateTime(2027, 2, 14));
-    });
+    test(
+      'nextBirthdayDate returns next year if birthday has already passed this year',
+      () {
+        final refDate = DateTime(2026, 7, 10);
+        final next = Birthday.nextBirthdayDate(
+          month: 2,
+          day: 14,
+          from: refDate,
+        );
+        expect(next, DateTime(2027, 2, 14));
+      },
+    );
 
     test('nextBirthdayDate returns today if birthday is today', () {
       final refDate = DateTime(2026, 6, 1);
-      final next = Birthday.nextBirthdayDate(
-        month: 6,
-        day: 1,
-        from: refDate,
-      );
+      final next = Birthday.nextBirthdayDate(month: 6, day: 1, from: refDate);
       expect(next, DateTime(2026, 6, 1));
     });
 

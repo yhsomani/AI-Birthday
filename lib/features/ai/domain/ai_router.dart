@@ -20,11 +20,11 @@ class AiRouter {
     AiMessageProvider? nanoProvider,
     Future<GeminiNanoStatus> Function()? nanoStatusChecker,
     AppLogger? logger,
-  })  : _credentialStorage = credentialStorage,
-        _userGeminiProvider = userGeminiProvider,
-        _nanoProvider = nanoProvider,
-        _nanoStatusChecker = nanoStatusChecker,
-        _logger = logger ?? const ConsoleAppLogger();
+  }) : _credentialStorage = credentialStorage,
+       _userGeminiProvider = userGeminiProvider,
+       _nanoProvider = nanoProvider,
+       _nanoStatusChecker = nanoStatusChecker,
+       _logger = logger ?? const ConsoleAppLogger();
 
   final CredentialStorage _credentialStorage;
   final AiMessageProvider _userGeminiProvider;
@@ -75,7 +75,8 @@ class AiRouter {
     // 3. Neither provider is available
     _logger.info('AiRouter', 'AI request failed: No provider available');
     throw const AppFailure.credentialMissing(
-      action: 'Add your Google Gemini API key in Settings to generate messages.',
+      action:
+          'Add your Google Gemini API key in Settings to generate messages.',
     );
   }
 }

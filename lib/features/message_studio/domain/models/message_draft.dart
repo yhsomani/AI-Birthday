@@ -12,12 +12,12 @@ enum DraftStatus {
   confirmedSent;
 
   String get displayName => switch (this) {
-        DraftStatus.draft => 'Draft',
-        DraftStatus.reviewed => 'Reviewed',
-        DraftStatus.ready => 'Ready to Send',
-        DraftStatus.handedOff => 'Handed Off',
-        DraftStatus.confirmedSent => 'Sent & Confirmed',
-      };
+    DraftStatus.draft => 'Draft',
+    DraftStatus.reviewed => 'Reviewed',
+    DraftStatus.ready => 'Ready to Send',
+    DraftStatus.handedOff => 'Handed Off',
+    DraftStatus.confirmedSent => 'Sent & Confirmed',
+  };
 
   static DraftStatus fromString(String? value) {
     if (value == null) return DraftStatus.draft;
@@ -69,7 +69,8 @@ class MessageDraft {
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  bool get isReviewed => status == DraftStatus.reviewed || status == DraftStatus.ready;
+  bool get isReviewed =>
+      status == DraftStatus.reviewed || status == DraftStatus.ready;
 
   MessageDraft copyWith({
     String? id,
@@ -100,18 +101,18 @@ class MessageDraft {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'birthdayId': birthdayId,
-        'personId': personId,
-        'body': body,
-        'tone': tone.name,
-        'length': length.name,
-        'status': status.name,
-        'providerType': providerType,
-        'variationIndex': variationIndex,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-      };
+    'id': id,
+    'birthdayId': birthdayId,
+    'personId': personId,
+    'body': body,
+    'tone': tone.name,
+    'length': length.name,
+    'status': status.name,
+    'providerType': providerType,
+    'variationIndex': variationIndex,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
 
   factory MessageDraft.fromJson(Map<String, dynamic> json) {
     return MessageDraft(

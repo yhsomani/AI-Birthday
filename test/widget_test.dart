@@ -5,13 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_birthday/app/app.dart';
 
 void main() {
-  testWidgets('AiBirthdayApp loads and renders bottom navigation and tabs', (WidgetTester tester) async {
+  testWidgets('AiBirthdayApp loads and renders bottom navigation and tabs', (
+    WidgetTester tester,
+  ) async {
     // Build app with ProviderScope
-    await tester.pumpWidget(
-      const ProviderScope(
-        child: AiBirthdayApp(),
-      ),
-    );
+    await tester.pumpWidget(const ProviderScope(child: AiBirthdayApp()));
 
     // Initial pump & settle
     await tester.pumpAndSettle();

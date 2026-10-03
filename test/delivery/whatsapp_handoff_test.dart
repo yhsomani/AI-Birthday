@@ -47,11 +47,13 @@ void main() {
           rawPhoneNumber: 'invalid-number',
           message: 'Happy birthday!',
         ),
-        throwsA(isA<AppFailure>().having(
-          (e) => e.code,
-          'code',
-          AppFailureCode.validation,
-        )),
+        throwsA(
+          isA<AppFailure>().having(
+            (e) => e.code,
+            'code',
+            AppFailureCode.validation,
+          ),
+        ),
       );
     });
 
@@ -61,11 +63,13 @@ void main() {
           rawPhoneNumber: '+14155551234',
           message: '   ',
         ),
-        throwsA(isA<AppFailure>().having(
-          (e) => e.code,
-          'code',
-          AppFailureCode.validation,
-        )),
+        throwsA(
+          isA<AppFailure>().having(
+            (e) => e.code,
+            'code',
+            AppFailureCode.validation,
+          ),
+        ),
       );
     });
   });

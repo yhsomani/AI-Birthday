@@ -11,13 +11,13 @@ enum RelationshipCategory {
   other;
 
   String get displayName => switch (this) {
-        RelationshipCategory.family => 'Family',
-        RelationshipCategory.friend => 'Friend',
-        RelationshipCategory.colleague => 'Colleague',
-        RelationshipCategory.partner => 'Partner',
-        RelationshipCategory.mentor => 'Mentor',
-        RelationshipCategory.other => 'Other',
-      };
+    RelationshipCategory.family => 'Family',
+    RelationshipCategory.friend => 'Friend',
+    RelationshipCategory.colleague => 'Colleague',
+    RelationshipCategory.partner => 'Partner',
+    RelationshipCategory.mentor => 'Mentor',
+    RelationshipCategory.other => 'Other',
+  };
 
   static RelationshipCategory fromString(String? value) {
     if (value == null) return RelationshipCategory.other;
@@ -35,10 +35,10 @@ enum RelationshipCloseness {
   distant;
 
   String get displayName => switch (this) {
-        RelationshipCloseness.close => 'Close',
-        RelationshipCloseness.casual => 'Casual',
-        RelationshipCloseness.distant => 'Distant',
-      };
+    RelationshipCloseness.close => 'Close',
+    RelationshipCloseness.casual => 'Casual',
+    RelationshipCloseness.distant => 'Distant',
+  };
 
   static RelationshipCloseness fromString(String? value) {
     if (value == null) return RelationshipCloseness.casual;

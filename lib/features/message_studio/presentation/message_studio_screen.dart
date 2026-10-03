@@ -21,12 +21,14 @@ class MessageStudioScreen extends ConsumerStatefulWidget {
   final String birthdayId;
 
   @override
-  ConsumerState<MessageStudioScreen> createState() => _MessageStudioScreenState();
+  ConsumerState<MessageStudioScreen> createState() =>
+      _MessageStudioScreenState();
 }
 
 class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
   final TextEditingController _messageController = TextEditingController();
-  final TextEditingController _customInstructionController = TextEditingController();
+  final TextEditingController _customInstructionController =
+      TextEditingController();
 
   Birthday? _birthday;
   Person? _person;
@@ -116,7 +118,8 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
       _messageController.text = result.message;
 
       // Update or create draft
-      final draftId = _draft?.id ?? 'draft-${DateTime.now().millisecondsSinceEpoch}';
+      final draftId =
+          _draft?.id ?? 'draft-${DateTime.now().millisecondsSinceEpoch}';
       final updatedDraft = MessageDraft(
         id: draftId,
         birthdayId: widget.birthdayId,
@@ -131,7 +134,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
       );
 
       await ref.read(draftsRepositoryProvider).saveDraft(updatedDraft);
-      await ref.read(birthdaysRepositoryProvider).updateBirthdayStatus(
+      await ref
+          .read(birthdaysRepositoryProvider)
+          .updateBirthdayStatus(
             widget.birthdayId,
             BirthdayStatus.messageDrafted,
             draftId: draftId,
@@ -164,7 +169,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
     final message = _messageController.text.trim();
     if (message.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter or generate a message first.')),
+        const SnackBar(
+          content: Text('Please enter or generate a message first.'),
+        ),
       );
       return;
     }
@@ -172,7 +179,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
     final phone = _person?.phoneNumber;
     if (phone == null || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Recipient does not have a phone number.')),
+        const SnackBar(
+          content: Text('Recipient does not have a phone number.'),
+        ),
       );
       return;
     }
@@ -185,10 +194,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
       );
 
       // Track handoff status (SSOT §9)
-      await ref.read(birthdaysRepositoryProvider).updateBirthdayStatus(
-            widget.birthdayId,
-            BirthdayStatus.handedOff,
-          );
+      await ref
+          .read(birthdaysRepositoryProvider)
+          .updateBirthdayStatus(widget.birthdayId, BirthdayStatus.handedOff);
 
       if (mounted) {
         _showHandoffConfirmationDialog(handoff.uri.toString());
@@ -245,7 +253,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
             ),
             FilledButton(
               onPressed: () async {
-                await ref.read(birthdaysRepositoryProvider).updateBirthdayStatus(
+                await ref
+                    .read(birthdaysRepositoryProvider)
+                    .updateBirthdayStatus(
                       widget.birthdayId,
                       BirthdayStatus.completed,
                     );
@@ -269,18 +279,16 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
     final text = _messageController.text.trim();
     if (text.isNotEmpty) {
       Clipboard.setData(ClipboardData(text: text));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Copied to clipboard 📋')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Copied to clipboard 📋')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_person == null || _birthday == null) {
@@ -354,7 +362,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.auto_awesome),
-                  label: Text(_isGenerating ? 'Drafting...' : 'Generate with AI'),
+                  label: Text(
+                    _isGenerating ? 'Drafting...' : 'Generate with AI',
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -385,9 +395,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  child: Text(_person!.name[0]),
-                ),
+                CircleAvatar(child: Text(_person!.name[0])),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -395,7 +403,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
                     children: [
                       Text(
                         _person!.name,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
                         '${_person!.relationship.displayName} • ${_person!.phoneNumber ?? 'No phone'}',
@@ -431,7 +442,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Tone:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const Text(
+              'Tone:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -447,7 +461,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
               }).toList(),
             ),
             const SizedBox(height: 12),
-            const Text('Length:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const Text(
+              'Length:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -466,7 +483,8 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
             TextField(
               controller: _customInstructionController,
               decoration: const InputDecoration(
-                hintText: 'Optional tweak (e.g. "rhyme", "mention weekend party")',
+                hintText:
+                    'Optional tweak (e.g. "rhyme", "mention weekend party")',
                 isDense: true,
               ),
             ),

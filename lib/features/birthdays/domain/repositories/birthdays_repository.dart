@@ -9,7 +9,11 @@ abstract interface class BirthdaysRepository {
   Future<Birthday?> getBirthday(String id);
   Future<Birthday?> getBirthdayForPerson(String personId);
   Future<void> saveBirthday(Birthday birthday);
-  Future<void> updateBirthdayStatus(String id, BirthdayStatus status, {String? draftId});
+  Future<void> updateBirthdayStatus(
+    String id,
+    BirthdayStatus status, {
+    String? draftId,
+  });
   Future<void> deleteBirthday(String id);
 }
 
@@ -39,9 +43,9 @@ class InMemoryBirthdaysRepository implements BirthdaysRepository {
   @override
   Future<Birthday?> getBirthdayForPerson(String personId) async {
     return _store.values.cast<Birthday?>().firstWhere(
-          (b) => b?.personId == personId,
-          orElse: () => null,
-        );
+      (b) => b?.personId == personId,
+      orElse: () => null,
+    );
   }
 
   @override
@@ -50,7 +54,11 @@ class InMemoryBirthdaysRepository implements BirthdaysRepository {
   }
 
   @override
-  Future<void> updateBirthdayStatus(String id, BirthdayStatus status, {String? draftId}) async {
+  Future<void> updateBirthdayStatus(
+    String id,
+    BirthdayStatus status, {
+    String? draftId,
+  }) async {
     final existing = _store[id];
     if (existing != null) {
       _store[id] = existing.copyWith(

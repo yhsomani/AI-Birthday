@@ -55,21 +55,18 @@ class WhatsAppHandoffBuilder {
     final cleanPhone = sanitizePhoneNumber(rawPhoneNumber);
     if (cleanPhone == null) {
       throw const AppFailure.validation(
-        detail: 'A valid phone number with country code is required for WhatsApp.',
+        detail:
+            'A valid phone number with country code is required for WhatsApp.',
       );
     }
 
     final trimmedMessage = message.trim();
     if (trimmedMessage.isEmpty) {
-      throw const AppFailure.validation(
-        detail: 'Message cannot be empty.',
-      );
+      throw const AppFailure.validation(detail: 'Message cannot be empty.');
     }
 
     // Build standard wa.me URL with properly percent-encoded text query
-    final uri = Uri.https('wa.me', '/$cleanPhone', {
-      'text': trimmedMessage,
-    });
+    final uri = Uri.https('wa.me', '/$cleanPhone', {'text': trimmedMessage});
 
     return WhatsAppHandoffResult(
       uri: uri,

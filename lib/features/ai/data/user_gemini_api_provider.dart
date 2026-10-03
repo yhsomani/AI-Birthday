@@ -17,11 +17,12 @@ import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/ai/domain/ai_provider.dart';
 
 /// Type signature for custom HTTP sender (used to mock network requests in tests).
-typedef HttpPostSender = Future<HttpResponsePayload> Function(
-  Uri uri,
-  Map<String, String> headers,
-  String body,
-);
+typedef HttpPostSender =
+    Future<HttpResponsePayload> Function(
+      Uri uri,
+      Map<String, String> headers,
+      String body,
+    );
 
 class HttpResponsePayload {
   const HttpResponsePayload({required this.statusCode, required this.body});
@@ -36,10 +37,10 @@ class UserGeminiApiProvider implements AiMessageProvider {
     AiPromptBuilder? promptBuilder,
     HttpPostSender? httpSender,
     this.model = 'gemini-1.5-flash',
-  })  : _credentialStorage = credentialStorage,
-        _logger = logger ?? const ConsoleAppLogger(),
-        _promptBuilder = promptBuilder ?? const AiPromptBuilder(),
-        _httpSender = httpSender ?? _defaultHttpSender;
+  }) : _credentialStorage = credentialStorage,
+       _logger = logger ?? const ConsoleAppLogger(),
+       _promptBuilder = promptBuilder ?? const AiPromptBuilder(),
+       _httpSender = httpSender ?? _defaultHttpSender;
 
   final CredentialStorage _credentialStorage;
   final AppLogger _logger;
@@ -51,7 +52,9 @@ class UserGeminiApiProvider implements AiMessageProvider {
   String get providerId => 'user_gemini';
 
   @override
-  Future<AiGenerationResult> generateMessage(AiGenerationRequest request) async {
+  Future<AiGenerationResult> generateMessage(
+    AiGenerationRequest request,
+  ) async {
     final apiKey = await _credentialStorage.getGeminiApiKey();
     if (apiKey == null || apiKey.isEmpty) {
       throw const AppFailure.credentialMissing(
@@ -62,11 +65,15 @@ class UserGeminiApiProvider implements AiMessageProvider {
     final prompt = _promptBuilder.buildPrompt(request);
 
     // Sanitized log: do not log apiKey or prompt body
-    _logger.info('UserGeminiApiProvider', 'Sending generation request', params: {
-      'model': model,
-      'relationship': request.person.relationship.name,
-      'hasCustomInstruction': request.customInstruction != null,
-    });
+    _logger.info(
+      'UserGeminiApiProvider',
+      'Sending generation request',
+      params: {
+        'model': model,
+        'relationship': request.person.relationship.name,
+        'hasCustomInstruction': request.customInstruction != null,
+      },
+    );
 
     final uri = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
@@ -76,23 +83,18 @@ class UserGeminiApiProvider implements AiMessageProvider {
       'contents': [
         {
           'parts': [
-            {'text': prompt}
-          ]
-        }
+            {'text': prompt},
+          ],
+        },
       ],
-      'generationConfig': {
-        'temperature': 0.7,
-        'maxOutputTokens': 256,
-      }
+      'generationConfig': {'temperature': 0.7, 'maxOutputTokens': 256},
     });
 
     HttpResponsePayload response;
     try {
-      response = await _httpSender(
-        uri,
-        {'Content-Type': 'application/json'},
-        requestBody,
-      );
+      response = await _httpSender(uri, {
+        'Content-Type': 'application/json',
+      }, requestBody);
     } on SocketException {
       throw const AppFailure.networkUnavailable();
     } on HttpException catch (e) {
@@ -153,28 +155,32 @@ class UserGeminiApiProvider implements AiMessageProvider {
   }
 
   Never _handleHttpError(int statusCode, String responseBody) {
-    _logger.warning('UserGeminiApiProvider', 'Gemini API returned error', params: {
-      'statusCode': statusCode,
-    });
+    _logger.warning(
+      'UserGeminiApiProvider',
+      'Gemini API returned error',
+      params: {'statusCode': statusCode},
+    );
 
     if (statusCode == 400 || statusCode == 401 || statusCode == 403) {
       // Check if it's an API key error
       throw const AppFailure.credentialInvalid(
-        detail: 'Google rejected the API key or the project lacks Gemini API access.',
-        action: 'Check your Gemini API key in Google AI Studio and update it in Settings.',
+        detail:
+            'Google rejected the API key or the project lacks Gemini API access.',
+        action:
+            'Check your Gemini API key in Google AI Studio and update it in Settings.',
       );
     } else if (statusCode == 429) {
       throw const AppFailure.quotaExceeded(
-        action: 'Check your Gemini API project quota limits or try again later.',
+        action:
+            'Check your Gemini API project quota limits or try again later.',
       );
     } else if (statusCode >= 500) {
       throw AppFailure.providerError(
-        detail: 'Google Gemini servers returned error $statusCode. Please try again.',
+        detail:
+            'Google Gemini servers returned error $statusCode. Please try again.',
       );
     } else {
-      throw AppFailure.providerError(
-        detail: 'HTTP $statusCode: $responseBody',
-      );
+      throw AppFailure.providerError(detail: 'HTTP $statusCode: $responseBody');
     }
   }
 

@@ -9,11 +9,11 @@ enum DeliveryChannel {
   share;
 
   String get displayName => switch (this) {
-        DeliveryChannel.whatsapp => 'WhatsApp',
-        DeliveryChannel.sms => 'SMS',
-        DeliveryChannel.clipboard => 'Copy to Clipboard',
-        DeliveryChannel.share => 'Share Sheet',
-      };
+    DeliveryChannel.whatsapp => 'WhatsApp',
+    DeliveryChannel.sms => 'SMS',
+    DeliveryChannel.clipboard => 'Copy to Clipboard',
+    DeliveryChannel.share => 'Share Sheet',
+  };
 
   static DeliveryChannel fromString(String? value) {
     if (value == null) return DeliveryChannel.whatsapp;
@@ -35,11 +35,11 @@ enum DeliveryState {
   failed;
 
   String get displayName => switch (this) {
-        DeliveryState.prepared => 'Ready to Send',
-        DeliveryState.handedOff => 'Handed Off to App',
-        DeliveryState.confirmedSent => 'Confirmed Sent',
-        DeliveryState.failed => 'Delivery Failed',
-      };
+    DeliveryState.prepared => 'Ready to Send',
+    DeliveryState.handedOff => 'Handed Off to App',
+    DeliveryState.confirmedSent => 'Confirmed Sent',
+    DeliveryState.failed => 'Delivery Failed',
+  };
 
   static DeliveryState fromString(String? value) {
     if (value == null) return DeliveryState.prepared;
@@ -69,13 +69,13 @@ class DeliveryRecord {
   final DateTime timestamp;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'draftId': draftId,
-        'channel': channel.name,
-        'state': state.name,
-        if (detail != null) 'detail': detail,
-        'timestamp': timestamp.toIso8601String(),
-      };
+    'id': id,
+    'draftId': draftId,
+    'channel': channel.name,
+    'state': state.name,
+    if (detail != null) 'detail': detail,
+    'timestamp': timestamp.toIso8601String(),
+  };
 
   factory DeliveryRecord.fromJson(Map<String, dynamic> json) {
     return DeliveryRecord(

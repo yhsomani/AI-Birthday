@@ -16,14 +16,15 @@ void main() {
         birthdayDay: 12,
         relationship: RelationshipCategory.colleague,
         relationshipCloseness: RelationshipCloseness.close,
-        importantFacts: ['Started marathon training', 'Loves specialty espresso'],
+        importantFacts: [
+          'Started marathon training',
+          'Loves specialty espresso',
+        ],
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
 
-      final prompt = builder.buildPrompt(
-        AiGenerationRequest(person: person),
-      );
+      final prompt = builder.buildPrompt(AiGenerationRequest(person: person));
 
       expect(prompt, contains('## ROLE'));
       expect(prompt, contains('## RECIPIENT'));
@@ -39,48 +40,55 @@ void main() {
       expect(prompt, contains('Return ONLY the final message'));
     });
 
-    test('Prompt warns against inventing facts when importantFacts is empty', () {
-      final person = Person(
-        id: 'p-2',
-        name: 'Bob',
-        birthdayMonth: 8,
-        birthdayDay: 20,
-        relationship: RelationshipCategory.friend,
-        importantFacts: const [],
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+    test(
+      'Prompt warns against inventing facts when importantFacts is empty',
+      () {
+        final person = Person(
+          id: 'p-2',
+          name: 'Bob',
+          birthdayMonth: 8,
+          birthdayDay: 20,
+          relationship: RelationshipCategory.friend,
+          importantFacts: const [],
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
 
-      final prompt = builder.buildPrompt(
-        AiGenerationRequest(person: person),
-      );
+        final prompt = builder.buildPrompt(AiGenerationRequest(person: person));
 
-      expect(prompt, contains('None provided. Do NOT invent any specific hobbies'));
-    });
+        expect(
+          prompt,
+          contains('None provided. Do NOT invent any specific hobbies'),
+        );
+      },
+    );
 
-    test('Prompt includes custom instruction and current draft for rewrites', () {
-      final person = Person(
-        id: 'p-3',
-        name: 'Charlie',
-        birthdayMonth: 11,
-        birthdayDay: 5,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+    test(
+      'Prompt includes custom instruction and current draft for rewrites',
+      () {
+        final person = Person(
+          id: 'p-3',
+          name: 'Charlie',
+          birthdayMonth: 11,
+          birthdayDay: 5,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
 
-      final prompt = builder.buildPrompt(
-        AiGenerationRequest(
-          person: person,
-          existingMessage: 'Happy birthday Charlie! Have a blast!',
-          customInstruction: 'Make it a short funny poem',
-          tone: MessageTone.funny,
-        ),
-      );
+        final prompt = builder.buildPrompt(
+          AiGenerationRequest(
+            person: person,
+            existingMessage: 'Happy birthday Charlie! Have a blast!',
+            customInstruction: 'Make it a short funny poem',
+            tone: MessageTone.funny,
+          ),
+        );
 
-      expect(prompt, contains('## CURRENT DRAFT'));
-      expect(prompt, contains('Happy birthday Charlie! Have a blast!'));
-      expect(prompt, contains('Make it a short funny poem'));
-      expect(prompt, contains('Funny'));
-    });
+        expect(prompt, contains('## CURRENT DRAFT'));
+        expect(prompt, contains('Happy birthday Charlie! Have a blast!'));
+        expect(prompt, contains('Make it a short funny poem'));
+        expect(prompt, contains('Funny'));
+      },
+    );
   });
 }

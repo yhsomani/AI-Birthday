@@ -9,7 +9,9 @@ import 'package:ai_birthday/features/message_studio/presentation/message_studio_
 import 'package:ai_birthday/features/people/presentation/people_screen.dart';
 import 'package:ai_birthday/features/settings/presentation/settings_screen.dart';
 
-final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'root',
+);
 
 final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,

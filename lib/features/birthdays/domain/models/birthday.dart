@@ -15,26 +15,25 @@ enum BirthdayStatus {
   failed;
 
   String get displayName => switch (this) {
-        BirthdayStatus.created => 'Created',
-        BirthdayStatus.upcoming => 'Upcoming',
-        BirthdayStatus.reminderDue => 'Reminder Due',
-        BirthdayStatus.messageNotPrepared => 'Message Needed',
-        BirthdayStatus.messageDrafted => 'Draft Prepared',
-        BirthdayStatus.messageReviewed => 'Reviewed',
-        BirthdayStatus.readyForDelivery => 'Ready to Send',
-        BirthdayStatus.handedOff => 'Handed Off',
-        BirthdayStatus.completed => 'Completed',
-        BirthdayStatus.failed => 'Needs Action',
-      };
+    BirthdayStatus.created => 'Created',
+    BirthdayStatus.upcoming => 'Upcoming',
+    BirthdayStatus.reminderDue => 'Reminder Due',
+    BirthdayStatus.messageNotPrepared => 'Message Needed',
+    BirthdayStatus.messageDrafted => 'Draft Prepared',
+    BirthdayStatus.messageReviewed => 'Reviewed',
+    BirthdayStatus.readyForDelivery => 'Ready to Send',
+    BirthdayStatus.handedOff => 'Handed Off',
+    BirthdayStatus.completed => 'Completed',
+    BirthdayStatus.failed => 'Needs Action',
+  };
 
   bool get isActionNeeded => switch (this) {
-        BirthdayStatus.reminderDue ||
-        BirthdayStatus.messageNotPrepared ||
-        BirthdayStatus.messageDrafted ||
-        BirthdayStatus.failed =>
-          true,
-        _ => false,
-      };
+    BirthdayStatus.reminderDue ||
+    BirthdayStatus.messageNotPrepared ||
+    BirthdayStatus.messageDrafted ||
+    BirthdayStatus.failed => true,
+    _ => false,
+  };
 
   static BirthdayStatus fromString(String? value) {
     if (value == null) return BirthdayStatus.upcoming;
@@ -79,7 +78,11 @@ class Birthday {
   /// Days remaining until the birthday from [referenceDate].
   /// Returns 0 if today, positive if in future, negative if passed.
   int daysUntil(DateTime referenceDate) {
-    final ref = DateTime(referenceDate.year, referenceDate.month, referenceDate.day);
+    final ref = DateTime(
+      referenceDate.year,
+      referenceDate.month,
+      referenceDate.day,
+    );
     final target = DateTime(date.year, date.month, date.day);
     return target.difference(ref).inDays;
   }
@@ -99,7 +102,8 @@ class Birthday {
     bool preferMar1 = false,
   }) {
     if (month == 2 && day == 29) {
-      final isLeapYear = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+      final isLeapYear =
+          (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
       if (!isLeapYear) {
         return preferMar1 ? DateTime(year, 3, 1) : DateTime(year, 2, 28);
       }
@@ -122,7 +126,8 @@ class Birthday {
       preferMar1: preferMar1,
     );
 
-    if (thisYearTarget.isAfter(today) || thisYearTarget.isAtSameMomentAs(today)) {
+    if (thisYearTarget.isAfter(today) ||
+        thisYearTarget.isAtSameMomentAs(today)) {
       return thisYearTarget;
     } else {
       return calculateOccurrenceDate(
@@ -157,15 +162,15 @@ class Birthday {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'personId': personId,
-        'cycleYear': cycleYear,
-        'date': date.toIso8601String(),
-        'status': status.name,
-        if (draftId != null) 'draftId': draftId,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-      };
+    'id': id,
+    'personId': personId,
+    'cycleYear': cycleYear,
+    'date': date.toIso8601String(),
+    'status': status.name,
+    if (draftId != null) 'draftId': draftId,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
 
   factory Birthday.fromJson(Map<String, dynamic> json) {
     return Birthday(

@@ -50,7 +50,9 @@ class AiPromptBuilder {
     // 2. Recipient
     buffer.writeln('## RECIPIENT');
     buffer.writeln('Name: ${person.name}');
-    buffer.writeln('Relationship: ${person.relationship.displayName} (Closeness: ${person.relationshipCloseness.displayName})');
+    buffer.writeln(
+      'Relationship: ${person.relationship.displayName} (Closeness: ${person.relationshipCloseness.displayName})',
+    );
     if (person.birthYear != null) {
       final currentYear = DateTime.now().year;
       final age = currentYear - person.birthYear!;
@@ -63,9 +65,13 @@ class AiPromptBuilder {
     // 3. Known Facts (User-provided only! SSOT §2, §7, §21)
     buffer.writeln('## KNOWN FACTS');
     if (person.importantFacts.isEmpty) {
-      buffer.writeln('None provided. Do NOT invent any specific hobbies, achievements, or biographical details.');
+      buffer.writeln(
+        'None provided. Do NOT invent any specific hobbies, achievements, or biographical details.',
+      );
     } else {
-      buffer.writeln('The following facts are verified by the user. You may naturally incorporate them:');
+      buffer.writeln(
+        'The following facts are verified by the user. You may naturally incorporate them:',
+      );
       for (final fact in person.importantFacts) {
         // Sanitize fact to prevent prompt injection attempts
         final cleanFact = fact.replaceAll('\n', ' ').trim();
@@ -92,7 +98,8 @@ class AiPromptBuilder {
     }
 
     // 5. Existing draft context if rewriting
-    if (request.existingMessage != null && request.existingMessage!.trim().isNotEmpty) {
+    if (request.existingMessage != null &&
+        request.existingMessage!.trim().isNotEmpty) {
       buffer.writeln('## CURRENT DRAFT');
       buffer.writeln(request.existingMessage!.trim());
       buffer.writeln();
@@ -100,19 +107,30 @@ class AiPromptBuilder {
 
     // 6. Task
     buffer.writeln('## TASK');
-    if (request.customInstruction != null && request.customInstruction!.trim().isNotEmpty) {
-      buffer.writeln('Rewrite the birthday message incorporating this instruction: ${request.customInstruction!.trim()}');
+    if (request.customInstruction != null &&
+        request.customInstruction!.trim().isNotEmpty) {
+      buffer.writeln(
+        'Rewrite the birthday message incorporating this instruction: ${request.customInstruction!.trim()}',
+      );
     } else if (request.existingMessage != null) {
-      buffer.writeln('Rewrite the current draft matching the requested tone, length, and language.');
+      buffer.writeln(
+        'Rewrite the current draft matching the requested tone, length, and language.',
+      );
     } else {
-      buffer.writeln('Write a natural, personal birthday greeting for ${person.name}.');
+      buffer.writeln(
+        'Write a natural, personal birthday greeting for ${person.name}.',
+      );
     }
     buffer.writeln();
 
     // 7. Strict Constraints (SSOT §21)
     buffer.writeln('## CONSTRAINTS');
-    buffer.writeln('- Do NOT invent recipient-specific facts, nicknames, or events not listed above.');
-    buffer.writeln('- Do NOT mention AI, models, prompts, or that you are an assistant.');
+    buffer.writeln(
+      '- Do NOT invent recipient-specific facts, nicknames, or events not listed above.',
+    );
+    buffer.writeln(
+      '- Do NOT mention AI, models, prompts, or that you are an assistant.',
+    );
     buffer.writeln('- Do NOT include quotation marks around the message.');
     buffer.writeln('- Return ONLY the final message ready to send.');
 

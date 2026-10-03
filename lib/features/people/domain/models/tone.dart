@@ -10,20 +10,21 @@ enum MessageTone {
   professional;
 
   String get displayName => switch (this) {
-        MessageTone.warm => 'Warm',
-        MessageTone.funny => 'Funny',
-        MessageTone.emotional => 'Emotional',
-        MessageTone.casual => 'Casual',
-        MessageTone.professional => 'Professional',
-      };
+    MessageTone.warm => 'Warm',
+    MessageTone.funny => 'Funny',
+    MessageTone.emotional => 'Emotional',
+    MessageTone.casual => 'Casual',
+    MessageTone.professional => 'Professional',
+  };
 
   String get instructionPrompt => switch (this) {
-        MessageTone.warm => 'Warm, affectionate, and thoughtful.',
-        MessageTone.funny => 'Light-hearted, playful, and humorous without being mean.',
-        MessageTone.emotional => 'Deeply heartfelt, touching, and sincere.',
-        MessageTone.casual => 'Relaxed, friendly, and conversational.',
-        MessageTone.professional => 'Polite, respectful, and cordial.',
-      };
+    MessageTone.warm => 'Warm, affectionate, and thoughtful.',
+    MessageTone.funny =>
+      'Light-hearted, playful, and humorous without being mean.',
+    MessageTone.emotional => 'Deeply heartfelt, touching, and sincere.',
+    MessageTone.casual => 'Relaxed, friendly, and conversational.',
+    MessageTone.professional => 'Polite, respectful, and cordial.',
+  };
 
   static MessageTone fromString(String? value) {
     if (value == null) return MessageTone.warm;
@@ -41,16 +42,18 @@ enum MessageLength {
   expanded;
 
   String get displayName => switch (this) {
-        MessageLength.short => 'Short (1-2 sentences)',
-        MessageLength.standard => 'Standard (2-3 sentences)',
-        MessageLength.expanded => 'Expanded (3-5 sentences)',
-      };
+    MessageLength.short => 'Short (1-2 sentences)',
+    MessageLength.standard => 'Standard (2-3 sentences)',
+    MessageLength.expanded => 'Expanded (3-5 sentences)',
+  };
 
   String get constraintPrompt => switch (this) {
-        MessageLength.short => 'Keep it very concise, 1 to 2 sentences maximum.',
-        MessageLength.standard => 'Keep it standard length, approximately 2 to 3 sentences.',
-        MessageLength.expanded => 'Write an expanded message, 3 to 5 sentences with rich detail.',
-      };
+    MessageLength.short => 'Keep it very concise, 1 to 2 sentences maximum.',
+    MessageLength.standard =>
+      'Keep it standard length, approximately 2 to 3 sentences.',
+    MessageLength.expanded =>
+      'Write an expanded message, 3 to 5 sentences with rich detail.',
+  };
 
   static MessageLength fromString(String? value) {
     if (value == null) return MessageLength.standard;
