@@ -42,6 +42,10 @@ class LogRecord {
 /// Pre-compiled RegExp significantly improves string matching performance.
 final _sensitiveKeyRegExp = RegExp(
   r'(credential|secret|token|apikey|password|key|phone|address)',
+// 🛡️ SECURITY: Explicitly include 'email' to prevent PII leakage.
+// ⚡ PERFORMANCE: Pre-compiled RegExp avoids looping and repeated string operations.
+final RegExp _sensitiveKeyRegExp = RegExp(
+  r'(credential|secret|token|apikey|password|key|phone|address|email)',
   caseSensitive: false,
 );
 
