@@ -1,30 +1,41 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ai_birthday/main.dart';
+import 'package:ai_birthday/app/app.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('AiBirthdayApp loads and renders bottom navigation and tabs', (
+    WidgetTester tester,
+  ) async {
+    // Build app with ProviderScope
+    await tester.pumpWidget(const ProviderScope(child: AiBirthdayApp()));
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Initial pump & settle
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Verify AppBar title
+    expect(find.text('AI-Birthday'), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify NavigationBar exists
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.text('People'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+
+    // Navigate to People tab
+    await tester.tap(find.text('People'));
+    await tester.pumpAndSettle();
+
+    // Verify People screen title
+    expect(find.text('People & Contacts'), findsOneWidget);
+
+    // Navigate to Settings tab
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    // Verify Settings screen title & key card
+    expect(find.text('Personal Gemini API Key'), findsOneWidget);
+    expect(find.text('Appearance'), findsOneWidget);
   });
 }
