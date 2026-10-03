@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -25,7 +26,10 @@ class PeopleScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.person_add_outlined),
             tooltip: 'Add Person',
-            onPressed: () => _showAddPersonDialog(context, ref),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _showAddPersonDialog(context, ref);
+            },
           ),
         ],
       ),
@@ -45,7 +49,10 @@ class PeopleScreen extends ConsumerWidget {
                   const Text('No contacts added yet'),
                   const SizedBox(height: 12),
                   FilledButton.icon(
-                    onPressed: () => _showAddPersonDialog(context, ref),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      _showAddPersonDialog(context, ref);
+                    },
                     icon: const Icon(Icons.add),
                     label: const Text('Add Birthday Contact'),
                   ),
@@ -112,7 +119,10 @@ class PeopleScreen extends ConsumerWidget {
         error: (err, _) => Center(child: Text('Error loading contacts: $err')),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddPersonDialog(context, ref),
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          _showAddPersonDialog(context, ref);
+        },
         tooltip: 'Add Person',
         child: const Icon(Icons.add),
       ),
