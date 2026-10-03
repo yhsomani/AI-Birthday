@@ -121,16 +121,20 @@ class ConsoleAppLogger implements AppLogger {
   void _emit(LogRecord record) {
     if (record.level.index < level.index) return;
     final params = _sanitize(record.params);
-    final extra = params.isEmpty
-        ? ''
-        : ' ${params.entries.map((e) => '${e.key}=${e.value}').join(' ')}';
-    final opacity = record.operationId == null
-        ? ''
-        : ' [op:${record.operationId}]';
+
+    final buffer = StringBuffer();
+    buffer.write('[${record.level.name}] ${record.category}');
+    if (record.operationId != null) {
+      buffer.write(' [op:${record.operationId}]');
+    }
+    buffer.write(': ${record.message}');
+    if (params.isNotEmpty) {
+      buffer.write(' ');
+      buffer.writeAll(params.entries.map((e) => '${e.key}=${e.value}'), ' ');
+    }
+
     // ignore: avoid_print
-    print(
-      '[${record.level.name}] ${record.category}$opacity: ${record.message}$extra',
-    );
+    print(buffer.toString());
   }
 
   void _log(LogRecord record) => _emit(record);
