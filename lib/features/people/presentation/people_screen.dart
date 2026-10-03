@@ -36,7 +36,11 @@ class PeopleScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.people_outline, size: 64, color: Colors.grey),
+                  const Icon(
+                    Icons.people_outline,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(height: 16),
                   const Text('No contacts added yet'),
                   const SizedBox(height: 12),
@@ -62,10 +66,15 @@ class PeopleScreen extends ConsumerWidget {
 
               return Card(
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   leading: CircleAvatar(
                     child: Text(
-                      person.name.isNotEmpty ? person.name[0].toUpperCase() : '?',
+                      person.name.isNotEmpty
+                          ? person.name[0].toUpperCase()
+                          : '?',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -82,7 +91,10 @@ class PeopleScreen extends ConsumerWidget {
                         const SizedBox(height: 4),
                         Text(
                           'Facts: ${person.importantFacts.join(', ')}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -127,7 +139,10 @@ class PeopleScreen extends ConsumerWidget {
                     radius: 24,
                     child: Text(
                       person.name[0],
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -137,7 +152,10 @@ class PeopleScreen extends ConsumerWidget {
                       children: [
                         Text(
                           person.name,
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Text(
                           '${person.relationship.displayName} (${person.relationshipCloseness.displayName})',
@@ -151,27 +169,48 @@ class PeopleScreen extends ConsumerWidget {
               const Divider(height: 32),
               _buildDetailRow(
                 'Birthday',
-                DateFormat.MMMMd().format(DateTime(2026, person.birthdayMonth, person.birthdayDay)),
+                DateFormat.MMMMd().format(
+                  DateTime(2026, person.birthdayMonth, person.birthdayDay),
+                ),
               ),
-              if (person.phoneNumber != null) _buildDetailRow('Phone', person.phoneNumber!),
-              _buildDetailRow('Preferred Tone', person.preferredTone.displayName),
-              _buildDetailRow('Delivery Channel', person.preferredDeliveryChannel.displayName),
+              if (person.phoneNumber != null)
+                _buildDetailRow('Phone', person.phoneNumber!),
+              _buildDetailRow(
+                'Preferred Tone',
+                person.preferredTone.displayName,
+              ),
+              _buildDetailRow(
+                'Delivery Channel',
+                person.preferredDeliveryChannel.displayName,
+              ),
               const SizedBox(height: 12),
-              const Text('Known Facts for AI (User-provided only):', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'Known Facts for AI (User-provided only):',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 6),
               if (person.importantFacts.isEmpty)
-                const Text('No specific facts added yet.', style: TextStyle(fontStyle: FontStyle.italic))
+                const Text(
+                  'No specific facts added yet.',
+                  style: TextStyle(fontStyle: FontStyle.italic),
+                )
               else
-                ...person.importantFacts.map((f) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(f)),
-                        ],
-                      ),
-                    )),
+                ...person.importantFacts.map(
+                  (f) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.check_circle_outline,
+                          size: 16,
+                          color: Colors.green,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(f)),
+                      ],
+                    ),
+                  ),
+                ),
               const SizedBox(height: 24),
             ],
           ),
@@ -215,7 +254,9 @@ class PeopleScreen extends ConsumerWidget {
                   children: [
                     TextField(
                       controller: nameCtrl,
-                      decoration: const InputDecoration(labelText: 'Full Name *'),
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name *',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -231,14 +272,19 @@ class PeopleScreen extends ConsumerWidget {
                         Expanded(
                           child: DropdownButtonFormField<int>(
                             value: selectedMonth,
-                            decoration: const InputDecoration(labelText: 'Month'),
+                            decoration: const InputDecoration(
+                              labelText: 'Month',
+                            ),
                             items: List.generate(12, (i) => i + 1).map((m) {
                               return DropdownMenuItem(
                                 value: m,
-                                child: Text(DateFormat.MMM().format(DateTime(2026, m))),
+                                child: Text(
+                                  DateFormat.MMM().format(DateTime(2026, m)),
+                                ),
                               );
                             }).toList(),
-                            onChanged: (val) => setState(() => selectedMonth = val ?? 1),
+                            onChanged: (val) =>
+                                setState(() => selectedMonth = val ?? 1),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -247,9 +293,13 @@ class PeopleScreen extends ConsumerWidget {
                             value: selectedDay,
                             decoration: const InputDecoration(labelText: 'Day'),
                             items: List.generate(31, (i) => i + 1).map((d) {
-                              return DropdownMenuItem(value: d, child: Text('$d'));
+                              return DropdownMenuItem(
+                                value: d,
+                                child: Text('$d'),
+                              );
                             }).toList(),
-                            onChanged: (val) => setState(() => selectedDay = val ?? 1),
+                            onChanged: (val) =>
+                                setState(() => selectedDay = val ?? 1),
                           ),
                         ),
                       ],
@@ -257,20 +307,35 @@ class PeopleScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<RelationshipCategory>(
                       value: selectedCategory,
-                      decoration: const InputDecoration(labelText: 'Relationship'),
+                      decoration: const InputDecoration(
+                        labelText: 'Relationship',
+                      ),
                       items: RelationshipCategory.values.map((c) {
-                        return DropdownMenuItem(value: c, child: Text(c.displayName));
-                      }).toList>,
-                      onChanged: (val) => setState(() => selectedCategory = val ?? RelationshipCategory.other),
+                        return DropdownMenuItem(
+                          value: c,
+                          child: Text(c.displayName),
+                        );
+                      }).toList(),
+                      onChanged: (val) => setState(
+                        () => selectedCategory =
+                            val ?? RelationshipCategory.other,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<MessageTone>(
                       value: selectedTone,
-                      decoration: const InputDecoration(labelText: 'Preferred Tone'),
+                      decoration: const InputDecoration(
+                        labelText: 'Preferred Tone',
+                      ),
                       items: MessageTone.values.map((t) {
-                        return DropdownMenuItem(value: t, child: Text(t.displayName));
+                        return DropdownMenuItem(
+                          value: t,
+                          child: Text(t.displayName),
+                        );
                       }).toList(),
-                      onChanged: (val) => setState(() => selectedTone = val ?? MessageTone.warm),
+                      onChanged: (val) => setState(
+                        () => selectedTone = val ?? MessageTone.warm,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -299,13 +364,16 @@ class PeopleScreen extends ConsumerWidget {
                         .where((f) => f.isNotEmpty)
                         .toList();
 
-                    final personId = 'person-${DateTime.now().millisecondsSinceEpoch}';
+                    final personId =
+                        'person-${DateTime.now().millisecondsSinceEpoch}';
                     final newPerson = Person(
                       id: personId,
                       name: name,
                       birthdayMonth: selectedMonth,
                       birthdayDay: selectedDay,
-                      phoneNumber: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+                      phoneNumber: phoneCtrl.text.trim().isEmpty
+                          ? null
+                          : phoneCtrl.text.trim(),
                       relationship: selectedCategory,
                       preferredTone: selectedTone,
                       importantFacts: facts,
@@ -329,8 +397,12 @@ class PeopleScreen extends ConsumerWidget {
                       updatedAt: DateTime.now(),
                     );
 
-                    await ref.read(peopleRepositoryProvider).savePerson(newPerson);
-                    await ref.read(birthdaysRepositoryProvider).saveBirthday(newBirthday);
+                    await ref
+                        .read(peopleRepositoryProvider)
+                        .savePerson(newPerson);
+                    await ref
+                        .read(birthdaysRepositoryProvider)
+                        .saveBirthday(newBirthday);
 
                     if (context.mounted) {
                       Navigator.of(context).pop();
