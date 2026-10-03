@@ -1,3 +1,6 @@
+## 2024-05-24 - [Optimize Redaction Regex]
+**Learning:** String `replaceAll` and `toLowerCase` operations inside loops during parameter redaction represent a significant logging overhead in Dart.
+**Action:** Pre-compile `RegExp` with `caseSensitive: false` to optimize frequent string filtering logic.
 ## 2023-10-02 - Optimize AppLogger redaction
 **Learning:** Using a loop that iterates over a constant set of string fragments and performs `.toLowerCase().replaceAll()` inside high-frequency loggers causes significant overhead.
 **Action:** Pre-compile a case-insensitive `RegExp` (e.g., `RegExp(r'(...)', caseSensitive: false)`) to match sensitive keys. This drastically improves string matching performance.

@@ -39,6 +39,8 @@ class LogRecord {
 }
 
 /// Sensitive parameter key pattern that must never appear in output.
+final RegExp _sensitivePattern = RegExp(
+  r'(credential|secret|token|apikey|password|key|phone|address)',
 /// Pre-compiled RegExp significantly improves string matching performance.
 final _sensitiveKeyRegExp = RegExp(
   r'(credential|secret|token|apikey|password|key|phone|address)',
@@ -51,6 +53,8 @@ final RegExp _sensitiveKeyRegExp = RegExp(
 
 /// Redacts values whose key suggests sensitive content.
 Object? _redactValue(String key, Object? value) {
+  final normalized = key.replaceAll('_', '').replaceAll('-', '');
+  if (_sensitivePattern.hasMatch(normalized)) {
   // ⚡ Bolt optimization: using pre-compiled case-insensitive RegExp
   // instead of loop + toLowerCase() + replaceAll() on constant fragments
   final normalized = key.replaceAll('_', '').replaceAll('-', '');
