@@ -38,6 +38,23 @@ class LogRecord {
   bool get isError => level == LogLevel.error;
 }
 
+/// Sensitive parameter key fragments that must never appear in output.
+const Set<String> _sensitiveKeyFragments = {
+  // 🛡️ SECURITY: Prevent PII leakage of sensitive user data
+  'credential',
+  'secret',
+  'token',
+  'apikey',
+  'api_key',
+  'api-key',
+  'password',
+  'key',
+  'phone',
+  'phonenumber',
+  'phone_number',
+  'address',
+  'email',
+};
 /// Sensitive parameter key pattern that must never appear in output.
 final RegExp _sensitivePattern = RegExp(
   r'(credential|secret|token|apikey|password|key|phone|address)',
