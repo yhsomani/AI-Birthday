@@ -1,4 +1,4 @@
-package com.yashsomani.ai_birthday
+package com.relateai.birthday
 
 import io.flutter.embedding.android.FlutterActivity
 
