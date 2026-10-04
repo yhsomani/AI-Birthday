@@ -38,6 +38,7 @@ class LogRecord {
   bool get isError => level == LogLevel.error;
 }
 
+<<<<<<< HEAD
 /// Sensitive parameter key fragments that must never appear in output.
 const Set<String> _sensitiveKeyFragments = {
   'credential',
@@ -60,14 +61,20 @@ const Set<String> _sensitiveKeyFragments = {
   'fact',
   'quote',
 };
+=======
+// 🛡️ SECURITY: Explicitly include 'email' to prevent PII leakage.
+// ⚡ PERFORMANCE: Pre-compiled RegExp avoids looping and repeated string operations.
+final RegExp _sensitiveKeyRegExp = RegExp(
+  r'(credential|secret|token|apikey|api_key|api-key|password|key|phone|phonenumber|phone_number|address|email)',
+  caseSensitive: false,
+);
+>>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
 
 /// Redacts values whose key suggests sensitive content.
 Object? _redactValue(String key, Object? value) {
-  final normalized = key.toLowerCase().replaceAll('_', '').replaceAll('-', '');
-  for (final fragment in _sensitiveKeyFragments) {
-    if (normalized.contains(fragment.toLowerCase().replaceAll('_', ''))) {
-      return '[REDACTED]';
-    }
+  final normalized = key.replaceAll('_', '').replaceAll('-', '');
+  if (_sensitiveKeyRegExp.hasMatch(normalized)) {
+    return '[REDACTED]';
   }
   return value;
 }
@@ -118,7 +125,8 @@ abstract interface class AppLogger {
     String? errorCategory,
   });
 
-  /// Returns a logger bound to [operationId] so all entries share an id.
+  /// Returns a new logger instance that automatically includes the
+  /// given [operationId] in all records emitted by it.
   AppLogger forOperation(String operationId);
 }
 
@@ -141,6 +149,7 @@ class ConsoleAppLogger implements AppLogger {
   void _emit(LogRecord record) {
     if (record.level.index < level.index) return;
     final params = _sanitize(record.params);
+<<<<<<< HEAD
     final extra = params.isEmpty
         ? ''
         : ' ${params.entries.map((e) => '${e.key}=${e.value}').join(' ')}';
@@ -150,6 +159,23 @@ class ConsoleAppLogger implements AppLogger {
     sink(
       '[${record.level.name}] ${record.category}$opacity: ${record.message}$extra',
     );
+=======
+
+    final prefix = [
+      '[${record.level.name}]',
+      record.category,
+      if (record.operationId != null) '[op:${record.operationId}]',
+    ].join(' ');
+
+    final suffix = [
+      record.message,
+      if (params.isNotEmpty)
+        ...params.entries.map((e) => '${e.key}=${e.value}'),
+    ].join(' ');
+
+    // ignore: avoid_print
+    print('$prefix: $suffix');
+>>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
   }
 
   void _log(LogRecord record) => _emit(record);
@@ -272,7 +298,11 @@ class _OperationBoundLogger implements AppLogger {
   }) => _inner.verbose(
     category,
     message,
+<<<<<<< HEAD
     operationId: _operationId,
+=======
+    operationId: operationId ?? this._operationId,
+>>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
     params: params,
   );
 
@@ -285,7 +315,11 @@ class _OperationBoundLogger implements AppLogger {
   }) => _inner.debug(
     category,
     message,
+<<<<<<< HEAD
     operationId: _operationId,
+=======
+    operationId: operationId ?? this._operationId,
+>>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
     params: params,
   );
 
@@ -295,8 +329,17 @@ class _OperationBoundLogger implements AppLogger {
     String message, {
     String? operationId,
     Map<String, Object?> params = const {},
+<<<<<<< HEAD
   }) =>
       _inner.info(category, message, operationId: _operationId, params: params);
+=======
+  }) => _inner.info(
+    category,
+    message,
+    operationId: operationId ?? this._operationId,
+    params: params,
+  );
+>>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
 
   @override
   void warning(
@@ -310,7 +353,11 @@ class _OperationBoundLogger implements AppLogger {
   }) => _inner.warning(
     category,
     message,
+<<<<<<< HEAD
     operationId: _operationId,
+=======
+    operationId: operationId ?? this._operationId,
+>>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
     params: params,
     error: error,
     stackTrace: stackTrace,
@@ -329,7 +376,11 @@ class _OperationBoundLogger implements AppLogger {
   }) => _inner.error(
     category,
     message,
+<<<<<<< HEAD
     operationId: _operationId,
+=======
+    operationId: operationId ?? this._operationId,
+>>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
     params: params,
     error: error,
     stackTrace: stackTrace,
