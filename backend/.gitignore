@@ -1,0 +1,9 @@
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+functions/lib/
+functions/node_modules/
+functions/coverage/
+functions/.env*
+functions/.secret.local

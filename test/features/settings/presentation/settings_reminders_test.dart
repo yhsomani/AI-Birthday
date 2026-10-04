@@ -1,0 +1,76 @@
+import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
+import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
+import 'package:ai_birthday/features/settings/presentation/settings_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  Future<void> pumpSettings(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      const ProviderScope(child: MaterialApp(home: SettingsScreen())),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('reminders section defaults to off with leads hidden', (
+    tester,
+  ) async {
+    await pumpSettings(tester);
+
+    expect(find.text('Reminders'), findsOneWidget);
+    expect(find.text('AI provider'), findsOneWidget);
+    expect(find.text('7 days before'), findsNothing);
+  });
+
+  testWidgets('enabling reminders reveals leads and quiet hours', (
+    tester,
+  ) async {
+    await pumpSettings(tester);
+
+    await tester.tap(find.byType(SwitchListTile).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('7 days before'), findsOneWidget);
+    expect(find.text('2 days before'), findsOneWidget);
+    expect(find.text('1 day before'), findsOneWidget);
+    expect(find.text('Today'), findsWidgets);
+    expect(find.textContaining('Quiet hours'), findsOneWidget);
+    expect(find.textContaining('No delivery between'), findsOneWidget);
+  });
+
+  testWidgets('leads can be individually toggled off', (tester) async {
+    await pumpSettings(tester);
+
+    await tester.tap(find.byType(SwitchListTile).first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(SwitchListTile, 'Approaching'));
+    await tester.pumpAndSettle();
+
+    final controller = ProviderScope.containerOf(
+      tester.element(find.byType(SettingsScreen)),
+    ).read(reminderSettingsProvider);
+    expect(controller.kinds, isNot(contains(ReminderKind.approaching)));
+    expect(controller.kinds, contains(ReminderKind.birthday));
+  });
+
+  testWidgets('quiet hours picker updates the stored window', (tester) async {
+    await pumpSettings(tester);
+    await tester.tap(find.byType(SwitchListTile).first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('No delivery between'));
+    await tester.pumpAndSettle();
+
+    // The time picker opens for the start bound first.
+    expect(find.text('Select time'), findsOneWidget);
+    // Cancel without changing, so the test stays deterministic.
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+  });
+}

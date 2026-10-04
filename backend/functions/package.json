@@ -1,0 +1,43 @@
+{
+  "name": "birthday-autopilot-control-plane",
+  "version": "0.1.0",
+  "description": "Server-only Firebase sender-fencing control plane for Birthday Autopilot.",
+  "private": true,
+  "main": "lib/functions/index.js",
+  "type": "module",
+  "packageManager": "npm@11.6.0",
+  "engines": {
+    "node": ">=22 <25",
+    "npm": "11.6.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run --exclude test/firestore.rules.emulator.test.ts --exclude test/controlPlane.emulator.test.ts",
+    "test:coverage": "vitest run --coverage --exclude test/firestore.rules.emulator.test.ts --exclude test/controlPlane.emulator.test.ts",
+    "test:emulator": "firebase emulators:exec --config ../firebase.json --project demo-birthday-autopilot --only firestore \"vitest run test/*.emulator.test.ts\"",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "audit:ci": "npm audit --audit-level=high"
+  },
+  "dependencies": {
+    "firebase-admin": "13.10.0",
+    "firebase-functions": "7.2.5",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@firebase/rules-unit-testing": "5.0.1",
+    "@types/node": "24.10.1",
+    "@typescript-eslint/eslint-plugin": "8.63.0",
+    "@typescript-eslint/parser": "8.63.0",
+    "@vitest/coverage-v8": "4.1.10",
+    "eslint": "10.7.0",
+    "fast-check": "4.9.0",
+    "firebase": "12.16.0",
+    "firebase-tools": "15.23.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.63.0",
+    "vitest": "4.1.10"
+  }
+}

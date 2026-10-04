@@ -52,6 +52,13 @@ const Set<String> _sensitiveKeyFragments = {
   'phonenumber',
   'phone_number',
   'address',
+  'note',
+  'message',
+  'content',
+  'body',
+  'text',
+  'fact',
+  'quote',
 };
 
 /// Redacts values whose key suggests sensitive content.
@@ -74,22 +81,56 @@ abstract interface class AppLogger {
   bool get isLevelEnabled;
   LogLevel get level;
 
-  void verbose(String category, String message, {String? operationId, Map<String, Object?> params});
-  void debug(String category, String message, {String? operationId, Map<String, Object?> params});
-  void info(String category, String message, {String? operationId, Map<String, Object?> params});
-  void warning(String category, String message, {String? operationId, Map<String, Object?> params, Object? error, StackTrace? stackTrace, String? errorCategory});
-  void error(String category, String message, {String? operationId, Map<String, Object?> params, Object? error, StackTrace? stackTrace, String? errorCategory});
+  void verbose(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params,
+  });
+  void debug(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params,
+  });
+  void info(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params,
+  });
+  void warning(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params,
+    Object? error,
+    StackTrace? stackTrace,
+    String? errorCategory,
+  });
+  void error(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params,
+    Object? error,
+    StackTrace? stackTrace,
+    String? errorCategory,
+  });
 
   /// Returns a logger bound to [operationId] so all entries share an id.
   AppLogger forOperation(String operationId);
 }
 
-/// Default logger that writes sanitized records to `debugPrint`.
+/// Default logger that writes sanitized records to an output sink.
 class ConsoleAppLogger implements AppLogger {
-  const ConsoleAppLogger({this.level = LogLevel.info});
+  ConsoleAppLogger({this.level = LogLevel.info, void Function(String)? sink})
+    : sink = sink ?? print;
 
   @override
   final LogLevel level;
+
+  final void Function(String) sink;
 
   @override
   bool get isLevelEnabled => true;
@@ -103,35 +144,111 @@ class ConsoleAppLogger implements AppLogger {
     final extra = params.isEmpty
         ? ''
         : ' ${params.entries.map((e) => '${e.key}=${e.value}').join(' ')}';
-    final opacity = record.operationId == null ? '' : ' [op:${record.operationId}]';
-    // ignore: avoid_print
-    print('[${record.level.name}] ${record.category}$opacity: ${record.message}$extra');
+    final opacity = record.operationId == null
+        ? ''
+        : ' [op:${record.operationId}]';
+    sink(
+      '[${record.level.name}] ${record.category}$opacity: ${record.message}$extra',
+    );
   }
 
   void _log(LogRecord record) => _emit(record);
 
   @override
-  void verbose(String category, String message, {String? operationId, Map<String, Object?> params = const {}}) =>
-      _log(LogRecord(level: LogLevel.verbose, category: category, message: message, operationId: operationId, params: params));
+  void verbose(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+  }) => _log(
+    LogRecord(
+      level: LogLevel.verbose,
+      category: category,
+      message: message,
+      operationId: operationId,
+      params: params,
+    ),
+  );
 
   @override
-  void debug(String category, String message, {String? operationId, Map<String, Object?> params = const {}}) =>
-      _log(LogRecord(level: LogLevel.debug, category: category, message: message, operationId: operationId, params: params));
+  void debug(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+  }) => _log(
+    LogRecord(
+      level: LogLevel.debug,
+      category: category,
+      message: message,
+      operationId: operationId,
+      params: params,
+    ),
+  );
 
   @override
-  void info(String category, String message, {String? operationId, Map<String, Object?> params = const {}}) =>
-      _log(LogRecord(level: LogLevel.info, category: category, message: message, operationId: operationId, params: params));
+  void info(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+  }) => _log(
+    LogRecord(
+      level: LogLevel.info,
+      category: category,
+      message: message,
+      operationId: operationId,
+      params: params,
+    ),
+  );
 
   @override
-  void warning(String category, String message, {String? operationId, Map<String, Object?> params = const {}, Object? error, StackTrace? stackTrace, String? errorCategory}) =>
-      _log(LogRecord(level: LogLevel.warning, category: category, message: message, operationId: operationId, params: params, error: error, stackTrace: stackTrace, errorCategory: errorCategory));
+  void warning(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+    Object? error,
+    StackTrace? stackTrace,
+    String? errorCategory,
+  }) => _log(
+    LogRecord(
+      level: LogLevel.warning,
+      category: category,
+      message: message,
+      operationId: operationId,
+      params: params,
+      error: error,
+      stackTrace: stackTrace,
+      errorCategory: errorCategory,
+    ),
+  );
 
   @override
-  void error(String category, String message, {String? operationId, Map<String, Object?> params = const {}, Object? error, StackTrace? stackTrace, String? errorCategory}) =>
-      _log(LogRecord(level: LogLevel.error, category: category, message: message, operationId: operationId, params: params, error: error, stackTrace: stackTrace, errorCategory: errorCategory));
+  void error(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+    Object? error,
+    StackTrace? stackTrace,
+    String? errorCategory,
+  }) => _log(
+    LogRecord(
+      level: LogLevel.error,
+      category: category,
+      message: message,
+      operationId: operationId,
+      params: params,
+      error: error,
+      stackTrace: stackTrace,
+      errorCategory: errorCategory,
+    ),
+  );
 
   @override
-  AppLogger forOperation(String operationId) => _OperationBoundLogger(this, operationId);
+  AppLogger forOperation(String operationId) =>
+      _OperationBoundLogger(this, operationId);
 }
 
 class _OperationBoundLogger implements AppLogger {
@@ -147,27 +264,81 @@ class _OperationBoundLogger implements AppLogger {
   bool get isLevelEnabled => _inner.isLevelEnabled;
 
   @override
-  void verbose(String category, String message, {String? operationId, Map<String, Object?> params = const {}}) =>
-      _inner.verbose(category, message, operationId: _operationId, params: params);
+  void verbose(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+  }) => _inner.verbose(
+    category,
+    message,
+    operationId: _operationId,
+    params: params,
+  );
 
   @override
-  void debug(String category, String message, {String? operationId, Map<String, Object?> params = const {}}) =>
-      _inner.debug(category, message, operationId: _operationId, params: params);
+  void debug(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+  }) => _inner.debug(
+    category,
+    message,
+    operationId: _operationId,
+    params: params,
+  );
 
   @override
-  void info(String category, String message, {String? operationId, Map<String, Object?> params = const {}}) =>
+  void info(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+  }) =>
       _inner.info(category, message, operationId: _operationId, params: params);
 
   @override
-  void warning(String category, String message, {String? operationId, Map<String, Object?> params = const {}, Object? error, StackTrace? stackTrace, String? errorCategory}) =>
-      _inner.warning(category, message, operationId: _operationId, params: params, error: error, stackTrace: stackTrace, errorCategory: errorCategory);
+  void warning(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+    Object? error,
+    StackTrace? stackTrace,
+    String? errorCategory,
+  }) => _inner.warning(
+    category,
+    message,
+    operationId: _operationId,
+    params: params,
+    error: error,
+    stackTrace: stackTrace,
+    errorCategory: errorCategory,
+  );
 
   @override
-  void error(String category, String message, {String? operationId, Map<String, Object?> params = const {}, Object? error, StackTrace? stackTrace, String? errorCategory}) =>
-      _inner.error(category, message, operationId: _operationId, params: params, error: error, stackTrace: stackTrace, errorCategory: errorCategory);
+  void error(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+    Object? error,
+    StackTrace? stackTrace,
+    String? errorCategory,
+  }) => _inner.error(
+    category,
+    message,
+    operationId: _operationId,
+    params: params,
+    error: error,
+    stackTrace: stackTrace,
+    errorCategory: errorCategory,
+  );
 
   @override
-  AppLogger forOperation(String operationId) => _inner.forOperation(operationId);
+  AppLogger forOperation(String operationId) =>
+      _inner.forOperation(operationId);
 }
 
 /// No-op logger for tests and non-diagnostic environments.
@@ -181,19 +352,50 @@ class NoopLogger implements AppLogger {
   bool get isLevelEnabled => false;
 
   @override
-  void verbose(String category, String message, {String? operationId, Map<String, Object?> params = const {}}) {}
+  void verbose(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+  }) {}
 
   @override
-  void debug(String category, String message, {String? operationId, Map<String, Object?> params = const {}}) {}
+  void debug(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+  }) {}
 
   @override
-  void info(String category, String message, {String? operationId, Map<String, Object?> params = const {}}) {}
+  void info(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+  }) {}
 
   @override
-  void warning(String category, String message, {String? operationId, Map<String, Object?> params = const {}, Object? error, StackTrace? stackTrace, String? errorCategory}) {}
+  void warning(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+    Object? error,
+    StackTrace? stackTrace,
+    String? errorCategory,
+  }) {}
 
   @override
-  void error(String category, String message, {String? operationId, Map<String, Object?> params = const {}, Object? error, StackTrace? stackTrace, String? errorCategory}) {}
+  void error(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+    Object? error,
+    StackTrace? stackTrace,
+    String? errorCategory,
+  }) {}
 
   @override
   AppLogger forOperation(String operationId) => this;
@@ -212,13 +414,24 @@ class RecordingLogger implements AppLogger {
 
   final List<LogRecord> records = [];
 
-  LogRecord _record(LogLevel level, String category, String message, {String? operationId, Map<String, Object?> params = const {}, Object? error, StackTrace? stackTrace, String? errorCategory}) {
+  LogRecord _record(
+    LogLevel level,
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+    Object? error,
+    StackTrace? stackTrace,
+    String? errorCategory,
+  }) {
     final record = LogRecord(
       level: level,
       category: category,
       message: message,
       operationId: operationId,
-      params: params,
+      params: params.map(
+        (key, value) => MapEntry(key, _redactValue(key, value)),
+      ),
       error: error,
       stackTrace: stackTrace,
       errorCategory: errorCategory,
@@ -229,20 +442,88 @@ class RecordingLogger implements AppLogger {
   }
 
   @override
-  void verbose(String category, String message, {String? operationId, Map<String, Object?> params = const {}}) => _record(LogLevel.verbose, category, message, operationId: operationId, params: params);
+  void verbose(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+  }) => _record(
+    LogLevel.verbose,
+    category,
+    message,
+    operationId: operationId,
+    params: params,
+  );
 
   @override
-  void debug(String category, String message, {String? operationId, Map<String, Object?> params = const {}}) => _record(LogLevel.debug, category, message, operationId: operationId, params: params);
+  void debug(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+  }) => _record(
+    LogLevel.debug,
+    category,
+    message,
+    operationId: operationId,
+    params: params,
+  );
 
   @override
-  void info(String category, String message, {String? operationId, Map<String, Object?> params = const {}}) => _record(LogLevel.info, category, message, operationId: operationId, params: params);
+  void info(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+  }) => _record(
+    LogLevel.info,
+    category,
+    message,
+    operationId: operationId,
+    params: params,
+  );
 
   @override
-  void warning(String category, String message, {String? operationId, Map<String, Object?> params = const {}, Object? error, StackTrace? stackTrace, String? errorCategory}) => _record(LogLevel.warning, category, message, operationId: operationId, params: params, error: error, stackTrace: stackTrace, errorCategory: errorCategory);
+  void warning(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+    Object? error,
+    StackTrace? stackTrace,
+    String? errorCategory,
+  }) => _record(
+    LogLevel.warning,
+    category,
+    message,
+    operationId: operationId,
+    params: params,
+    error: error,
+    stackTrace: stackTrace,
+    errorCategory: errorCategory,
+  );
 
   @override
-  void error(String category, String message, {String? operationId, Map<String, Object?> params = const {}, Object? error, StackTrace? stackTrace, String? errorCategory}) => _record(LogLevel.error, category, message, operationId: operationId, params: params, error: error, stackTrace: stackTrace, errorCategory: errorCategory);
+  void error(
+    String category,
+    String message, {
+    String? operationId,
+    Map<String, Object?> params = const {},
+    Object? error,
+    StackTrace? stackTrace,
+    String? errorCategory,
+  }) => _record(
+    LogLevel.error,
+    category,
+    message,
+    operationId: operationId,
+    params: params,
+    error: error,
+    stackTrace: stackTrace,
+    errorCategory: errorCategory,
+  );
 
   @override
-  AppLogger forOperation(String operationId) => _OperationBoundLogger(this, operationId);
+  AppLogger forOperation(String operationId) =>
+      _OperationBoundLogger(this, operationId);
 }

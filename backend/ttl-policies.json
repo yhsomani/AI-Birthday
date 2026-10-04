@@ -1,0 +1,18 @@
+{
+  "field": "cleanupAt",
+  "collectionGroups": [
+    "installations",
+    "armBudgets",
+    "occurrenceClaims",
+    "occurrenceKeys",
+    "destinationGuards",
+    "testClaims",
+    "armOutcomes",
+    "claimRequests",
+    "deletionTombstones",
+    "coordinationOperationReceipts",
+    "coordinationLatestReceipts",
+    "deletionReceipts"
+  ],
+  "important": "TTL is physical cleanup only. Every authorization and budget decision checks logical expiry transactionally."
+}
