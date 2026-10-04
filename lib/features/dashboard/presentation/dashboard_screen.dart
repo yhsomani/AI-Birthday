@@ -14,6 +14,7 @@ import 'package:intl/intl.dart';
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
+import 'package:ai_birthday/shared/design_system/empty_state.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -131,16 +132,10 @@ class DashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 10),
               if (upcomingBirthdays.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Center(
-                      child: Text(
-                        'No upcoming birthdays tracked in the next 30 days.',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                    ),
-                  ),
+                const EmptyState(
+                  icon: Icons.event_available,
+                  title: 'No upcoming birthdays',
+                  message: 'No birthdays tracked in the next 30 days.',
                 )
               else
                 ...upcomingBirthdays.take(5).map((b) {
@@ -167,11 +162,10 @@ class DashboardScreen extends ConsumerWidget {
             child: CircularProgressIndicator(),
           ),
         ),
-        error: (err, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('Error loading birthdays: $err'),
-          ),
+        error: (err, _) => EmptyState(
+          icon: Icons.error_outline,
+          title: 'Error loading birthdays',
+          message: err.toString(),
         ),
       ),
     );
@@ -257,9 +251,9 @@ class DashboardScreen extends ConsumerWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: highlight ? const Color(0xFFA64B2A) : null,
-              ),
+            fontWeight: FontWeight.bold,
+            color: highlight ? const Color(0xFFA64B2A) : null,
+          ),
         ),
         const SizedBox(width: 8),
         Container(
@@ -304,7 +298,9 @@ class DashboardScreen extends ConsumerWidget {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: const Color(0xFFA64B2A).withValues(alpha: 0.12),
+                  backgroundColor: const Color(
+                    0xFFA64B2A,
+                  ).withValues(alpha: 0.12),
                   foregroundColor: const Color(0xFFA64B2A),
                   child: Text(
                     person != null && person.name.isNotEmpty
@@ -334,14 +330,19 @@ class DashboardScreen extends ConsumerWidget {
                           color: isToday
                               ? const Color(0xFFA64B2A)
                               : Colors.grey[700],
-                          fontWeight: isToday ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: isToday
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         ),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFD9822B).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),

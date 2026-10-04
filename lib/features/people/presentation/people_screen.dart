@@ -9,6 +9,7 @@ import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/people/data/person_providers.dart'
     show personServiceProvider;
 import 'package:ai_birthday/features/people/domain/models/person.dart';
+import 'package:ai_birthday/shared/design_system/empty_state.dart';
 
 class PeopleScreen extends ConsumerWidget {
   const PeopleScreen({super.key});
@@ -59,8 +60,9 @@ class PeopleScreen extends ConsumerWidget {
 
     final peopleRepo = ref.read(peopleRepositoryProvider);
     final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
-    final associatedBirthday =
-        await birthdaysRepo.getBirthdayForPerson(person.id);
+    final associatedBirthday = await birthdaysRepo.getBirthdayForPerson(
+      person.id,
+    );
 
     await peopleRepo.deletePerson(person.id);
     if (associatedBirthday != null) {
@@ -113,27 +115,17 @@ class PeopleScreen extends ConsumerWidget {
       body: peopleAsync.when(
         data: (people) {
           if (people.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.people_outline,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('No contacts added yet'),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      context.push('/people/add');
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Birthday Contact'),
-                  ),
-                ],
+            return EmptyState(
+              icon: Icons.people_outline,
+              title: 'No contacts added yet',
+              message: 'Add a birthday contact to start tracking.',
+              action: FilledButton.icon(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  context.push('/people/add');
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Add Birthday Contact'),
               ),
             );
           }
@@ -174,7 +166,9 @@ class PeopleScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 4),
-                      Text('$dateStr$ageTurn • ${person.relationship.displayName}'),
+                      Text(
+                        '$dateStr$ageTurn • ${person.relationship.displayName}',
+                      ),
                       if (person.importantFacts.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -200,9 +194,9 @@ class PeopleScreen extends ConsumerWidget {
                         decoration: BoxDecoration(
                           color: next.isToday
                               ? Theme.of(context).colorScheme.primaryContainer
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .surfaceContainerHighest,
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -211,12 +205,12 @@ class PeopleScreen extends ConsumerWidget {
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: next.isToday
-                                ? Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimaryContainer
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -231,10 +225,7 @@ class PeopleScreen extends ConsumerWidget {
                         },
                         itemBuilder: (context) => const [
                           PopupMenuItem(value: 'edit', child: Text('Edit')),
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Text('Delete'),
-                          ),
+                          PopupMenuItem(value: 'delete', child: Text('Delete')),
                         ],
                       ),
                     ],
@@ -403,4 +394,3 @@ class PeopleScreen extends ConsumerWidget {
     );
   }
 }
-
