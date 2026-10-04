@@ -36,7 +36,7 @@ class UserGeminiApiProvider implements AiMessageProvider {
     AppLogger? logger,
     AiPromptBuilder? promptBuilder,
     HttpPostSender? httpSender,
-    this.model = 'gemini-1.5-flash',
+    this.model = 'gemini-2.5-flash-lite',
   }) : _credentialStorage = credentialStorage,
        _logger = logger ?? ConsoleAppLogger(),
        _promptBuilder = promptBuilder ?? const AiPromptBuilder(),
@@ -101,15 +101,15 @@ class UserGeminiApiProvider implements AiMessageProvider {
       throw AppFailure.providerError(detail: e.message);
     } catch (e, st) {
       if (e is AppFailure) rethrow;
-      // 🛡️ SECURITY: Prevent internal exception strings from leaking into user-facing AppFailure details.
+      print('USER_GEMINI_ERROR: $e');
       _logger.error(
         'UserGeminiApiProvider',
-        'Unexpected error generating message',
+        'Unexpected error generating message: $e',
         error: e,
         stackTrace: st,
       );
-      throw const AppFailure.providerError(
-        detail: 'An unexpected error occurred during generation.',
+      throw AppFailure.providerError(
+        detail: 'An error occurred during generation: $e',
       );
     }
 
@@ -204,7 +204,7 @@ class UserGeminiApiProvider implements AiMessageProvider {
     try {
       final request = await client.postUrl(uri);
       headers.forEach((k, v) => request.headers.set(k, v));
-      request.write(body);
+      request.add(utf8.encode(body));
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
       return HttpResponsePayload(

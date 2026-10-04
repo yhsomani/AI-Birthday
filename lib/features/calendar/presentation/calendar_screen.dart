@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../birthdays/domain/birthday_engine.dart';
 import '../../people/data/person_providers.dart';
 import '../../people/domain/person.dart';
+import '../../people/domain/person_enums.dart';
+import '../../../app/providers.dart';
 
 /// Calendar view of annual birthdays (SSOT §15 navigation, §14).
 ///
@@ -109,14 +111,41 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final people = ref.watch(personListProvider);
+    final peopleAsync = ref.watch(peopleStreamProvider);
+    final driftPeople = ref.watch(personListProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Calendar')),
-      body: people.when(
+      body: peopleAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) =>
             const Center(child: Text('Could not load birthdays.')),
-        data: (list) => _monthGrid(context, list),
+        data: (inMemoryList) {
+          final driftList = driftPeople.asData?.value ?? [];
+          final combined = <String, Person>{};
+
+          for (final p in inMemoryList) {
+            combined[p.id] = Person(
+              id: p.id,
+              name: p.name,
+              birthdayMonth: p.birthdayMonth,
+              birthdayDay: p.birthdayDay,
+              birthYear: p.birthYear,
+              phoneNumber: p.phoneNumber,
+              relationship: p.relationship.displayName,
+              preferredTone: PreferredTone.warm,
+              createdAt: p.createdAt,
+              updatedAt: p.updatedAt,
+              version: 1,
+            );
+          }
+
+          for (final p in driftList) {
+            combined[p.id] = p;
+          }
+
+          return _monthGrid(context, combined.values.toList());
+        },
       ),
     );
   }

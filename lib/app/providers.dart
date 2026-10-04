@@ -48,7 +48,7 @@ final subscriptionNotifierProvider =
 });
 
 /// Application Entitlement state provider (Free vs Pro). Defaults safely to Free (SSOT §11).
-final entitlementProvider = StateProvider<UserEntitlement>((ref) {
+final entitlementProvider = Provider<UserEntitlement>((ref) {
   return ref.watch(subscriptionNotifierProvider);
 });
 

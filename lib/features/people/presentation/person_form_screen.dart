@@ -69,16 +69,45 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
     super.initState();
     final id = widget.personId;
     if (id != null) {
-      ref.read(personByIdProvider(id).future).then((person) {
+      ref.read(personByIdProvider(id).future).then((person) async {
         if (!mounted) return;
-        if (person == null) {
+        var p = person;
+        if (p == null) {
+          final memPerson =
+              await ref.read(peopleRepositoryProvider).getPerson(id);
+          if (memPerson != null) {
+            p = Person(
+              id: memPerson.id,
+              name: memPerson.name,
+              birthdayMonth: memPerson.birthdayMonth,
+              birthdayDay: memPerson.birthdayDay,
+              birthYear: memPerson.birthYear,
+              phoneNumber: memPerson.phoneNumber,
+              email: memPerson.email,
+              relationship: memPerson.relationship.displayName,
+              preferredTone: PreferredTone.values.firstWhere(
+                (t) =>
+                    t.name.toLowerCase() ==
+                    memPerson.preferredTone.name.toLowerCase(),
+                orElse: () => PreferredTone.warm,
+              ),
+              importantFacts: memPerson.importantFacts,
+              notes: memPerson.notes,
+              createdAt: memPerson.createdAt,
+              updatedAt: memPerson.updatedAt,
+              version: 1,
+            );
+          }
+        }
+        if (!mounted) return;
+        if (p == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('This person could not be found.')),
           );
           context.pop();
           return;
         }
-        setState(() => _populate(person));
+        setState(() => _populate(p!));
       });
     }
   }

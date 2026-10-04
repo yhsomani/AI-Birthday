@@ -131,7 +131,7 @@ class PeopleScreen extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -221,7 +221,7 @@ class PeopleScreen extends ConsumerWidget {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: () {
-                    Navigator.of(context).pop();
+                    Navigator.of(sheetContext).pop();
                     context.push('/people/edit/${person.id}');
                   },
                   icon: const Icon(Icons.edit_outlined),
