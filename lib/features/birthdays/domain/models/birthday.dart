@@ -1,6 +1,8 @@
 /// Birthday tracking and lifecycle model (SSOT §8, §14).
 library;
 
+import '../birthday_engine.dart';
+
 /// Lifecycle states of a tracked birthday event.
 enum BirthdayStatus {
   created,
@@ -102,11 +104,14 @@ class Birthday {
     required int day,
     bool preferMar1 = false,
   }) {
-    if (month == 2 && day == 29) {
-      final isLeapYear =
-          (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
-      if (!isLeapYear) {
-        return preferMar1 ? DateTime(year, 3, 1) : DateTime(year, 2, 28);
+    if (month == BirthdayEngine.feb29Month && day == BirthdayEngine.feb29Day) {
+      if (!BirthdayEngine.isLeapYear(year)) {
+        final resolved = const BirthdayEngine().resolveFeb29(
+          year,
+          resolution:
+              preferMar1 ? LeapDayResolution.mar1 : LeapDayResolution.feb28,
+        );
+        return DateTime(year, resolved.month, resolved.day);
       }
     }
     return DateTime(year, month, day);

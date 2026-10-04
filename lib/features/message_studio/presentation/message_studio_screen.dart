@@ -242,14 +242,18 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
       } catch (e) {
         ref
             .read(loggerProvider)
-            .warning('MessageStudio', 'Could not launch WhatsApp directly: $e');
+            .warning('MessageStudio', 'Could not launch WhatsApp directly', error: e);
       }
 
-      // Track handoff status only when launch succeeds (SSOT §9)
+      // Track handoff status only when launch succeeds; otherwise action required (SSOT §9)
       if (launched) {
         await ref
             .read(birthdaysRepositoryProvider)
             .updateBirthdayStatus(widget.birthdayId, BirthdayStatus.handedOff);
+      } else {
+        await ref
+            .read(birthdaysRepositoryProvider)
+            .updateBirthdayStatus(widget.birthdayId, BirthdayStatus.failed);
       }
 
       if (mounted) {

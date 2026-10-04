@@ -103,13 +103,13 @@ class UserGeminiApiProvider implements AiMessageProvider {
       if (e is AppFailure) rethrow;
       _logger.error(
         'UserGeminiApiProvider',
-        'Unexpected error generating message: $e',
+        'Unexpected error generating message',
         error: e,
         stackTrace: st,
       );
 
-      throw AppFailure.providerError(
-        detail: 'An error occurred during generation: $e',
+      throw const AppFailure.providerError(
+        detail: 'An error occurred during message generation.',
       );
     }
 
@@ -189,7 +189,9 @@ class UserGeminiApiProvider implements AiMessageProvider {
             'Google Gemini servers returned error $statusCode. Please try again.',
       );
     } else {
-      throw AppFailure.providerError(detail: 'HTTP $statusCode: $responseBody');
+      throw AppFailure.providerError(
+        detail: 'HTTP request failed with status $statusCode',
+      );
     }
   }
 

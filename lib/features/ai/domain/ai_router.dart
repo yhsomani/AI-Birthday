@@ -76,7 +76,7 @@ class AiRouter {
     _logger.info('AiRouter', 'AI request failed: No provider available');
     throw const AppFailure.credentialMissing(
       action:
-          'Add your Google Gemini API key in Settings to generate messages.',
+          'AI is not currently available on this device. Add your Google Gemini API key in Settings, or use Gemini Nano when available on this device.',
     );
   }
 }
