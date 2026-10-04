@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/core/security/credential_storage.dart';
 import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
-import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/ai/domain/ai_router.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_repository.dart';
@@ -21,9 +20,14 @@ import 'package:ai_birthday/core/security/flutter_secure_storage_driver.dart';
 import 'package:ai_birthday/features/people/domain/repositories/people_repository.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 
+import 'package:ai_birthday/core/platform/gemini_nano_platform.dart';
+import 'package:ai_birthday/features/ai/domain/ai_provider.dart';
+import 'package:ai_birthday/features/ai/data/gemini_nano_provider.dart';
+import 'package:ai_birthday/features/subscription/application/subscription_service.dart';
+
 /// App Logger provider.
 final loggerProvider = Provider<AppLogger>((ref) {
-  return const ConsoleAppLogger();
+  return ConsoleAppLogger();
 });
 
 /// Credential Storage provider.
@@ -36,14 +40,33 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) {
   return ThemeMode.system;
 });
 
-/// Application Entitlement state provider (Free vs Pro).
+/// Subscription Notifier managing entitlement through purchase & verification lifecycle (SSOT §11).
+final subscriptionNotifierProvider =
+    StateNotifierProvider<SubscriptionNotifier, UserEntitlement>((ref) {
+  final logger = ref.watch(loggerProvider);
+  return SubscriptionNotifier(initial: UserEntitlement.free, logger: logger);
+});
+
+/// Application Entitlement state provider (Free vs Pro). Defaults safely to Free (SSOT §11).
 final entitlementProvider = StateProvider<UserEntitlement>((ref) {
-  return UserEntitlement.proActive;
+  return ref.watch(subscriptionNotifierProvider);
 });
 
 /// WhatsApp Handoff Builder provider.
 final whatsappHandoffBuilderProvider = Provider<WhatsAppHandoffBuilder>((ref) {
   return const WhatsAppHandoffBuilder();
+});
+
+/// Gemini Nano Platform provider.
+final geminiNanoPlatformProvider = Provider<GeminiNanoPlatform>((ref) {
+  return const DefaultGeminiNanoPlatform();
+});
+
+/// Gemini Nano on-device AI provider.
+final geminiNanoProvider = Provider<GeminiNanoProvider>((ref) {
+  final platform = ref.watch(geminiNanoPlatformProvider);
+  final logger = ref.watch(loggerProvider);
+  return GeminiNanoProvider(platform: platform, logger: logger);
 });
 
 /// User Gemini API Provider.
@@ -53,15 +76,24 @@ final userGeminiApiProvider = Provider<UserGeminiApiProvider>((ref) {
   return UserGeminiApiProvider(credentialStorage: storage, logger: logger);
 });
 
-/// AI Router provider.
+/// AI Router provider wiring entitlement, user Gemini key, and Gemini Nano (SSOT §5).
 final aiRouterProvider = Provider<AiRouter>((ref) {
   final storage = ref.watch(credentialStorageProvider);
   final geminiProvider = ref.watch(userGeminiApiProvider);
+  final nanoPlatform = ref.watch(geminiNanoPlatformProvider);
+  final nanoProvider = ref.watch(geminiNanoProvider);
   final logger = ref.watch(loggerProvider);
 
   return AiRouter(
     credentialStorage: storage,
     userGeminiProvider: geminiProvider,
+    nanoProvider: nanoProvider,
+    nanoStatusChecker: () async {
+      final state = await nanoPlatform.currentState();
+      return state.isUsable
+          ? GeminiNanoStatus.available
+          : GeminiNanoStatus.unavailable;
+    },
     logger: logger,
   );
 });

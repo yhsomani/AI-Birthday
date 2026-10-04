@@ -1,29 +1,20 @@
-<<<<<<< HEAD
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../../auth/application/auth_controller.dart';
-import '../../auth/domain/auth_state.dart';
-import '../../reminders/application/reminder_settings_controller.dart';
-import '../../reminders/domain/quiet_hours.dart';
-import '../../reminders/domain/reminder_kind.dart';
-
-/// Settings.
-///
-/// Sections grow as their owning features land: Account (device Firebase),
-/// Notifications/Reminders (Phase 1), Subscription (Phase 2), AI and Gemini
-/// API credential (Phase 3).
-=======
-/// Settings screen for API credentials, subscription entitlement, and preferences (SSOT §5, §11, §20).
+/// Authoritative Settings screen for Account, Reminders, AI Credentials,
+/// Subscription Entitlement, and Appearance (SSOT §5, §11, §17, §20).
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ai_birthday/app/providers.dart';
+import 'package:ai_birthday/core/platform/gemini_nano_platform.dart';
+import 'package:ai_birthday/features/auth/application/auth_controller.dart';
+import 'package:ai_birthday/features/auth/domain/auth_state.dart';
+import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
+import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
+import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 
->>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -32,7 +23,75 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-<<<<<<< HEAD
+  final TextEditingController _apiKeyController = TextEditingController();
+  bool _hasKey = false;
+  bool _obscureKey = true;
+  bool _isPurchasing = false;
+  NanoState _nanoState = NanoState.unavailable;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkStoredKey();
+    _checkNanoState();
+  }
+
+  @override
+  void dispose() {
+    _apiKeyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkStoredKey() async {
+    try {
+      final storage = ref.read(credentialStorageProvider);
+      final key = await storage.getGeminiApiKey();
+      if (!mounted) return;
+      if (key != null && key.isNotEmpty) {
+        setState(() {
+          _hasKey = true;
+          _apiKeyController.text = key;
+        });
+      }
+    } catch (_) {
+      // Gracefully ignored in tests and unsupported environments
+    }
+  }
+
+  Future<void> _checkNanoState() async {
+    try {
+      final state = await ref.read(geminiNanoPlatformProvider).currentState();
+      if (mounted) {
+        setState(() => _nanoState = state);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveKey() async {
+    HapticFeedback.lightImpact();
+    final text = _apiKeyController.text.trim();
+    final storage = ref.read(credentialStorageProvider);
+    if (text.isEmpty) {
+      await storage.deleteGeminiApiKey();
+      setState(() => _hasKey = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gemini API key removed.')),
+        );
+      }
+    } else {
+      await storage.saveGeminiApiKey(text);
+      setState(() => _hasKey = true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gemini API key saved in secure hardware storage.'),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _editQuietHours(QuietHours quiet) async {
     final start = await showTimePicker(
       context: context,
@@ -50,9 +109,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
     if (end == null || !mounted) return;
-    ref
-        .read(reminderSettingsProvider.notifier)
-        .setQuietHours(
+    ref.read(reminderSettingsProvider.notifier).setQuietHours(
           QuietHours(
             start: Duration(hours: start.hour, minutes: start.minute),
             end: Duration(hours: end.hour, minutes: end.minute),
@@ -64,283 +121,409 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return MaterialLocalizations.of(context).formatTimeOfDay(
       TimeOfDay(hour: time.inHours % 24, minute: time.inMinutes % 60),
     );
-=======
-  final TextEditingController _apiKeyController = TextEditingController();
-  bool _hasKey = false;
-  bool _isLoading = true;
-  bool _obscureKey = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkStoredKey();
   }
 
-  @override
-  void dispose() {
-    _apiKeyController.dispose();
-    super.dispose();
+  Future<void> _handlePurchasePro() async {
+    HapticFeedback.lightImpact();
+    setState(() => _isPurchasing = true);
+    final success = await ref
+        .read(subscriptionNotifierProvider.notifier)
+        .purchaseProMonthly();
+    if (!mounted) return;
+    setState(() => _isPurchasing = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'Pro Subscription Activated! AI message drafting is now unlocked. ✨'
+              : 'Purchase could not be completed.',
+        ),
+      ),
+    );
   }
 
-  Future<void> _checkStoredKey() async {
-    final storage = ref.read(credentialStorageProvider);
-    final key = await storage.getGeminiApiKey();
-    setState(() {
-      _hasKey = key != null && key.isNotEmpty;
-      if (_hasKey) {
-        _apiKeyController.text = key!;
-      }
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _saveKey() async {
-    final text = _apiKeyController.text.trim();
-    final storage = ref.read(credentialStorageProvider);
-    if (text.isEmpty) {
-      await storage.deleteGeminiApiKey();
-      setState(() => _hasKey = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gemini API key removed.')),
-        );
-      }
-    } else {
-      await storage.saveGeminiApiKey(text);
-      setState(() => _hasKey = true);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gemini API key saved in secure storage.')),
-        );
-      }
-    }
->>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
+  Future<void> _handleRestorePurchases() async {
+    HapticFeedback.lightImpact();
+    final restored = await ref
+        .read(subscriptionNotifierProvider.notifier)
+        .restorePurchases();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          restored
+              ? 'Existing Pro subscription restored!'
+              : 'No active purchases found to restore.',
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-<<<<<<< HEAD
     final theme = Theme.of(context);
-    final settings = ref.watch(reminderSettingsProvider);
+    final reminderSettings = ref.watch(reminderSettingsProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final entitlement = ref.watch(entitlementProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          _Section(title: 'Account', children: const [_AuthTile()]),
-          _Section(
-            title: 'AI',
-            children: const [
-              ListTile(
-                leading: Icon(Icons.auto_awesome_outlined),
-                title: Text('AI provider'),
-                subtitle: Text('Available soon'),
-                enabled: false,
+          // Section 1: Account
+          _SectionHeader(title: 'Account'),
+          Card(child: const _AuthTile()),
+          const SizedBox(height: 20),
+
+          // Section 2: Subscription & Entitlement (SSOT §11)
+          _SectionHeader(title: 'Subscription & Entitlement'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        entitlement.canUseAi
+                            ? Icons.verified
+                            : Icons.lock_outline,
+                        color: entitlement.canUseAi
+                            ? const Color(0xFFD9822B)
+                            : Colors.grey,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        entitlement.status.displayName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Spacer(),
+                      Chip(
+                        label: Text(
+                          entitlement.canUseAi ? 'UNLOCKED' : 'FREE TIER',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: entitlement.canUseAi
+                                ? const Color(0xFF2D5A46)
+                                : Colors.grey[700],
+                          ),
+                        ),
+                        backgroundColor: entitlement.canUseAi
+                            ? const Color(0xFF2D5A46).withValues(alpha: 0.12)
+                            : Colors.grey.withValues(alpha: 0.12),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    entitlement.canUseAi
+                        ? 'Full AI draft generation, rewrite variations, and personalized message studio are active.'
+                        : 'Application AI features require an active subscription entitlement. Birthday tracking and manual drafting remain free forever.',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 16),
+                  if (!entitlement.canUseAi) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _isPurchasing ? null : _handlePurchasePro,
+                        icon: _isPurchasing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.star_outline),
+                        label: Text(
+                          _isPurchasing
+                              ? 'Verifying Purchase...'
+                              : 'Upgrade to Pro (\$2.99/mo)',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: _handleRestorePurchases,
+                        child: const Text('Restore Purchases'),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  // Developer Sandbox Testing Section
+                  Row(
+                    children: [
+                      const Icon(Icons.bug_report_outlined, size: 16, color: Colors.grey),
+                      const SizedBox(width: 6),
+                      Text(
+                        '[Dev Sandbox Testing]',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Simulate Pro:',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(width: 8),
+                      Switch(
+                        value: entitlement.canUseAi,
+                        onChanged: (val) {
+                          HapticFeedback.lightImpact();
+                          ref
+                              .read(subscriptionNotifierProvider.notifier)
+                              .setDevSandboxEntitlement(
+                                val
+                                    ? UserEntitlement.proActive
+                                    : UserEntitlement.free,
+                              );
+                        },
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-          _Section(
-            title: 'Notifications',
-            children: [
-              SwitchListTile(
-                secondary: const Icon(Icons.notifications_outlined),
-                title: const Text('Reminders'),
-                subtitle: const Text('Reminders before birthdays'),
-                value: settings.enabled,
-                onChanged: (on) =>
-                    ref.read(reminderSettingsProvider.notifier).setEnabled(on),
+          const SizedBox(height: 20),
+
+          // Section 3: AI Provider & Personal Gemini API Key (SSOT §5, §20)
+          _SectionHeader(title: 'AI provider'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.key, color: Color(0xFFA64B2A)),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Personal Gemini API Key',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_hasKey)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2D5A46).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Configured',
+                            style: TextStyle(
+                              color: Color(0xFF2D5A46),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Stored strictly on your device using hardware-backed secure storage. Never logged or sent to external servers.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  TextField(
+                    controller: _apiKeyController,
+                    obscureText: _obscureKey,
+                    decoration: InputDecoration(
+                      labelText: 'Gemini API Key (AIzaSy...)',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureKey
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscureKey = !_obscureKey),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (_hasKey) ...[
+                        TextButton(
+                          onPressed: () {
+                            _apiKeyController.clear();
+                            _saveKey();
+                          },
+                          child: const Text(
+                            'Remove Key',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      FilledButton(
+                        onPressed: _saveKey,
+                        child: const Text('Save Key'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              if (settings.enabled) ...[
-                for (final kind in ReminderKind.values)
-                  SwitchListTile(
-                    title: Text(kind.title),
-                    subtitle: Text(kind.when),
-                    value: settings.kinds.contains(kind),
-                    onChanged: (on) => ref
-                        .read(reminderSettingsProvider.notifier)
-                        .setKind(kind, on),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Section 4: On-Device AI / Gemini Nano (SSOT §5, §25)
+          _SectionHeader(title: 'On-Device Intelligence'),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.memory, color: Color(0xFF2D5A46)),
+              title: const Text('Gemini Nano (AICore)'),
+              subtitle: Text(
+                switch (_nanoState) {
+                  NanoState.available => 'Ready on device for offline generation.',
+                  NanoState.downloadable => 'Model available for download on this device.',
+                  NanoState.downloading => 'Downloading on-device model...',
+                  _ => 'Secondary fallback on supported Android devices.',
+                },
+              ),
+              trailing: Chip(
+                label: Text(
+                  _nanoState == NanoState.available ? 'AVAILABLE' : 'STANDBY',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: _nanoState == NanoState.available
+                        ? const Color(0xFF2D5A46)
+                        : Colors.grey[700],
                   ),
-                ListTile(
-                  leading: const Icon(Icons.bedtime_outlined),
-                  title: const Text('Quiet hours'),
-                  subtitle: Text(
-                    'No delivery between '
-                    '${_formatTime(settings.quietHours.start)} and '
-                    '${_formatTime(settings.quietHours.end)}',
-                  ),
-                  onTap: () => _editQuietHours(settings.quietHours),
                 ),
-              ],
-            ],
+                backgroundColor: _nanoState == NanoState.available
+                    ? const Color(0xFF2D5A46).withValues(alpha: 0.12)
+                    : Colors.grey.withValues(alpha: 0.12),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+
+          // Section 5: Reminders & Quiet Hours (SSOT §17)
+          _SectionHeader(title: 'Reminders'),
+          Card(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  secondary: const Icon(Icons.notifications_outlined),
+                  title: const Text('Birthday reminders'),
+                  subtitle: const Text('Reminders before birthdays'),
+                  value: reminderSettings.enabled,
+                  onChanged: (on) {
+                    HapticFeedback.lightImpact();
+                    ref.read(reminderSettingsProvider.notifier).setEnabled(on);
+                  },
+                ),
+                if (reminderSettings.enabled) ...[
+                  const Divider(height: 1),
+                  for (final kind in ReminderKind.values)
+                    SwitchListTile(
+                      title: Text(kind.title),
+                      subtitle: Text(kind.when),
+                      value: reminderSettings.kinds.contains(kind),
+                      onChanged: (on) {
+                        HapticFeedback.lightImpact();
+                        ref
+                            .read(reminderSettingsProvider.notifier)
+                            .setKind(kind, on);
+                      },
+                    ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.bedtime_outlined),
+                    title: const Text('Quiet hours'),
+                    subtitle: Text(
+                      'No delivery between '
+                      '${_formatTime(reminderSettings.quietHours.start)} and '
+                      '${_formatTime(reminderSettings.quietHours.end)}',
+                    ),
+                    onTap: () => _editQuietHours(reminderSettings.quietHours),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Section 6: Display & Appearance
+          _SectionHeader(title: 'Appearance'),
+          Card(
+            child: SwitchListTile(
+              secondary: const Icon(Icons.dark_mode_outlined),
+              title: const Text('Dark Mode'),
+              value: themeMode == ThemeMode.dark,
+              onChanged: (val) {
+                HapticFeedback.lightImpact();
+                ref.read(themeModeProvider.notifier).state =
+                    val ? ThemeMode.dark : ThemeMode.light;
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+
           Center(
             child: Text(
-              'AI-Birthday',
+              'AI-Birthday • v1.0.0',
               style: theme.textTheme.labelMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
+          const SizedBox(height: 16),
         ],
-=======
-    final themeMode = ref.watch(themeModeProvider);
-    final entitlement = ref.watch(entitlementProvider);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Section 1: AI Provider & Gemini Credentials (SSOT §5)
-                _buildSectionHeader('AI Provider & Credentials'),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.key, color: Color(0xFFE03E5D)),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Personal Gemini API Key',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                            ),
-                            const Spacer(),
-                            if (_hasKey)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'Configured',
-                                  style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Your Gemini API key is stored strictly on your device using hardware-backed secure storage. It is never logged or sent to any developer cloud server.',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _apiKeyController,
-                          obscureText: _obscureKey,
-                          decoration: InputDecoration(
-                            labelText: 'Gemini API Key (AIzaSy...)',
-                            suffixIcon: IconButton(
-                              icon: Icon(_obscureKey ? Icons.visibility : Icons.visibility_off),
-                              onPressed: () => setState(() => _obscureKey = !_obscureKey),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (_hasKey) ...[
-                              TextButton(
-                                onPressed: () {
-                                  _apiKeyController.clear();
-                                  _saveKey();
-                                },
-                                child: const Text('Remove Key', style: TextStyle(color: Colors.red)),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            FilledButton(
-                              onPressed: _saveKey,
-                              child: const Text('Save Key'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Section 2: Application Subscription / Entitlement (SSOT §11)
-                _buildSectionHeader('Subscription & Entitlement'),
-                Card(
-                  child: ListTile(
-                    leading: Icon(
-                      entitlement.canUseAi ? Icons.verified : Icons.lock_outline,
-                      color: entitlement.canUseAi ? Colors.amber[700] : Colors.grey,
-                    ),
-                    title: Text(entitlement.status.displayName),
-                    subtitle: Text(
-                      entitlement.canUseAi
-                          ? 'AI draft generation is unlocked.'
-                          : 'Subscribe to unlock AI message drafting.',
-                    ),
-                    trailing: Switch(
-                      value: entitlement.canUseAi,
-                      onChanged: (val) {
-                        ref.read(entitlementProvider.notifier).state =
-                            val ? UserEntitlement.proActive : UserEntitlement.free;
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Section 3: On-Device AI (Gemini Nano)
-                _buildSectionHeader('On-Device Intelligence'),
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.memory, color: Colors.blueGrey),
-                    title: const Text('Gemini Nano (AICore)'),
-                    subtitle: const Text('Secondary fallback on supported Android devices.'),
-                    trailing: const Chip(
-                      label: Text('Ready on Android', style: TextStyle(fontSize: 10)),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Section 4: Display & Appearance
-                _buildSectionHeader('Appearance'),
-                Card(
-                  child: SwitchListTile(
-                    secondary: const Icon(Icons.dark_mode_outlined),
-                    title: const Text('Dark Mode'),
-                    value: themeMode == ThemeMode.dark,
-                    onChanged: (val) {
-                      ref.read(themeModeProvider.notifier).state =
-                          val ? ThemeMode.dark : ThemeMode.light;
-                    },
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
->>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
       ),
     );
   }
 }
-<<<<<<< HEAD
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+          letterSpacing: 0.5,
+          color: Color(0xFFA64B2A),
+        ),
+      ),
+    );
+  }
+}
 
 class _AuthTile extends ConsumerWidget {
   const _AuthTile();
@@ -370,15 +553,20 @@ class _AuthTile extends ConsumerWidget {
           leading: const Icon(Icons.login),
           title: const Text('Sign in with Google'),
           subtitle: const Text('Sync, backups and delivery'),
-          onTap: () => ref.read(authControllerProvider.notifier).signIn(),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ref.read(authControllerProvider.notifier).signIn();
+          },
         ),
         AuthStatus.signedIn => ListTile(
           leading: const Icon(Icons.account_circle_outlined),
           title: Text(state.identity?.displayName ?? 'Signed in'),
           subtitle: Text(state.identity?.email ?? ''),
           trailing: TextButton(
-            onPressed: () =>
-                ref.read(authControllerProvider.notifier).signOut(),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              ref.read(authControllerProvider.notifier).signOut();
+            },
             child: const Text('Sign out'),
           ),
         ),
@@ -392,33 +580,3 @@ class _AuthTile extends ConsumerWidget {
     );
   }
 }
-
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.children});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            title,
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        ...children,
-      ],
-    );
-  }
-}
-=======
->>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88

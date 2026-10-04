@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 // Standalone comprehensive verification runner for AI-Birthday core domain, AI, security, and delivery logic.
 import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/core/logging/app_logger.dart';

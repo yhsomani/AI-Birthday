@@ -109,13 +109,9 @@ class AppFailure implements Exception {
     : this(
         AppFailureCode.aiCredentialInvalid,
         message: 'The Gemini API key could not be used',
-<<<<<<< HEAD
-        detail: detail ?? 'The key may be invalid or the project may have no access to the Gemini API.',
-=======
         detail:
             detail ??
             'The key may be invalid or the project may have no access to the Gemini API.',
->>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
         action: action,
       );
 
@@ -136,12 +132,8 @@ class AppFailure implements Exception {
     : this(
         AppFailureCode.aiQuotaExceeded,
         message: 'AI quota was exceeded',
-<<<<<<< HEAD
-        detail: 'The AI provider rejected the request because its usage limit was reached.',
-=======
         detail:
             'The AI provider rejected the request because its usage limit was reached.',
->>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
         action:
             action ?? 'Try again later, or check your Gemini project quota.',
       );

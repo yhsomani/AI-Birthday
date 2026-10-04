@@ -15,7 +15,7 @@ final googleAuthGatewayProvider = Provider<GoogleAuthGateway>(
 /// Application auth state, mutated only through the gateway. build() awaits a
 /// real configuration report from the gateway — status is never invented.
 class AuthController extends AsyncNotifier<AuthState> {
-  AuthController({this._logger = const NoopLogger()});
+  AuthController({AppLogger? logger}) : _logger = logger ?? const NoopLogger();
 
   final AppLogger _logger;
 

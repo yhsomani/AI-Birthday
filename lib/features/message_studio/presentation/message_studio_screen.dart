@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
-import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
@@ -175,6 +175,31 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
     }
   }
 
+  Future<void> _saveDraft({DraftStatus status = DraftStatus.draft}) async {
+    if (_person == null) return;
+    final draftId =
+        _draft?.id ?? 'draft-${DateTime.now().millisecondsSinceEpoch}';
+    final updatedDraft = MessageDraft(
+      id: draftId,
+      birthdayId: widget.birthdayId,
+      personId: _person!.id,
+      body: _messageController.text,
+      tone: _selectedTone,
+      length: _selectedLength,
+      status: status,
+      providerType: _draft?.providerType ?? 'manual',
+      createdAt: _draft?.createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    await ref.read(draftsRepositoryProvider).saveDraft(updatedDraft);
+    if (mounted) {
+      setState(() {
+        _draft = updatedDraft;
+      });
+    }
+  }
+
   Future<void> _handleWhatsAppSend() async {
     final message = _messageController.text.trim();
     if (message.isEmpty) {
@@ -203,46 +228,68 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
         message: message,
       );
 
-      // Track handoff status (SSOT §9)
+      // Save draft as ready for delivery
+      await _saveDraft(status: DraftStatus.ready);
+
+      // Attempt to launch WhatsApp with official Click-to-Chat URL
+      bool launched = false;
+      try {
+        launched = await launchUrl(
+          handoff.uri,
+          mode: LaunchMode.externalApplication,
+        );
+      } catch (e) {
+        ref.read(loggerProvider).warning('MessageStudio', 'Could not launch WhatsApp directly: $e');
+      }
+
+      // Track handoff status after launch attempt (SSOT §9)
       await ref
           .read(birthdaysRepositoryProvider)
           .updateBirthdayStatus(widget.birthdayId, BirthdayStatus.handedOff);
 
       if (mounted) {
-        _showHandoffConfirmationDialog(handoff.uri.toString());
+        _showHandoffConfirmationDialog(handoff.uri.toString(), wasLaunched: launched);
       }
     } on AppFailure catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.detail ?? e.message ?? 'Handoff failed')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.detail ?? e.message ?? 'Handoff failed')),
+        );
+      }
     }
   }
 
-  void _showHandoffConfirmationDialog(String waUrl) {
+  void _showHandoffConfirmationDialog(String waUrl, {required bool wasLaunched}) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.check_circle_outline, color: Colors.green),
-              SizedBox(width: 8),
-              Text('WhatsApp Handoff'),
+              Icon(
+                wasLaunched ? Icons.mark_chat_read_outlined : Icons.open_in_new,
+                color: const Color(0xFF2D5A46),
+              ),
+              const SizedBox(width: 8),
+              const Text('WhatsApp Handoff'),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Official Click-to-Chat URL prepared! In the actual app, this opens WhatsApp directly with your message pre-filled.',
+              Text(
+                wasLaunched
+                    ? 'WhatsApp opened with your pre-filled message. Once you have tapped Send in WhatsApp, confirm below to update your celebration tracker.'
+                    : 'WhatsApp could not be opened automatically. You can use the link below or copy the message to your clipboard:',
               ),
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
                 ),
                 child: SelectableText(
                   waUrl,
@@ -251,7 +298,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Per SSOT §9, please confirm once you have tapped Send in WhatsApp:',
+                'Did you send the message?',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -263,17 +310,19 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
             ),
             FilledButton(
               onPressed: () async {
+                HapticFeedback.lightImpact();
                 await ref
                     .read(birthdaysRepositoryProvider)
                     .updateBirthdayStatus(
                       widget.birthdayId,
                       BirthdayStatus.completed,
                     );
+                await _saveDraft(status: DraftStatus.confirmedSent);
                 if (context.mounted) {
                   Navigator.of(context).pop();
                   context.pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Celebration completed! 🎉')),
+                    const SnackBar(content: Text('Celebration confirmed as sent! 🎉')),
                   );
                 }
               },
@@ -335,9 +384,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.withOpacity(0.3)),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [

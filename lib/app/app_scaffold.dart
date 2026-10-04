@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
-/// Material 3 bottom-navigation scaffold hosting the application shell.
-///
-/// Navigation destinations: Home, Birthdays, Calendar, History, Settings
-/// (SSOT §15 / UI/UX design system §2).
+/// Material 3 bottom-navigation scaffold hosting the application shell (SSOT §15, §24).
 class AppScaffold extends StatelessWidget {
   const AppScaffold({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   void _onDestinationSelected(int index) {
+    HapticFeedback.lightImpact();
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -26,14 +25,14 @@ class AppScaffold extends StatelessWidget {
         onDestinationSelected: _onDestinationSelected,
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.cake_outlined),
             selectedIcon: Icon(Icons.cake),
-            label: 'Birthdays',
+            label: 'Dashboard',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people),
+            label: 'People',
           ),
           NavigationDestination(
             icon: Icon(Icons.calendar_month_outlined),
@@ -46,8 +45,8 @@ class AppScaffold extends StatelessWidget {
             label: 'History',
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
+            icon: Icon(Icons.tune_outlined),
+            selectedIcon: Icon(Icons.tune),
             label: 'Settings',
           ),
         ],

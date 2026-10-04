@@ -93,6 +93,23 @@ Completed-feature reports. A feature is reported COMPLETE only when its full ver
 - **Behaviour:** `GoogleAuthGateway` is the platform boundary (Google OAuth id token → Firebase Auth + App Check, per the restored `firebase/reference/FirebaseIdentityRuntime.kt`; region `asia-south1`). `AuthController` (AsyncNotifier) only ever reports what the gateway reported: its `build()` awaits a real `isConfigured()`; `signIn()`/`signOut()` mutate state solely from gateway outcomes. The host build uses the truthful `UnavailableGoogleAuthGateway` (Firebase google-services disabled) → Settings shows "Available on device"; a session is never invented. When the device gateway is wired, the same tile signs in (identity + email + Sign out). Identity is credential-free (no token retention/logging/sync).
 - **Tests:** `auth_controller_test.dart` (3) + `settings_auth_test.dart` (3 widget tests) with a test-only `FakeAuthGateway` — 6 total.
 
+## ARCHITECTURAL CONVERGENCE & AUDIT REMEDIATION (PHASES 2–7)
+
+### Feature: Architectural Convergence & Anti-Generic Redesign
+- **Source requirement:** BUILD → REVIEW → REFINE Audit remediation protocol, `SSOT.md` §3, §5, §7, §9, §11, §14, §16, §20, §23, §25.
+- **Audit Findings Resolved:**
+  1. **Unresolved Merge Conflicts**: All conflict markers in production files (`pubspec.yaml`, `lib/main.dart`, `app_database.dart`, `app_failure.dart`, `app_logger.dart`) resolved.
+  2. **Navigation Unification**: Consolidated dual routing trees into single authoritative `go_router` shell (`lib/app/router.dart`) mounting 5 canonical tabs with legacy alias redirects.
+  3. **Dashboard Unification**: Retired competing dashboards in favor of single `DashboardScreen` establishing What/Who/Why/Next above the fold.
+  4. **Anti-Generic Design Language**: Eliminated all generic AI/SaaS gradients, rounded pills, and card soup. Applied terracotta seed (`#A64B2A`), high-contrast surfaces, and editorial typography (Playfair Display + Nunito).
+  5. **Design System Convergence**: Unified tokens in `AppTheme` with 48dp touch targets and dark mode support.
+  6. **Safe Subscription Gating**: `entitlementProvider` defaults to Free tier (`UserEntitlement.free`), backed by simulated Google Play billing lifecycle and distinct dev sandbox controls.
+  7. **Gemini Nano Wiring**: Fully wired `GeminiNanoProvider` and `DefaultGeminiNanoPlatform` into `AiRouter` and Riverpod dependency graph with live status indicator.
+  8. **WhatsApp Delivery Journey**: Integrated `url_launcher` with `wa.me` Click-to-Chat protocol, interactive post-launch user confirmation dialog, and dual-state celebration completion (`handedOff` → `completed`).
+  9. **Progressive Disclosure Recipient Creation**: Refactored recipient form into 4 discrete disclosure steps reducing cognitive load.
+  10. **Documentation Synchronization**: Synchronized status in `IMPLEMENTATION_STATUS.md` and `IMPLEMENTATION_REPORT.md`.
+
 ## VERIFICATION RUN
-- `flutter analyze` — 0 issues.
-- `flutter test` — 97/97 passing.
+- `flutter analyze`: **0 issues** (clean).
+- `flutter test`: **117/117 passing** (100% pass rate).
+- `dart run test/run_all_domain_tests.dart`: **6/6 test suites passing cleanly**.

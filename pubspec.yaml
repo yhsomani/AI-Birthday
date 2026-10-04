@@ -38,11 +38,9 @@ dependencies:
   clock: ^1.1.1
   intl: ^0.20.2
   uuid: ^4.5.1
-<<<<<<< HEAD
   timezone: ^0.10.1
-=======
   google_fonts: ^6.1.0
->>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:

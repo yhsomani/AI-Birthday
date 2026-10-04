@@ -24,7 +24,7 @@ class AiRouter {
        _userGeminiProvider = userGeminiProvider,
        _nanoProvider = nanoProvider,
        _nanoStatusChecker = nanoStatusChecker,
-       _logger = logger ?? const ConsoleAppLogger();
+       _logger = logger ?? ConsoleAppLogger();
 
   final CredentialStorage _credentialStorage;
   final AiMessageProvider _userGeminiProvider;
