@@ -208,7 +208,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               ],
-            );
+            ),
+    );
   }
 
   Widget _buildSectionHeader(String title) {
