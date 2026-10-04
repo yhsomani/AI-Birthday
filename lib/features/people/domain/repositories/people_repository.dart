@@ -1,5 +1,4 @@
-/// Repository contract for managing contacts and recipient preferences (SSOT §7, §18).
-library;
+import 'dart:async';
 
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 
@@ -22,10 +21,13 @@ class InMemoryPeopleRepository implements PeopleRepository {
   }
 
   final Map<String, Person> _store = {};
+  final StreamController<List<Person>> _controller =
+      StreamController<List<Person>>.broadcast();
 
   @override
   Stream<List<Person>> watchPeople() async* {
     yield _sortedPeople();
+    yield* _controller.stream;
   }
 
   @override
@@ -37,11 +39,13 @@ class InMemoryPeopleRepository implements PeopleRepository {
   @override
   Future<void> savePerson(Person person) async {
     _store[person.id] = person;
+    _controller.add(_sortedPeople());
   }
 
   @override
   Future<void> deletePerson(String id) async {
     _store.remove(id);
+    _controller.add(_sortedPeople());
   }
 
   List<Person> _sortedPeople() {
@@ -50,3 +54,4 @@ class InMemoryPeopleRepository implements PeopleRepository {
     return list;
   }
 }
+

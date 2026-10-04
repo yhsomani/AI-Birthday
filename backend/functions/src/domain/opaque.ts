@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { createHmac } from 'node:crypto';
 
 import { z } from 'zod';
@@ -38,26 +37,16 @@ export function parseKeyRing(raw: unknown): KeyRing {
   return previous === undefined ? { current } : { current, previous };
 }
 
-function addField(
-  hmac: ReturnType<typeof createHmac>,
-  value: Uint8Array,
-): void {
-  const length = Buffer.allocUnsafe(4);
-=======
-import { createHmac } from 'crypto';
-
 export function addField(
   hmac: ReturnType<typeof createHmac>,
   value: Uint8Array,
 ): void {
   // Use Buffer.alloc(4) instead of Buffer.allocUnsafe(4) to ensure memory is zero-initialized
   const length = Buffer.alloc(4);
->>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
   length.writeUInt32BE(value.length);
   hmac.update(length);
   hmac.update(value);
 }
-<<<<<<< HEAD
 
 function derive(
   entry: KeyRingEntry,
@@ -115,5 +104,4 @@ export function deriveContentFreeKeys(
     .map(entry => derive(entry, uid, namespace, Buffer.from(value, 'utf8')))
     .sort();
 }
-=======
->>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
+

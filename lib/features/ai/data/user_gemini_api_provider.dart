@@ -101,13 +101,13 @@ class UserGeminiApiProvider implements AiMessageProvider {
       throw AppFailure.providerError(detail: e.message);
     } catch (e, st) {
       if (e is AppFailure) rethrow;
-      print('USER_GEMINI_ERROR: $e');
       _logger.error(
         'UserGeminiApiProvider',
         'Unexpected error generating message: $e',
         error: e,
         stackTrace: st,
       );
+
       throw AppFailure.providerError(
         detail: 'An error occurred during generation: $e',
       );

@@ -230,3 +230,10 @@ final birthdaysStreamProvider = StreamProvider<List<Birthday>>((ref) {
   final repo = ref.watch(birthdaysRepositoryProvider);
   return repo.watchBirthdays();
 });
+
+/// Stream of all message drafts.
+final draftsStreamProvider = StreamProvider<List<MessageDraft>>((ref) {
+  final repo = ref.watch(draftsRepositoryProvider);
+  return repo.watchDrafts();
+});
+

@@ -5,10 +5,92 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:ai_birthday/app/providers.dart';
+import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
+import 'package:ai_birthday/features/people/data/person_providers.dart'
+    show personServiceProvider;
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 
 class PeopleScreen extends ConsumerWidget {
   const PeopleScreen({super.key});
+
+  static const BirthdayEngine _engine = BirthdayEngine();
+
+  NextBirthday _next(Person person) => _engine.computeNext(
+    month: person.birthdayMonth,
+    day: person.birthdayDay,
+    birthYear: person.birthYear,
+    timezoneName: person.timezone,
+  );
+
+  String _countdownLabel(NextBirthday next) {
+    if (next.isToday) return 'Today';
+    if (next.daysUntil == 1) return 'Tomorrow';
+    if (next.daysUntil <= 90) return 'In ${next.daysUntil} days';
+    return 'In ${(next.daysUntil / 30).ceil()} months';
+  }
+
+  Future<void> _confirmAndDelete(
+    BuildContext context,
+    WidgetRef ref,
+    Person person,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Remove ${person.name}?'),
+        content: const Text(
+          'Their birthday will be hidden. You can undo this at any time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final peopleRepo = ref.read(peopleRepositoryProvider);
+    final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
+    final associatedBirthday =
+        await birthdaysRepo.getBirthdayForPerson(person.id);
+
+    await peopleRepo.deletePerson(person.id);
+    if (associatedBirthday != null) {
+      await birthdaysRepo.deleteBirthday(associatedBirthday.id);
+    }
+
+    try {
+      await ref.read(personServiceProvider).remove(person.id);
+    } catch (_) {}
+
+    if (!context.mounted) return;
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Deleted ${person.name}.'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            await peopleRepo.savePerson(person);
+            if (associatedBirthday != null) {
+              await birthdaysRepo.saveBirthday(associatedBirthday);
+            }
+            try {
+              await ref.read(personServiceProvider).restore(person.id);
+            } catch (_) {}
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -62,9 +144,13 @@ class PeopleScreen extends ConsumerWidget {
             separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final person = people[index];
+              final next = _next(person);
               final dateStr = DateFormat.MMMMd().format(
                 DateTime(2026, person.birthdayMonth, person.birthdayDay),
               );
+              final ageTurn = person.birthYear != null
+                  ? ' • turns ${next.year - person.birthYear!}'
+                  : '';
 
               return Card(
                 child: ListTile(
@@ -88,7 +174,7 @@ class PeopleScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 4),
-                      Text('$dateStr • ${person.relationship.displayName}'),
+                      Text('$dateStr$ageTurn • ${person.relationship.displayName}'),
                       if (person.importantFacts.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -103,8 +189,57 @@ class PeopleScreen extends ConsumerWidget {
                       ],
                     ],
                   ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showPersonDetailsModal(context, person),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: next.isToday
+                              ? Theme.of(context).colorScheme.primaryContainer
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _countdownLabel(next),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: next.isToday
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        tooltip: 'Person actions',
+                        onSelected: (action) {
+                          if (action == 'edit') {
+                            context.push('/people/edit/${person.id}');
+                          } else if (action == 'delete') {
+                            _confirmAndDelete(context, ref, person);
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(value: 'edit', child: Text('Edit')),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  onTap: () => _showPersonDetailsModal(context, ref, person),
                 ),
               );
             },
@@ -124,7 +259,11 @@ class PeopleScreen extends ConsumerWidget {
     );
   }
 
-  void _showPersonDetailsModal(BuildContext context, Person person) {
+  void _showPersonDetailsModal(
+    BuildContext context,
+    WidgetRef ref,
+    Person person,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -228,6 +367,21 @@ class PeopleScreen extends ConsumerWidget {
                   label: const Text('Edit Contact Details'),
                 ),
               ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                  onPressed: () {
+                    Navigator.of(sheetContext).pop();
+                    _confirmAndDelete(context, ref, person);
+                  },
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Delete Contact'),
+                ),
+              ),
               const SizedBox(height: 12),
             ],
           ),
@@ -249,3 +403,4 @@ class PeopleScreen extends ConsumerWidget {
     );
   }
 }
+

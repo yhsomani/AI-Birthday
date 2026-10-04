@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-<<<<<<< HEAD
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
@@ -19,16 +18,5 @@
     "types": ["node", "vitest/globals"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "vitest.config.ts"]
-=======
-    "target": "es2022",
-    "module": "commonjs",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist",
-    "rootDir": "./"
-  },
-  "include": ["src/**/*", "test/**/*"]
->>>>>>> e8906b8fe21fa6f7bcb6466936b85c0d59161f88
 }
+

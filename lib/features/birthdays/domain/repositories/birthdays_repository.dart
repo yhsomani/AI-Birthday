@@ -1,5 +1,4 @@
-/// Repository contract for managing birthday event cycles and statuses (SSOT §8, §15).
-library;
+import 'dart:async';
 
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 
@@ -28,10 +27,13 @@ class InMemoryBirthdaysRepository implements BirthdaysRepository {
   }
 
   final Map<String, Birthday> _store = {};
+  final StreamController<List<Birthday>> _controller =
+      StreamController<List<Birthday>>.broadcast();
 
   @override
   Stream<List<Birthday>> watchBirthdays() async* {
     yield _sortedBirthdays();
+    yield* _controller.stream;
   }
 
   @override
@@ -51,6 +53,7 @@ class InMemoryBirthdaysRepository implements BirthdaysRepository {
   @override
   Future<void> saveBirthday(Birthday birthday) async {
     _store[birthday.id] = birthday;
+    _controller.add(_sortedBirthdays());
   }
 
   @override
@@ -66,12 +69,14 @@ class InMemoryBirthdaysRepository implements BirthdaysRepository {
         draftId: draftId ?? existing.draftId,
         updatedAt: DateTime.now(),
       );
+      _controller.add(_sortedBirthdays());
     }
   }
 
   @override
   Future<void> deleteBirthday(String id) async {
     _store.remove(id);
+    _controller.add(_sortedBirthdays());
   }
 
   List<Birthday> _sortedBirthdays() {
@@ -80,3 +85,4 @@ class InMemoryBirthdaysRepository implements BirthdaysRepository {
     return list;
   }
 }
+
