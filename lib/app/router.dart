@@ -23,18 +23,9 @@ final appRouter = GoRouter(
   initialLocation: '/dashboard',
   routes: [
     // Redirect aliases to canonical destinations
-    GoRoute(
-      path: '/',
-      redirect: (_, _) => '/dashboard',
-    ),
-    GoRoute(
-      path: '/home',
-      redirect: (_, _) => '/dashboard',
-    ),
-    GoRoute(
-      path: '/birthdays',
-      redirect: (_, _) => '/people',
-    ),
+    GoRoute(path: '/', redirect: (_, _) => '/dashboard'),
+    GoRoute(path: '/home', redirect: (_, _) => '/dashboard'),
+    GoRoute(path: '/birthdays', redirect: (_, _) => '/people'),
 
     // Modal / Detail routes mounted above the shell
     GoRoute(

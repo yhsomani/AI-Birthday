@@ -63,4 +63,3 @@ class InMemoryDraftsRepository implements DraftsRepository {
     return list;
   }
 }
-

@@ -74,6 +74,7 @@ class PersonListScreen extends ConsumerWidget {
             );
           }
           return ListView.separated(
+            padding: const EdgeInsets.only(bottom: 88),
             itemCount: list.length,
             separatorBuilder: (context, index) => const Divider(height: 1),
             itemBuilder: (context, index) {

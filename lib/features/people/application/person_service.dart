@@ -20,14 +20,17 @@ class PersonService {
     this._logger, {
     DateTime Function()? now,
     String Function()? newId,
+    Future<void> Function()? onChanged,
   }) : _now = now ?? clock.clock.now,
-       _newId = newId ?? (() => const Uuid().v4());
+       _newId = newId ?? (() => const Uuid().v4()),
+       _onChanged = onChanged;
 
   final PeopleStore _store;
   final PersonInputValidator _validator;
   final AppLogger _logger;
   final DateTime Function() _now;
   final String Function() _newId;
+  final Future<void> Function()? _onChanged;
 
   Stream<List<Person>> watchAll() => _store.watchAll();
 
@@ -41,6 +44,7 @@ class PersonService {
     final person = draft.toPerson(id: _newId(), now: _now());
     await _store.save(person);
     _logger.info('people', 'created person', params: {'personId': person.id});
+    await _onChanged?.call();
     return person;
   }
 
@@ -55,18 +59,21 @@ class PersonService {
       'updated person',
       params: {'personId': updated.id, 'version': updated.version},
     );
+    await _onChanged?.call();
     return updated;
   }
 
-  Future<void> remove(String id) {
+  Future<void> remove(String id) async {
     _logger.info('people', 'removed person', params: {'personId': id});
-    return _store.softDelete(id);
+    await _store.softDelete(id);
+    await _onChanged?.call();
   }
 
   /// Restores a soft-deleted recipient, clearing its tombstone (undo).
-  Future<void> restore(String id) {
+  Future<void> restore(String id) async {
     _logger.info('people', 'restored person', params: {'personId': id});
-    return _store.restore(id);
+    await _store.restore(id);
+    await _onChanged?.call();
   }
 
   void _ensureValid(PersonDraft draft) {

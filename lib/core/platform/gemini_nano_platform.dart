@@ -6,6 +6,12 @@
 /// provider must be detected through the platform instead of assumed.
 library;
 
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+import 'package:ai_birthday/core/errors/app_failure.dart';
+
 /// Normalized Gemini Nano states (SSOT §5).
 ///
 /// Mapped from native AICore/ML Kit states into this authoritative set:
@@ -58,4 +64,86 @@ abstract interface class GeminiNanoPlatform {
 
   /// Releases native resources (lifecycle cleanup).
   Future<void> dispose();
+}
+
+/// Production MethodChannel platform bridge for Gemini Nano on Android.
+class MethodChannelGeminiNanoPlatform implements GeminiNanoPlatform {
+  MethodChannelGeminiNanoPlatform({
+    MethodChannel channel = const MethodChannel(
+      'com.yashsomani.ai_birthday/nano',
+    ),
+  }) : _channel = channel;
+
+  final MethodChannel _channel;
+  final StreamController<NanoState> _stateController =
+      StreamController<NanoState>.broadcast();
+
+  bool get _isLiveAndroid =>
+      !kIsWeb &&
+      defaultTargetPlatform == TargetPlatform.android &&
+      WidgetsBinding.instance is WidgetsFlutterBinding;
+
+  @override
+  Future<NanoState> currentState() async {
+    if (!_isLiveAndroid) {
+      return NanoState.unavailable;
+    }
+    try {
+      final res = await _channel.invokeMethod<String>('currentState');
+      return switch (res) {
+        'available' => NanoState.available,
+        'downloadable' => NanoState.downloadable,
+        'downloading' => NanoState.downloading,
+        'busy' => NanoState.busy,
+        'quotaExceeded' => NanoState.quotaExceeded,
+        _ => NanoState.unavailable,
+      };
+    } catch (_) {
+      return NanoState.unavailable;
+    }
+  }
+
+  @override
+  Stream<NanoState> get stateChanges => _stateController.stream;
+
+  @override
+  Future<NanoState> startDownload() async {
+    if (!_isLiveAndroid) {
+      return NanoState.unavailable;
+    }
+    try {
+      final res = await _channel.invokeMethod<String>('startDownload');
+      final state = switch (res) {
+        'available' => NanoState.available,
+        'downloading' => NanoState.downloading,
+        _ => NanoState.unavailable,
+      };
+      _stateController.add(state);
+      return state;
+    } catch (_) {
+      return NanoState.unavailable;
+    }
+  }
+
+  @override
+  Future<NanoGenerationResult> generate(String prompt) async {
+    if (!_isLiveAndroid) {
+      throw const AppFailure.nanoUnavailable();
+    }
+    try {
+      final res = await _channel.invokeMethod<String>('generate', {
+        'prompt': prompt,
+      });
+      return NanoGenerationResult(text: res ?? '');
+    } on PlatformException catch (e) {
+      throw AppFailure.providerError(
+        detail: e.message ?? 'Nano platform error',
+      );
+    }
+  }
+
+  @override
+  Future<void> dispose() async {
+    await _stateController.close();
+  }
 }

@@ -35,7 +35,8 @@ class HomeScreen extends ConsumerWidget {
             return const EmptyState(
               icon: Icons.cake_outlined,
               title: 'No birthdays yet',
-              message: 'Add a birthday and AI-Birthday will take care of reminders, drafts and delivery.',
+              message:
+                  'Add a birthday and AI-Birthday will take care of reminders, drafts and delivery.',
             );
           }
           return _HomeBody(feed: feed);
@@ -54,7 +55,7 @@ class _HomeBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
       children: [
         _SectionCard(
           title: 'Today',

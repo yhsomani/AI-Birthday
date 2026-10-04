@@ -48,3 +48,11 @@ app.*.map.json
 .widget_preview/
 backend/functions/node_modules/
 node_modules/
+
+# Android signing keys & properties
+*.keystore
+*.jks
+**/key.properties
+
+# Test and capture screenshots
+screen_*.png

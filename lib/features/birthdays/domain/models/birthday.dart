@@ -83,7 +83,8 @@ class Birthday {
       referenceDate.month,
       referenceDate.day,
     );
-    final target = DateTime(date.year, date.month, date.day);
+    final normalized = referenceDate.isUtc ? date.toUtc() : date.toLocal();
+    final target = DateTime(normalized.year, normalized.month, normalized.day);
     return target.difference(ref).inDays;
   }
 

@@ -5,8 +5,7 @@ import 'package:intl/intl.dart';
 import '../../birthdays/domain/birthday_engine.dart';
 import '../../people/data/person_providers.dart';
 import '../../people/domain/person.dart';
-import '../../people/domain/person_enums.dart';
-import '../../../app/providers.dart';
+import '../../../shared/design_system/design_system.dart';
 
 /// Calendar view of annual birthdays (SSOT §15 navigation, §14).
 ///
@@ -65,54 +64,44 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   void _showDay(BuildContext context, DateTime date, List<Person> people) {
     final theme = Theme.of(context);
-    showModalBottomSheet<void>(
+    AppBottomSheet.show<void>(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Birthdays ${DateFormat.MMMd().format(date)}',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: Text(
+            'Birthdays ${DateFormat.MMMd().format(date)}',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  for (final person in people)
-                    ListTile(
-                      leading: CircleAvatar(
-                        child: Text(_initials(person.name)),
-                      ),
-                      title: Text(person.name),
-                      subtitle: person.birthYear != null
-                          ? Text(
-                              '${person.birthYear!}'
-                              ' · turns ${date.year - person.birthYear!}',
-                            )
-                          : null,
-                    ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+        for (final person in people)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: CircleAvatar(
+              backgroundColor: AppColors.primaryTerracottaContainer,
+              foregroundColor: AppColors.primaryTerracotta,
+              child: Text(_initials(person.name)),
+            ),
+            title: Text(
+              person.name,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: person.birthYear != null
+                ? Text(
+                    '${person.birthYear!}'
+                    ' · turns ${date.year - person.birthYear!}',
+                  )
+                : null,
+          ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final peopleAsync = ref.watch(peopleStreamProvider);
-    final driftPeople = ref.watch(personListProvider);
+    final peopleAsync = ref.watch(personListProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Calendar')),
@@ -120,32 +109,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) =>
             const Center(child: Text('Could not load birthdays.')),
-        data: (inMemoryList) {
-          final driftList = driftPeople.asData?.value ?? [];
-          final combined = <String, Person>{};
-
-          for (final p in inMemoryList) {
-            combined[p.id] = Person(
-              id: p.id,
-              name: p.name,
-              birthdayMonth: p.birthdayMonth,
-              birthdayDay: p.birthdayDay,
-              birthYear: p.birthYear,
-              phoneNumber: p.phoneNumber,
-              relationship: p.relationship.displayName,
-              preferredTone: PreferredTone.warm,
-              createdAt: p.createdAt,
-              updatedAt: p.updatedAt,
-              version: 1,
-            );
-          }
-
-          for (final p in driftList) {
-            combined[p.id] = p;
-          }
-
-          return _monthGrid(context, combined.values.toList());
-        },
+        data: (people) => _monthGrid(context, people),
       ),
     );
   }
@@ -304,8 +268,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             children: [
               if (isToday)
                 Container(
-                  width: 28,
-                  height: 28,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
+                  padding: const EdgeInsets.all(2),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,

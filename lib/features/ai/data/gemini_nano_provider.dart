@@ -39,9 +39,12 @@ class GeminiNanoProvider implements AiMessageProvider {
       );
       throw AppFailure.nanoUnavailable(
         action: switch (state) {
-          NanoState.downloadable => 'Model download required before generation.',
-          NanoState.downloading => 'Model is currently downloading. Please wait.',
-          NanoState.busy => 'On-device model is busy. Please try again in a moment.',
+          NanoState.downloadable =>
+            'Model download required before generation.',
+          NanoState.downloading =>
+            'Model is currently downloading. Please wait.',
+          NanoState.busy =>
+            'On-device model is busy. Please try again in a moment.',
           _ => 'Gemini Nano is unavailable on this device.',
         },
       );
@@ -103,7 +106,8 @@ class DefaultGeminiNanoPlatform implements GeminiNanoPlatform {
       throw const AppFailure.nanoUnavailable();
     }
     return const NanoGenerationResult(
-      text: 'Wishing you a truly wonderful and memorable birthday filled with happiness!',
+      text:
+          'Wishing you a truly wonderful and memorable birthday filled with happiness!',
     );
   }
 

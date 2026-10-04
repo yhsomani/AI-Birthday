@@ -14,6 +14,7 @@ import 'package:intl/intl.dart';
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
+import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -75,7 +76,12 @@ class DashboardScreen extends ConsumerWidget {
           }
 
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(
+              16,
+              12,
+              16,
+              AppSpacing.bottomClearance,
+            ),
             children: [
               // 1. Above-The-Fold Command Center Summary (What / Why / Next)
               _buildCommandHeader(
@@ -84,32 +90,31 @@ class DashboardScreen extends ConsumerWidget {
                 actionNeededCount: actionNeededBirthdays.length,
                 totalTracked: people.length,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.lg),
 
               // 2. Action Needed Section (High-Intent Next Steps)
               if (actionNeededBirthdays.isNotEmpty) ...[
-                _buildSectionTitle(
-                  context,
+                AppSectionHeader(
                   title: 'Action Needed',
                   count: actionNeededBirthdays.length,
-                  highlight: true,
+                  isAccent: true,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.xs),
                 ...actionNeededBirthdays.map((b) {
                   final person = peopleMap[b.personId];
                   return _buildActionCard(context, ref, b, person);
                 }),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.lg),
               ],
 
               // 3. Today's Celebrations Section
               if (todayBirthdays.isNotEmpty) ...[
-                _buildSectionTitle(
-                  context,
+                AppSectionHeader(
                   title: "Today's Birthdays",
                   count: todayBirthdays.length,
+                  isAccent: true,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.xs),
                 ...todayBirthdays.map((b) {
                   final person = peopleMap[b.personId];
                   return _buildCelebrationCard(
@@ -120,20 +125,19 @@ class DashboardScreen extends ConsumerWidget {
                     isToday: true,
                   );
                 }),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.lg),
               ],
 
               // 4. Upcoming Timeline Section
-              _buildSectionTitle(
-                context,
+              AppSectionHeader(
                 title: 'Upcoming Birthdays',
                 count: upcomingBirthdays.length,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.xs),
               if (upcomingBirthdays.isEmpty)
                 Card(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.xl),
                     child: Center(
                       child: Text(
                         'No upcoming birthdays tracked in the next 30 days.',
@@ -153,11 +157,11 @@ class DashboardScreen extends ConsumerWidget {
                     isToday: false,
                   );
                 }),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.lg),
 
               // 5. Quick Actions Bar
               _buildQuickActions(context),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.xl),
             ],
           );
         },
@@ -246,43 +250,6 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSectionTitle(
-    BuildContext context, {
-    required String title,
-    required int count,
-    bool highlight = false,
-  }) {
-    return Row(
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: highlight ? const Color(0xFFA64B2A) : null,
-              ),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-          decoration: BoxDecoration(
-            color: highlight
-                ? const Color(0xFFA64B2A).withValues(alpha: 0.12)
-                : Colors.grey.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            '$count',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: highlight ? const Color(0xFFA64B2A) : Colors.grey[700],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   /// High-priority card clearly establishing Who, Why, and Next action.
   Widget _buildActionCard(
     BuildContext context,
@@ -295,17 +262,17 @@ class DashboardScreen extends ConsumerWidget {
     final isToday = days == 0;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: const Color(0xFFA64B2A).withValues(alpha: 0.12),
-                  foregroundColor: const Color(0xFFA64B2A),
+                  backgroundColor: AppColors.primaryTerracottaContainer,
+                  foregroundColor: AppColors.primaryTerracotta,
                   child: Text(
                     person != null && person.name.isNotEmpty
                         ? person.name[0].toUpperCase()
@@ -313,7 +280,7 @@ class DashboardScreen extends ConsumerWidget {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,39 +299,35 @@ class DashboardScreen extends ConsumerWidget {
                         style: TextStyle(
                           fontSize: 13,
                           color: isToday
-                              ? const Color(0xFFA64B2A)
+                              ? AppColors.primaryTerracotta
                               : Colors.grey[700],
-                          fontWeight: isToday ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: isToday
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD9822B).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    birthday.status.displayName,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFD9822B),
-                    ),
-                  ),
+                CountdownChip(
+                  daysUntil: days,
+                  isToday: isToday,
+                  customLabel: birthday.status.displayName,
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Channel: ${person?.preferredDeliveryChannel.displayName ?? 'WhatsApp'}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                Flexible(
+                  child: Text(
+                    'Channel: ${person?.preferredDeliveryChannel.displayName ?? 'WhatsApp'}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+                const SizedBox(width: AppSpacing.xs),
                 FilledButton.icon(
                   onPressed: () {
                     HapticFeedback.lightImpact();
@@ -390,56 +353,18 @@ class DashboardScreen extends ConsumerWidget {
   }) {
     final now = DateTime.now();
     final days = birthday.daysUntil(now);
-    final daysText = isToday
-        ? 'Today'
-        : (days == 1 ? 'Tomorrow' : 'In $days days');
+    final subtitle =
+        '${person?.relationship.displayName ?? 'Friend'} • ${DateFormat.MMMd().format(birthday.date)}';
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: isToday
-              ? const Color(0xFFA64B2A)
-              : Colors.grey.withValues(alpha: 0.15),
-          foregroundColor: isToday ? Colors.white : Colors.black87,
-          child: Text(
-            person != null && person.name.isNotEmpty
-                ? person.name[0].toUpperCase()
-                : '?',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        title: Text(
-          person?.name ?? 'Unknown',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-        ),
-        subtitle: Text(
-          '${person?.relationship.displayName ?? 'Friend'} • ${DateFormat.MMMd().format(birthday.date)}',
-          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              daysText,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isToday ? const Color(0xFFA64B2A) : Colors.grey[600],
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.chevron_right),
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                context.push('/message-studio/${birthday.id}');
-              },
-            ),
-          ],
-        ),
-      ),
+    return CelebrationCard(
+      name: person?.name ?? 'Unknown',
+      subtitle: subtitle,
+      daysUntil: days,
+      isToday: isToday,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        context.push('/message-studio/${birthday.id}');
+      },
     );
   }
 

@@ -32,6 +32,12 @@ class RecordingGateway implements NotificationSchedulerGateway {
   Future<void> cancelAll() async {
     cancelAllCalls++;
   }
+
+  @override
+  Future<void> sendTestNotification({
+    required String title,
+    required String body,
+  }) async {}
 }
 
 void main() {

@@ -85,4 +85,3 @@ class InMemoryBirthdaysRepository implements BirthdaysRepository {
     return list;
   }
 }
-

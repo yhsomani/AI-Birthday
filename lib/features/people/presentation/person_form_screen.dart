@@ -6,10 +6,13 @@ import 'package:go_router/go_router.dart';
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
-import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart' as b_models;
+import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart'
+    as b_models;
 import 'package:ai_birthday/features/people/data/person_providers.dart';
-import 'package:ai_birthday/features/people/domain/models/person.dart' as p_models;
-import 'package:ai_birthday/features/people/domain/models/relationship.dart' as p_rel;
+import 'package:ai_birthday/features/people/domain/models/person.dart'
+    as p_models;
+import 'package:ai_birthday/features/people/domain/models/relationship.dart'
+    as p_rel;
 import 'package:ai_birthday/features/people/domain/models/tone.dart' as p_tone;
 import 'package:ai_birthday/features/people/domain/person.dart';
 import 'package:ai_birthday/features/people/domain/person_enums.dart';
@@ -73,8 +76,9 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
         if (!mounted) return;
         var p = person;
         if (p == null) {
-          final memPerson =
-              await ref.read(peopleRepositoryProvider).getPerson(id);
+          final memPerson = await ref
+              .read(peopleRepositoryProvider)
+              .getPerson(id);
           if (memPerson != null) {
             p = Person(
               id: memPerson.id,
@@ -228,8 +232,12 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
           birthYear: saved.birthYear,
           phoneNumber: saved.phoneNumber,
           email: saved.email,
-          relationship: p_rel.RelationshipCategory.fromString(saved.relationship),
-          preferredTone: p_tone.MessageTone.fromString(saved.preferredTone.name),
+          relationship: p_rel.RelationshipCategory.fromString(
+            saved.relationship,
+          ),
+          preferredTone: p_tone.MessageTone.fromString(
+            saved.preferredTone.name,
+          ),
           importantFacts: saved.importantFacts,
           notes: saved.notes,
           createdAt: saved.createdAt,
@@ -237,19 +245,32 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
         );
         await peopleRepo.savePerson(personModel);
 
+        final now = DateTime.now();
         final nextDate = b_models.Birthday.nextBirthdayDate(
           month: saved.birthdayMonth,
           day: saved.birthdayDay,
-          from: DateTime.now(),
+          from: now,
         );
+        final existingBirthday = await birthdaysRepo.getBirthdayForPerson(
+          saved.id,
+        );
+        final isToday =
+            nextDate.year == now.year &&
+            nextDate.month == now.month &&
+            nextDate.day == now.day;
         final birthdayModel = b_models.Birthday(
-          id: 'birthday-${saved.id}',
+          id: existingBirthday?.id ?? 'birthday-${saved.id}',
           personId: saved.id,
           cycleYear: nextDate.year,
           date: nextDate,
-          status: b_models.BirthdayStatus.upcoming,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
+          status:
+              existingBirthday?.status ??
+              (isToday
+                  ? b_models.BirthdayStatus.reminderDue
+                  : b_models.BirthdayStatus.upcoming),
+          draftId: existingBirthday?.draftId,
+          createdAt: existingBirthday?.createdAt ?? now,
+          updatedAt: now,
         );
         await birthdaysRepo.saveBirthday(birthdayModel);
       } catch (_) {
@@ -257,8 +278,9 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Saved ${saved.name}.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Saved ${saved.name}.')));
       context.pop(saved);
     } on AppFailure catch (failure) {
       if (!mounted) return;
@@ -286,7 +308,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       appBar: AppBar(title: Text(title)),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 48),
           children: [
             // STEP 1: Core Essentials (Name & Birthday Date)
             Card(
@@ -565,18 +587,24 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
             const SizedBox(height: 24),
 
             // PRIMARY SAVE ACTION
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: FilledButton(
-                onPressed: _saving ? null : _save,
-                child: Text(
-                  _saving ? 'Saving…' : 'Save',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+              onPressed: _saving ? null : _save,
+              child: Text(
+                _saving ? 'Saving…' : 'Save',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
           ],
         ),
       ),

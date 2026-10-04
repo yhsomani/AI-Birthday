@@ -14,6 +14,7 @@ import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
+import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 class MessageStudioScreen extends ConsumerStatefulWidget {
   const MessageStudioScreen({super.key, required this.birthdayId});
@@ -239,16 +240,23 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
           mode: LaunchMode.externalApplication,
         );
       } catch (e) {
-        ref.read(loggerProvider).warning('MessageStudio', 'Could not launch WhatsApp directly: $e');
+        ref
+            .read(loggerProvider)
+            .warning('MessageStudio', 'Could not launch WhatsApp directly: $e');
       }
 
-      // Track handoff status after launch attempt (SSOT §9)
-      await ref
-          .read(birthdaysRepositoryProvider)
-          .updateBirthdayStatus(widget.birthdayId, BirthdayStatus.handedOff);
+      // Track handoff status only when launch succeeds (SSOT §9)
+      if (launched) {
+        await ref
+            .read(birthdaysRepositoryProvider)
+            .updateBirthdayStatus(widget.birthdayId, BirthdayStatus.handedOff);
+      }
 
       if (mounted) {
-        _showHandoffConfirmationDialog(handoff.uri.toString(), wasLaunched: launched);
+        _showHandoffConfirmationDialog(
+          handoff.uri.toString(),
+          wasLaunched: launched,
+        );
       }
     } on AppFailure catch (e) {
       if (mounted) {
@@ -259,7 +267,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
     }
   }
 
-  void _showHandoffConfirmationDialog(String waUrl, {required bool wasLaunched}) {
+  void _showHandoffConfirmationDialog(
+    String waUrl, {
+    required bool wasLaunched,
+  }) {
     showDialog(
       context: context,
       builder: (context) {
@@ -322,7 +333,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
                   Navigator.of(context).pop();
                   context.pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Celebration confirmed as sent! 🎉')),
+                    const SnackBar(
+                      content: Text('Celebration confirmed as sent! 🎉'),
+                    ),
                   );
                 }
               },
@@ -369,76 +382,84 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          AppSpacing.bottomClearance,
+        ),
         children: [
           // Recipient Context Card
           _buildRecipientCard(),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // Tone & Length Controls
           _buildControlsCard(),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
 
           // Error banner if any
           if (_errorMessage != null) ...[
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.sm),
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                color: Theme.of(
+                  context,
+                ).colorScheme.errorContainer.withValues(alpha: 0.5),
+                borderRadius: AppSpacing.roundedMd,
+                border: Border.all(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.error.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.red),
-                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.error_outline,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
                       _errorMessage!,
-                      style: const TextStyle(color: Colors.red, fontSize: 13),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
           ],
 
           // Message Editor Box
           _buildMessageEditor(),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.lg),
 
           // Action Buttons
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.tonalIcon(
-                  onPressed: _isGenerating ? null : _generateWithAi,
-                  icon: _isGenerating
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.auto_awesome),
-                  label: Text(
-                    _isGenerating ? 'Drafting...' : 'Generate with AI',
-                  ),
-                ),
+          ResponsiveActionBar(
+            primary: FilledButton.icon(
+              onPressed: _handleWhatsAppSend,
+              icon: const Icon(Icons.chat),
+              label: const Text('Send on WhatsApp'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.whatsappGreen,
+                foregroundColor: Colors.white,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _handleWhatsAppSend,
-                  icon: const Icon(Icons.chat),
-                  label: const Text('Send on WhatsApp'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF25D366),
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ],
+            ),
+            secondary: FilledButton.tonalIcon(
+              onPressed: _isGenerating ? null : _generateWithAi,
+              icon: _isGenerating
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.auto_awesome),
+              label: Text(_isGenerating ? 'Drafting...' : 'Generate with AI'),
+            ),
           ),
         ],
       ),

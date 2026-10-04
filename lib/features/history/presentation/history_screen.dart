@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/providers.dart';
-import '../../../shared/design_system/empty_state.dart';
+import '../../../shared/design_system/design_system.dart';
 import '../../message_studio/domain/models/message_draft.dart';
 
 /// History — message and delivery activity timeline (SSOT §3, §16, §28).
@@ -35,14 +35,20 @@ class HistoryScreen extends ConsumerWidget {
           final peopleMap = {for (final p in people) p.id: p};
 
           return ListView.separated(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              AppSpacing.bottomClearance,
+            ),
             itemCount: drafts.length,
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final draft = drafts[index];
               final person = peopleMap[draft.personId];
               final recipientName = person?.name ?? 'Birthday Recipient';
-              final isSent = draft.status == DraftStatus.confirmedSent ||
+              final isSent =
+                  draft.status == DraftStatus.confirmedSent ||
                   draft.status == DraftStatus.handedOff;
 
               return Card(
@@ -66,7 +72,9 @@ class HistoryScreen extends ConsumerWidget {
                               recipientName.isNotEmpty
                                   ? recipientName[0].toUpperCase()
                                   : '?',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -99,9 +107,9 @@ class HistoryScreen extends ConsumerWidget {
                               color: isSent
                                   ? Colors.green.withValues(alpha: 0.12)
                                   : Theme.of(context)
-                                      .colorScheme
-                                      .primaryContainer
-                                      .withValues(alpha: 0.5),
+                                        .colorScheme
+                                        .primaryContainer
+                                        .withValues(alpha: 0.5),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
@@ -121,8 +129,8 @@ class HistoryScreen extends ConsumerWidget {
                                   isSent
                                       ? 'Sent'
                                       : draft.status == DraftStatus.ready
-                                          ? 'Ready'
-                                          : 'Draft',
+                                      ? 'Ready'
+                                      : 'Draft',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
@@ -159,7 +167,9 @@ class HistoryScreen extends ConsumerWidget {
                         children: [
                           TextButton.icon(
                             onPressed: () {
-                              Clipboard.setData(ClipboardData(text: draft.body));
+                              Clipboard.setData(
+                                ClipboardData(text: draft.body),
+                              );
                               HapticFeedback.lightImpact();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
@@ -174,7 +184,9 @@ class HistoryScreen extends ConsumerWidget {
                           const SizedBox(width: 8),
                           FilledButton.tonalIcon(
                             onPressed: () {
-                              context.push('/message-studio/${draft.birthdayId}');
+                              context.push(
+                                '/message-studio/${draft.birthdayId}',
+                              );
                             },
                             icon: const Icon(Icons.open_in_new, size: 16),
                             label: const Text('Studio'),
@@ -192,4 +204,3 @@ class HistoryScreen extends ConsumerWidget {
     );
   }
 }
-

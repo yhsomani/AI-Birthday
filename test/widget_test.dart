@@ -23,5 +23,9 @@ void main() {
     expect(find.text('Dashboard'), findsOneWidget);
     expect(find.text('People'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
+
+    // Drain StreamProvider cancellation timers before test concludes
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 10));
   });
 }

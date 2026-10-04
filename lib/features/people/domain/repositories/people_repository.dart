@@ -54,4 +54,3 @@ class InMemoryPeopleRepository implements PeopleRepository {
     return list;
   }
 }
-

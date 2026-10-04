@@ -9,26 +9,28 @@ library;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../shared/design_system/app_colors.dart';
+
 class AppTheme {
   const AppTheme._();
 
   // Distinctive celebratory palette (warm terracotta, vintage amber, forest green accents)
-  static const Color primaryTerracotta = Color(0xFFA64B2A);
-  static const Color primaryTerracottaDark = Color(0xFFE28464);
-  static const Color accentAmber = Color(0xFFD9822B);
-  static const Color accentForest = Color(0xFF2D5A46);
+  static const Color primaryTerracotta = AppColors.primaryTerracotta;
+  static const Color primaryTerracottaDark = AppColors.primaryTerracottaLight;
+  static const Color accentAmber = AppColors.accentAmber;
+  static const Color accentForest = AppColors.accentForest;
 
   // Surface colors - Light (Linen / Editorial)
-  static const Color lightBackground = Color(0xFFFAF7F2);
-  static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightSurfaceVariant = Color(0xFFF2ECE4);
-  static const Color lightBorder = Color(0xFFE5DDD3);
+  static const Color lightBackground = AppColors.lightBackground;
+  static const Color lightSurface = AppColors.lightSurface;
+  static const Color lightSurfaceVariant = AppColors.lightSurfaceVariant;
+  static const Color lightBorder = AppColors.lightBorder;
 
   // Surface colors - Dark (Warm Charcoal / Espresso)
-  static const Color darkBackground = Color(0xFF161413);
-  static const Color darkSurface = Color(0xFF201D1B);
-  static const Color darkSurfaceVariant = Color(0xFF2B2724);
-  static const Color darkBorder = Color(0xFF38332F);
+  static const Color darkBackground = AppColors.darkBackground;
+  static const Color darkSurface = AppColors.darkSurface;
+  static const Color darkSurfaceVariant = AppColors.darkSurfaceVariant;
+  static const Color darkBorder = AppColors.darkBorder;
 
   /// Material 3 Light Theme
   static ThemeData get light => _buildTheme(Brightness.light);
@@ -65,7 +67,9 @@ class AppTheme {
         isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
       );
     } catch (_) {
-      baseTextTheme = isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme;
+      baseTextTheme = isDark
+          ? ThemeData.dark().textTheme
+          : ThemeData.light().textTheme;
     }
 
     TextStyle headlineStyle(TextStyle? fallback) {
@@ -131,7 +135,10 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(64, 48), // Strict 48dp accessible touch target
+          minimumSize: const Size(
+            64,
+            48,
+          ), // Strict 48dp accessible touch target
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -154,20 +161,19 @@ class AppTheme {
         style: TextButton.styleFrom(
           minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
-        style: IconButton.styleFrom(
-          minimumSize: const Size(48, 48),
-        ),
+        style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surfaceVariant,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: border),
@@ -188,11 +194,7 @@ class AppTheme {
         indicatorColor: primary.withValues(alpha: 0.15),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       ),
-      dividerTheme: DividerThemeData(
-        color: border,
-        thickness: 1,
-        space: 24,
-      ),
+      dividerTheme: DividerThemeData(color: border, thickness: 1, space: 24),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

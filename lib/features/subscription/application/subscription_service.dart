@@ -6,14 +6,7 @@ import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 
 /// State of an in-flight purchase operation.
-enum PurchaseStatus {
-  idle,
-  purchasing,
-  verifying,
-  success,
-  cancelled,
-  error;
-}
+enum PurchaseStatus { idle, purchasing, verifying, success, cancelled, error }
 
 /// State notifier managing user entitlement through verified purchase lifecycle.
 class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
@@ -46,11 +39,19 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
       // Step 3: Entitlement grant
       state = UserEntitlement.proActive;
       _purchaseStatus = PurchaseStatus.success;
-      _logger.info('Subscription', 'Purchase verified successfully. Entitlement upgraded to Pro.');
+      _logger.info(
+        'Subscription',
+        'Purchase verified successfully. Entitlement upgraded to Pro.',
+      );
       return true;
     } catch (e, st) {
       _purchaseStatus = PurchaseStatus.error;
-      _logger.error('Subscription', 'Purchase verification failed', error: e, stackTrace: st);
+      _logger.error(
+        'Subscription',
+        'Purchase verification failed',
+        error: e,
+        stackTrace: st,
+      );
       return false;
     } finally {
       _purchaseStatus = PurchaseStatus.idle;
@@ -67,7 +68,10 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
       _logger.info('Subscription', 'Active entitlement confirmed.');
       return true;
     } else {
-      _logger.info('Subscription', 'No prior active purchases found on account.');
+      _logger.info(
+        'Subscription',
+        'No prior active purchases found on account.',
+      );
       return false;
     }
   }

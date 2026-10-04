@@ -2,6 +2,7 @@
 /// Subscription Entitlement, and Appearance (SSOT §5, §11, §17, §20).
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/core/platform/gemini_nano_platform.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 import 'package:ai_birthday/features/auth/domain/auth_state.dart';
+import 'package:ai_birthday/features/reminders/application/reminder_providers.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
 import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
 import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
@@ -71,23 +73,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     HapticFeedback.lightImpact();
     final text = _apiKeyController.text.trim();
     final storage = ref.read(credentialStorageProvider);
-    if (text.isEmpty) {
-      await storage.deleteGeminiApiKey();
-      setState(() => _hasKey = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gemini API key removed.')),
-        );
+    try {
+      if (text.isEmpty) {
+        await storage.deleteGeminiApiKey();
+        setState(() => _hasKey = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Gemini API key removed.')),
+          );
+        }
+      } else {
+        await storage.saveGeminiApiKey(text);
+        setState(() => _hasKey = true);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Gemini API key saved in secure hardware storage.'),
+            ),
+          );
+        }
       }
-    } else {
-      await storage.saveGeminiApiKey(text);
-      setState(() => _hasKey = true);
+    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Gemini API key saved in secure hardware storage.'),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving API key: $e')));
       }
     }
   }
@@ -109,7 +119,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
     if (end == null || !mounted) return;
-    ref.read(reminderSettingsProvider.notifier).setQuietHours(
+    ref
+        .read(reminderSettingsProvider.notifier)
+        .setQuietHours(
           QuietHours(
             start: Duration(hours: start.hour, minutes: start.minute),
             end: Duration(hours: end.hour, minutes: end.minute),
@@ -170,7 +182,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
         children: [
           // Section 1: Account
           _SectionHeader(title: 'Account'),
@@ -239,7 +251,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.star_outline),
                         label: Text(
@@ -260,41 +274,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ],
                   ),
-                  const Divider(height: 24),
-                  // Developer Sandbox Testing Section
-                  Row(
-                    children: [
-                      const Icon(Icons.bug_report_outlined, size: 16, color: Colors.grey),
-                      const SizedBox(width: 6),
-                      Text(
-                        '[Dev Sandbox Testing]',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w600,
+                  if (kDebugMode) ...[
+                    const Divider(height: 24),
+                    // Developer Sandbox Testing Section
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.bug_report_outlined,
+                          size: 16,
+                          color: Colors.grey,
                         ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        'Simulate Pro:',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                      const SizedBox(width: 8),
-                      Switch(
-                        value: entitlement.canUseAi,
-                        onChanged: (val) {
-                          HapticFeedback.lightImpact();
-                          ref
-                              .read(subscriptionNotifierProvider.notifier)
-                              .setDevSandboxEntitlement(
-                                val
-                                    ? UserEntitlement.proActive
-                                    : UserEntitlement.free,
-                              );
-                        },
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '[Dev Sandbox Testing]',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Simulate Pro:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Switch(
+                          value: entitlement.canUseAi,
+                          onChanged: (val) {
+                            HapticFeedback.lightImpact();
+                            ref
+                                .read(subscriptionNotifierProvider.notifier)
+                                .setDevSandboxEntitlement(
+                                  val
+                                      ? UserEntitlement.proActive
+                                      : UserEntitlement.free,
+                                );
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -328,7 +351,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2D5A46).withValues(alpha: 0.12),
+                            color: const Color(
+                              0xFF2D5A46,
+                            ).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Text(
@@ -354,9 +379,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       labelText: 'Gemini API Key (AIzaSy...)',
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscureKey
-                              ? Icons.visibility
-                              : Icons.visibility_off,
+                          _obscureKey ? Icons.visibility : Icons.visibility_off,
                         ),
                         onPressed: () =>
                             setState(() => _obscureKey = !_obscureKey),
@@ -398,14 +421,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: ListTile(
               leading: const Icon(Icons.memory, color: Color(0xFF2D5A46)),
               title: const Text('Gemini Nano (AICore)'),
-              subtitle: Text(
-                switch (_nanoState) {
-                  NanoState.available => 'Ready on device for offline generation.',
-                  NanoState.downloadable => 'Model available for download on this device.',
-                  NanoState.downloading => 'Downloading on-device model...',
-                  _ => 'Secondary fallback on supported Android devices.',
-                },
-              ),
+              subtitle: Text(switch (_nanoState) {
+                NanoState.available =>
+                  'Ready on device for offline generation.',
+                NanoState.downloadable =>
+                  'Model available for download on this device.',
+                NanoState.downloading => 'Downloading on-device model...',
+                _ => 'Secondary fallback on supported Android devices.',
+              }),
               trailing: Chip(
                 label: Text(
                   _nanoState == NanoState.available ? 'AVAILABLE' : 'STANDBY',
@@ -438,6 +461,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   value: reminderSettings.enabled,
                   onChanged: (on) {
                     HapticFeedback.lightImpact();
+                    if (on) {
+                      ref
+                          .read(notificationSchedulerGatewayProvider)
+                          .requestPermission();
+                    }
                     ref.read(reminderSettingsProvider.notifier).setEnabled(on);
                   },
                 ),
@@ -466,6 +494,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     onTap: () => _editQuietHours(reminderSettings.quietHours),
                   ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.notifications_active_outlined),
+                    title: const Text('Send test notification'),
+                    subtitle: const Text(
+                      'Trigger immediate alert on this device',
+                    ),
+                    onTap: () async {
+                      HapticFeedback.lightImpact();
+                      await ref
+                          .read(notificationSchedulerGatewayProvider)
+                          .sendTestNotification(
+                            title: '🎉 Birthday Reminder Test',
+                            body:
+                                'Notifications are working properly on your device!',
+                          );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Test notification dispatched!'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 ],
               ],
             ),
@@ -481,8 +535,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               value: themeMode == ThemeMode.dark,
               onChanged: (val) {
                 HapticFeedback.lightImpact();
-                ref.read(themeModeProvider.notifier).state =
-                    val ? ThemeMode.dark : ThemeMode.light;
+                ref.read(themeModeProvider.notifier).state = val
+                    ? ThemeMode.dark
+                    : ThemeMode.light;
               },
             ),
           ),

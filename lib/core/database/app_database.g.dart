@@ -1212,65 +1212,1637 @@ class PersonsCompanion extends UpdateCompanion<Person> {
   }
 }
 
+class $BirthdaysTable extends Birthdays
+    with TableInfo<$BirthdaysTable, Birthday> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BirthdaysTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cycleYearMeta = const VerificationMeta(
+    'cycleYear',
+  );
+  @override
+  late final GeneratedColumn<int> cycleYear = GeneratedColumn<int>(
+    'cycle_year',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _draftIdMeta = const VerificationMeta(
+    'draftId',
+  );
+  @override
+  late final GeneratedColumn<String> draftId = GeneratedColumn<String>(
+    'draft_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    personId,
+    cycleYear,
+    date,
+    status,
+    draftId,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'birthdays';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Birthday> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_personIdMeta);
+    }
+    if (data.containsKey('cycle_year')) {
+      context.handle(
+        _cycleYearMeta,
+        cycleYear.isAcceptableOrUnknown(data['cycle_year']!, _cycleYearMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cycleYearMeta);
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('draft_id')) {
+      context.handle(
+        _draftIdMeta,
+        draftId.isAcceptableOrUnknown(data['draft_id']!, _draftIdMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Birthday map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Birthday(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      )!,
+      cycleYear: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cycle_year'],
+      )!,
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      draftId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}draft_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $BirthdaysTable createAlias(String alias) {
+    return $BirthdaysTable(attachedDatabase, alias);
+  }
+}
+
+class Birthday extends DataClass implements Insertable<Birthday> {
+  final String id;
+  final String personId;
+  final int cycleYear;
+  final DateTime date;
+  final String status;
+  final String? draftId;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const Birthday({
+    required this.id,
+    required this.personId,
+    required this.cycleYear,
+    required this.date,
+    required this.status,
+    this.draftId,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['person_id'] = Variable<String>(personId);
+    map['cycle_year'] = Variable<int>(cycleYear);
+    map['date'] = Variable<DateTime>(date);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || draftId != null) {
+      map['draft_id'] = Variable<String>(draftId);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  BirthdaysCompanion toCompanion(bool nullToAbsent) {
+    return BirthdaysCompanion(
+      id: Value(id),
+      personId: Value(personId),
+      cycleYear: Value(cycleYear),
+      date: Value(date),
+      status: Value(status),
+      draftId: draftId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(draftId),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory Birthday.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Birthday(
+      id: serializer.fromJson<String>(json['id']),
+      personId: serializer.fromJson<String>(json['personId']),
+      cycleYear: serializer.fromJson<int>(json['cycleYear']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      status: serializer.fromJson<String>(json['status']),
+      draftId: serializer.fromJson<String?>(json['draftId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'personId': serializer.toJson<String>(personId),
+      'cycleYear': serializer.toJson<int>(cycleYear),
+      'date': serializer.toJson<DateTime>(date),
+      'status': serializer.toJson<String>(status),
+      'draftId': serializer.toJson<String?>(draftId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  Birthday copyWith({
+    String? id,
+    String? personId,
+    int? cycleYear,
+    DateTime? date,
+    String? status,
+    Value<String?> draftId = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => Birthday(
+    id: id ?? this.id,
+    personId: personId ?? this.personId,
+    cycleYear: cycleYear ?? this.cycleYear,
+    date: date ?? this.date,
+    status: status ?? this.status,
+    draftId: draftId.present ? draftId.value : this.draftId,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  Birthday copyWithCompanion(BirthdaysCompanion data) {
+    return Birthday(
+      id: data.id.present ? data.id.value : this.id,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      cycleYear: data.cycleYear.present ? data.cycleYear.value : this.cycleYear,
+      date: data.date.present ? data.date.value : this.date,
+      status: data.status.present ? data.status.value : this.status,
+      draftId: data.draftId.present ? data.draftId.value : this.draftId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Birthday(')
+          ..write('id: $id, ')
+          ..write('personId: $personId, ')
+          ..write('cycleYear: $cycleYear, ')
+          ..write('date: $date, ')
+          ..write('status: $status, ')
+          ..write('draftId: $draftId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    personId,
+    cycleYear,
+    date,
+    status,
+    draftId,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Birthday &&
+          other.id == this.id &&
+          other.personId == this.personId &&
+          other.cycleYear == this.cycleYear &&
+          other.date == this.date &&
+          other.status == this.status &&
+          other.draftId == this.draftId &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class BirthdaysCompanion extends UpdateCompanion<Birthday> {
+  final Value<String> id;
+  final Value<String> personId;
+  final Value<int> cycleYear;
+  final Value<DateTime> date;
+  final Value<String> status;
+  final Value<String?> draftId;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const BirthdaysCompanion({
+    this.id = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.cycleYear = const Value.absent(),
+    this.date = const Value.absent(),
+    this.status = const Value.absent(),
+    this.draftId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BirthdaysCompanion.insert({
+    required String id,
+    required String personId,
+    required int cycleYear,
+    required DateTime date,
+    required String status,
+    this.draftId = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       personId = Value(personId),
+       cycleYear = Value(cycleYear),
+       date = Value(date),
+       status = Value(status),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<Birthday> custom({
+    Expression<String>? id,
+    Expression<String>? personId,
+    Expression<int>? cycleYear,
+    Expression<DateTime>? date,
+    Expression<String>? status,
+    Expression<String>? draftId,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (personId != null) 'person_id': personId,
+      if (cycleYear != null) 'cycle_year': cycleYear,
+      if (date != null) 'date': date,
+      if (status != null) 'status': status,
+      if (draftId != null) 'draft_id': draftId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BirthdaysCompanion copyWith({
+    Value<String>? id,
+    Value<String>? personId,
+    Value<int>? cycleYear,
+    Value<DateTime>? date,
+    Value<String>? status,
+    Value<String?>? draftId,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return BirthdaysCompanion(
+      id: id ?? this.id,
+      personId: personId ?? this.personId,
+      cycleYear: cycleYear ?? this.cycleYear,
+      date: date ?? this.date,
+      status: status ?? this.status,
+      draftId: draftId ?? this.draftId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (cycleYear.present) {
+      map['cycle_year'] = Variable<int>(cycleYear.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<DateTime>(date.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (draftId.present) {
+      map['draft_id'] = Variable<String>(draftId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BirthdaysCompanion(')
+          ..write('id: $id, ')
+          ..write('personId: $personId, ')
+          ..write('cycleYear: $cycleYear, ')
+          ..write('date: $date, ')
+          ..write('status: $status, ')
+          ..write('draftId: $draftId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MessageDraftsTable extends MessageDrafts
+    with TableInfo<$MessageDraftsTable, MessageDraft> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MessageDraftsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _birthdayIdMeta = const VerificationMeta(
+    'birthdayId',
+  );
+  @override
+  late final GeneratedColumn<String> birthdayId = GeneratedColumn<String>(
+    'birthday_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bodyMeta = const VerificationMeta('body');
+  @override
+  late final GeneratedColumn<String> body = GeneratedColumn<String>(
+    'body',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _toneMeta = const VerificationMeta('tone');
+  @override
+  late final GeneratedColumn<String> tone = GeneratedColumn<String>(
+    'tone',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lengthMeta = const VerificationMeta('length');
+  @override
+  late final GeneratedColumn<String> length = GeneratedColumn<String>(
+    'length',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _providerTypeMeta = const VerificationMeta(
+    'providerType',
+  );
+  @override
+  late final GeneratedColumn<String> providerType = GeneratedColumn<String>(
+    'provider_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _variationIndexMeta = const VerificationMeta(
+    'variationIndex',
+  );
+  @override
+  late final GeneratedColumn<int> variationIndex = GeneratedColumn<int>(
+    'variation_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    birthdayId,
+    personId,
+    body,
+    tone,
+    length,
+    status,
+    providerType,
+    variationIndex,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'message_drafts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MessageDraft> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('birthday_id')) {
+      context.handle(
+        _birthdayIdMeta,
+        birthdayId.isAcceptableOrUnknown(data['birthday_id']!, _birthdayIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_birthdayIdMeta);
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_personIdMeta);
+    }
+    if (data.containsKey('body')) {
+      context.handle(
+        _bodyMeta,
+        body.isAcceptableOrUnknown(data['body']!, _bodyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bodyMeta);
+    }
+    if (data.containsKey('tone')) {
+      context.handle(
+        _toneMeta,
+        tone.isAcceptableOrUnknown(data['tone']!, _toneMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_toneMeta);
+    }
+    if (data.containsKey('length')) {
+      context.handle(
+        _lengthMeta,
+        length.isAcceptableOrUnknown(data['length']!, _lengthMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lengthMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('provider_type')) {
+      context.handle(
+        _providerTypeMeta,
+        providerType.isAcceptableOrUnknown(
+          data['provider_type']!,
+          _providerTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_providerTypeMeta);
+    }
+    if (data.containsKey('variation_index')) {
+      context.handle(
+        _variationIndexMeta,
+        variationIndex.isAcceptableOrUnknown(
+          data['variation_index']!,
+          _variationIndexMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MessageDraft map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MessageDraft(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      birthdayId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}birthday_id'],
+      )!,
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      )!,
+      body: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}body'],
+      )!,
+      tone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tone'],
+      )!,
+      length: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}length'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      providerType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_type'],
+      )!,
+      variationIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}variation_index'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $MessageDraftsTable createAlias(String alias) {
+    return $MessageDraftsTable(attachedDatabase, alias);
+  }
+}
+
+class MessageDraft extends DataClass implements Insertable<MessageDraft> {
+  final String id;
+  final String birthdayId;
+  final String personId;
+  final String body;
+  final String tone;
+  final String length;
+  final String status;
+  final String providerType;
+  final int variationIndex;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const MessageDraft({
+    required this.id,
+    required this.birthdayId,
+    required this.personId,
+    required this.body,
+    required this.tone,
+    required this.length,
+    required this.status,
+    required this.providerType,
+    required this.variationIndex,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['birthday_id'] = Variable<String>(birthdayId);
+    map['person_id'] = Variable<String>(personId);
+    map['body'] = Variable<String>(body);
+    map['tone'] = Variable<String>(tone);
+    map['length'] = Variable<String>(length);
+    map['status'] = Variable<String>(status);
+    map['provider_type'] = Variable<String>(providerType);
+    map['variation_index'] = Variable<int>(variationIndex);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  MessageDraftsCompanion toCompanion(bool nullToAbsent) {
+    return MessageDraftsCompanion(
+      id: Value(id),
+      birthdayId: Value(birthdayId),
+      personId: Value(personId),
+      body: Value(body),
+      tone: Value(tone),
+      length: Value(length),
+      status: Value(status),
+      providerType: Value(providerType),
+      variationIndex: Value(variationIndex),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory MessageDraft.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MessageDraft(
+      id: serializer.fromJson<String>(json['id']),
+      birthdayId: serializer.fromJson<String>(json['birthdayId']),
+      personId: serializer.fromJson<String>(json['personId']),
+      body: serializer.fromJson<String>(json['body']),
+      tone: serializer.fromJson<String>(json['tone']),
+      length: serializer.fromJson<String>(json['length']),
+      status: serializer.fromJson<String>(json['status']),
+      providerType: serializer.fromJson<String>(json['providerType']),
+      variationIndex: serializer.fromJson<int>(json['variationIndex']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'birthdayId': serializer.toJson<String>(birthdayId),
+      'personId': serializer.toJson<String>(personId),
+      'body': serializer.toJson<String>(body),
+      'tone': serializer.toJson<String>(tone),
+      'length': serializer.toJson<String>(length),
+      'status': serializer.toJson<String>(status),
+      'providerType': serializer.toJson<String>(providerType),
+      'variationIndex': serializer.toJson<int>(variationIndex),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  MessageDraft copyWith({
+    String? id,
+    String? birthdayId,
+    String? personId,
+    String? body,
+    String? tone,
+    String? length,
+    String? status,
+    String? providerType,
+    int? variationIndex,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => MessageDraft(
+    id: id ?? this.id,
+    birthdayId: birthdayId ?? this.birthdayId,
+    personId: personId ?? this.personId,
+    body: body ?? this.body,
+    tone: tone ?? this.tone,
+    length: length ?? this.length,
+    status: status ?? this.status,
+    providerType: providerType ?? this.providerType,
+    variationIndex: variationIndex ?? this.variationIndex,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  MessageDraft copyWithCompanion(MessageDraftsCompanion data) {
+    return MessageDraft(
+      id: data.id.present ? data.id.value : this.id,
+      birthdayId: data.birthdayId.present
+          ? data.birthdayId.value
+          : this.birthdayId,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      body: data.body.present ? data.body.value : this.body,
+      tone: data.tone.present ? data.tone.value : this.tone,
+      length: data.length.present ? data.length.value : this.length,
+      status: data.status.present ? data.status.value : this.status,
+      providerType: data.providerType.present
+          ? data.providerType.value
+          : this.providerType,
+      variationIndex: data.variationIndex.present
+          ? data.variationIndex.value
+          : this.variationIndex,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessageDraft(')
+          ..write('id: $id, ')
+          ..write('birthdayId: $birthdayId, ')
+          ..write('personId: $personId, ')
+          ..write('body: $body, ')
+          ..write('tone: $tone, ')
+          ..write('length: $length, ')
+          ..write('status: $status, ')
+          ..write('providerType: $providerType, ')
+          ..write('variationIndex: $variationIndex, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    birthdayId,
+    personId,
+    body,
+    tone,
+    length,
+    status,
+    providerType,
+    variationIndex,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MessageDraft &&
+          other.id == this.id &&
+          other.birthdayId == this.birthdayId &&
+          other.personId == this.personId &&
+          other.body == this.body &&
+          other.tone == this.tone &&
+          other.length == this.length &&
+          other.status == this.status &&
+          other.providerType == this.providerType &&
+          other.variationIndex == this.variationIndex &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
+  final Value<String> id;
+  final Value<String> birthdayId;
+  final Value<String> personId;
+  final Value<String> body;
+  final Value<String> tone;
+  final Value<String> length;
+  final Value<String> status;
+  final Value<String> providerType;
+  final Value<int> variationIndex;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const MessageDraftsCompanion({
+    this.id = const Value.absent(),
+    this.birthdayId = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.body = const Value.absent(),
+    this.tone = const Value.absent(),
+    this.length = const Value.absent(),
+    this.status = const Value.absent(),
+    this.providerType = const Value.absent(),
+    this.variationIndex = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MessageDraftsCompanion.insert({
+    required String id,
+    required String birthdayId,
+    required String personId,
+    required String body,
+    required String tone,
+    required String length,
+    required String status,
+    required String providerType,
+    this.variationIndex = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       birthdayId = Value(birthdayId),
+       personId = Value(personId),
+       body = Value(body),
+       tone = Value(tone),
+       length = Value(length),
+       status = Value(status),
+       providerType = Value(providerType),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<MessageDraft> custom({
+    Expression<String>? id,
+    Expression<String>? birthdayId,
+    Expression<String>? personId,
+    Expression<String>? body,
+    Expression<String>? tone,
+    Expression<String>? length,
+    Expression<String>? status,
+    Expression<String>? providerType,
+    Expression<int>? variationIndex,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (birthdayId != null) 'birthday_id': birthdayId,
+      if (personId != null) 'person_id': personId,
+      if (body != null) 'body': body,
+      if (tone != null) 'tone': tone,
+      if (length != null) 'length': length,
+      if (status != null) 'status': status,
+      if (providerType != null) 'provider_type': providerType,
+      if (variationIndex != null) 'variation_index': variationIndex,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MessageDraftsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? birthdayId,
+    Value<String>? personId,
+    Value<String>? body,
+    Value<String>? tone,
+    Value<String>? length,
+    Value<String>? status,
+    Value<String>? providerType,
+    Value<int>? variationIndex,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return MessageDraftsCompanion(
+      id: id ?? this.id,
+      birthdayId: birthdayId ?? this.birthdayId,
+      personId: personId ?? this.personId,
+      body: body ?? this.body,
+      tone: tone ?? this.tone,
+      length: length ?? this.length,
+      status: status ?? this.status,
+      providerType: providerType ?? this.providerType,
+      variationIndex: variationIndex ?? this.variationIndex,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (birthdayId.present) {
+      map['birthday_id'] = Variable<String>(birthdayId.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (body.present) {
+      map['body'] = Variable<String>(body.value);
+    }
+    if (tone.present) {
+      map['tone'] = Variable<String>(tone.value);
+    }
+    if (length.present) {
+      map['length'] = Variable<String>(length.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (providerType.present) {
+      map['provider_type'] = Variable<String>(providerType.value);
+    }
+    if (variationIndex.present) {
+      map['variation_index'] = Variable<int>(variationIndex.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessageDraftsCompanion(')
+          ..write('id: $id, ')
+          ..write('birthdayId: $birthdayId, ')
+          ..write('personId: $personId, ')
+          ..write('body: $body, ')
+          ..write('tone: $tone, ')
+          ..write('length: $length, ')
+          ..write('status: $status, ')
+          ..write('providerType: $providerType, ')
+          ..write('variationIndex: $variationIndex, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ReminderSettingsEntriesTable extends ReminderSettingsEntries
+    with TableInfo<$ReminderSettingsEntriesTable, ReminderSettingsEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ReminderSettingsEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _enabledMeta = const VerificationMeta(
+    'enabled',
+  );
+  @override
+  late final GeneratedColumn<bool> enabled = GeneratedColumn<bool>(
+    'enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _kindsMeta = const VerificationMeta('kinds');
+  @override
+  late final GeneratedColumn<String> kinds = GeneratedColumn<String>(
+    'kinds',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quietHoursStartMinutesMeta =
+      const VerificationMeta('quietHoursStartMinutes');
+  @override
+  late final GeneratedColumn<int> quietHoursStartMinutes = GeneratedColumn<int>(
+    'quiet_hours_start_minutes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quietHoursEndMinutesMeta =
+      const VerificationMeta('quietHoursEndMinutes');
+  @override
+  late final GeneratedColumn<int> quietHoursEndMinutes = GeneratedColumn<int>(
+    'quiet_hours_end_minutes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    key,
+    enabled,
+    kinds,
+    quietHoursStartMinutes,
+    quietHoursEndMinutes,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'reminder_settings_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ReminderSettingsEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('enabled')) {
+      context.handle(
+        _enabledMeta,
+        enabled.isAcceptableOrUnknown(data['enabled']!, _enabledMeta),
+      );
+    }
+    if (data.containsKey('kinds')) {
+      context.handle(
+        _kindsMeta,
+        kinds.isAcceptableOrUnknown(data['kinds']!, _kindsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindsMeta);
+    }
+    if (data.containsKey('quiet_hours_start_minutes')) {
+      context.handle(
+        _quietHoursStartMinutesMeta,
+        quietHoursStartMinutes.isAcceptableOrUnknown(
+          data['quiet_hours_start_minutes']!,
+          _quietHoursStartMinutesMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_quietHoursStartMinutesMeta);
+    }
+    if (data.containsKey('quiet_hours_end_minutes')) {
+      context.handle(
+        _quietHoursEndMinutesMeta,
+        quietHoursEndMinutes.isAcceptableOrUnknown(
+          data['quiet_hours_end_minutes']!,
+          _quietHoursEndMinutesMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_quietHoursEndMinutesMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {key};
+  @override
+  ReminderSettingsEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ReminderSettingsEntry(
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      enabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}enabled'],
+      )!,
+      kinds: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kinds'],
+      )!,
+      quietHoursStartMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}quiet_hours_start_minutes'],
+      )!,
+      quietHoursEndMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}quiet_hours_end_minutes'],
+      )!,
+    );
+  }
+
+  @override
+  $ReminderSettingsEntriesTable createAlias(String alias) {
+    return $ReminderSettingsEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class ReminderSettingsEntry extends DataClass
+    implements Insertable<ReminderSettingsEntry> {
+  final String key;
+  final bool enabled;
+  final String kinds;
+  final int quietHoursStartMinutes;
+  final int quietHoursEndMinutes;
+  const ReminderSettingsEntry({
+    required this.key,
+    required this.enabled,
+    required this.kinds,
+    required this.quietHoursStartMinutes,
+    required this.quietHoursEndMinutes,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['key'] = Variable<String>(key);
+    map['enabled'] = Variable<bool>(enabled);
+    map['kinds'] = Variable<String>(kinds);
+    map['quiet_hours_start_minutes'] = Variable<int>(quietHoursStartMinutes);
+    map['quiet_hours_end_minutes'] = Variable<int>(quietHoursEndMinutes);
+    return map;
+  }
+
+  ReminderSettingsEntriesCompanion toCompanion(bool nullToAbsent) {
+    return ReminderSettingsEntriesCompanion(
+      key: Value(key),
+      enabled: Value(enabled),
+      kinds: Value(kinds),
+      quietHoursStartMinutes: Value(quietHoursStartMinutes),
+      quietHoursEndMinutes: Value(quietHoursEndMinutes),
+    );
+  }
+
+  factory ReminderSettingsEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ReminderSettingsEntry(
+      key: serializer.fromJson<String>(json['key']),
+      enabled: serializer.fromJson<bool>(json['enabled']),
+      kinds: serializer.fromJson<String>(json['kinds']),
+      quietHoursStartMinutes: serializer.fromJson<int>(
+        json['quietHoursStartMinutes'],
+      ),
+      quietHoursEndMinutes: serializer.fromJson<int>(
+        json['quietHoursEndMinutes'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'key': serializer.toJson<String>(key),
+      'enabled': serializer.toJson<bool>(enabled),
+      'kinds': serializer.toJson<String>(kinds),
+      'quietHoursStartMinutes': serializer.toJson<int>(quietHoursStartMinutes),
+      'quietHoursEndMinutes': serializer.toJson<int>(quietHoursEndMinutes),
+    };
+  }
+
+  ReminderSettingsEntry copyWith({
+    String? key,
+    bool? enabled,
+    String? kinds,
+    int? quietHoursStartMinutes,
+    int? quietHoursEndMinutes,
+  }) => ReminderSettingsEntry(
+    key: key ?? this.key,
+    enabled: enabled ?? this.enabled,
+    kinds: kinds ?? this.kinds,
+    quietHoursStartMinutes:
+        quietHoursStartMinutes ?? this.quietHoursStartMinutes,
+    quietHoursEndMinutes: quietHoursEndMinutes ?? this.quietHoursEndMinutes,
+  );
+  ReminderSettingsEntry copyWithCompanion(
+    ReminderSettingsEntriesCompanion data,
+  ) {
+    return ReminderSettingsEntry(
+      key: data.key.present ? data.key.value : this.key,
+      enabled: data.enabled.present ? data.enabled.value : this.enabled,
+      kinds: data.kinds.present ? data.kinds.value : this.kinds,
+      quietHoursStartMinutes: data.quietHoursStartMinutes.present
+          ? data.quietHoursStartMinutes.value
+          : this.quietHoursStartMinutes,
+      quietHoursEndMinutes: data.quietHoursEndMinutes.present
+          ? data.quietHoursEndMinutes.value
+          : this.quietHoursEndMinutes,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReminderSettingsEntry(')
+          ..write('key: $key, ')
+          ..write('enabled: $enabled, ')
+          ..write('kinds: $kinds, ')
+          ..write('quietHoursStartMinutes: $quietHoursStartMinutes, ')
+          ..write('quietHoursEndMinutes: $quietHoursEndMinutes')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    key,
+    enabled,
+    kinds,
+    quietHoursStartMinutes,
+    quietHoursEndMinutes,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ReminderSettingsEntry &&
+          other.key == this.key &&
+          other.enabled == this.enabled &&
+          other.kinds == this.kinds &&
+          other.quietHoursStartMinutes == this.quietHoursStartMinutes &&
+          other.quietHoursEndMinutes == this.quietHoursEndMinutes);
+}
+
+class ReminderSettingsEntriesCompanion
+    extends UpdateCompanion<ReminderSettingsEntry> {
+  final Value<String> key;
+  final Value<bool> enabled;
+  final Value<String> kinds;
+  final Value<int> quietHoursStartMinutes;
+  final Value<int> quietHoursEndMinutes;
+  final Value<int> rowid;
+  const ReminderSettingsEntriesCompanion({
+    this.key = const Value.absent(),
+    this.enabled = const Value.absent(),
+    this.kinds = const Value.absent(),
+    this.quietHoursStartMinutes = const Value.absent(),
+    this.quietHoursEndMinutes = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ReminderSettingsEntriesCompanion.insert({
+    required String key,
+    this.enabled = const Value.absent(),
+    required String kinds,
+    required int quietHoursStartMinutes,
+    required int quietHoursEndMinutes,
+    this.rowid = const Value.absent(),
+  }) : key = Value(key),
+       kinds = Value(kinds),
+       quietHoursStartMinutes = Value(quietHoursStartMinutes),
+       quietHoursEndMinutes = Value(quietHoursEndMinutes);
+  static Insertable<ReminderSettingsEntry> custom({
+    Expression<String>? key,
+    Expression<bool>? enabled,
+    Expression<String>? kinds,
+    Expression<int>? quietHoursStartMinutes,
+    Expression<int>? quietHoursEndMinutes,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (key != null) 'key': key,
+      if (enabled != null) 'enabled': enabled,
+      if (kinds != null) 'kinds': kinds,
+      if (quietHoursStartMinutes != null)
+        'quiet_hours_start_minutes': quietHoursStartMinutes,
+      if (quietHoursEndMinutes != null)
+        'quiet_hours_end_minutes': quietHoursEndMinutes,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ReminderSettingsEntriesCompanion copyWith({
+    Value<String>? key,
+    Value<bool>? enabled,
+    Value<String>? kinds,
+    Value<int>? quietHoursStartMinutes,
+    Value<int>? quietHoursEndMinutes,
+    Value<int>? rowid,
+  }) {
+    return ReminderSettingsEntriesCompanion(
+      key: key ?? this.key,
+      enabled: enabled ?? this.enabled,
+      kinds: kinds ?? this.kinds,
+      quietHoursStartMinutes:
+          quietHoursStartMinutes ?? this.quietHoursStartMinutes,
+      quietHoursEndMinutes: quietHoursEndMinutes ?? this.quietHoursEndMinutes,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (enabled.present) {
+      map['enabled'] = Variable<bool>(enabled.value);
+    }
+    if (kinds.present) {
+      map['kinds'] = Variable<String>(kinds.value);
+    }
+    if (quietHoursStartMinutes.present) {
+      map['quiet_hours_start_minutes'] = Variable<int>(
+        quietHoursStartMinutes.value,
+      );
+    }
+    if (quietHoursEndMinutes.present) {
+      map['quiet_hours_end_minutes'] = Variable<int>(
+        quietHoursEndMinutes.value,
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReminderSettingsEntriesCompanion(')
+          ..write('key: $key, ')
+          ..write('enabled: $enabled, ')
+          ..write('kinds: $kinds, ')
+          ..write('quietHoursStartMinutes: $quietHoursStartMinutes, ')
+          ..write('quietHoursEndMinutes: $quietHoursEndMinutes, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $PersonsTable persons = $PersonsTable(this);
+  late final $BirthdaysTable birthdays = $BirthdaysTable(this);
+  late final $MessageDraftsTable messageDrafts = $MessageDraftsTable(this);
+  late final $ReminderSettingsEntriesTable reminderSettingsEntries =
+      $ReminderSettingsEntriesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [persons];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    persons,
+    birthdays,
+    messageDrafts,
+    reminderSettingsEntries,
+  ];
 }
 
-typedef $$PersonsTableCreateCompanionBuilder = PersonsCompanion Function({
-  required String id,
-  required String name,
-  required int birthdayMonth,
-  required int birthdayDay,
-  Value<int?> birthYear,
-  Value<String?> phoneNumber,
-  Value<String?> email,
-  required String relationship,
-  required String relationshipCloseness,
-  required String preferredLanguage,
-  required String preferredTone,
-  required String importantFacts,
-  Value<String?> notes,
-  required String preferredDeliveryChannel,
-  Value<String?> timezone,
-  Value<bool> autoPrepare,
-  required String autoSendPolicy,
-  required DateTime createdAt,
-  required DateTime updatedAt,
-  required int version,
-  Value<DateTime?> deletedAt,
-  Value<int> rowid,
-});
-typedef $$PersonsTableUpdateCompanionBuilder = PersonsCompanion Function({
-  Value<String> id,
-  Value<String> name,
-  Value<int> birthdayMonth,
-  Value<int> birthdayDay,
-  Value<int?> birthYear,
-  Value<String?> phoneNumber,
-  Value<String?> email,
-  Value<String> relationship,
-  Value<String> relationshipCloseness,
-  Value<String> preferredLanguage,
-  Value<String> preferredTone,
-  Value<String> importantFacts,
-  Value<String?> notes,
-  Value<String> preferredDeliveryChannel,
-  Value<String?> timezone,
-  Value<bool> autoPrepare,
-  Value<String> autoSendPolicy,
-  Value<DateTime> createdAt,
-  Value<DateTime> updatedAt,
-  Value<int> version,
-  Value<DateTime?> deletedAt,
-  Value<int> rowid,
-});
+typedef $$PersonsTableCreateCompanionBuilder =
+    PersonsCompanion Function({
+      required String id,
+      required String name,
+      required int birthdayMonth,
+      required int birthdayDay,
+      Value<int?> birthYear,
+      Value<String?> phoneNumber,
+      Value<String?> email,
+      required String relationship,
+      required String relationshipCloseness,
+      required String preferredLanguage,
+      required String preferredTone,
+      required String importantFacts,
+      Value<String?> notes,
+      required String preferredDeliveryChannel,
+      Value<String?> timezone,
+      Value<bool> autoPrepare,
+      required String autoSendPolicy,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      required int version,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$PersonsTableUpdateCompanionBuilder =
+    PersonsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<int> birthdayMonth,
+      Value<int> birthdayDay,
+      Value<int?> birthYear,
+      Value<String?> phoneNumber,
+      Value<String?> email,
+      Value<String> relationship,
+      Value<String> relationshipCloseness,
+      Value<String> preferredLanguage,
+      Value<String> preferredTone,
+      Value<String> importantFacts,
+      Value<String?> notes,
+      Value<String> preferredDeliveryChannel,
+      Value<String?> timezone,
+      Value<bool> autoPrepare,
+      Value<String> autoSendPolicy,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> version,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
 
 class $$PersonsTableFilterComposer
     extends Composer<_$AppDatabase, $PersonsTable> {
@@ -1741,10 +3313,813 @@ typedef $$PersonsTableProcessedTableManager =
       Person,
       PrefetchHooks Function()
     >;
+typedef $$BirthdaysTableCreateCompanionBuilder =
+    BirthdaysCompanion Function({
+      required String id,
+      required String personId,
+      required int cycleYear,
+      required DateTime date,
+      required String status,
+      Value<String?> draftId,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$BirthdaysTableUpdateCompanionBuilder =
+    BirthdaysCompanion Function({
+      Value<String> id,
+      Value<String> personId,
+      Value<int> cycleYear,
+      Value<DateTime> date,
+      Value<String> status,
+      Value<String?> draftId,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$BirthdaysTableFilterComposer
+    extends Composer<_$AppDatabase, $BirthdaysTable> {
+  $$BirthdaysTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get cycleYear => $composableBuilder(
+    column: $table.cycleYear,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get draftId => $composableBuilder(
+    column: $table.draftId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$BirthdaysTableOrderingComposer
+    extends Composer<_$AppDatabase, $BirthdaysTable> {
+  $$BirthdaysTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get cycleYear => $composableBuilder(
+    column: $table.cycleYear,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get draftId => $composableBuilder(
+    column: $table.draftId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$BirthdaysTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BirthdaysTable> {
+  $$BirthdaysTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<int> get cycleYear =>
+      $composableBuilder(column: $table.cycleYear, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get draftId =>
+      $composableBuilder(column: $table.draftId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$BirthdaysTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BirthdaysTable,
+          Birthday,
+          $$BirthdaysTableFilterComposer,
+          $$BirthdaysTableOrderingComposer,
+          $$BirthdaysTableAnnotationComposer,
+          $$BirthdaysTableCreateCompanionBuilder,
+          $$BirthdaysTableUpdateCompanionBuilder,
+          (Birthday, BaseReferences<_$AppDatabase, $BirthdaysTable, Birthday>),
+          Birthday,
+          PrefetchHooks Function()
+        > {
+  $$BirthdaysTableTableManager(_$AppDatabase db, $BirthdaysTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BirthdaysTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BirthdaysTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BirthdaysTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> personId = const Value.absent(),
+                Value<int> cycleYear = const Value.absent(),
+                Value<DateTime> date = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> draftId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BirthdaysCompanion(
+                id: id,
+                personId: personId,
+                cycleYear: cycleYear,
+                date: date,
+                status: status,
+                draftId: draftId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String personId,
+                required int cycleYear,
+                required DateTime date,
+                required String status,
+                Value<String?> draftId = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => BirthdaysCompanion.insert(
+                id: id,
+                personId: personId,
+                cycleYear: cycleYear,
+                date: date,
+                status: status,
+                draftId: draftId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$BirthdaysTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BirthdaysTable,
+      Birthday,
+      $$BirthdaysTableFilterComposer,
+      $$BirthdaysTableOrderingComposer,
+      $$BirthdaysTableAnnotationComposer,
+      $$BirthdaysTableCreateCompanionBuilder,
+      $$BirthdaysTableUpdateCompanionBuilder,
+      (Birthday, BaseReferences<_$AppDatabase, $BirthdaysTable, Birthday>),
+      Birthday,
+      PrefetchHooks Function()
+    >;
+typedef $$MessageDraftsTableCreateCompanionBuilder =
+    MessageDraftsCompanion Function({
+      required String id,
+      required String birthdayId,
+      required String personId,
+      required String body,
+      required String tone,
+      required String length,
+      required String status,
+      required String providerType,
+      Value<int> variationIndex,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$MessageDraftsTableUpdateCompanionBuilder =
+    MessageDraftsCompanion Function({
+      Value<String> id,
+      Value<String> birthdayId,
+      Value<String> personId,
+      Value<String> body,
+      Value<String> tone,
+      Value<String> length,
+      Value<String> status,
+      Value<String> providerType,
+      Value<int> variationIndex,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$MessageDraftsTableFilterComposer
+    extends Composer<_$AppDatabase, $MessageDraftsTable> {
+  $$MessageDraftsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get birthdayId => $composableBuilder(
+    column: $table.birthdayId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tone => $composableBuilder(
+    column: $table.tone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get length => $composableBuilder(
+    column: $table.length,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerType => $composableBuilder(
+    column: $table.providerType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get variationIndex => $composableBuilder(
+    column: $table.variationIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$MessageDraftsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MessageDraftsTable> {
+  $$MessageDraftsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get birthdayId => $composableBuilder(
+    column: $table.birthdayId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tone => $composableBuilder(
+    column: $table.tone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get length => $composableBuilder(
+    column: $table.length,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerType => $composableBuilder(
+    column: $table.providerType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get variationIndex => $composableBuilder(
+    column: $table.variationIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$MessageDraftsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MessageDraftsTable> {
+  $$MessageDraftsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get birthdayId => $composableBuilder(
+    column: $table.birthdayId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<String> get body =>
+      $composableBuilder(column: $table.body, builder: (column) => column);
+
+  GeneratedColumn<String> get tone =>
+      $composableBuilder(column: $table.tone, builder: (column) => column);
+
+  GeneratedColumn<String> get length =>
+      $composableBuilder(column: $table.length, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get providerType => $composableBuilder(
+    column: $table.providerType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get variationIndex => $composableBuilder(
+    column: $table.variationIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$MessageDraftsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MessageDraftsTable,
+          MessageDraft,
+          $$MessageDraftsTableFilterComposer,
+          $$MessageDraftsTableOrderingComposer,
+          $$MessageDraftsTableAnnotationComposer,
+          $$MessageDraftsTableCreateCompanionBuilder,
+          $$MessageDraftsTableUpdateCompanionBuilder,
+          (
+            MessageDraft,
+            BaseReferences<_$AppDatabase, $MessageDraftsTable, MessageDraft>,
+          ),
+          MessageDraft,
+          PrefetchHooks Function()
+        > {
+  $$MessageDraftsTableTableManager(_$AppDatabase db, $MessageDraftsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MessageDraftsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MessageDraftsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MessageDraftsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> birthdayId = const Value.absent(),
+                Value<String> personId = const Value.absent(),
+                Value<String> body = const Value.absent(),
+                Value<String> tone = const Value.absent(),
+                Value<String> length = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> providerType = const Value.absent(),
+                Value<int> variationIndex = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MessageDraftsCompanion(
+                id: id,
+                birthdayId: birthdayId,
+                personId: personId,
+                body: body,
+                tone: tone,
+                length: length,
+                status: status,
+                providerType: providerType,
+                variationIndex: variationIndex,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String birthdayId,
+                required String personId,
+                required String body,
+                required String tone,
+                required String length,
+                required String status,
+                required String providerType,
+                Value<int> variationIndex = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => MessageDraftsCompanion.insert(
+                id: id,
+                birthdayId: birthdayId,
+                personId: personId,
+                body: body,
+                tone: tone,
+                length: length,
+                status: status,
+                providerType: providerType,
+                variationIndex: variationIndex,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$MessageDraftsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MessageDraftsTable,
+      MessageDraft,
+      $$MessageDraftsTableFilterComposer,
+      $$MessageDraftsTableOrderingComposer,
+      $$MessageDraftsTableAnnotationComposer,
+      $$MessageDraftsTableCreateCompanionBuilder,
+      $$MessageDraftsTableUpdateCompanionBuilder,
+      (
+        MessageDraft,
+        BaseReferences<_$AppDatabase, $MessageDraftsTable, MessageDraft>,
+      ),
+      MessageDraft,
+      PrefetchHooks Function()
+    >;
+typedef $$ReminderSettingsEntriesTableCreateCompanionBuilder =
+    ReminderSettingsEntriesCompanion Function({
+      required String key,
+      Value<bool> enabled,
+      required String kinds,
+      required int quietHoursStartMinutes,
+      required int quietHoursEndMinutes,
+      Value<int> rowid,
+    });
+typedef $$ReminderSettingsEntriesTableUpdateCompanionBuilder =
+    ReminderSettingsEntriesCompanion Function({
+      Value<String> key,
+      Value<bool> enabled,
+      Value<String> kinds,
+      Value<int> quietHoursStartMinutes,
+      Value<int> quietHoursEndMinutes,
+      Value<int> rowid,
+    });
+
+class $$ReminderSettingsEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $ReminderSettingsEntriesTable> {
+  $$ReminderSettingsEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get enabled => $composableBuilder(
+    column: $table.enabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kinds => $composableBuilder(
+    column: $table.kinds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get quietHoursStartMinutes => $composableBuilder(
+    column: $table.quietHoursStartMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get quietHoursEndMinutes => $composableBuilder(
+    column: $table.quietHoursEndMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ReminderSettingsEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ReminderSettingsEntriesTable> {
+  $$ReminderSettingsEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get enabled => $composableBuilder(
+    column: $table.enabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kinds => $composableBuilder(
+    column: $table.kinds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get quietHoursStartMinutes => $composableBuilder(
+    column: $table.quietHoursStartMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get quietHoursEndMinutes => $composableBuilder(
+    column: $table.quietHoursEndMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ReminderSettingsEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ReminderSettingsEntriesTable> {
+  $$ReminderSettingsEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<bool> get enabled =>
+      $composableBuilder(column: $table.enabled, builder: (column) => column);
+
+  GeneratedColumn<String> get kinds =>
+      $composableBuilder(column: $table.kinds, builder: (column) => column);
+
+  GeneratedColumn<int> get quietHoursStartMinutes => $composableBuilder(
+    column: $table.quietHoursStartMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get quietHoursEndMinutes => $composableBuilder(
+    column: $table.quietHoursEndMinutes,
+    builder: (column) => column,
+  );
+}
+
+class $$ReminderSettingsEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ReminderSettingsEntriesTable,
+          ReminderSettingsEntry,
+          $$ReminderSettingsEntriesTableFilterComposer,
+          $$ReminderSettingsEntriesTableOrderingComposer,
+          $$ReminderSettingsEntriesTableAnnotationComposer,
+          $$ReminderSettingsEntriesTableCreateCompanionBuilder,
+          $$ReminderSettingsEntriesTableUpdateCompanionBuilder,
+          (
+            ReminderSettingsEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $ReminderSettingsEntriesTable,
+              ReminderSettingsEntry
+            >,
+          ),
+          ReminderSettingsEntry,
+          PrefetchHooks Function()
+        > {
+  $$ReminderSettingsEntriesTableTableManager(
+    _$AppDatabase db,
+    $ReminderSettingsEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ReminderSettingsEntriesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$ReminderSettingsEntriesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ReminderSettingsEntriesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> key = const Value.absent(),
+                Value<bool> enabled = const Value.absent(),
+                Value<String> kinds = const Value.absent(),
+                Value<int> quietHoursStartMinutes = const Value.absent(),
+                Value<int> quietHoursEndMinutes = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ReminderSettingsEntriesCompanion(
+                key: key,
+                enabled: enabled,
+                kinds: kinds,
+                quietHoursStartMinutes: quietHoursStartMinutes,
+                quietHoursEndMinutes: quietHoursEndMinutes,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String key,
+                Value<bool> enabled = const Value.absent(),
+                required String kinds,
+                required int quietHoursStartMinutes,
+                required int quietHoursEndMinutes,
+                Value<int> rowid = const Value.absent(),
+              }) => ReminderSettingsEntriesCompanion.insert(
+                key: key,
+                enabled: enabled,
+                kinds: kinds,
+                quietHoursStartMinutes: quietHoursStartMinutes,
+                quietHoursEndMinutes: quietHoursEndMinutes,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ReminderSettingsEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ReminderSettingsEntriesTable,
+      ReminderSettingsEntry,
+      $$ReminderSettingsEntriesTableFilterComposer,
+      $$ReminderSettingsEntriesTableOrderingComposer,
+      $$ReminderSettingsEntriesTableAnnotationComposer,
+      $$ReminderSettingsEntriesTableCreateCompanionBuilder,
+      $$ReminderSettingsEntriesTableUpdateCompanionBuilder,
+      (
+        ReminderSettingsEntry,
+        BaseReferences<
+          _$AppDatabase,
+          $ReminderSettingsEntriesTable,
+          ReminderSettingsEntry
+        >,
+      ),
+      ReminderSettingsEntry,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
   $$PersonsTableTableManager get persons =>
       $$PersonsTableTableManager(_db, _db.persons);
+  $$BirthdaysTableTableManager get birthdays =>
+      $$BirthdaysTableTableManager(_db, _db.birthdays);
+  $$MessageDraftsTableTableManager get messageDrafts =>
+      $$MessageDraftsTableTableManager(_db, _db.messageDrafts);
+  $$ReminderSettingsEntriesTableTableManager get reminderSettingsEntries =>
+      $$ReminderSettingsEntriesTableTableManager(
+        _db,
+        _db.reminderSettingsEntries,
+      );
 }
