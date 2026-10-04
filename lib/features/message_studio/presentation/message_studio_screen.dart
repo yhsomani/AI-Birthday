@@ -10,7 +10,6 @@ import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
-import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
@@ -241,7 +240,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: SelectableText(
@@ -335,9 +334,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.withOpacity(0.3)),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [

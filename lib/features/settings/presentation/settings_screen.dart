@@ -60,7 +60,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       setState(() => _hasKey = true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gemini API key saved in secure storage.')),
+          const SnackBar(
+            content: Text('Gemini API key saved in secure storage.'),
+          ),
         );
       }
     }
@@ -72,13 +74,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final entitlement = ref.watch(entitlementProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
+      appBar: AppBar(title: const Text('Settings')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.symmetric(
+                horizontal: MediaQuery.of(context).size.width > 600
+                    ? (MediaQuery.of(context).size.width - 600) / 2
+                    : 16,
+                vertical: 16,
+              ),
               children: [
                 // Section 1: AI Provider & Gemini Credentials (SSOT §5)
                 _buildSectionHeader('AI Provider & Credentials'),
@@ -90,23 +95,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.key, color: Color(0xFFE03E5D)),
+                            Icon(
+                              Icons.key,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                             const SizedBox(width: 8),
-                            const Text(
+                            Text(
                               'Personal Gemini API Key',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: Theme.of(context).textTheme.titleMedium,
                             ),
                             const Spacer(),
                             if (_hasKey)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.12),
+                                  color: Theme.of(context).colorScheme.tertiary
+                                      .withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'Configured',
-                                  style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.tertiary,
+                                      ),
                                 ),
                               ),
                           ],
@@ -114,7 +131,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         const SizedBox(height: 8),
                         Text(
                           'Your Gemini API key is stored strictly on your device using hardware-backed secure storage. It is never logged or sent to any developer cloud server.',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodySmall?.color,
+                              ),
                         ),
                         const SizedBox(height: 16),
                         TextField(
@@ -123,8 +145,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           decoration: InputDecoration(
                             labelText: 'Gemini API Key (AIzaSy...)',
                             suffixIcon: IconButton(
-                              icon: Icon(_obscureKey ? Icons.visibility : Icons.visibility_off),
-                              onPressed: () => setState(() => _obscureKey = !_obscureKey),
+                              icon: Icon(
+                                _obscureKey
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
+                              onPressed: () =>
+                                  setState(() => _obscureKey = !_obscureKey),
                             ),
                           ),
                         ),
@@ -138,7 +165,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   _apiKeyController.clear();
                                   _saveKey();
                                 },
-                                child: const Text('Remove Key', style: TextStyle(color: Colors.red)),
+                                child: const Text(
+                                  'Remove Key',
+                                  style: TextStyle(color: Colors.red),
+                                ),
                               ),
                               const SizedBox(width: 8),
                             ],
@@ -159,8 +189,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 Card(
                   child: ListTile(
                     leading: Icon(
-                      entitlement.canUseAi ? Icons.verified : Icons.lock_outline,
-                      color: entitlement.canUseAi ? Colors.amber[700] : Colors.grey,
+                      entitlement.canUseAi
+                          ? Icons.verified
+                          : Icons.lock_outline,
+                      color: entitlement.canUseAi
+                          ? Colors.amber[700]
+                          : Colors.grey,
                     ),
                     title: Text(entitlement.status.displayName),
                     subtitle: Text(
@@ -171,8 +205,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     trailing: Switch(
                       value: entitlement.canUseAi,
                       onChanged: (val) {
-                        ref.read(entitlementProvider.notifier).state =
-                            val ? UserEntitlement.proActive : UserEntitlement.free;
+                        ref.read(entitlementProvider.notifier).state = val
+                            ? UserEntitlement.proActive
+                            : UserEntitlement.free;
                       },
                     ),
                   ),
@@ -185,9 +220,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: ListTile(
                     leading: const Icon(Icons.memory, color: Colors.blueGrey),
                     title: const Text('Gemini Nano (AICore)'),
-                    subtitle: const Text('Secondary fallback on supported Android devices.'),
+                    subtitle: const Text(
+                      'Secondary fallback on supported Android devices.',
+                    ),
                     trailing: const Chip(
-                      label: Text('Ready on Android', style: TextStyle(fontSize: 10)),
+                      label: Text(
+                        'Ready on Android',
+                        style: TextStyle(fontSize: 10),
+                      ),
                       visualDensity: VisualDensity.compact,
                     ),
                   ),
@@ -202,8 +242,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     title: const Text('Dark Mode'),
                     value: themeMode == ThemeMode.dark,
                     onChanged: (val) {
-                      ref.read(themeModeProvider.notifier).state =
-                          val ? ThemeMode.dark : ThemeMode.light;
+                      ref.read(themeModeProvider.notifier).state = val
+                          ? ThemeMode.dark
+                          : ThemeMode.light;
                     },
                   ),
                 ),
@@ -214,10 +255,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      padding: const EdgeInsets.only(left: 4, bottom: 8, top: 16),
       child: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        title.toUpperCase(),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }

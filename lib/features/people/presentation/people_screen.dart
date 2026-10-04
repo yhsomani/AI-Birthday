@@ -62,9 +62,14 @@ class PeopleScreen extends ConsumerWidget {
           }
 
           return ListView.separated(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.symmetric(
+              horizontal: MediaQuery.of(context).size.width > 600
+                  ? (MediaQuery.of(context).size.width - 600) / 2
+                  : 16,
+              vertical: 16,
+            ),
             itemCount: people.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            separatorBuilder: (context, index) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final person = people[index];
               final dateStr = DateFormat.MMMMd().format(
@@ -75,33 +80,44 @@ class PeopleScreen extends ConsumerWidget {
                 child: ListTile(
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
-                    vertical: 8,
+                    vertical: 12,
                   ),
                   leading: CircleAvatar(
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer,
+                    foregroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onPrimaryContainer,
                     child: Text(
                       person.name.isNotEmpty
                           ? person.name[0].toUpperCase()
                           : '?',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
                   title: Text(
                     person.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 4),
-                      Text('$dateStr • ${person.relationship.displayName}'),
+                      Text(
+                        '$dateStr • ${person.relationship.displayName}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                       if (person.importantFacts.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
                           'Facts: ${person.importantFacts.join(', ')}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodySmall?.color,
+                              ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -146,13 +162,16 @@ class PeopleScreen extends ConsumerWidget {
               Row(
                 children: [
                   CircleAvatar(
-                    radius: 24,
+                    radius: 28,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer,
+                    foregroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onPrimaryContainer,
                     child: Text(
                       person.name[0],
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -162,14 +181,16 @@ class PeopleScreen extends ConsumerWidget {
                       children: [
                         Text(
                           person.name,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.headlineSmall,
                         ),
                         Text(
                           '${person.relationship.displayName} (${person.relationshipCloseness.displayName})',
-                          style: TextStyle(color: Colors.grey[600]),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodySmall?.color,
+                              ),
                         ),
                       ],
                     ),
@@ -178,31 +199,36 @@ class PeopleScreen extends ConsumerWidget {
               ),
               const Divider(height: 32),
               _buildDetailRow(
+                context,
                 'Birthday',
                 DateFormat.MMMMd().format(
                   DateTime(2026, person.birthdayMonth, person.birthdayDay),
                 ),
               ),
               if (person.phoneNumber != null)
-                _buildDetailRow('Phone', person.phoneNumber!),
+                _buildDetailRow(context, 'Phone', person.phoneNumber!),
               _buildDetailRow(
+                context,
                 'Preferred Tone',
                 person.preferredTone.displayName,
               ),
               _buildDetailRow(
+                context,
                 'Delivery Channel',
                 person.preferredDeliveryChannel.displayName,
               ),
-              const SizedBox(height: 12),
-              const Text(
-                'Known Facts for AI (User-provided only):',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              const SizedBox(height: 24),
+              Text(
+                'Known Facts for AI',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               if (person.importantFacts.isEmpty)
-                const Text(
+                Text(
                   'No specific facts added yet.',
-                  style: TextStyle(fontStyle: FontStyle.italic),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
                 )
               else
                 ...person.importantFacts.map(
@@ -210,13 +236,18 @@ class PeopleScreen extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.check_circle_outline,
                           size: 16,
-                          color: Colors.green,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                         const SizedBox(width: 8),
-                        Expanded(child: Text(f)),
+                        Expanded(
+                          child: Text(
+                            f,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -229,14 +260,20 @@ class PeopleScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey[600])),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.textTheme.bodySmall?.color,
+            ),
+          ),
+          Text(value, style: theme.textTheme.titleSmall),
         ],
       ),
     );
@@ -281,7 +318,7 @@ class PeopleScreen extends ConsumerWidget {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<int>(
-                            value: selectedMonth,
+                            initialValue: selectedMonth,
                             decoration: const InputDecoration(
                               labelText: 'Month',
                             ),
@@ -300,7 +337,7 @@ class PeopleScreen extends ConsumerWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<int>(
-                            value: selectedDay,
+                            initialValue: selectedDay,
                             decoration: const InputDecoration(labelText: 'Day'),
                             items: List.generate(31, (i) => i + 1).map((d) {
                               return DropdownMenuItem(
@@ -316,7 +353,7 @@ class PeopleScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<RelationshipCategory>(
-                      value: selectedCategory,
+                      initialValue: selectedCategory,
                       decoration: const InputDecoration(
                         labelText: 'Relationship',
                       ),
@@ -333,7 +370,7 @@ class PeopleScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<MessageTone>(
-                      value: selectedTone,
+                      initialValue: selectedTone,
                       decoration: const InputDecoration(
                         labelText: 'Preferred Tone',
                       ),

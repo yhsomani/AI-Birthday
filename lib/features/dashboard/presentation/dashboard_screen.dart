@@ -48,7 +48,12 @@ class DashboardScreen extends ConsumerWidget {
           }
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.symmetric(
+              horizontal: MediaQuery.of(context).size.width > 600
+                  ? (MediaQuery.of(context).size.width - 600) / 2
+                  : 16,
+              vertical: 16,
+            ),
             children: [
               // Hero Greeting Banner
               _buildGreetingBanner(context, todayBirthdays.length),
@@ -113,51 +118,84 @@ class DashboardScreen extends ConsumerWidget {
 
   Widget _buildGreetingBanner(BuildContext context, int todayCount) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     final isToday = todayCount > 0;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isToday
-              ? [const Color(0xFFE03E5D), const Color(0xFFF59E0B)]
-              : [
-                  theme.colorScheme.primaryContainer,
-                  theme.colorScheme.surfaceVariant,
-                ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isToday
+              ? theme.colorScheme.primary
+              : theme.dividerColor.withValues(alpha: 0.1),
+          width: isToday ? 2 : 1,
         ),
-        borderRadius: BorderRadius.circular(20),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            isToday
-                ? '$todayCount ${todayCount == 1 ? 'Birthday' : 'Birthdays'} Today!'
-                : 'All caught up!',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: isToday
-                  ? Colors.white
-                  : theme.colorScheme.onPrimaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isToday ? Icons.celebration : Icons.auto_awesome,
+                  color: isToday
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.secondary,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    isToday
+                        ? '$todayCount ${todayCount == 1 ? 'Birthday' : 'Birthdays'} Today'
+                        : 'Your AI Birthday Assistant',
+                    style: textTheme.headlineSmall?.copyWith(
+                      color: isToday
+                          ? theme.colorScheme.primary
+                          : textTheme.titleLarge?.color,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            isToday
-                ? 'Review prepared messages and send personalized greetings on WhatsApp.'
-                : 'Upcoming birthdays are monitored with automated draft preparation.',
-            style: TextStyle(
-              fontSize: 14,
-              color: isToday
-                  ? Colors.white.withOpacity(0.9)
-                  : theme.colorScheme.onSurfaceVariant,
+            const SizedBox(height: 12),
+            Text(
+              isToday
+                  ? 'Review the AI-generated drafts and send a personalized message.'
+                  : 'Never miss an important date. We monitor your contacts and prepare thoughtful messages in your exact tone before the day arrives.',
+              style: textTheme.bodyLarge,
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                if (!isToday)
+                  FilledButton.icon(
+                    onPressed: () => context.push('/people'),
+                    icon: const Icon(Icons.person_add),
+                    label: const Text('Add Contact'),
+                  )
+                else
+                  FilledButton.icon(
+                    onPressed: () {
+                      // Action is contextual per list item below, this is just a quick action hint.
+                    },
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('View Drafts Below'),
+                  ),
+                const SizedBox(width: 12),
+                if (!isToday)
+                  TextButton(
+                    onPressed: () => context.push('/people'),
+                    child: const Text('View Directory'),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -169,18 +207,15 @@ class DashboardScreen extends ConsumerWidget {
   }) {
     return Row(
       children: [
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-        ),
+        Text(title, style: Theme.of(context).textTheme.titleLarge),
         if (badgeCount != null && badgeCount > 0) ...[
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -229,7 +264,7 @@ class DashboardScreen extends ConsumerWidget {
                         ? const Color(0xFFE03E5D)
                         : Theme.of(
                             context,
-                          ).colorScheme.secondary.withOpacity(0.2),
+                          ).colorScheme.secondary.withValues(alpha: 0.2),
                     foregroundColor: isToday ? Colors.white : Colors.black87,
                     child: Text(
                       person != null && person.name.isNotEmpty
@@ -268,7 +303,9 @@ class DashboardScreen extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: isToday
                           ? const Color(0xFFE03E5D)
-                          : Theme.of(context).colorScheme.surfaceVariant,
+                          : Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -294,7 +331,7 @@ class DashboardScreen extends ConsumerWidget {
                     padding: EdgeInsets.zero,
                     visualDensity: VisualDensity.compact,
                   ),
-                  FilledButton.tonalIcon(
+                  FilledButton.icon(
                     onPressed: () {
                       context.push('/message-studio/${birthday.id}');
                     },

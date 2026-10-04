@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/core/security/credential_storage.dart';
 import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
-import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/ai/domain/ai_router.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_repository.dart';
