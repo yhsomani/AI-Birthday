@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
@@ -49,7 +50,10 @@ class PersonListScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Birthdays')),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/people/add'),
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          context.push('/people/add');
+        },
         tooltip: 'Add a birthday',
         child: const Icon(Icons.add),
       ),
