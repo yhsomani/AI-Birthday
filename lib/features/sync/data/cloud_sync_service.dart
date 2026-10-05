@@ -43,7 +43,8 @@ class CloudSyncService {
   final AppLogger? _logger;
 
   static const String _projectId = 'relateai-birthday-ysomani';
-  static const String _apiKey = 'AIzaSyDUgbmii4EH0PCHVOxO9TXvGeXyFpyxWNQ';
+  static const String _apiKey =
+      String.fromEnvironment('FIREBASE_WEB_API_KEY');
   static const String _lastSyncKey = 'cloud_last_sync_timestamp';
 
   Future<DateTime?> getLastSyncTime() async {
@@ -57,6 +58,13 @@ class CloudSyncService {
   /// Synchronizes local birthdays with the authenticated user's Firestore collection.
   Future<CloudSyncResult> sync(AuthState authState) async {
     final now = DateTime.now();
+    if (_apiKey.isEmpty) {
+      return CloudSyncResult(
+        success: false,
+        error: 'Cloud backup is not configured in this build.',
+        timestamp: now,
+      );
+    }
     if (!authState.isSignedIn || authState.identity == null) {
       return CloudSyncResult(
         success: false,
@@ -201,6 +209,13 @@ class CloudSyncService {
   /// Restores cloud backup from Firestore REST into local Drift SQLite.
   Future<CloudSyncResult> restore(AuthState authState) async {
     final now = DateTime.now();
+    if (_apiKey.isEmpty) {
+      return CloudSyncResult(
+        success: false,
+        error: 'Cloud restore is not configured in this build.',
+        timestamp: now,
+      );
+    }
     if (!authState.isSignedIn || authState.identity == null) {
       return CloudSyncResult(
         success: false,
