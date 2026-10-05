@@ -2,6 +2,7 @@
 library;
 
 import 'dart:convert';
+import 'package:drift/drift.dart' as drift;
 import 'package:http/http.dart' as http;
 
 import '../../../core/database/app_database.dart';
@@ -192,6 +193,186 @@ class CloudSyncService {
       return CloudSyncResult(
         success: false,
         error: e.toString(),
+        timestamp: now,
+      );
+    }
+  }
+
+  /// Restores cloud backup from Firestore REST into local Drift SQLite.
+  Future<CloudSyncResult> restore(AuthState authState) async {
+    final now = DateTime.now();
+    if (!authState.isSignedIn || authState.identity == null) {
+      return CloudSyncResult(
+        success: false,
+        error: 'Please sign in to restore from cloud backup.',
+        timestamp: now,
+      );
+    }
+
+    final uid =
+        authState.identity!.firebaseUid ?? authState.identity!.googleSubject;
+    _logger?.info('CloudRestore', 'Starting restore for user $uid');
+
+    try {
+      final birthdaysBaseUrl =
+          'https://firestore.googleapis.com/v1/projects/$_projectId/databases/(default)/documents/users/$uid/birthdays';
+      final peopleBaseUrl =
+          'https://firestore.googleapis.com/v1/projects/$_projectId/databases/(default)/documents/users/$uid/people';
+
+      final requestHeaders = <String, String>{
+        'Content-Type': 'application/json',
+        if (authState.identity?.idToken != null)
+          'Authorization': 'Bearer ${authState.identity!.idToken}',
+      };
+
+      var restored = 0;
+
+      // 1. Fetch people documents from Firestore
+      final peopleRes = await _http.get(
+        Uri.parse('$peopleBaseUrl?key=$_apiKey'),
+        headers: requestHeaders,
+      );
+
+      if (peopleRes.statusCode == 200) {
+        final Map<String, dynamic> body = jsonDecode(peopleRes.body);
+        final docs = body['documents'] as List<dynamic>? ?? [];
+        for (final doc in docs) {
+          final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
+          final id = fields['id']?['stringValue'] as String?;
+          final name = fields['name']?['stringValue'] as String?;
+          if (id == null || name == null) continue;
+
+          final monthStr = fields['birthdayMonth']?['integerValue'] as String?;
+          final dayStr = fields['birthdayDay']?['integerValue'] as String?;
+          final yearStr = fields['birthYear']?['integerValue'] as String?;
+          final phone = fields['phoneNumber']?['stringValue'] as String?;
+          final email = fields['email']?['stringValue'] as String?;
+          final rel =
+              fields['relationship']?['stringValue'] as String? ?? 'friend';
+          final closeness =
+              fields['relationshipCloseness']?['stringValue'] as String? ??
+              'close';
+          final lang =
+              fields['preferredLanguage']?['stringValue'] as String? ?? 'en';
+          final tone =
+              fields['preferredTone']?['stringValue'] as String? ?? 'warm';
+          final facts =
+              fields['importantFacts']?['stringValue'] as String? ?? '';
+          final notes = fields['notes']?['stringValue'] as String?;
+          final channel =
+              fields['preferredDeliveryChannel']?['stringValue'] as String? ??
+              'whatsapp';
+          final createdAtStr = fields['createdAt']?['stringValue'] as String?;
+          final updatedAtStr = fields['updatedAt']?['stringValue'] as String?;
+
+          await _db
+              .into(_db.persons)
+              .insertOnConflictUpdate(
+                PersonsCompanion(
+                  id: drift.Value(id),
+                  name: drift.Value(name),
+                  birthdayMonth: drift.Value(
+                    monthStr != null ? int.tryParse(monthStr) : null,
+                  ),
+                  birthdayDay: drift.Value(
+                    dayStr != null ? int.tryParse(dayStr) : null,
+                  ),
+                  birthYear: drift.Value(
+                    yearStr != null ? int.tryParse(yearStr) : null,
+                  ),
+                  phoneNumber: drift.Value(phone),
+                  email: drift.Value(email),
+                  relationship: drift.Value(rel),
+                  relationshipCloseness: drift.Value(closeness),
+                  preferredLanguage: drift.Value(lang),
+                  preferredTone: drift.Value(tone),
+                  importantFacts: drift.Value(facts),
+                  notes: drift.Value(notes),
+                  preferredDeliveryChannel: drift.Value(channel),
+                  autoSendPolicy: const drift.Value('manualOnly'),
+                  createdAt: drift.Value(
+                    createdAtStr != null
+                        ? DateTime.tryParse(createdAtStr) ?? now
+                        : now,
+                  ),
+                  updatedAt: drift.Value(
+                    updatedAtStr != null
+                        ? DateTime.tryParse(updatedAtStr) ?? now
+                        : now,
+                  ),
+                  version: const drift.Value(1),
+                ),
+              );
+          restored++;
+        }
+      }
+
+      // 2. Fetch birthday documents from Firestore
+      final birthdaysRes = await _http.get(
+        Uri.parse('$birthdaysBaseUrl?key=$_apiKey'),
+        headers: requestHeaders,
+      );
+
+      if (birthdaysRes.statusCode == 200) {
+        final Map<String, dynamic> body = jsonDecode(birthdaysRes.body);
+        final docs = body['documents'] as List<dynamic>? ?? [];
+        for (final doc in docs) {
+          final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
+          final id = fields['id']?['stringValue'] as String?;
+          final personId = fields['personId']?['stringValue'] as String?;
+          final dateStr = fields['date']?['stringValue'] as String?;
+          final cycleYearStr = fields['cycleYear']?['integerValue'] as String?;
+          final status =
+              fields['status']?['stringValue'] as String? ?? 'upcoming';
+          final updatedAtStr = fields['updatedAt']?['stringValue'] as String?;
+
+          if (id == null || personId == null || dateStr == null) continue;
+          final date = DateTime.tryParse(dateStr) ?? now;
+          final cycleYear = cycleYearStr != null
+              ? int.tryParse(cycleYearStr) ?? date.year
+              : date.year;
+          final updatedAt = updatedAtStr != null
+              ? DateTime.tryParse(updatedAtStr) ?? now
+              : now;
+
+          await _db
+              .into(_db.birthdays)
+              .insertOnConflictUpdate(
+                BirthdaysCompanion(
+                  id: drift.Value(id),
+                  personId: drift.Value(personId),
+                  cycleYear: drift.Value(cycleYear),
+                  date: drift.Value(date),
+                  status: drift.Value(status),
+                  createdAt: drift.Value(updatedAt),
+                  updatedAt: drift.Value(updatedAt),
+                ),
+              );
+          restored++;
+        }
+      }
+
+      _logger?.info(
+        'CloudRestore',
+        'Cloud restore finished successfully. Downloaded/Restored: $restored',
+      );
+
+      return CloudSyncResult(
+        success: true,
+        uploadedCount: 0,
+        downloadedCount: restored,
+        timestamp: now,
+      );
+    } catch (e, st) {
+      _logger?.error(
+        'CloudRestore',
+        'Restore failed with exception',
+        error: e,
+        stackTrace: st,
+      );
+      return CloudSyncResult(
+        success: false,
+        error: 'Cloud restore failed: ${e.toString()}',
         timestamp: now,
       );
     }

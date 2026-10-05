@@ -32,7 +32,10 @@ void main() {
   ) async {
     await pumpSettings(tester);
 
-    final remindersSwitch = find.widgetWithText(SwitchListTile, 'Birthday reminders');
+    final remindersSwitch = find.widgetWithText(
+      SwitchListTile,
+      'Birthday reminders',
+    );
     await tester.ensureVisible(remindersSwitch);
     await tester.pumpAndSettle();
     await tester.tap(remindersSwitch);
@@ -49,14 +52,19 @@ void main() {
   testWidgets('leads can be individually toggled off', (tester) async {
     await pumpSettings(tester);
 
-    final remindersSwitch = find.widgetWithText(SwitchListTile, 'Birthday reminders');
+    final remindersSwitch = find.widgetWithText(
+      SwitchListTile,
+      'Birthday reminders',
+    );
     await tester.ensureVisible(remindersSwitch);
     await tester.pumpAndSettle();
     await tester.tap(remindersSwitch);
     await tester.pumpAndSettle();
 
-    final approachingFinder =
-        find.widgetWithText(SwitchListTile, 'Approaching');
+    final approachingFinder = find.widgetWithText(
+      SwitchListTile,
+      'Approaching',
+    );
     await tester.ensureVisible(approachingFinder);
     await tester.pumpAndSettle();
     await tester.tap(approachingFinder);
@@ -71,7 +79,10 @@ void main() {
 
   testWidgets('quiet hours picker updates the stored window', (tester) async {
     await pumpSettings(tester);
-    final remindersSwitch = find.widgetWithText(SwitchListTile, 'Birthday reminders');
+    final remindersSwitch = find.widgetWithText(
+      SwitchListTile,
+      'Birthday reminders',
+    );
     await tester.ensureVisible(remindersSwitch);
     await tester.pumpAndSettle();
     await tester.tap(remindersSwitch);

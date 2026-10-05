@@ -103,4 +103,31 @@ class AndroidNotificationSchedulerGateway
       // Ignored
     }
   }
+
+  @override
+  Future<String?> getInitialNotificationPersonId() async {
+    if (!_isLiveAndroid) return null;
+    try {
+      final res = await _channel.invokeMapMethod<String, dynamic>(
+        'getInitialNotification',
+      );
+      return res?['personId'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  void setNotificationOpenedHandler(void Function(String personId) onOpened) {
+    if (!_isLiveAndroid) return;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onNotificationOpened') {
+        final args = call.arguments as Map<dynamic, dynamic>?;
+        final personId = args?['personId'] as String?;
+        if (personId != null && personId.isNotEmpty) {
+          onOpened(personId);
+        }
+      }
+    });
+  }
 }

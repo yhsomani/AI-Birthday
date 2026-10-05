@@ -61,9 +61,7 @@ class PeopleScreen extends ConsumerWidget {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Exported ${people.length} contacts to CSV file. 📋',
-          ),
+          content: Text('Exported ${people.length} contacts to CSV file. 📋'),
         ),
       );
     }

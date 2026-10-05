@@ -38,6 +38,12 @@ class RecordingGateway implements NotificationSchedulerGateway {
     required String title,
     required String body,
   }) async {}
+
+  @override
+  Future<String?> getInitialNotificationPersonId() async => null;
+
+  @override
+  void setNotificationOpenedHandler(void Function(String personId) onOpened) {}
 }
 
 void main() {

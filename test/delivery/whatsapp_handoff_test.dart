@@ -19,6 +19,12 @@ void main() {
         WhatsAppHandoffBuilder.sanitizePhoneNumber('44 20 7946 0958'),
         '442079460958',
       );
+      expect(
+        WhatsAppHandoffBuilder.sanitizePhoneNumber('0044 20 7946 0958'),
+        '442079460958',
+      );
+      // Local number with leading zero missing country code
+      expect(WhatsAppHandoffBuilder.sanitizePhoneNumber('07123456789'), isNull);
       // Too short
       expect(WhatsAppHandoffBuilder.sanitizePhoneNumber('123'), isNull);
       // Null

@@ -124,6 +124,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Future<void> _handleCloudRestore() async {
+    HapticFeedback.lightImpact();
+    final auth = ref.read(authControllerProvider).valueOrNull;
+    if (auth == null || !auth.isSignedIn) {
+      AuthBottomSheet.show(context);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore from Cloud Backup?'),
+        content: const Text(
+          'This will download your saved birthdays and contacts from the cloud and merge them into your device. Existing records with matching IDs will be updated.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isSyncing = true);
+    final syncService = ref.read(cloudSyncServiceProvider);
+    final result = await syncService.restore(auth);
+    if (!mounted) return;
+    setState(() => _isSyncing = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.success
+              ? 'Cloud restore complete! ${result.downloadedCount} records restored to your device.'
+              : 'Restore failed: ${result.error ?? 'Unknown error'}',
+        ),
+      ),
+    );
+  }
+
   Future<void> _launchExternalUrl(String url) async {
     final uri = Uri.parse(url);
     try {
@@ -184,7 +231,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!mounted) return;
       setState(() {
         _connectionResult = GeminiConnectionResult.error(
-          'Connection test failed: $e',
+          'Unable to verify API key. Please check your connection and try again.',
         );
         _isTestingKey = false;
       });
@@ -236,9 +283,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving API key: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to save API key to secure storage. Please try again.',
+            ),
+          ),
+        );
       }
     }
   }
@@ -378,12 +429,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(height: 6),
                   Text(
                     'Privacy note: Backing up uploads your saved recipient names, birthdays, phone numbers, and notes to your Google Cloud storage.',
-                    style: TextStyle(fontSize: 11, color: Colors.grey[500], fontStyle: FontStyle.italic),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[500],
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.end,
                     children: [
+                      OutlinedButton.icon(
+                        onPressed: _isSyncing ? null : _handleCloudRestore,
+                        icon: const Icon(
+                          Icons.cloud_download_outlined,
+                          size: 18,
+                        ),
+                        label: const Text('Restore from Cloud'),
+                      ),
                       FilledButton.tonalIcon(
                         onPressed: _isSyncing ? null : _handleCloudSync,
                         icon: _isSyncing
@@ -395,7 +460,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ),
                               )
                             : const Icon(Icons.cloud_upload, size: 18),
-                        label: Text(_isSyncing ? 'Backing up...' : 'Back Up Now'),
+                        label: Text(
+                          _isSyncing ? 'Backing up...' : 'Back Up Now',
+                        ),
                       ),
                     ],
                   ),
@@ -427,7 +494,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       Text(
                         entitlement.status.displayName,
                         style: const TextStyle(
-                           fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
                       ),
@@ -612,7 +679,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _buildConnectionResultBanner(_connectionResult!),
                   ],
                   const SizedBox(height: 14),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       if (_hasKey)
                         TextButton(
@@ -625,12 +696,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             style: TextStyle(color: Colors.red),
                           ),
                         ),
-                      const Spacer(),
                       OutlinedButton(
                         onPressed: _saveKey,
                         child: const Text('Save Key'),
                       ),
-                      const SizedBox(width: 8),
                       FilledButton.icon(
                         onPressed: _isTestingKey ? null : _testConnection,
                         icon: _isTestingKey
@@ -704,7 +773,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.memory, color: AppColors.accentForest),
+                  leading: const Icon(
+                    Icons.memory,
+                    color: AppColors.accentForest,
+                  ),
                   title: const Text('Gemini Nano (AICore)'),
                   subtitle: Text(switch (_nanoState) {
                     NanoState.available =>
@@ -713,7 +785,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       'Model available for download on this device.',
                     NanoState.downloading => 'Downloading on-device model...',
                     _ =>
-                      'Offline AI on supported Android devices with Google AICore.',
+                      'Not available on this device hardware (requires Google AICore on Android 14+).',
                   }),
                   trailing: Chip(
                     label: Text(
@@ -756,12 +828,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   title: const Text('Birthday reminders'),
                   subtitle: const Text('Reminders before birthdays'),
                   value: reminderSettings.enabled,
-                  onChanged: (on) {
+                  onChanged: (on) async {
                     HapticFeedback.lightImpact();
                     if (on) {
-                      ref
+                      final granted = await ref
                           .read(notificationSchedulerGatewayProvider)
                           .requestPermission();
+                      if (!granted) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Notification permission was not granted. Please enable notifications in device settings.',
+                              ),
+                            ),
+                          );
+                        }
+                        ref
+                            .read(reminderSettingsProvider.notifier)
+                            .setEnabled(false);
+                        return;
+                      }
                     }
                     ref.read(reminderSettingsProvider.notifier).setEnabled(on);
                   },
@@ -843,7 +930,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ListTile(
                   leading: const Icon(Icons.explore_outlined),
                   title: const Text('Replay App Onboarding'),
-                  subtitle: const Text('View the 5-step loop and feature guide'),
+                  subtitle: const Text(
+                    'View the 5-step loop and feature guide',
+                  ),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                   onTap: () {
                     HapticFeedback.lightImpact();
@@ -1181,7 +1270,9 @@ class _GeminiSetupGuideSheet extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryTerracotta.withValues(alpha: 0.12),
+                      color: AppColors.primaryTerracotta.withValues(
+                        alpha: 0.12,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(

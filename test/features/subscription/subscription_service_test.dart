@@ -11,7 +11,9 @@ class FakeUnavailableIap implements iap.InAppPurchase {
   Future<bool> isAvailable() async => false;
 
   @override
-  Future<iap.ProductDetailsResponse> queryProductDetails(Set<String> identifiers) async {
+  Future<iap.ProductDetailsResponse> queryProductDetails(
+    Set<String> identifiers,
+  ) async {
     return iap.ProductDetailsResponse(
       productDetails: [],
       notFoundIDs: identifiers.toList(),
@@ -19,10 +21,15 @@ class FakeUnavailableIap implements iap.InAppPurchase {
   }
 
   @override
-  Future<bool> buyNonConsumable({required iap.PurchaseParam purchaseParam}) async => false;
+  Future<bool> buyNonConsumable({
+    required iap.PurchaseParam purchaseParam,
+  }) async => false;
 
   @override
-  Future<bool> buyConsumable({required iap.PurchaseParam purchaseParam, bool autoConsume = true}) async => false;
+  Future<bool> buyConsumable({
+    required iap.PurchaseParam purchaseParam,
+    bool autoConsume = true,
+  }) async => false;
 
   @override
   Future<void> completePurchase(iap.PurchaseDetails purchase) async {}
@@ -39,7 +46,9 @@ class FakeEmptyProductsIap extends FakeUnavailableIap {
   Future<bool> isAvailable() async => true;
 
   @override
-  Future<iap.ProductDetailsResponse> queryProductDetails(Set<String> identifiers) async {
+  Future<iap.ProductDetailsResponse> queryProductDetails(
+    Set<String> identifiers,
+  ) async {
     return iap.ProductDetailsResponse(
       productDetails: [],
       notFoundIDs: identifiers.toList(),
@@ -49,34 +58,40 @@ class FakeEmptyProductsIap extends FakeUnavailableIap {
 
 void main() {
   group('SubscriptionNotifier Truthfulness Tests (P0)', () {
-    test('does NOT grant Pro entitlement when Play Store is unavailable', () async {
-      final notifier = SubscriptionNotifier(
-        inAppPurchase: FakeUnavailableIap(),
-      );
+    test(
+      'does NOT grant Pro entitlement when Play Store is unavailable',
+      () async {
+        final notifier = SubscriptionNotifier(
+          inAppPurchase: FakeUnavailableIap(),
+        );
 
-      expect(notifier.state, UserEntitlement.free);
+        expect(notifier.state, UserEntitlement.free);
 
-      final result = await notifier.purchaseProMonthly();
+        final result = await notifier.purchaseProMonthly();
 
-      expect(result, isFalse);
-      expect(notifier.state, UserEntitlement.free);
-      expect(notifier.purchaseStatus, PurchaseStatus.idle);
-      notifier.dispose();
-    });
+        expect(result, isFalse);
+        expect(notifier.state, UserEntitlement.free);
+        expect(notifier.purchaseStatus, PurchaseStatus.idle);
+        notifier.dispose();
+      },
+    );
 
-    test('does NOT grant Pro entitlement when product details are empty', () async {
-      final notifier = SubscriptionNotifier(
-        inAppPurchase: FakeEmptyProductsIap(),
-      );
+    test(
+      'does NOT grant Pro entitlement when product details are empty',
+      () async {
+        final notifier = SubscriptionNotifier(
+          inAppPurchase: FakeEmptyProductsIap(),
+        );
 
-      expect(notifier.state, UserEntitlement.free);
+        expect(notifier.state, UserEntitlement.free);
 
-      final result = await notifier.purchaseProMonthly();
+        final result = await notifier.purchaseProMonthly();
 
-      expect(result, isFalse);
-      expect(notifier.state, UserEntitlement.free);
-      expect(notifier.purchaseStatus, PurchaseStatus.idle);
-      notifier.dispose();
-    });
+        expect(result, isFalse);
+        expect(notifier.state, UserEntitlement.free);
+        expect(notifier.purchaseStatus, PurchaseStatus.idle);
+        notifier.dispose();
+      },
+    );
   });
 }

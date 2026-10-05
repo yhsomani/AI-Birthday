@@ -161,10 +161,16 @@ void main() {
       final sent = await gateway.sendPhoneOtp('+15551234567');
       expect(sent, isTrue);
 
-      final verifyResult = await gateway.verifyPhoneOtp(
+      final invalidResult = await gateway.verifyPhoneOtp(
         '+15551234567',
-        '123456',
+        '000000',
       );
+      expect(invalidResult, isA<SignInFailed>());
+
+      final otp = gateway.getActiveOtp('+15551234567');
+      expect(otp, isNotNull);
+
+      final verifyResult = await gateway.verifyPhoneOtp('+15551234567', otp!);
       expect(verifyResult, isA<SignInSuccess>());
       final success = verifyResult as SignInSuccess;
       expect(success.identity.displayName, '+15551234567');
@@ -176,9 +182,18 @@ void main() {
       final sent = await gateway.sendEmailOtp('otpuser@example.com');
       expect(sent, isTrue);
 
+      final invalidResult = await gateway.verifyEmailOtp(
+        'otpuser@example.com',
+        '000000',
+      );
+      expect(invalidResult, isA<SignInFailed>());
+
+      final otp = gateway.getActiveOtp('otpuser@example.com');
+      expect(otp, isNotNull);
+
       final verifyResult = await gateway.verifyEmailOtp(
         'otpuser@example.com',
-        '123456',
+        otp!,
       );
       expect(verifyResult, isA<SignInSuccess>());
       final success = verifyResult as SignInSuccess;

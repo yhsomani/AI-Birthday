@@ -18,9 +18,15 @@ import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 class MessageStudioScreen extends ConsumerStatefulWidget {
-  const MessageStudioScreen({super.key, required this.birthdayId});
+  const MessageStudioScreen({super.key, this.birthdayId, this.personId})
+    : assert(
+        (birthdayId != null && birthdayId.length > 0) ||
+            (personId != null && personId.length > 0),
+        'Either birthdayId or personId must be provided',
+      );
 
-  final String birthdayId;
+  final String? birthdayId;
+  final String? personId;
 
   @override
   ConsumerState<MessageStudioScreen> createState() =>
@@ -56,7 +62,8 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       _autosaveTimer?.cancel();
       _performAutosave();
     }
@@ -94,6 +101,8 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     }
   }
 
+  String get _activeBirthdayId => _birthday?.id ?? widget.birthdayId ?? '';
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
@@ -101,7 +110,17 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     final pRepo = ref.read(peopleRepositoryProvider);
     final dRepo = ref.read(draftsRepositoryProvider);
 
-    final birthday = await bRepo.getBirthday(widget.birthdayId);
+    Birthday? birthday;
+    if (widget.birthdayId != null && widget.birthdayId!.isNotEmpty) {
+      birthday = await bRepo.getBirthday(widget.birthdayId!);
+      birthday ??= await bRepo.getBirthdayForPerson(widget.birthdayId!);
+    }
+    if (birthday == null &&
+        widget.personId != null &&
+        widget.personId!.isNotEmpty) {
+      birthday = await bRepo.getBirthdayForPerson(widget.personId!);
+    }
+
     if (birthday != null) {
       final person = await pRepo.getPerson(birthday.personId);
       final draft = await dRepo.getDraftForBirthday(birthday.id);
@@ -163,7 +182,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           _draft?.id ?? 'draft-${DateTime.now().millisecondsSinceEpoch}';
       final updatedDraft = MessageDraft(
         id: draftId,
-        birthdayId: widget.birthdayId,
+        birthdayId: _activeBirthdayId,
         personId: _person!.id,
         body: result.message,
         tone: _selectedTone,
@@ -178,7 +197,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       await ref
           .read(birthdaysRepositoryProvider)
           .updateBirthdayStatus(
-            widget.birthdayId,
+            _activeBirthdayId,
             BirthdayStatus.messageDrafted,
             draftId: draftId,
           );
@@ -222,7 +241,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         _draft?.id ?? 'draft-${DateTime.now().millisecondsSinceEpoch}';
     final updatedDraft = MessageDraft(
       id: draftId,
-      birthdayId: widget.birthdayId,
+      birthdayId: _activeBirthdayId,
       personId: _person!.id,
       body: _messageController.text,
       tone: _selectedTone,
@@ -293,11 +312,11 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       if (launched) {
         await ref
             .read(birthdaysRepositoryProvider)
-            .updateBirthdayStatus(widget.birthdayId, BirthdayStatus.handedOff);
+            .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
       } else {
         await ref
             .read(birthdaysRepositoryProvider)
-            .updateBirthdayStatus(widget.birthdayId, BirthdayStatus.failed);
+            .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
       }
 
       if (mounted) {
@@ -338,7 +357,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     if (launched) {
       await ref
           .read(birthdaysRepositoryProvider)
-          .updateBirthdayStatus(widget.birthdayId, BirthdayStatus.handedOff);
+          .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
     }
 
     if (mounted) {
@@ -371,7 +390,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     if (launched) {
       await ref
           .read(birthdaysRepositoryProvider)
-          .updateBirthdayStatus(widget.birthdayId, BirthdayStatus.handedOff);
+          .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
     }
 
     if (mounted) {
@@ -477,20 +496,20 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         MessageTone.funny,
         MessageTone.emotional,
       ];
-      final variations = <MapEntry<MessageTone, String>>[];
-
-      for (final t in tones) {
-        final req = AiGenerationRequest(
-          person: _person!,
-          tone: t,
-          length: _selectedLength,
-        );
-        final res = await aiRouter.generate(
-          request: req,
-          entitlement: entitlement,
-        );
-        variations.add(MapEntry(t, res.message));
-      }
+      final variations = await Future.wait(
+        tones.map((t) async {
+          final req = AiGenerationRequest(
+            person: _person!,
+            tone: t,
+            length: _selectedLength,
+          );
+          final res = await aiRouter.generate(
+            request: req,
+            entitlement: entitlement,
+          );
+          return MapEntry(t, res.message);
+        }),
+      );
 
       if (!mounted) return;
       setState(() => _isGenerating = false);
@@ -572,7 +591,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Could not generate variations: $e';
+          _errorMessage = e is AppFailure
+              ? '${e.message}: ${e.detail ?? ''} ${e.action ?? ''}'.trim()
+              : 'Could not generate variations. You can compose your message manually or retry.';
           _isGenerating = false;
         });
       }
@@ -678,7 +699,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                 await ref
                     .read(birthdaysRepositoryProvider)
                     .updateBirthdayStatus(
-                      widget.birthdayId,
+                      _activeBirthdayId,
                       BirthdayStatus.completed,
                     );
                 await _saveDraft(status: DraftStatus.confirmedSent);
@@ -750,7 +771,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           _buildControlsCard(),
           const SizedBox(height: AppSpacing.md),
 
-          // Error banner if any
+          // Error banner with recovery action buttons
           if (_errorMessage != null) ...[
             Container(
               padding: const EdgeInsets.all(AppSpacing.sm),
@@ -765,21 +786,60 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                   ).colorScheme.error.withValues(alpha: 0.3),
                 ),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: Text(
-                      _errorMessage!,
-                      style: TextStyle(
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
                         color: Theme.of(context).colorScheme.error,
-                        fontSize: 13,
                       ),
-                    ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Retry'),
+                        onPressed: _generateWithAi,
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.edit_note, size: 16),
+                        label: const Text('Write manually'),
+                        onPressed: () {
+                          setState(() => _errorMessage = null);
+                        },
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.tune, size: 16),
+                        label: const Text('AI Settings'),
+                        onPressed: () => context.push('/settings'),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

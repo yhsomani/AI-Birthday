@@ -81,8 +81,8 @@ class InMemoryCredentialStorage implements CredentialStorage {
   InMemoryCredentialStorage({
     String? initialKey,
     bool initialOnboardingCompleted = false,
-  })  : _key = initialKey,
-        _onboardingCompleted = initialOnboardingCompleted;
+  }) : _key = initialKey,
+       _onboardingCompleted = initialOnboardingCompleted;
 
   String? _key;
   bool _onboardingCompleted;

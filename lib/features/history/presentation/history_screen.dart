@@ -56,10 +56,19 @@ class HistoryScreen extends ConsumerWidget {
               };
 
               final (statusIcon, statusLabel) = switch (draft.status) {
-                DraftStatus.confirmedSent => (Icons.check_circle_outline, 'Sent'),
-                DraftStatus.handedOff => (Icons.open_in_new, 'Opened in WhatsApp'),
+                DraftStatus.confirmedSent => (
+                  Icons.check_circle_outline,
+                  'Sent',
+                ),
+                DraftStatus.handedOff => (
+                  Icons.open_in_new,
+                  'Opened in WhatsApp',
+                ),
                 DraftStatus.ready => (Icons.send_outlined, 'Ready to Send'),
-                DraftStatus.reviewed => (Icons.rate_review_outlined, 'Reviewed'),
+                DraftStatus.reviewed => (
+                  Icons.rate_review_outlined,
+                  'Reviewed',
+                ),
                 DraftStatus.draft => (Icons.edit_note_outlined, 'Draft'),
               };
 
@@ -122,11 +131,7 @@ class HistoryScreen extends ConsumerWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  statusIcon,
-                                  size: 14,
-                                  color: statusColor,
-                                ),
+                                Icon(statusIcon, size: 14, color: statusColor),
                                 const SizedBox(width: 4),
                                 Text(
                                   statusLabel,

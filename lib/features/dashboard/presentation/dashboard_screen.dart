@@ -231,8 +231,8 @@ class DashboardScreen extends ConsumerWidget {
             totalTracked == 0
                 ? "Let's add your first birthday"
                 : todayCount > 0
-                    ? '$todayCount ${todayCount == 1 ? 'Birthday' : 'Birthdays'} Today'
-                    : 'All Celebrations On Track',
+                ? '$todayCount ${todayCount == 1 ? 'Birthday' : 'Birthdays'} Today'
+                : 'All Celebrations On Track',
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -242,8 +242,8 @@ class DashboardScreen extends ConsumerWidget {
             totalTracked == 0
                 ? 'Add friends and family so AI-Birthday can prepare personalized greetings right on time.'
                 : actionNeededCount > 0
-                    ? '$actionNeededCount greeting ${actionNeededCount == 1 ? 'requires' : 'require'} review before sending.'
-                    : 'No urgent actions needed. Messages will be prepared ahead of upcoming dates.',
+                ? '$actionNeededCount greeting ${actionNeededCount == 1 ? 'requires' : 'require'} review before sending.'
+                : 'No urgent actions needed. Messages will be prepared ahead of upcoming dates.',
             style: TextStyle(
               fontSize: 14,
               color: theme.colorScheme.onSurfaceVariant,
@@ -396,8 +396,7 @@ class DashboardScreen extends ConsumerWidget {
       BirthdayStatus.messageNotPrepared => Icons.edit_note_rounded,
       BirthdayStatus.messageDrafted => Icons.rate_review_outlined,
       BirthdayStatus.messageReviewed ||
-      BirthdayStatus.readyForDelivery =>
-        Icons.send_rounded,
+      BirthdayStatus.readyForDelivery => Icons.send_rounded,
       BirthdayStatus.handedOff => Icons.check_circle_outline,
       _ => Icons.arrow_forward,
     };
@@ -407,8 +406,7 @@ class DashboardScreen extends ConsumerWidget {
     return switch (status) {
       BirthdayStatus.messageNotPrepared => 'Draft Greeting',
       BirthdayStatus.messageDrafted => 'Review Draft',
-      BirthdayStatus.messageReviewed ||
-      BirthdayStatus.readyForDelivery =>
+      BirthdayStatus.messageReviewed || BirthdayStatus.readyForDelivery =>
         'Send via ${person?.preferredDeliveryChannel.displayName ?? 'WhatsApp'}',
       BirthdayStatus.handedOff => 'Confirm Sent',
       _ => 'Review & Send',

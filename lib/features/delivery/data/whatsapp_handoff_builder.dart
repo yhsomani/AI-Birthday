@@ -38,8 +38,13 @@ class WhatsAppHandoffBuilder {
   /// E.g. "+1 (555) 123-4567" -> "15551234567"
   static String? sanitizePhoneNumber(String? rawPhone) {
     if (rawPhone == null) return null;
-    final digitsOnly = rawPhone.replaceAll(RegExp(r'\D'), '');
-    if (digitsOnly.length < 7 || digitsOnly.length > 15) {
+    var digitsOnly = rawPhone.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.startsWith('00')) {
+      digitsOnly = digitsOnly.substring(2);
+    }
+    if (digitsOnly.length < 7 ||
+        digitsOnly.length > 15 ||
+        digitsOnly.startsWith('0')) {
       return null;
     }
     return digitsOnly;

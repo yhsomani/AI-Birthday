@@ -26,14 +26,44 @@ class MainActivity : FlutterActivity() {
 
     private var pendingNotificationResult: MethodChannel.Result? = null
     private var pendingContactsResult: MethodChannel.Result? = null
+    private var initialPersonId: String? = null
+    private var notificationsChannel: MethodChannel? = null
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        val pId = intent?.getStringExtra(BirthdayNotificationReceiver.EXTRA_PERSON_ID)
+        if (!pId.isNullOrBlank()) {
+            initialPersonId = pId
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val pId = intent.getStringExtra(BirthdayNotificationReceiver.EXTRA_PERSON_ID)
+        if (!pId.isNullOrBlank()) {
+            initialPersonId = pId
+            notificationsChannel?.invokeMethod("onNotificationOpened", mapOf("personId" to pId))
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
         // Setup Notifications MethodChannel
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NOTIFICATIONS_CHANNEL)
-            .setMethodCallHandler { call, result ->
+        val notifChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NOTIFICATIONS_CHANNEL)
+        notificationsChannel = notifChannel
+        notifChannel.setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "getInitialNotification" -> {
+                        val pId = initialPersonId
+                        initialPersonId = null
+                        if (pId != null) {
+                            result.success(mapOf("personId" to pId))
+                        } else {
+                            result.success(null)
+                        }
+                    }
                     "hasPermission" -> {
                         val enabled = NotificationManagerCompat.from(this).areNotificationsEnabled()
                         result.success(enabled)
@@ -68,7 +98,8 @@ class MainActivity : FlutterActivity() {
                     "testNotification" -> {
                         val title = call.argument<String>("title") ?: "Birthday Reminder"
                         val body = call.argument<String>("body") ?: "Testing notification delivery"
-                        showImmediateNotification(title, body)
+                        val personId = call.argument<String>("personId")
+                        showImmediateNotification(title, body, personId)
                         result.success(null)
                     }
                     else -> result.notImplemented()
@@ -347,7 +378,7 @@ class MainActivity : FlutterActivity() {
         notificationManager?.cancelAll()
     }
 
-    private fun showImmediateNotification(title: String, body: String) {
+    private fun showImmediateNotification(title: String, body: String, personId: String? = null) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -363,6 +394,9 @@ class MainActivity : FlutterActivity() {
 
         val launchIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            if (personId != null) {
+                putExtra(BirthdayNotificationReceiver.EXTRA_PERSON_ID, personId)
+            }
         }
 
         val pendingIntent = PendingIntent.getActivity(

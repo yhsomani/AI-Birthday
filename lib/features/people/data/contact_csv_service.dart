@@ -70,10 +70,7 @@ class ParsedContactCandidate {
 
 /// Result of a CSV parse operation containing valid candidates and details on skipped rows.
 class CsvParseResult {
-  const CsvParseResult({
-    required this.candidates,
-    this.invalidRows = const [],
-  });
+  const CsvParseResult({required this.candidates, this.invalidRows = const []});
 
   final List<ParsedContactCandidate> candidates;
   final List<String> invalidRows;
@@ -113,7 +110,10 @@ class ContactCsvService {
     String csvContent, {
     List<Person> existingPeople = const [],
   }) {
-    return parseCsvWithResult(csvContent, existingPeople: existingPeople).candidates;
+    return parseCsvWithResult(
+      csvContent,
+      existingPeople: existingPeople,
+    ).candidates;
   }
 
   /// Parses CSV [csvContent] and returns candidates plus detailed invalid row messages.
@@ -185,7 +185,9 @@ class ContactCsvService {
           month > 12 ||
           day < 1 ||
           day > 31) {
-        invalidRows.add('Row $rowNumber ("$name"): Missing or invalid birthday');
+        invalidRows.add(
+          'Row $rowNumber ("$name"): Missing or invalid birthday',
+        );
         continue;
       }
 
@@ -256,10 +258,7 @@ class ContactCsvService {
       );
     }
 
-    return CsvParseResult(
-      candidates: candidates,
-      invalidRows: invalidRows,
-    );
+    return CsvParseResult(candidates: candidates, invalidRows: invalidRows);
   }
 
   static String _cleanPhone(String phone) =>

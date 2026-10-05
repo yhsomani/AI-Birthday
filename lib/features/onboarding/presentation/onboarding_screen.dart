@@ -34,7 +34,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     HapticFeedback.lightImpact();
     await ref.read(credentialStorageProvider).setCompletedOnboarding(true);
     if (!mounted) return;
-    context.go('/dashboard');
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/dashboard');
+    }
   }
 
   void _nextPage() {
@@ -60,10 +64,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         elevation: 0,
         actions: [
           if (_currentPage < _totalPages - 1)
-            TextButton(
-              onPressed: _finishOnboarding,
-              child: const Text('Skip'),
-            ),
+            TextButton(onPressed: _finishOnboarding, child: const Text('Skip')),
         ],
       ),
       body: SafeArea(
@@ -191,8 +192,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           const SizedBox(height: 32),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.person_add_rounded, color: AppColors.primaryTerracotta),
-              title: const Text('Add Birthday Manually', style: TextStyle(fontWeight: FontWeight.w600)),
+              leading: const Icon(
+                Icons.person_add_rounded,
+                color: AppColors.primaryTerracotta,
+              ),
+              title: const Text(
+                'Add Birthday Manually',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               subtitle: const Text('Enter name, date, relationship, and tone.'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
@@ -204,9 +211,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           const SizedBox(height: 12),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.contact_phone_rounded, color: AppColors.accentForest),
-              title: const Text('Import from Phone Contacts', style: TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: const Text('Quickly scan phone contacts to import existing birthdays.'),
+              leading: const Icon(
+                Icons.contact_phone_rounded,
+                color: AppColors.accentForest,
+              ),
+              title: const Text(
+                'Import from Phone Contacts',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                'Quickly scan phone contacts to import existing birthdays.',
+              ),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
                 _finishOnboarding();
@@ -264,12 +279,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           const SizedBox(height: 14),
           _buildReminderTimelineStep(
             days: '2 Days',
-            label: 'Draft ready: Personalized message is prepared for your review.',
+            label:
+                'Draft ready: Personalized message is prepared for your review.',
           ),
           const SizedBox(height: 14),
           _buildReminderTimelineStep(
             days: 'Today',
-            label: 'Send day: One tap handoff to WhatsApp with your confirmed greeting.',
+            label:
+                'Send day: One tap handoff to WhatsApp with your confirmed greeting.',
           ),
         ],
       ),
@@ -299,10 +316,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         const SizedBox(width: 14),
         Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 13, height: 1.3),
-          ),
+          child: Text(label, style: const TextStyle(fontSize: 13, height: 1.3)),
         ),
       ],
     );
@@ -332,7 +346,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               const SizedBox(height: 2),
               Text(
                 description,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.3),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  height: 1.3,
+                ),
               ),
             ],
           ),
@@ -368,7 +386,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
           FilledButton.icon(
             onPressed: _nextPage,
-            icon: Icon(isLastPage ? Icons.check : Icons.arrow_forward, size: 18),
+            icon: Icon(
+              isLastPage ? Icons.check : Icons.arrow_forward,
+              size: 18,
+            ),
             label: Text(isLastPage ? 'Get Started' : 'Next'),
           ),
         ],

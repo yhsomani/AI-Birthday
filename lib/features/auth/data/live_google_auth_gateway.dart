@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:google_sign_in/google_sign_in.dart' hide GoogleIdentity;
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 import '../../../core/logging/app_logger.dart';
 import '../../../core/security/credential_storage.dart';
@@ -97,20 +98,12 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
       _logger?.info('AuthGateway', 'Starting Google sign-in flow');
       await _ensureInitialized();
 
-      GoogleSignInAccount? account;
+      final GoogleSignInAccount account;
       try {
         account = await GoogleSignIn.instance.authenticate();
       } catch (e) {
-        _logger?.warning('AuthGateway', 'Native GoogleSignIn note: $e');
-        final fallbackIdentity = const GoogleIdentity(
-          googleSubject: 'google_339889410493_ysomani',
-          email: 'ysomani07@gmail.com',
-          displayName: 'Yash Somani',
-          firebaseUid: 'relateai_ysomani07',
-          idToken: 'live_google_id_token_ysomani07',
-        );
-        await _saveSession(fallbackIdentity);
-        return SignInSuccess(fallbackIdentity);
+        _logger?.warning('AuthGateway', 'Native GoogleSignIn failed: $e');
+        return SignInFailed('Google Sign-In failed or was cancelled: $e');
       }
 
       final idToken = account.authentication.idToken;
@@ -160,15 +153,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
         error: e,
         stackTrace: st,
       );
-      final fallbackIdentity = const GoogleIdentity(
-        googleSubject: 'google_339889410493_ysomani',
-        email: 'ysomani07@gmail.com',
-        displayName: 'Yash Somani',
-        firebaseUid: 'relateai_ysomani07',
-        idToken: 'live_google_id_token_ysomani07',
-      );
-      await _saveSession(fallbackIdentity);
-      return SignInSuccess(fallbackIdentity);
+      return const SignInFailed('Sign-in failed. Please try again.');
     }
   }
 
@@ -187,7 +172,8 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
   Future<SignInOutcome> verifyPhoneOtp(String phoneNumber, String otp) async {
     final sanitized = phoneNumber.trim().replaceAll(' ', '');
     final expected = _activeOtps[sanitized];
-    if (otp.trim() == expected || otp.trim() == '123456') {
+    if (expected != null && otp.trim() == expected) {
+      _activeOtps.remove(sanitized);
       final phoneDigits = sanitized.replaceAll(RegExp(r'[^0-9]'), '');
       final identity = GoogleIdentity(
         googleSubject: 'phone_$phoneDigits',
@@ -218,7 +204,8 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
   Future<SignInOutcome> verifyEmailOtp(String email, String otp) async {
     final sanitized = email.trim().toLowerCase();
     final expected = _activeOtps[sanitized];
-    if (otp.trim() == expected || otp.trim() == '123456') {
+    if (expected != null && otp.trim() == expected) {
+      _activeOtps.remove(sanitized);
       final hash = sanitized.hashCode.abs();
       final identity = GoogleIdentity(
         googleSubject: 'email_$hash',
@@ -234,7 +221,15 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
     return const SignInFailed('Invalid verification code. Please try again.');
   }
 
-  /// Direct Email/Password sign-in via Firebase Auth REST API with resilient fallback.
+  /// Returns the active OTP for testing verification.
+  @visibleForTesting
+  String? getActiveOtp(String recipient) {
+    final sanitizedEmail = recipient.trim().toLowerCase();
+    final sanitizedPhone = recipient.trim().replaceAll(' ', '');
+    return _activeOtps[sanitizedEmail] ?? _activeOtps[sanitizedPhone];
+  }
+
+  /// Direct Email/Password sign-in via Firebase Auth REST API.
   Future<SignInOutcome> signInWithEmail(String email, String password) async {
     final cleanEmail = email.trim();
     if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
@@ -274,37 +269,16 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
         final err =
             (data['error'] as Map<String, dynamic>?)?['message'] as String? ??
             'Sign in failed';
-        if (err.contains('PASSWORD_LOGIN_DISABLED') ||
-            err.contains('OPERATION_NOT_ALLOWED')) {
-          final hash = cleanEmail.hashCode.abs();
-          final identity = GoogleIdentity(
-            googleSubject: 'email_$hash',
-            email: cleanEmail,
-            displayName: cleanEmail.split('@').first,
-            firebaseUid: 'email_$hash',
-            idToken:
-                'live_email_token_${DateTime.now().millisecondsSinceEpoch}',
-          );
-          await _saveSession(identity);
-          return SignInSuccess(identity);
-        }
         return SignInFailed(_mapFirebaseErrorMessage(err));
       }
     } catch (e) {
-      final hash = cleanEmail.hashCode.abs();
-      final identity = GoogleIdentity(
-        googleSubject: 'email_$hash',
-        email: cleanEmail,
-        displayName: cleanEmail.split('@').first,
-        firebaseUid: 'email_$hash',
-        idToken: 'live_email_token_${DateTime.now().millisecondsSinceEpoch}',
+      return const SignInFailed(
+        'Sign in failed. Please check your network connection.',
       );
-      await _saveSession(identity);
-      return SignInSuccess(identity);
     }
   }
 
-  /// Direct Email/Password account registration via Firebase Auth REST API with resilient fallback.
+  /// Direct Email/Password account registration via Firebase Auth REST API.
   Future<SignInOutcome> signUpWithEmail(String email, String password) async {
     final cleanEmail = email.trim();
     if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
@@ -343,33 +317,12 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
         final err =
             (data['error'] as Map<String, dynamic>?)?['message'] as String? ??
             'Sign up failed';
-        if (err.contains('OPERATION_NOT_ALLOWED') ||
-            err.contains('PASSWORD_LOGIN_DISABLED')) {
-          final hash = cleanEmail.hashCode.abs();
-          final identity = GoogleIdentity(
-            googleSubject: 'email_$hash',
-            email: cleanEmail,
-            displayName: cleanEmail.split('@').first,
-            firebaseUid: 'email_$hash',
-            idToken:
-                'live_email_token_${DateTime.now().millisecondsSinceEpoch}',
-          );
-          await _saveSession(identity);
-          return SignInSuccess(identity);
-        }
         return SignInFailed(_mapFirebaseErrorMessage(err));
       }
     } catch (e) {
-      final hash = cleanEmail.hashCode.abs();
-      final identity = GoogleIdentity(
-        googleSubject: 'email_$hash',
-        email: cleanEmail,
-        displayName: cleanEmail.split('@').first,
-        firebaseUid: 'email_$hash',
-        idToken: 'live_email_token_${DateTime.now().millisecondsSinceEpoch}',
+      return const SignInFailed(
+        'Sign up failed. Please check your network connection.',
       );
-      await _saveSession(identity);
-      return SignInSuccess(identity);
     }
   }
 

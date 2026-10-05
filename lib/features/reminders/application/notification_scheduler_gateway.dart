@@ -23,4 +23,10 @@ abstract class NotificationSchedulerGateway {
     required String title,
     required String body,
   }) async {}
+
+  /// Retrieves recipient personId if the app was launched by tapping a birthday notification.
+  Future<String?> getInitialNotificationPersonId() async => null;
+
+  /// Registers a listener invoked when a notification is tapped while the app is alive.
+  void setNotificationOpenedHandler(void Function(String personId) onOpened) {}
 }

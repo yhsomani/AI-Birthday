@@ -23,15 +23,18 @@ void main() {
           ),
           GoRoute(
             path: '/dashboard',
-            builder: (context, state) => const Scaffold(body: Text('Dashboard Screen')),
+            builder: (context, state) =>
+                const Scaffold(body: Text('Dashboard Screen')),
           ),
           GoRoute(
             path: '/people/add',
-            builder: (context, state) => const Scaffold(body: Text('Add Person Screen')),
+            builder: (context, state) =>
+                const Scaffold(body: Text('Add Person Screen')),
           ),
           GoRoute(
             path: '/people',
-            builder: (context, state) => const Scaffold(body: Text('People Screen')),
+            builder: (context, state) =>
+                const Scaffold(body: Text('People Screen')),
           ),
         ],
       );
@@ -39,27 +42,30 @@ void main() {
 
     Widget buildTestApp() {
       return ProviderScope(
-        overrides: [
-          credentialStorageProvider.overrideWithValue(fakeStorage),
-        ],
-        child: MaterialApp.router(
-          routerConfig: testRouter,
-        ),
+        overrides: [credentialStorageProvider.overrideWithValue(fakeStorage)],
+        child: MaterialApp.router(routerConfig: testRouter),
       );
     }
 
-    testWidgets('displays page 1 with core 5-step loop and privacy guarantee', (tester) async {
+    testWidgets('displays page 1 with core 5-step loop and privacy guarantee', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildTestApp());
       await tester.pumpAndSettle();
 
       expect(find.text('Never miss a birthday that matters.'), findsOneWidget);
-      expect(find.text('Remember → Prepare → Personalize → Review → Send'), findsOneWidget);
+      expect(
+        find.text('Remember → Prepare → Personalize → Review → Send'),
+        findsOneWidget,
+      );
       expect(find.text('Strictly Local-First Privacy'), findsOneWidget);
       expect(find.text('Next'), findsOneWidget);
       expect(find.text('Skip'), findsOneWidget);
     });
 
-    testWidgets('navigates through pages to completion and saves status', (tester) async {
+    testWidgets('navigates through pages to completion and saves status', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildTestApp());
       await tester.pumpAndSettle();
 
@@ -89,7 +95,9 @@ void main() {
       expect(find.text('Dashboard Screen'), findsOneWidget);
     });
 
-    testWidgets('tapping Skip finishes onboarding and navigates to dashboard', (tester) async {
+    testWidgets('tapping Skip finishes onboarding and navigates to dashboard', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildTestApp());
       await tester.pumpAndSettle();
 

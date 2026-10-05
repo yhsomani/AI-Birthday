@@ -15,11 +15,11 @@ import 'package:ai_birthday/features/people/domain/models/relationship.dart'
     as p_rel;
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart'
     as d_chan;
-import 'package:ai_birthday/features/people/domain/models/tone.dart' as p_tone;
 import 'package:ai_birthday/features/people/domain/person.dart';
 import 'package:ai_birthday/features/people/domain/person_enums.dart'
     hide DeliveryChannel, RelationshipCloseness;
-import 'package:ai_birthday/features/people/domain/person_enums.dart' as p_enums;
+import 'package:ai_birthday/features/people/domain/person_enums.dart'
+    as p_enums;
 import 'package:ai_birthday/features/people/domain/person_input.dart';
 import 'package:ai_birthday/features/people/domain/person_input_validator.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
@@ -155,11 +155,16 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
     _notes.text = person.notes ?? '';
     _timezone.text = person.timezone ?? '';
     _tone = person.preferredTone;
-    _closeness = _existingPerson?.relationshipCloseness ??
-        p_rel.RelationshipCloseness.fromString(person.relationshipCloseness.name);
-    _preferredLanguage = _existingPerson?.preferredLanguage ??
+    _closeness =
+        _existingPerson?.relationshipCloseness ??
+        p_rel.RelationshipCloseness.fromString(
+          person.relationshipCloseness.name,
+        );
+    _preferredLanguage =
+        _existingPerson?.preferredLanguage ??
         (person.preferredLanguage.isNotEmpty ? person.preferredLanguage : 'en');
-    _deliveryChannel = _existingPerson?.preferredDeliveryChannel ??
+    _deliveryChannel =
+        _existingPerson?.preferredDeliveryChannel ??
         d_chan.DeliveryChannel.fromString(person.preferredDeliveryChannel.name);
     _autoPrepare = _existingPerson?.autoPrepare ?? person.autoPrepare;
     _facts
@@ -218,7 +223,9 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       phoneNumber: emptyToNull(_phone.text),
       email: emptyToNull(_email.text),
       relationship: _relationship.text.trim(),
-      relationshipCloseness: p_enums.RelationshipCloseness.parse(_closeness.name),
+      relationshipCloseness: p_enums.RelationshipCloseness.parse(
+        _closeness.name,
+      ),
       preferredLanguage: _preferredLanguage,
       preferredTone: _tone,
       importantFacts: _facts
@@ -226,7 +233,9 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
           .where((f) => f.isNotEmpty)
           .toList(),
       notes: emptyToNull(_notes.text),
-      preferredDeliveryChannel: p_enums.DeliveryChannel.parse(_deliveryChannel.name),
+      preferredDeliveryChannel: p_enums.DeliveryChannel.parse(
+        _deliveryChannel.name,
+      ),
       timezone: emptyToNull(_timezone.text),
       autoPrepare: _autoPrepare,
     );
@@ -248,70 +257,36 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
           ? await service.update(_loaded!, draft)
           : await service.create(draft);
 
-      // Keep in-memory repository synchronized for live Dashboard and People streams
-      try {
-        final peopleRepo = ref.read(peopleRepositoryProvider);
+      if (saved.hasBirthday) {
         final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
-
-        final personModel = p_models.Person(
-          id: saved.id,
-          name: saved.name,
-          birthdayMonth: saved.birthdayMonth,
-          birthdayDay: saved.birthdayDay,
-          birthYear: saved.birthYear,
-          phoneNumber: saved.phoneNumber,
-          email: saved.email,
-          relationship: p_rel.RelationshipCategory.fromString(
-            saved.relationship,
-          ),
-          relationshipCloseness: _closeness,
-          preferredLanguage: _preferredLanguage,
-          preferredTone: p_tone.MessageTone.fromString(
-            saved.preferredTone.name,
-          ),
-          importantFacts: saved.importantFacts,
-          notes: saved.notes,
-          preferredDeliveryChannel: _deliveryChannel,
-          timezone: saved.timezone,
-          autoPrepare: _autoPrepare,
-          createdAt: _existingPerson?.createdAt ?? saved.createdAt,
-          updatedAt: DateTime.now().toUtc(),
-          version: (_existingPerson?.version ?? 0) + 1,
+        final now = DateTime.now();
+        final nextDate = b_models.Birthday.nextBirthdayDate(
+          month: saved.birthdayMonth!,
+          day: saved.birthdayDay!,
+          from: now,
         );
-        await peopleRepo.savePerson(personModel);
-
-        if (saved.hasBirthday) {
-          final now = DateTime.now();
-          final nextDate = b_models.Birthday.nextBirthdayDate(
-            month: saved.birthdayMonth!,
-            day: saved.birthdayDay!,
-            from: now,
-          );
-          final existingBirthday = await birthdaysRepo.getBirthdayForPerson(
-            saved.id,
-          );
-          final isToday =
-              nextDate.year == now.year &&
-              nextDate.month == now.month &&
-              nextDate.day == now.day;
-          final birthdayModel = b_models.Birthday(
-            id: existingBirthday?.id ?? 'birthday-${saved.id}',
-            personId: saved.id,
-            cycleYear: nextDate.year,
-            date: nextDate,
-            status:
-                existingBirthday?.status ??
-                (isToday
-                    ? b_models.BirthdayStatus.reminderDue
-                    : b_models.BirthdayStatus.upcoming),
-            draftId: existingBirthday?.draftId,
-            createdAt: existingBirthday?.createdAt ?? now,
-            updatedAt: now,
-          );
-          await birthdaysRepo.saveBirthday(birthdayModel);
-        }
-      } catch (_) {
-        // Safe fallback if tests do not override in-memory repos
+        final existingBirthday = await birthdaysRepo.getBirthdayForPerson(
+          saved.id,
+        );
+        final isToday =
+            nextDate.year == now.year &&
+            nextDate.month == now.month &&
+            nextDate.day == now.day;
+        final birthdayModel = b_models.Birthday(
+          id: existingBirthday?.id ?? 'birthday-${saved.id}',
+          personId: saved.id,
+          cycleYear: nextDate.year,
+          date: nextDate,
+          status:
+              existingBirthday?.status ??
+              (isToday
+                  ? b_models.BirthdayStatus.reminderDue
+                  : b_models.BirthdayStatus.upcoming),
+          draftId: existingBirthday?.draftId,
+          createdAt: existingBirthday?.createdAt ?? now,
+          updatedAt: now,
+        );
+        await birthdaysRepo.saveBirthday(birthdayModel);
       }
 
       if (!mounted) return;
@@ -491,11 +466,23 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                         DropdownButtonFormField<String>(
                           initialValue: _preferredLanguage,
                           items: const [
-                            DropdownMenuItem(value: 'en', child: Text('English')),
+                            DropdownMenuItem(
+                              value: 'en',
+                              child: Text('English'),
+                            ),
                             DropdownMenuItem(value: 'hi', child: Text('Hindi')),
-                            DropdownMenuItem(value: 'es', child: Text('Spanish')),
-                            DropdownMenuItem(value: 'fr', child: Text('French')),
-                            DropdownMenuItem(value: 'de', child: Text('German')),
+                            DropdownMenuItem(
+                              value: 'es',
+                              child: Text('Spanish'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'fr',
+                              child: Text('French'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'de',
+                              child: Text('German'),
+                            ),
                           ],
                           onChanged: (value) => setState(
                             () => _preferredLanguage = value ?? 'en',
