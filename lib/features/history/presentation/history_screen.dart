@@ -21,7 +21,9 @@ class HistoryScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('History & Activity')),
       body: draftsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error loading history: $err')),
+        error: (err, _) => const Center(
+          child: Text('Error loading history. Please try again later.'),
+        ),
         data: (drafts) {
           if (drafts.isEmpty) {
             return const EmptyState(

@@ -21,9 +21,9 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
     required SecureStoreDriver store,
     http.Client? httpClient,
     AppLogger? logger,
-  })  : _store = store,
-        _http = httpClient ?? http.Client(),
-        _logger = logger;
+  }) : _store = store,
+       _http = httpClient ?? http.Client(),
+       _logger = logger;
 
   final SecureStoreDriver _store;
   final http.Client _http;
@@ -49,9 +49,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
     try {
-      await GoogleSignIn.instance.initialize(
-        serverClientId: _serverClientId,
-      );
+      await GoogleSignIn.instance.initialize(serverClientId: _serverClientId);
       _initialized = true;
     } catch (e) {
       _logger?.warning('AuthGateway', 'GoogleSignIn initialize note: $e');
@@ -114,7 +112,6 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
         await _saveSession(fallbackIdentity);
         return SignInSuccess(fallbackIdentity);
       }
-
 
       final idToken = account.authentication.idToken;
       String? firebaseUid = account.id;
@@ -285,7 +282,8 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
             email: cleanEmail,
             displayName: cleanEmail.split('@').first,
             firebaseUid: 'email_$hash',
-            idToken: 'live_email_token_${DateTime.now().millisecondsSinceEpoch}',
+            idToken:
+                'live_email_token_${DateTime.now().millisecondsSinceEpoch}',
           );
           await _saveSession(identity);
           return SignInSuccess(identity);
@@ -353,7 +351,8 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
             email: cleanEmail,
             displayName: cleanEmail.split('@').first,
             firebaseUid: 'email_$hash',
-            idToken: 'live_email_token_${DateTime.now().millisecondsSinceEpoch}',
+            idToken:
+                'live_email_token_${DateTime.now().millisecondsSinceEpoch}',
           );
           await _saveSession(identity);
           return SignInSuccess(identity);

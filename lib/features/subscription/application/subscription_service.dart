@@ -18,10 +18,10 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     SecureStoreDriver? store,
     iap.InAppPurchase? inAppPurchase,
     AppLogger? logger,
-  })  : _store = store,
-        _iap = inAppPurchase ?? iap.InAppPurchase.instance,
-        _logger = logger ?? ConsoleAppLogger(),
-        super(initial) {
+  }) : _store = store,
+       _iap = inAppPurchase ?? iap.InAppPurchase.instance,
+       _logger = logger ?? ConsoleAppLogger(),
+       super(initial) {
     _initIapAndRestore();
   }
 

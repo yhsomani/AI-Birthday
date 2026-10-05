@@ -171,10 +171,10 @@ class DashboardScreen extends ConsumerWidget {
             child: CircularProgressIndicator(),
           ),
         ),
-        error: (err, _) => Center(
+        error: (err, _) => const Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('Error loading birthdays: $err'),
+            padding: EdgeInsets.all(24),
+            child: Text('Error loading birthdays. Please try again later.'),
           ),
         ),
       ),

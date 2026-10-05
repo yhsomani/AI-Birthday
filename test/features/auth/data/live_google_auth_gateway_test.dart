@@ -91,7 +91,10 @@ void main() {
         httpClient: mockClient,
       );
 
-      final outcome = await gateway.signInWithEmail('user@example.com', 'pass1234');
+      final outcome = await gateway.signInWithEmail(
+        'user@example.com',
+        'pass1234',
+      );
       expect(outcome, isA<SignInSuccess>());
       final success = outcome as SignInSuccess;
       expect(success.identity.email, 'user@example.com');
@@ -116,7 +119,10 @@ void main() {
         httpClient: mockClient,
       );
 
-      final outcome = await gateway.signInWithEmail('user@example.com', 'wrong');
+      final outcome = await gateway.signInWithEmail(
+        'user@example.com',
+        'wrong',
+      );
       expect(outcome, isA<SignInFailed>());
       final failed = outcome as SignInFailed;
       expect(failed.message, contains('Invalid email or password.'));
@@ -140,7 +146,10 @@ void main() {
         httpClient: mockClient,
       );
 
-      final outcome = await gateway.signUpWithEmail('new@example.com', 'pass1234');
+      final outcome = await gateway.signUpWithEmail(
+        'new@example.com',
+        'pass1234',
+      );
       expect(outcome, isA<SignInSuccess>());
       final success = outcome as SignInSuccess;
       expect(success.identity.email, 'new@example.com');
@@ -152,7 +161,10 @@ void main() {
       final sent = await gateway.sendPhoneOtp('+15551234567');
       expect(sent, isTrue);
 
-      final verifyResult = await gateway.verifyPhoneOtp('+15551234567', '123456');
+      final verifyResult = await gateway.verifyPhoneOtp(
+        '+15551234567',
+        '123456',
+      );
       expect(verifyResult, isA<SignInSuccess>());
       final success = verifyResult as SignInSuccess;
       expect(success.identity.displayName, '+15551234567');
@@ -164,7 +176,10 @@ void main() {
       final sent = await gateway.sendEmailOtp('otpuser@example.com');
       expect(sent, isTrue);
 
-      final verifyResult = await gateway.verifyEmailOtp('otpuser@example.com', '123456');
+      final verifyResult = await gateway.verifyEmailOtp(
+        'otpuser@example.com',
+        '123456',
+      );
       expect(verifyResult, isA<SignInSuccess>());
       final success = verifyResult as SignInSuccess;
       expect(success.identity.email, 'otpuser@example.com');

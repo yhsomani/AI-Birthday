@@ -690,7 +690,9 @@ class PeopleScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error loading contacts: $err')),
+        error: (err, _) => const Center(
+          child: Text('Error loading contacts. Please try again later.'),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {

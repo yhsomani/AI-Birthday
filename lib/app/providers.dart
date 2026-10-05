@@ -55,10 +55,7 @@ final subscriptionNotifierProvider =
       final logger = ref.watch(loggerProvider);
       return SubscriptionNotifier(
         initial: UserEntitlement.free,
-        store: FlutterSecureStorageDriver(
-          const FlutterSecureStorage(),
-          logger,
-        ),
+        store: FlutterSecureStorageDriver(const FlutterSecureStorage(), logger),
         logger: logger,
       );
     });
@@ -101,11 +98,7 @@ final cloudSyncServiceProvider = Provider<CloudSyncService>((ref) {
     const FlutterSecureStorage(),
     logger,
   );
-  return CloudSyncService(
-    db: db,
-    store: store,
-    logger: logger,
-  );
+  return CloudSyncService(db: db, store: store, logger: logger);
 });
 
 /// Gemini Nano Platform provider.

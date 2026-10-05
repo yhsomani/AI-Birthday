@@ -138,12 +138,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           );
         }
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving API key: $e')));
-      }
+    } catch (e, st) {
+      if (!mounted) return;
+      // 🛡️ SECURITY: Prevent internal exception strings from leaking into the UI.
+      ref
+          .read(loggerProvider)
+          .error('Settings', 'Error saving API key', error: e, stackTrace: st);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'An unexpected error occurred while saving the API key.',
+          ),
+        ),
+      );
     }
   }
 
@@ -739,9 +746,7 @@ class _AuthTile extends ConsumerWidget {
         ),
         AuthStatus.signedIn => ListTile(
           leading: CircleAvatar(
-            backgroundColor: const Color(
-              0xFF2D5A46,
-            ).withValues(alpha: 0.15),
+            backgroundColor: const Color(0xFF2D5A46).withValues(alpha: 0.15),
             foregroundColor: const Color(0xFF2D5A46),
             backgroundImage: state.identity?.photoUrl != null
                 ? NetworkImage(state.identity!.photoUrl!)

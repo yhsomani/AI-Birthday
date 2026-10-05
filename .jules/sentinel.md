@@ -21,3 +21,7 @@
 **Vulnerability:** Use of Buffer.allocUnsafe exposes uninitialized memory which could lead to information leakage if the buffer is read before being fully overwritten.
 **Learning:** While Buffer.allocUnsafe can be faster, it skips zeroing out memory. Unless there is a strict, proven performance bottleneck requiring it, always default to Buffer.alloc to ensure memory hygiene.
 **Prevention:** Use Buffer.alloc() instead of Buffer.allocUnsafe() as a secure default for memory allocation in Node.js applications.
+## 2024-05-24 - Secure Error Handling in Flutter UI
+**Vulnerability:** Information Disclosure
+**Learning:** Generic `catch (e)` blocks that directly expose raw exception objects (`e.toString()`) to user-facing error models or UI elements (like `SnackBar` or `Text`) can leak sensitive internal state, stack traces, or configuration details to the user.
+**Prevention:** Never expose raw exception strings to the UI. Always log the raw exception and stack trace internally via a secure logger (e.g., `loggerProvider`), and present a static, sanitized error message to the user.
