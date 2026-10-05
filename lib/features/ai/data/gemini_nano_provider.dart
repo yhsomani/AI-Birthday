@@ -102,12 +102,10 @@ class DefaultGeminiNanoPlatform implements GeminiNanoPlatform {
 
   @override
   Future<NanoGenerationResult> generate(String prompt) async {
-    if (_initialState != NanoState.available) {
-      throw const AppFailure.nanoUnavailable();
-    }
-    return const NanoGenerationResult(
-      text:
-          'Wishing you a truly wonderful and memorable birthday filled with happiness!',
+    // The default Dart adapter must never impersonate Gemini Nano. A real
+    // Android AICore implementation is required before this state can be usable.
+    throw const AppFailure.nanoUnavailable(
+      action: 'Gemini Nano is not available in this build.',
     );
   }
 
