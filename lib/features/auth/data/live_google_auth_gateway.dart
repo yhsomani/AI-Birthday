@@ -32,7 +32,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
   bool _initialized = false;
 
   static const String _firebaseApiKey =
-      'AIzaSyDUgbmii4EH0PCHVOxO9TXvGeXyFpyxWNQ';
+      String.fromEnvironment('FIREBASE_WEB_API_KEY');
 
   static const String _serverClientId =
       '339889410493-g5klr4838kfibddoqvk1rbbt39dblffp.apps.googleusercontent.com';
@@ -59,7 +59,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
   }
 
   @override
-  Future<bool> isConfigured() async => true;
+  Future<bool> isConfigured() async => _firebaseApiKey.isNotEmpty;
 
   @override
   Future<GoogleIdentity?> getStoredIdentity() async {
