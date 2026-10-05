@@ -36,15 +36,6 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   static const String _keyEntitlement = 'user_subscription_entitlement';
 
   Future<void> _initIapAndRestore() async {
-    if (_store != null) {
-      try {
-        final saved = await _store.read(_keyEntitlement);
-        if (saved == 'proActive') {
-          state = UserEntitlement.proActive;
-        }
-      } catch (_) {}
-    }
-
     try {
       final available = await _iap.isAvailable();
       if (!available) return;
@@ -55,6 +46,10 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
           _logger.error('Subscription', 'Purchase stream error: $err');
         },
       );
+
+      // Ask Google Play for the current store-owned purchases. Entitlement is
+      // derived from verified purchase events, never from local cached state.
+      await _iap.restorePurchases();
     } catch (e) {
       _logger.warning('Subscription', 'InAppPurchase initialize note: $e');
     }
@@ -132,19 +127,16 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     _logger.info('Subscription', 'Checking for restorable purchases');
     try {
       final isAvailable = await _iap.isAvailable();
-      if (isAvailable) {
-        await _iap.restorePurchases();
-      }
-      final saved = await _store?.read(_keyEntitlement);
-      if (saved == 'proActive' || state.canUseAi) {
-        state = UserEntitlement.proActive;
-        _logger.info('Subscription', 'Active entitlement confirmed.');
-        return true;
-      }
+      if (!isAvailable) return false;
+
+      await _iap.restorePurchases();
+      // The purchase stream is the source of truth. Do not read or promote a
+      // cached local entitlement here.
+      return state.canUseAi;
     } catch (e) {
       _logger.warning('Subscription', 'Restore purchase note: $e');
+      return false;
     }
-    return false;
   }
 
   /// Cancels / resets entitlement for test and verification scenarios.
@@ -154,17 +146,4 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     _store?.delete(_keyEntitlement);
   }
 
-  /// Explicit developer sandbox override for controlled QA testing.
-  void setDevSandboxEntitlement(UserEntitlement entitlement) {
-    _logger.warning(
-      'Subscription',
-      'DEV OVERRIDE: Setting entitlement to ${entitlement.status.displayName}',
-    );
-    state = entitlement;
-    if (entitlement.canUseAi) {
-      _store?.write(_keyEntitlement, 'proActive');
-    } else {
-      _store?.delete(_keyEntitlement);
-    }
-  }
 }
