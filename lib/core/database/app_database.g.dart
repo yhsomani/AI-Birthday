@@ -33,9 +33,9 @@ class $PersonsTable extends Persons with TableInfo<$PersonsTable, Person> {
   late final GeneratedColumn<int> birthdayMonth = GeneratedColumn<int>(
     'birthday_month',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.int,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _birthdayDayMeta = const VerificationMeta(
     'birthdayDay',
@@ -44,9 +44,9 @@ class $PersonsTable extends Persons with TableInfo<$PersonsTable, Person> {
   late final GeneratedColumn<int> birthdayDay = GeneratedColumn<int>(
     'birthday_day',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.int,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _birthYearMeta = const VerificationMeta(
     'birthYear',
@@ -293,8 +293,6 @@ class $PersonsTable extends Persons with TableInfo<$PersonsTable, Person> {
           _birthdayMonthMeta,
         ),
       );
-    } else if (isInserting) {
-      context.missing(_birthdayMonthMeta);
     }
     if (data.containsKey('birthday_day')) {
       context.handle(
@@ -304,8 +302,6 @@ class $PersonsTable extends Persons with TableInfo<$PersonsTable, Person> {
           _birthdayDayMeta,
         ),
       );
-    } else if (isInserting) {
-      context.missing(_birthdayDayMeta);
     }
     if (data.containsKey('birth_year')) {
       context.handle(
@@ -476,11 +472,11 @@ class $PersonsTable extends Persons with TableInfo<$PersonsTable, Person> {
       birthdayMonth: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}birthday_month'],
-      )!,
+      ),
       birthdayDay: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}birthday_day'],
-      )!,
+      ),
       birthYear: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}birth_year'],
@@ -561,8 +557,8 @@ class $PersonsTable extends Persons with TableInfo<$PersonsTable, Person> {
 class Person extends DataClass implements Insertable<Person> {
   final String id;
   final String name;
-  final int birthdayMonth;
-  final int birthdayDay;
+  final int? birthdayMonth;
+  final int? birthdayDay;
   final int? birthYear;
   final String? phoneNumber;
   final String? email;
@@ -583,8 +579,8 @@ class Person extends DataClass implements Insertable<Person> {
   const Person({
     required this.id,
     required this.name,
-    required this.birthdayMonth,
-    required this.birthdayDay,
+    this.birthdayMonth,
+    this.birthdayDay,
     this.birthYear,
     this.phoneNumber,
     this.email,
@@ -608,8 +604,12 @@ class Person extends DataClass implements Insertable<Person> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
-    map['birthday_month'] = Variable<int>(birthdayMonth);
-    map['birthday_day'] = Variable<int>(birthdayDay);
+    if (!nullToAbsent || birthdayMonth != null) {
+      map['birthday_month'] = Variable<int>(birthdayMonth);
+    }
+    if (!nullToAbsent || birthdayDay != null) {
+      map['birthday_day'] = Variable<int>(birthdayDay);
+    }
     if (!nullToAbsent || birthYear != null) {
       map['birth_year'] = Variable<int>(birthYear);
     }
@@ -648,8 +648,12 @@ class Person extends DataClass implements Insertable<Person> {
     return PersonsCompanion(
       id: Value(id),
       name: Value(name),
-      birthdayMonth: Value(birthdayMonth),
-      birthdayDay: Value(birthdayDay),
+      birthdayMonth: birthdayMonth == null && nullToAbsent
+          ? const Value.absent()
+          : Value(birthdayMonth),
+      birthdayDay: birthdayDay == null && nullToAbsent
+          ? const Value.absent()
+          : Value(birthdayDay),
       birthYear: birthYear == null && nullToAbsent
           ? const Value.absent()
           : Value(birthYear),
@@ -690,8 +694,8 @@ class Person extends DataClass implements Insertable<Person> {
     return Person(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
-      birthdayMonth: serializer.fromJson<int>(json['birthdayMonth']),
-      birthdayDay: serializer.fromJson<int>(json['birthdayDay']),
+      birthdayMonth: serializer.fromJson<int?>(json['birthdayMonth']),
+      birthdayDay: serializer.fromJson<int?>(json['birthdayDay']),
       birthYear: serializer.fromJson<int?>(json['birthYear']),
       phoneNumber: serializer.fromJson<String?>(json['phoneNumber']),
       email: serializer.fromJson<String?>(json['email']),
@@ -721,8 +725,8 @@ class Person extends DataClass implements Insertable<Person> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
-      'birthdayMonth': serializer.toJson<int>(birthdayMonth),
-      'birthdayDay': serializer.toJson<int>(birthdayDay),
+      'birthdayMonth': serializer.toJson<int?>(birthdayMonth),
+      'birthdayDay': serializer.toJson<int?>(birthdayDay),
       'birthYear': serializer.toJson<int?>(birthYear),
       'phoneNumber': serializer.toJson<String?>(phoneNumber),
       'email': serializer.toJson<String?>(email),
@@ -748,8 +752,8 @@ class Person extends DataClass implements Insertable<Person> {
   Person copyWith({
     String? id,
     String? name,
-    int? birthdayMonth,
-    int? birthdayDay,
+    Value<int?> birthdayMonth = const Value.absent(),
+    Value<int?> birthdayDay = const Value.absent(),
     Value<int?> birthYear = const Value.absent(),
     Value<String?> phoneNumber = const Value.absent(),
     Value<String?> email = const Value.absent(),
@@ -770,8 +774,10 @@ class Person extends DataClass implements Insertable<Person> {
   }) => Person(
     id: id ?? this.id,
     name: name ?? this.name,
-    birthdayMonth: birthdayMonth ?? this.birthdayMonth,
-    birthdayDay: birthdayDay ?? this.birthdayDay,
+    birthdayMonth: birthdayMonth.present
+        ? birthdayMonth.value
+        : this.birthdayMonth,
+    birthdayDay: birthdayDay.present ? birthdayDay.value : this.birthdayDay,
     birthYear: birthYear.present ? birthYear.value : this.birthYear,
     phoneNumber: phoneNumber.present ? phoneNumber.value : this.phoneNumber,
     email: email.present ? email.value : this.email,
@@ -921,8 +927,8 @@ class Person extends DataClass implements Insertable<Person> {
 class PersonsCompanion extends UpdateCompanion<Person> {
   final Value<String> id;
   final Value<String> name;
-  final Value<int> birthdayMonth;
-  final Value<int> birthdayDay;
+  final Value<int?> birthdayMonth;
+  final Value<int?> birthdayDay;
   final Value<int?> birthYear;
   final Value<String?> phoneNumber;
   final Value<String?> email;
@@ -968,8 +974,8 @@ class PersonsCompanion extends UpdateCompanion<Person> {
   PersonsCompanion.insert({
     required String id,
     required String name,
-    required int birthdayMonth,
-    required int birthdayDay,
+    this.birthdayMonth = const Value.absent(),
+    this.birthdayDay = const Value.absent(),
     this.birthYear = const Value.absent(),
     this.phoneNumber = const Value.absent(),
     this.email = const Value.absent(),
@@ -990,8 +996,6 @@ class PersonsCompanion extends UpdateCompanion<Person> {
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
-       birthdayMonth = Value(birthdayMonth),
-       birthdayDay = Value(birthdayDay),
        relationship = Value(relationship),
        relationshipCloseness = Value(relationshipCloseness),
        preferredLanguage = Value(preferredLanguage),
@@ -1057,8 +1061,8 @@ class PersonsCompanion extends UpdateCompanion<Person> {
   PersonsCompanion copyWith({
     Value<String>? id,
     Value<String>? name,
-    Value<int>? birthdayMonth,
-    Value<int>? birthdayDay,
+    Value<int?>? birthdayMonth,
+    Value<int?>? birthdayDay,
     Value<int?>? birthYear,
     Value<String?>? phoneNumber,
     Value<String?>? email,
@@ -2797,8 +2801,8 @@ typedef $$PersonsTableCreateCompanionBuilder =
     PersonsCompanion Function({
       required String id,
       required String name,
-      required int birthdayMonth,
-      required int birthdayDay,
+      Value<int?> birthdayMonth,
+      Value<int?> birthdayDay,
       Value<int?> birthYear,
       Value<String?> phoneNumber,
       Value<String?> email,
@@ -2822,8 +2826,8 @@ typedef $$PersonsTableUpdateCompanionBuilder =
     PersonsCompanion Function({
       Value<String> id,
       Value<String> name,
-      Value<int> birthdayMonth,
-      Value<int> birthdayDay,
+      Value<int?> birthdayMonth,
+      Value<int?> birthdayDay,
       Value<int?> birthYear,
       Value<String?> phoneNumber,
       Value<String?> email,
@@ -3199,8 +3203,8 @@ class $$PersonsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
-                Value<int> birthdayMonth = const Value.absent(),
-                Value<int> birthdayDay = const Value.absent(),
+                Value<int?> birthdayMonth = const Value.absent(),
+                Value<int?> birthdayDay = const Value.absent(),
                 Value<int?> birthYear = const Value.absent(),
                 Value<String?> phoneNumber = const Value.absent(),
                 Value<String?> email = const Value.absent(),
@@ -3247,8 +3251,8 @@ class $$PersonsTableTableManager
               ({
                 required String id,
                 required String name,
-                required int birthdayMonth,
-                required int birthdayDay,
+                Value<int?> birthdayMonth = const Value.absent(),
+                Value<int?> birthdayDay = const Value.absent(),
                 Value<int?> birthYear = const Value.absent(),
                 Value<String?> phoneNumber = const Value.absent(),
                 Value<String?> email = const Value.absent(),

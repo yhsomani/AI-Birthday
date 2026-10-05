@@ -21,8 +21,8 @@ void main() {
             PersonsCompanion.insert(
               id: 'p-1',
               name: 'Ananya',
-              birthdayMonth: 5,
-              birthdayDay: 17,
+              birthdayMonth: const Value(5),
+              birthdayDay: const Value(17),
               relationship: 'Sister',
               relationshipCloseness: 'family',
               preferredLanguage: 'en',
@@ -50,8 +50,8 @@ void main() {
           PersonsCompanion.insert(
             id: 'p-1',
             name: 'Rahul',
-            birthdayMonth: 9,
-            birthdayDay: 1,
+            birthdayMonth: const Value(9),
+            birthdayDay: const Value(1),
             relationship: 'Friend',
             relationshipCloseness: 'friend',
             preferredLanguage: 'en',
@@ -66,8 +66,8 @@ void main() {
           PersonsCompanion.insert(
             id: 'p-2',
             name: 'Mia',
-            birthdayMonth: 2,
-            birthdayDay: 29,
+            birthdayMonth: const Value(2),
+            birthdayDay: const Value(29),
             relationship: 'Friend',
             relationshipCloseness: 'goodFriend',
             preferredLanguage: 'en',
@@ -101,8 +101,8 @@ void main() {
             PersonsCompanion.insert(
               id: 'p-1',
               name: 'Ananya',
-              birthdayMonth: 5,
-              birthdayDay: 17,
+              birthdayMonth: const Value(5),
+              birthdayDay: const Value(17),
               relationship: 'Sister',
               relationshipCloseness: 'family',
               preferredLanguage: 'en',
@@ -126,6 +126,35 @@ void main() {
       final rows = await db.select(db.persons).get();
       expect(rows.single.version, 2);
       expect(rows, hasLength(1));
+    });
+
+    test('supports person without a birthday (null month/day)', () async {
+      final now = DateTime.utc(2026, 10, 5);
+      await db
+          .into(db.persons)
+          .insert(
+            PersonsCompanion.insert(
+              id: 'p-no-bday',
+              name: 'Contact Without Birthday',
+              relationship: 'Friend',
+              relationshipCloseness: 'casual',
+              preferredLanguage: 'en',
+              preferredTone: 'warm',
+              importantFacts: '[]',
+              preferredDeliveryChannel: 'none',
+              autoSendPolicy: 'manualOnly',
+              createdAt: now,
+              updatedAt: now,
+              version: 1,
+            ),
+          );
+
+      final rows = await (db.select(
+        db.persons,
+      )..where((p) => p.id.equals('p-no-bday'))).get();
+      expect(rows, hasLength(1));
+      expect(rows.single.birthdayMonth, null);
+      expect(rows.single.birthdayDay, null);
     });
   });
 }

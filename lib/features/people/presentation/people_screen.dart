@@ -19,14 +19,17 @@ class PeopleScreen extends ConsumerWidget {
 
   static const BirthdayEngine _engine = BirthdayEngine();
 
-  NextBirthday _next(Person person) => _engine.computeNext(
-    month: person.birthdayMonth,
-    day: person.birthdayDay,
-    birthYear: person.birthYear,
-    timezoneName: person.timezone,
-  );
+  NextBirthday? _next(Person person) => person.hasBirthday
+      ? _engine.computeNext(
+          month: person.birthdayMonth!,
+          day: person.birthdayDay!,
+          birthYear: person.birthYear,
+          timezoneName: person.timezone,
+        )
+      : null;
 
-  String _countdownLabel(NextBirthday next) {
+  String _countdownLabel(NextBirthday? next) {
+    if (next == null) return '';
     if (next.isToday) return 'Today';
     if (next.daysUntil == 1) return 'Tomorrow';
     if (next.daysUntil <= 90) return 'In ${next.daysUntil} days';
@@ -255,10 +258,13 @@ class PeopleScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Birthday: ${c.birthdayMonth}/${c.birthdayDay}'
-                              '${c.birthYear != null ? ' (${c.birthYear})' : ''}'
-                              ' • ${c.relationship.displayName}'
-                              '${c.phoneNumber != null ? ' • ${c.phoneNumber}' : ''}',
+                              c.hasBirthday
+                                  ? 'Birthday: ${c.birthdayMonth}/${c.birthdayDay}'
+                                        '${c.birthYear != null ? ' (${c.birthYear})' : ''}'
+                                        ' • ${c.relationship.displayName}'
+                                        '${c.phoneNumber != null ? ' • ${c.phoneNumber}' : ''}'
+                                  : 'No birthday • ${c.relationship.displayName}'
+                                        '${c.phoneNumber != null ? ' • ${c.phoneNumber}' : ''}',
                             ),
                             if (c.isPotentialDuplicate) ...[
                               const SizedBox(height: 4),
@@ -317,28 +323,30 @@ class PeopleScreen extends ConsumerWidget {
       final person = candidate.toPerson();
       await peopleRepo.savePerson(person);
 
-      final nextDate = b_models.Birthday.nextBirthdayDate(
-        month: person.birthdayMonth,
-        day: person.birthdayDay,
-        from: now,
-      );
-      final isToday =
-          nextDate.year == now.year &&
-          nextDate.month == now.month &&
-          nextDate.day == now.day;
+      if (person.hasBirthday) {
+        final nextDate = b_models.Birthday.nextBirthdayDate(
+          month: person.birthdayMonth!,
+          day: person.birthdayDay!,
+          from: now,
+        );
+        final isToday =
+            nextDate.year == now.year &&
+            nextDate.month == now.month &&
+            nextDate.day == now.day;
 
-      final birthday = b_models.Birthday(
-        id: 'birthday-${person.id}',
-        personId: person.id,
-        cycleYear: nextDate.year,
-        date: nextDate,
-        status: isToday
-            ? b_models.BirthdayStatus.reminderDue
-            : b_models.BirthdayStatus.upcoming,
-        createdAt: now,
-        updatedAt: now,
-      );
-      await birthdaysRepo.saveBirthday(birthday);
+        final birthday = b_models.Birthday(
+          id: 'birthday-${person.id}',
+          personId: person.id,
+          cycleYear: nextDate.year,
+          date: nextDate,
+          status: isToday
+              ? b_models.BirthdayStatus.reminderDue
+              : b_models.BirthdayStatus.upcoming,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await birthdaysRepo.saveBirthday(birthday);
+      }
       importedCount++;
     }
 
@@ -589,10 +597,19 @@ class PeopleScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final person = people[index];
               final next = _next(person);
-              final dateStr = DateFormat.MMMMd().format(
-                DateTime(2026, person.birthdayMonth, person.birthdayDay),
-              );
-              final ageTurn = person.birthYear != null
+              final dateStr = person.hasBirthday
+                  ? DateFormat.MMMMd().format(
+                      DateTime(
+                        2026,
+                        person.birthdayMonth!,
+                        person.birthdayDay!,
+                      ),
+                    )
+                  : 'No birthday set';
+              final ageTurn =
+                  (person.hasBirthday &&
+                      person.birthYear != null &&
+                      next != null)
                   ? ' • turns ${next.year - person.birthYear!}'
                   : '';
 
@@ -603,10 +620,10 @@ class PeopleScreen extends ConsumerWidget {
                     vertical: 8,
                   ),
                   leading: CircleAvatar(
-                    backgroundColor: next.isToday
+                    backgroundColor: (next?.isToday ?? false)
                         ? AppColors.primaryTerracottaContainer
                         : null,
-                    foregroundColor: next.isToday
+                    foregroundColor: (next?.isToday ?? false)
                         ? AppColors.primaryTerracotta
                         : null,
                     child: Text(
@@ -644,11 +661,12 @@ class PeopleScreen extends ConsumerWidget {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CountdownChip(
-                        daysUntil: next.daysUntil,
-                        isToday: next.isToday,
-                        customLabel: _countdownLabel(next),
-                      ),
+                      if (next != null)
+                        CountdownChip(
+                          daysUntil: next.daysUntil,
+                          isToday: next.isToday,
+                          customLabel: _countdownLabel(next),
+                        ),
                       PopupMenuButton<String>(
                         tooltip: 'Person actions',
                         onSelected: (action) async {
@@ -749,9 +767,11 @@ class PeopleScreen extends ConsumerWidget {
         const Divider(height: 32),
         _buildDetailRow(
           'Birthday',
-          DateFormat.MMMMd().format(
-            DateTime(2026, person.birthdayMonth, person.birthdayDay),
-          ),
+          person.hasBirthday
+              ? DateFormat.MMMMd().format(
+                  DateTime(2026, person.birthdayMonth!, person.birthdayDay!),
+                )
+              : 'Not set',
         ),
         if (person.phoneNumber != null)
           _buildDetailRow('Phone', person.phoneNumber!),

@@ -103,4 +103,25 @@ void main() {
     expect(next.countdownLabel, 'Tomorrow');
     expect(next.turnLabel, 'turns 25');
   });
+
+  test('excludes people without a birthday from both today and upcoming', () {
+    final now = DateTime.utc(2026, 1, 1, 8);
+    final noBdayPerson = Person(
+      id: 'no-bday',
+      name: 'No Birthday',
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    final feed = const HomeFeedBuilder().build(
+      people: [
+        noBdayPerson,
+        person(id: 'a', name: 'Ana', month: 3, day: 14),
+      ],
+      reference: reference,
+    );
+
+    expect(feed.today.map((i) => i.person.name), ['Ana']);
+    expect(feed.upcoming, isEmpty);
+  });
 }

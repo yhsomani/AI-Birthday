@@ -90,8 +90,8 @@ class PersonDraft {
     return Person(
       id: id,
       name: name,
-      birthdayMonth: birthdayMonth!,
-      birthdayDay: birthdayDay!,
+      birthdayMonth: birthdayMonth,
+      birthdayDay: birthdayDay,
       birthYear: birthYear,
       phoneNumber: phoneNumber,
       email: email,

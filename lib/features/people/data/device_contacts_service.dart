@@ -73,8 +73,8 @@ class DeviceContact {
   /// Converts this device contact into a candidate for user review.
   ParsedContactCandidate toCandidate({List<Person> existingPeople = const []}) {
     final parsed = parseBirthday();
-    final month = parsed?['month'] ?? DateTime.now().month;
-    final day = parsed?['day'] ?? DateTime.now().day;
+    final month = parsed?['month'];
+    final day = parsed?['day'];
     final year = parsed?['year'];
 
     // Duplicate detection (SSOT §18)
@@ -96,6 +96,7 @@ class DeviceContact {
         break;
       } else if (sameName &&
           parsed != null &&
+          existing.hasBirthday &&
           existing.birthdayMonth == month &&
           existing.birthdayDay == day) {
         duplicateWarning = 'Name & birthday match existing "${existing.name}"';
@@ -114,9 +115,7 @@ class DeviceContact {
       relationship: RelationshipCategory.friend,
       preferredTone: MessageTone.warm,
       importantFacts: const [],
-      notes: parsed == null
-          ? 'Imported from phone (birthday default set to today)'
-          : 'Imported from phone contacts',
+      notes: 'Imported from phone contacts',
       duplicateWarning: duplicateWarning,
     );
   }

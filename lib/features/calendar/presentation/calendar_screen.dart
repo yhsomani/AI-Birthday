@@ -123,8 +123,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
     final birthdaysForDay = <int, List<Person>>{};
     for (final person in people) {
+      if (!person.hasBirthday) continue;
       if (person.birthdayMonth != month) continue;
-      final day = _resolvedDay(month, person.birthdayDay, year);
+      final day = _resolvedDay(month, person.birthdayDay!, year);
       birthdaysForDay.putIfAbsent(day, () => []).add(person);
     }
 

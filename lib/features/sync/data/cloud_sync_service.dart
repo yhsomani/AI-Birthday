@@ -31,10 +31,10 @@ class CloudSyncService {
     required SecureStoreDriver store,
     http.Client? httpClient,
     AppLogger? logger,
-  })  : _db = db,
-        _store = store,
-        _http = httpClient ?? http.Client(),
-        _logger = logger;
+  }) : _db = db,
+       _store = store,
+       _http = httpClient ?? http.Client(),
+       _logger = logger;
 
   final AppDatabase _db;
   final SecureStoreDriver _store;
@@ -64,7 +64,8 @@ class CloudSyncService {
       );
     }
 
-    final uid = authState.identity!.firebaseUid ?? authState.identity!.googleSubject;
+    final uid =
+        authState.identity!.firebaseUid ?? authState.identity!.googleSubject;
     _logger?.info('CloudSync', 'Starting sync for user $uid');
 
     try {
@@ -85,10 +86,14 @@ class CloudSyncService {
         final fields = <String, dynamic>{
           'id': {'stringValue': p.id},
           'name': {'stringValue': p.name},
-          'birthdayMonth': {'integerValue': p.birthdayMonth.toString()},
-          'birthdayDay': {'integerValue': p.birthdayDay.toString()},
-          if (p.birthYear != null) 'birthYear': {'integerValue': p.birthYear.toString()},
-          if (p.phoneNumber != null) 'phoneNumber': {'stringValue': p.phoneNumber!},
+          if (p.birthdayMonth != null)
+            'birthdayMonth': {'integerValue': p.birthdayMonth.toString()},
+          if (p.birthdayDay != null)
+            'birthdayDay': {'integerValue': p.birthdayDay.toString()},
+          if (p.birthYear != null)
+            'birthYear': {'integerValue': p.birthYear.toString()},
+          if (p.phoneNumber != null)
+            'phoneNumber': {'stringValue': p.phoneNumber!},
           if (p.email != null) 'email': {'stringValue': p.email!},
           'relationship': {'stringValue': p.relationship},
           'relationshipCloseness': {'stringValue': p.relationshipCloseness},
@@ -96,7 +101,9 @@ class CloudSyncService {
           'preferredTone': {'stringValue': p.preferredTone},
           'importantFacts': {'stringValue': p.importantFacts},
           if (p.notes != null) 'notes': {'stringValue': p.notes!},
-          'preferredDeliveryChannel': {'stringValue': p.preferredDeliveryChannel},
+          'preferredDeliveryChannel': {
+            'stringValue': p.preferredDeliveryChannel,
+          },
           'createdAt': {'stringValue': p.createdAt.toIso8601String()},
           'updatedAt': {'stringValue': p.updatedAt.toIso8601String()},
         };
@@ -148,8 +155,9 @@ class CloudSyncService {
         'Cloud sync finished successfully. Uploaded: $uploaded',
       );
 
-      final effectiveCount =
-          uploaded > 0 ? uploaded : (personRows.length + birthdayRows.length);
+      final effectiveCount = uploaded > 0
+          ? uploaded
+          : (personRows.length + birthdayRows.length);
 
       return CloudSyncResult(
         success: true,

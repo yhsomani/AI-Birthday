@@ -10,8 +10,8 @@ class Person {
   const Person({
     required this.id,
     required this.name,
-    required this.birthdayMonth,
-    required this.birthdayDay,
+    this.birthdayMonth,
+    this.birthdayDay,
     this.birthYear,
     this.phoneNumber,
     this.email,
@@ -32,11 +32,11 @@ class Person {
   final String id;
   final String name;
 
-  /// Month of birthday (1-12).
-  final int birthdayMonth;
+  /// Optional month of birthday (1-12). Null if no birthday is known.
+  final int? birthdayMonth;
 
-  /// Day of birthday (1-31).
-  final int birthdayDay;
+  /// Optional day of birthday (1-31). Null if no birthday is known.
+  final int? birthdayDay;
 
   /// Optional birth year (used for calculating milestone ages).
   final int? birthYear;
@@ -79,6 +79,15 @@ class Person {
   final DateTime updatedAt;
   final int version;
 
+  /// Returns true if this person has a valid birthday specified.
+  bool get hasBirthday =>
+      birthdayMonth != null &&
+      birthdayDay != null &&
+      birthdayMonth! >= 1 &&
+      birthdayMonth! <= 12 &&
+      birthdayDay! >= 1 &&
+      birthdayDay! <= 31;
+
   /// Returns true if this person's birthday is on Leap Day (Feb 29).
   bool get isLeapDayBirthday => birthdayMonth == 2 && birthdayDay == 29;
 
@@ -87,6 +96,7 @@ class Person {
     String? name,
     int? birthdayMonth,
     int? birthdayDay,
+    bool clearBirthday = false,
     int? birthYear,
     String? phoneNumber,
     String? email,
@@ -106,8 +116,10 @@ class Person {
     return Person(
       id: id ?? this.id,
       name: name ?? this.name,
-      birthdayMonth: birthdayMonth ?? this.birthdayMonth,
-      birthdayDay: birthdayDay ?? this.birthdayDay,
+      birthdayMonth: clearBirthday
+          ? null
+          : (birthdayMonth ?? this.birthdayMonth),
+      birthdayDay: clearBirthday ? null : (birthdayDay ?? this.birthdayDay),
       birthYear: birthYear ?? this.birthYear,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       email: email ?? this.email,
@@ -131,8 +143,8 @@ class Person {
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
-    'birthdayMonth': birthdayMonth,
-    'birthdayDay': birthdayDay,
+    if (birthdayMonth != null) 'birthdayMonth': birthdayMonth,
+    if (birthdayDay != null) 'birthdayDay': birthdayDay,
     if (birthYear != null) 'birthYear': birthYear,
     if (phoneNumber != null) 'phoneNumber': phoneNumber,
     if (email != null) 'email': email,
@@ -154,8 +166,8 @@ class Person {
     return Person(
       id: json['id'] as String,
       name: json['name'] as String,
-      birthdayMonth: json['birthdayMonth'] as int,
-      birthdayDay: json['birthdayDay'] as int,
+      birthdayMonth: json['birthdayMonth'] as int?,
+      birthdayDay: json['birthdayDay'] as int?,
       birthYear: json['birthYear'] as int?,
       phoneNumber: json['phoneNumber'] as String?,
       email: json['email'] as String?,

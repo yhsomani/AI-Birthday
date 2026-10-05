@@ -18,18 +18,22 @@ class PersonListScreen extends ConsumerWidget {
   static const BirthdayEngine _engine = BirthdayEngine();
 
   String _dateLabel(Person person) {
-    final date = DateTime(2000, person.birthdayMonth, person.birthdayDay);
+    if (!person.hasBirthday) return 'No birthday set';
+    final date = DateTime(2000, person.birthdayMonth!, person.birthdayDay!);
     return DateFormat.MMMd().format(date);
   }
 
-  NextBirthday _next(Person person) => _engine.computeNext(
-    month: person.birthdayMonth,
-    day: person.birthdayDay,
-    birthYear: person.birthYear,
-    timezoneName: person.timezone,
-  );
+  NextBirthday? _next(Person person) => person.hasBirthday
+      ? _engine.computeNext(
+          month: person.birthdayMonth!,
+          day: person.birthdayDay!,
+          birthYear: person.birthYear,
+          timezoneName: person.timezone,
+        )
+      : null;
 
-  String _countdownLabel(NextBirthday next) {
+  String _countdownLabel(NextBirthday? next) {
+    if (next == null) return '';
     if (next.isToday) return 'Today';
     if (next.daysUntil == 1) return 'Tomorrow';
     if (next.daysUntil <= 90) return 'In ${next.daysUntil} days';
@@ -39,8 +43,9 @@ class PersonListScreen extends ConsumerWidget {
   String _subtitle(Person person) {
     final date = _dateLabel(person);
     final year = person.birthYear;
-    if (year == null) return date;
-    return '$date · turns ${_next(person).year - year}';
+    final next = _next(person);
+    if (!person.hasBirthday || year == null || next == null) return date;
+    return '$date · turns ${next.year - year}';
   }
 
   @override
@@ -153,10 +158,11 @@ class _PersonTile extends ConsumerWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(countdown),
-          ),
+          if (countdown.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(countdown),
+            ),
           PopupMenuButton<_TileAction>(
             tooltip: 'Person actions',
             onSelected: (action) {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -39,8 +40,9 @@ void main() {
 
     test('returns failure when authState is signed out', () async {
       final service = CloudSyncService(db: db, store: store);
-      final result =
-          await service.sync(const AuthState(status: AuthStatus.signedOut));
+      final result = await service.sync(
+        const AuthState(status: AuthStatus.signedOut),
+      );
 
       expect(result.success, isFalse);
       expect(result.error, contains('Please sign in'));
@@ -50,12 +52,14 @@ void main() {
       final now = DateTime.now();
 
       // Seed a person and birthday
-      await db.into(db.persons).insert(
+      await db
+          .into(db.persons)
+          .insert(
             PersonsCompanion.insert(
               id: 'p-1',
               name: 'Taylor Swift',
-              birthdayMonth: 12,
-              birthdayDay: 13,
+              birthdayMonth: const Value(12),
+              birthdayDay: const Value(13),
               relationship: 'Friend',
               relationshipCloseness: 'close',
               preferredLanguage: 'en',
@@ -69,7 +73,9 @@ void main() {
             ),
           );
 
-      await db.into(db.birthdays).insert(
+      await db
+          .into(db.birthdays)
+          .insert(
             BirthdaysCompanion.insert(
               id: 'b-1',
               personId: 'p-1',

@@ -72,9 +72,10 @@ class ReminderScheduler {
     final seen = <({String personId, ReminderKind kind})>{};
 
     for (final person in people) {
+      if (!person.hasBirthday) continue;
       final next = engine.computeNext(
-        month: person.birthdayMonth,
-        day: person.birthdayDay,
+        month: person.birthdayMonth!,
+        day: person.birthdayDay!,
         birthYear: person.birthYear,
         timezoneName: person.timezone ?? fallbackTimezone,
         reference: reference,

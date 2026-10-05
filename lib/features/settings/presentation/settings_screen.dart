@@ -739,9 +739,7 @@ class _AuthTile extends ConsumerWidget {
         ),
         AuthStatus.signedIn => ListTile(
           leading: CircleAvatar(
-            backgroundColor: const Color(
-              0xFF2D5A46,
-            ).withValues(alpha: 0.15),
+            backgroundColor: const Color(0xFF2D5A46).withValues(alpha: 0.15),
             foregroundColor: const Color(0xFF2D5A46),
             backgroundImage: state.identity?.photoUrl != null
                 ? NetworkImage(state.identity!.photoUrl!)

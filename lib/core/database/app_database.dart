@@ -23,8 +23,8 @@ part 'app_database.g.dart';
 class Persons extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
-  IntColumn get birthdayMonth => integer()();
-  IntColumn get birthdayDay => integer()();
+  IntColumn get birthdayMonth => integer().nullable()();
+  IntColumn get birthdayDay => integer().nullable()();
   IntColumn get birthYear => integer().nullable()();
   TextColumn get phoneNumber => text().nullable()();
   TextColumn get email => text().nullable()();
@@ -108,7 +108,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -119,6 +119,22 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(messageDrafts);
         await m.createTable(reminderSettingsEntries);
       }
+      if (from < 3) {
+        await customStatement(
+          "UPDATE persons SET birthday_month = NULL, birthday_day = NULL, notes = 'Imported from phone contacts' WHERE notes LIKE '%birthday default set to today%';",
+        );
+        await customStatement(
+          "DELETE FROM birthdays WHERE person_id IN (SELECT id FROM persons WHERE birthday_month IS NULL);",
+        );
+      }
+    },
+    beforeOpen: (details) async {
+      await customStatement(
+        "UPDATE persons SET birthday_month = NULL, birthday_day = NULL, notes = 'Imported from phone contacts' WHERE notes LIKE '%birthday default set to today%';",
+      );
+      await customStatement(
+        "DELETE FROM birthdays WHERE person_id IN (SELECT id FROM persons WHERE birthday_month IS NULL);",
+      );
     },
   );
 }

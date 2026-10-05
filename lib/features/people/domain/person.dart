@@ -9,8 +9,8 @@ class Person {
   const Person({
     required this.id,
     required this.name,
-    required this.birthdayMonth,
-    required this.birthdayDay,
+    this.birthdayMonth,
+    this.birthdayDay,
     this.birthYear,
     this.phoneNumber,
     this.email,
@@ -32,8 +32,8 @@ class Person {
 
   final String id;
   final String name;
-  final int birthdayMonth;
-  final int birthdayDay;
+  final int? birthdayMonth;
+  final int? birthdayDay;
   final int? birthYear;
   final String? phoneNumber;
   final String? email;
@@ -52,12 +52,22 @@ class Person {
   final int version;
   final DateTime? deletedAt;
 
+  /// Returns true if this person has a valid birthday specified.
+  bool get hasBirthday =>
+      birthdayMonth != null &&
+      birthdayDay != null &&
+      birthdayMonth! >= 1 &&
+      birthdayMonth! <= 12 &&
+      birthdayDay! >= 1 &&
+      birthdayDay! <= 31;
+
   /// Copies this person applying the given updates, bumping [version].
   Person copyWith({
     String? id,
     String? name,
     int? birthdayMonth,
     int? birthdayDay,
+    bool clearBirthday = false,
     int? birthYear,
     bool clearBirthYear = false,
     String? phoneNumber,
@@ -81,8 +91,10 @@ class Person {
     return Person(
       id: id ?? this.id,
       name: name ?? this.name,
-      birthdayMonth: birthdayMonth ?? this.birthdayMonth,
-      birthdayDay: birthdayDay ?? this.birthdayDay,
+      birthdayMonth: clearBirthday
+          ? null
+          : (birthdayMonth ?? this.birthdayMonth),
+      birthdayDay: clearBirthday ? null : (birthdayDay ?? this.birthdayDay),
       birthYear: clearBirthYear ? null : (birthYear ?? this.birthYear),
       phoneNumber: phoneNumber ?? this.phoneNumber,
       email: email ?? this.email,

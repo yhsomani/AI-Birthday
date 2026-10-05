@@ -11,8 +11,8 @@ import 'package:ai_birthday/features/people/domain/models/tone.dart';
 class ParsedContactCandidate {
   const ParsedContactCandidate({
     required this.name,
-    required this.birthdayMonth,
-    required this.birthdayDay,
+    this.birthdayMonth,
+    this.birthdayDay,
     this.birthYear,
     this.phoneNumber,
     this.email,
@@ -24,8 +24,8 @@ class ParsedContactCandidate {
   });
 
   final String name;
-  final int birthdayMonth;
-  final int birthdayDay;
+  final int? birthdayMonth;
+  final int? birthdayDay;
   final int? birthYear;
   final String? phoneNumber;
   final String? email;
@@ -38,6 +38,15 @@ class ParsedContactCandidate {
   final String? duplicateWarning;
 
   bool get isPotentialDuplicate => duplicateWarning != null;
+
+  /// Returns true if this candidate has a valid birthday specified.
+  bool get hasBirthday =>
+      birthdayMonth != null &&
+      birthdayDay != null &&
+      birthdayMonth! >= 1 &&
+      birthdayMonth! <= 12 &&
+      birthdayDay! >= 1 &&
+      birthdayDay! <= 31;
 
   Person toPerson({String? id}) {
     final now = DateTime.now();
@@ -73,8 +82,8 @@ class ContactCsvService {
     for (final person in people) {
       final fields = [
         _escapeCsv(person.name),
-        person.birthdayMonth.toString(),
-        person.birthdayDay.toString(),
+        person.hasBirthday ? person.birthdayMonth.toString() : '',
+        person.hasBirthday ? person.birthdayDay.toString() : '',
         person.birthYear?.toString() ?? '',
         _escapeCsv(person.phoneNumber ?? ''),
         _escapeCsv(person.relationship.displayName),
@@ -194,6 +203,7 @@ class ContactCsvService {
           duplicateWarning = 'Phone match: number matches "${existing.name}"';
           break;
         } else if (sameName &&
+            existing.hasBirthday &&
             existing.birthdayMonth == month &&
             existing.birthdayDay == day) {
           duplicateWarning =

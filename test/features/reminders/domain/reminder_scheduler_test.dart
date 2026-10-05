@@ -117,4 +117,22 @@ void main() {
     expect(trigger.at.hour, 9);
     expect(trigger.at.minute, 0);
   });
+
+  test('skips people without a birthday', () {
+    const scheduler = ReminderScheduler();
+    final now = DateTime.utc(2026, 1, 1, 8);
+    final noBdayPerson = Person(
+      id: 'p-no-bday',
+      name: 'No Birthday Person',
+      createdAt: now,
+      updatedAt: now,
+    );
+    final plan = scheduler.plan(
+      people: [noBdayPerson],
+      reference: DateTime.utc(2026, 3, 14),
+      enabled: ReminderKind.values.toSet(),
+    );
+    expect(plan.active, isEmpty);
+    expect(plan.suppressed, isEmpty);
+  });
 }

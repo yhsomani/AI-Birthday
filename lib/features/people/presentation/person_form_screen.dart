@@ -162,8 +162,14 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
   void _onMonthChanged(int? month) {
     setState(() {
       _month = month;
-      final maxDay = month == 2 ? 29 : BirthdayEngine.daysInMonth(month!, 2024);
-      if (_day != null && _day! > maxDay) {
+      if (month != null) {
+        final maxDay = month == 2
+            ? 29
+            : BirthdayEngine.daysInMonth(month, 2024);
+        if (_day != null && _day! > maxDay) {
+          _day = null;
+        }
+      } else {
         _day = null;
       }
     });
@@ -245,34 +251,36 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
         );
         await peopleRepo.savePerson(personModel);
 
-        final now = DateTime.now();
-        final nextDate = b_models.Birthday.nextBirthdayDate(
-          month: saved.birthdayMonth,
-          day: saved.birthdayDay,
-          from: now,
-        );
-        final existingBirthday = await birthdaysRepo.getBirthdayForPerson(
-          saved.id,
-        );
-        final isToday =
-            nextDate.year == now.year &&
-            nextDate.month == now.month &&
-            nextDate.day == now.day;
-        final birthdayModel = b_models.Birthday(
-          id: existingBirthday?.id ?? 'birthday-${saved.id}',
-          personId: saved.id,
-          cycleYear: nextDate.year,
-          date: nextDate,
-          status:
-              existingBirthday?.status ??
-              (isToday
-                  ? b_models.BirthdayStatus.reminderDue
-                  : b_models.BirthdayStatus.upcoming),
-          draftId: existingBirthday?.draftId,
-          createdAt: existingBirthday?.createdAt ?? now,
-          updatedAt: now,
-        );
-        await birthdaysRepo.saveBirthday(birthdayModel);
+        if (saved.hasBirthday) {
+          final now = DateTime.now();
+          final nextDate = b_models.Birthday.nextBirthdayDate(
+            month: saved.birthdayMonth!,
+            day: saved.birthdayDay!,
+            from: now,
+          );
+          final existingBirthday = await birthdaysRepo.getBirthdayForPerson(
+            saved.id,
+          );
+          final isToday =
+              nextDate.year == now.year &&
+              nextDate.month == now.month &&
+              nextDate.day == now.day;
+          final birthdayModel = b_models.Birthday(
+            id: existingBirthday?.id ?? 'birthday-${saved.id}',
+            personId: saved.id,
+            cycleYear: nextDate.year,
+            date: nextDate,
+            status:
+                existingBirthday?.status ??
+                (isToday
+                    ? b_models.BirthdayStatus.reminderDue
+                    : b_models.BirthdayStatus.upcoming),
+            draftId: existingBirthday?.draftId,
+            createdAt: existingBirthday?.createdAt ?? now,
+            updatedAt: now,
+          );
+          await birthdaysRepo.saveBirthday(birthdayModel);
+        }
       } catch (_) {
         // Safe fallback if tests do not override in-memory repos
       }

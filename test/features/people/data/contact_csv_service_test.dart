@@ -118,5 +118,36 @@ Dr. Brown,1955-11-05
       expect(candidates[0].birthdayDay, 5);
       expect(candidates[0].birthYear, 1955);
     });
+
+    test('exports person without birthday with empty month and day fields', () {
+      final personWithoutBday = Person(
+        id: 'no-bday',
+        name: 'No Birthday Contact',
+        phoneNumber: '+14155550000',
+        createdAt: now,
+        updatedAt: now,
+      );
+      final csv = service.exportToCsv([personWithoutBday]);
+      expect(csv, contains('No Birthday Contact,,,,+14155550000'));
+    });
+
+    test(
+      'ParsedContactCandidate without birthday sets hasBirthday false and converts to Person cleanly',
+      () {
+        const candidate = ParsedContactCandidate(
+          name: 'Friend Without Birthday',
+          phoneNumber: '+19998887777',
+        );
+        expect(candidate.hasBirthday, isFalse);
+        expect(candidate.birthdayMonth, isNull);
+        expect(candidate.birthdayDay, isNull);
+
+        final person = candidate.toPerson();
+        expect(person.hasBirthday, isFalse);
+        expect(person.birthdayMonth, isNull);
+        expect(person.birthdayDay, isNull);
+        expect(person.name, 'Friend Without Birthday');
+      },
+    );
   });
 }
