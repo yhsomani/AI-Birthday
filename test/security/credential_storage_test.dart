@@ -45,7 +45,7 @@ void main() {
 
         expect(recordingLogger.records, hasLength(1));
         final record = recordingLogger.records.first;
-        expect(record.params['userId'], 'user-123');
+        expect(record.params['userId'], '[REDACTED]');
         expect(record.params['safeParam'], 'celebration');
 
         // Now verify ConsoleAppLogger string emission logic redacts keys

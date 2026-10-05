@@ -2,8 +2,19 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // The coordination ledger is server-only. Authenticated mobile clients use
-    // callable Functions and never receive direct Firestore capability.
+    // Entitlement status is readable only by the authenticated owner, writable only by server.
+    match /users/{userId}/entitlement/{document=**} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    // Encrypted zero-PII cloud backup envelope is readable & writable by the authenticated owner.
+    match /users/{userId}/backup/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // The coordination ledger and all other collections are server-only.
+    // Authenticated mobile clients use callable Functions and never receive direct Firestore capability.
     match /{document=**} {
       allow read, write: if false;
     }

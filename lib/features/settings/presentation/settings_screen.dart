@@ -2,7 +2,6 @@
 /// Subscription Entitlement, and Help & Guide (SSOT §5, §11, §17, §20).
 library;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,7 +19,6 @@ import 'package:ai_birthday/features/reminders/application/reminder_providers.da
 import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
 import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
 import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
-import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -556,50 +554,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ],
                   ),
-                  if (kDebugMode) ...[
-                    const Divider(height: 24),
-                    // Developer Sandbox Testing Section
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.bug_report_outlined,
-                          size: 16,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '[Dev Sandbox Testing]',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          'Simulate Pro:',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Switch(
-                          value: entitlement.canUseAi,
-                          onChanged: (val) {
-                            HapticFeedback.lightImpact();
-                            ref
-                                .read(subscriptionNotifierProvider.notifier)
-                                .setDevSandboxEntitlement(
-                                  val
-                                      ? UserEntitlement.proActive
-                                      : UserEntitlement.free,
-                                );
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
                 ],
               ),
             ),

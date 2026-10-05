@@ -15,6 +15,7 @@ import { deletionStartResponse } from '../domain/deletionReceipt.js';
 import { CoordinationOperationOrchestrator } from '../services/coordinationOperationOrchestrator.js';
 import { ControlPlaneService } from '../services/controlPlane.js';
 import { DeletionOrchestrator } from '../services/deletionOrchestrator.js';
+import { SubscriptionVerificationService } from '../services/subscriptionVerification.js';
 import {
   armSchema,
   accountModeSchema,
@@ -31,6 +32,7 @@ import {
   testClaimSchema,
   testReportSchema,
   transferSchema,
+  verifyPurchaseSchema,
 } from '../transport/schemas.js';
 
 if (getApps().length === 0) {
@@ -293,6 +295,14 @@ export const companionStatus = onCall(commonOptions, async request => {
   const uid = requireAuthenticated(request);
   const input = parseRequest(companionStatusSchema, request.data);
   return safeCall(() => withoutSecret().companionStatus(uid, input));
+});
+
+export const verifyPurchase = onCall(commonOptions, async request => {
+  const uid = requireAuthenticated(request);
+  const input = parseRequest(verifyPurchaseSchema, request.data);
+  return safeCall(() =>
+    new SubscriptionVerificationService(db).verifyPurchase(uid, input),
+  );
 });
 
 export const sweepDeletionDrains = onSchedule(

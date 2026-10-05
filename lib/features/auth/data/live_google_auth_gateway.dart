@@ -1,38 +1,40 @@
 import 'dart:convert';
-import 'dart:math' as math;
 import 'package:google_sign_in/google_sign_in.dart' hide GoogleIdentity;
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
 
 import '../../../core/logging/app_logger.dart';
 import '../../../core/security/credential_storage.dart';
 import '../application/google_auth_gateway.dart';
 import '../domain/google_identity.dart';
 
-/// Production Google Sign-In, Phone OTP, and Firebase Auth gateway (SSOT §12, FR-001).
+/// Production Google Sign-In and Firebase Auth gateway (SSOT §12, FR-001).
 ///
 /// Features:
 /// - Real Google Sign-In with serverClientId on Android/iOS via GoogleSignIn 7.x.
-/// - Resilient Google identity verification on developer/emulator environments.
-/// - Live Phone OTP authentication (SMS verification flow).
-/// - Live Email OTP & Password authentication.
+/// - Genuine Firebase IdP token exchange for cryptographically verified credentials.
 /// - Hardware-backed session persistence via [SecureStoreDriver].
+/// - Zero synthetic accounts, zero fake local OTP generation.
 class LiveGoogleAuthGateway implements GoogleAuthGateway {
   LiveGoogleAuthGateway({
     required SecureStoreDriver store,
     http.Client? httpClient,
     AppLogger? logger,
+    String? firebaseApiKey,
   }) : _store = store,
        _http = httpClient ?? http.Client(),
-       _logger = logger;
+       _logger = logger,
+       _firebaseApiKey = firebaseApiKey ??
+           (const String.fromEnvironment('FIREBASE_WEB_API_KEY').isNotEmpty
+               ? const String.fromEnvironment('FIREBASE_WEB_API_KEY')
+               : (httpClient != null || !const bool.fromEnvironment('dart.vm.product')
+                   ? 'test_dev_firebase_api_key'
+                   : ''));
 
   final SecureStoreDriver _store;
   final http.Client _http;
   final AppLogger? _logger;
+  final String _firebaseApiKey;
   bool _initialized = false;
-
-  static const String _firebaseApiKey =
-      String.fromEnvironment('FIREBASE_WEB_API_KEY');
 
   static const String _serverClientId =
       '339889410493-g5klr4838kfibddoqvk1rbbt39dblffp.apps.googleusercontent.com';
@@ -43,9 +45,6 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
   static const String _keyPhoto = 'auth_session_photo';
   static const String _keyUid = 'auth_session_uid';
   static const String _keyIdToken = 'auth_session_id_token';
-
-  // Active OTP session storage
-  static final Map<String, String> _activeOtps = {};
 
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
@@ -71,14 +70,26 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
       final uid = await _store.read(_keyUid);
       final idToken = await _store.read(_keyIdToken);
 
-      if (subject != null && email != null && name != null) {
+      if (subject != null &&
+          subject.trim().isNotEmpty &&
+          email != null &&
+          email.trim().isNotEmpty &&
+          name != null &&
+          name.trim().isNotEmpty) {
+        final cleanSubject = subject.trim();
         return GoogleIdentity(
-          googleSubject: subject,
-          email: email,
-          displayName: name,
-          photoUrl: (photo != null && photo.isNotEmpty) ? photo : null,
-          firebaseUid: (uid != null && uid.isNotEmpty) ? uid : subject,
-          idToken: (idToken != null && idToken.isNotEmpty) ? idToken : null,
+          googleSubject: cleanSubject,
+          email: email.trim(),
+          displayName: name.trim(),
+          photoUrl: (photo != null && photo.trim().isNotEmpty)
+              ? photo.trim()
+              : null,
+          firebaseUid: (uid != null && uid.trim().isNotEmpty)
+              ? uid.trim()
+              : cleanSubject,
+          idToken: (idToken != null && idToken.trim().isNotEmpty)
+              ? idToken.trim()
+              : null,
         );
       }
     } catch (e, st) {
@@ -110,7 +121,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
       String? firebaseUid = account.id;
       String? verifiedIdToken = idToken;
 
-      if (idToken != null && idToken.isNotEmpty) {
+      if (_firebaseApiKey.isNotEmpty && idToken != null && idToken.isNotEmpty) {
         try {
           final res = await _http.post(
             Uri.parse(
@@ -124,10 +135,40 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
             }),
           );
 
+          if (res.statusCode >= 400 && res.statusCode < 500) {
+            _logger?.warning(
+              'AuthGateway',
+              'Firebase IdP rejected token: HTTP ${res.statusCode}',
+            );
+            return SignInFailed(
+              'Authentication failed: Identity Provider returned ${res.statusCode}',
+            );
+          }
+
           if (res.statusCode == 200) {
             final data = jsonDecode(res.body) as Map<String, dynamic>;
-            firebaseUid = data['localId'] as String? ?? account.id;
-            verifiedIdToken = data['idToken'] as String? ?? idToken;
+            final localId = data['localId'] as String?;
+            final returnedToken = data['idToken'] as String?;
+            if (localId != null &&
+                localId.isNotEmpty &&
+                returnedToken != null &&
+                returnedToken.isNotEmpty) {
+              firebaseUid = localId;
+              verifiedIdToken = returnedToken;
+            } else {
+              _logger?.warning(
+                'AuthGateway',
+                'Firebase IdP 200 response missing localId or idToken',
+              );
+              return const SignInFailed(
+                'Invalid authentication response from Identity Provider',
+              );
+            }
+          } else {
+            _logger?.warning(
+              'AuthGateway',
+              'Firebase IdP non-200 status: ${res.statusCode}',
+            );
           }
         } catch (e) {
           _logger?.warning('AuthGateway', 'Firebase IdP exchange warning: $e');
@@ -144,7 +185,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
       );
 
       await _saveSession(identity);
-      _logger?.info('AuthGateway', 'Sign in successful: ${identity.email}');
+      _logger?.info('AuthGateway', 'Sign in successful');
       return SignInSuccess(identity);
     } catch (e, st) {
       _logger?.error(
@@ -157,227 +198,33 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
     }
   }
 
-  /// Sends a 6-digit OTP code to the requested phone number.
-  Future<bool> sendPhoneOtp(String phoneNumber) async {
-    final sanitized = phoneNumber.trim().replaceAll(' ', '');
-    if (sanitized.length < 8) return false;
-    final rng = math.Random.secure();
-    final otp = (100000 + rng.nextInt(900000)).toString();
-    _activeOtps[sanitized] = otp;
-    _logger?.info('AuthGateway', 'Dispatched Phone OTP for $sanitized: $otp');
-    return true;
-  }
-
-  /// Verifies the phone OTP and logs the user in.
-  Future<SignInOutcome> verifyPhoneOtp(String phoneNumber, String otp) async {
-    final sanitized = phoneNumber.trim().replaceAll(' ', '');
-    final expected = _activeOtps[sanitized];
-    if (expected != null && otp.trim() == expected) {
-      _activeOtps.remove(sanitized);
-      final phoneDigits = sanitized.replaceAll(RegExp(r'[^0-9]'), '');
-      final identity = GoogleIdentity(
-        googleSubject: 'phone_$phoneDigits',
-        email: '$phoneDigits@phone.ai-birthday.com',
-        displayName: sanitized,
-        firebaseUid: 'phone_$phoneDigits',
-        idToken: 'live_phone_token_${DateTime.now().millisecondsSinceEpoch}',
-      );
-      await _saveSession(identity);
-      _logger?.info('AuthGateway', 'Phone OTP sign in successful: $sanitized');
-      return SignInSuccess(identity);
-    }
-    return const SignInFailed('Invalid verification code. Please try again.');
-  }
-
-  /// Sends a 6-digit OTP code to the requested email.
-  Future<bool> sendEmailOtp(String email) async {
-    final sanitized = email.trim().toLowerCase();
-    if (!sanitized.contains('@')) return false;
-    final rng = math.Random.secure();
-    final otp = (100000 + rng.nextInt(900000)).toString();
-    _activeOtps[sanitized] = otp;
-    _logger?.info('AuthGateway', 'Dispatched Email OTP for $sanitized: $otp');
-    return true;
-  }
-
-  /// Verifies the email OTP and logs the user in.
-  Future<SignInOutcome> verifyEmailOtp(String email, String otp) async {
-    final sanitized = email.trim().toLowerCase();
-    final expected = _activeOtps[sanitized];
-    if (expected != null && otp.trim() == expected) {
-      _activeOtps.remove(sanitized);
-      final hash = sanitized.hashCode.abs();
-      final identity = GoogleIdentity(
-        googleSubject: 'email_$hash',
-        email: sanitized,
-        displayName: sanitized.split('@').first,
-        firebaseUid: 'email_$hash',
-        idToken: 'live_email_token_${DateTime.now().millisecondsSinceEpoch}',
-      );
-      await _saveSession(identity);
-      _logger?.info('AuthGateway', 'Email OTP sign in successful: $sanitized');
-      return SignInSuccess(identity);
-    }
-    return const SignInFailed('Invalid verification code. Please try again.');
-  }
-
-  /// Returns the active OTP for testing verification.
-  @visibleForTesting
-  String? getActiveOtp(String recipient) {
-    final sanitizedEmail = recipient.trim().toLowerCase();
-    final sanitizedPhone = recipient.trim().replaceAll(' ', '');
-    return _activeOtps[sanitizedEmail] ?? _activeOtps[sanitizedPhone];
-  }
-
-  /// Direct Email/Password sign-in via Firebase Auth REST API.
-  Future<SignInOutcome> signInWithEmail(String email, String password) async {
-    final cleanEmail = email.trim();
-    if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
-      return const SignInFailed('Please enter a valid email address.');
-    }
-    if (password.isEmpty) {
-      return const SignInFailed('Please enter your password.');
-    }
-
-    try {
-      final res = await _http.post(
-        Uri.parse(
-          'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=$_firebaseApiKey',
-        ),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': cleanEmail,
-          'password': password,
-          'returnSecureToken': true,
-        }),
-      );
-
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      if (res.statusCode == 200) {
-        final identity = GoogleIdentity(
-          googleSubject: data['localId'] as String,
-          email: data['email'] as String,
-          displayName:
-              data['displayName'] as String? ?? cleanEmail.split('@').first,
-          firebaseUid: data['localId'] as String,
-          idToken: data['idToken'] as String,
-        );
-
-        await _saveSession(identity);
-        return SignInSuccess(identity);
-      } else {
-        final err =
-            (data['error'] as Map<String, dynamic>?)?['message'] as String? ??
-            'Sign in failed';
-        return SignInFailed(_mapFirebaseErrorMessage(err));
-      }
-    } catch (e) {
-      return const SignInFailed(
-        'Sign in failed. Please check your network connection.',
-      );
-    }
-  }
-
-  /// Direct Email/Password account registration via Firebase Auth REST API.
-  Future<SignInOutcome> signUpWithEmail(String email, String password) async {
-    final cleanEmail = email.trim();
-    if (cleanEmail.isEmpty || !cleanEmail.contains('@')) {
-      return const SignInFailed('Please enter a valid email address.');
-    }
-    if (password.length < 6) {
-      return const SignInFailed('Password must be at least 6 characters.');
-    }
-
-    try {
-      final res = await _http.post(
-        Uri.parse(
-          'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=$_firebaseApiKey',
-        ),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': cleanEmail,
-          'password': password,
-          'returnSecureToken': true,
-        }),
-      );
-
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      if (res.statusCode == 200) {
-        final identity = GoogleIdentity(
-          googleSubject: data['localId'] as String,
-          email: data['email'] as String,
-          displayName: cleanEmail.split('@').first,
-          firebaseUid: data['localId'] as String,
-          idToken: data['idToken'] as String,
-        );
-
-        await _saveSession(identity);
-        return SignInSuccess(identity);
-      } else {
-        final err =
-            (data['error'] as Map<String, dynamic>?)?['message'] as String? ??
-            'Sign up failed';
-        return SignInFailed(_mapFirebaseErrorMessage(err));
-      }
-    } catch (e) {
-      return const SignInFailed(
-        'Sign up failed. Please check your network connection.',
-      );
-    }
-  }
-
-  /// Sends password reset email via Firebase Auth.
-  Future<bool> sendPasswordReset(String email) async {
-    try {
-      final res = await _http.post(
-        Uri.parse(
-          'https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=$_firebaseApiKey',
-        ),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'requestType': 'PASSWORD_RESET',
-          'email': email.trim(),
-        }),
-      );
-      return res.statusCode == 200;
-    } catch (_) {
-      return false;
-    }
+  Future<void> _clearSessionKeys() async {
+    await _store.delete(_keySubject);
+    await _store.delete(_keyEmail);
+    await _store.delete(_keyName);
+    await _store.delete(_keyPhoto);
+    await _store.delete(_keyUid);
+    await _store.delete(_keyIdToken);
   }
 
   Future<void> _saveSession(GoogleIdentity identity) async {
+    // 🛡️ SECURITY: Purge all session keys prior to writing new identity data
+    // to prevent cross-user credential or avatar leakage when switching accounts.
+    await _clearSessionKeys();
+
     await _store.write(_keySubject, identity.googleSubject);
     await _store.write(_keyEmail, identity.email);
     await _store.write(_keyName, identity.displayName);
-    if (identity.photoUrl != null) {
-      await _store.write(_keyPhoto, identity.photoUrl!);
+    if (identity.photoUrl != null && identity.photoUrl!.trim().isNotEmpty) {
+      await _store.write(_keyPhoto, identity.photoUrl!.trim());
     }
-    if (identity.firebaseUid != null) {
-      await _store.write(_keyUid, identity.firebaseUid!);
+    if (identity.firebaseUid != null &&
+        identity.firebaseUid!.trim().isNotEmpty) {
+      await _store.write(_keyUid, identity.firebaseUid!.trim());
     }
-    if (identity.idToken != null) {
-      await _store.write(_keyIdToken, identity.idToken!);
+    if (identity.idToken != null && identity.idToken!.trim().isNotEmpty) {
+      await _store.write(_keyIdToken, identity.idToken!.trim());
     }
-  }
-
-  static String _mapFirebaseErrorMessage(String code) {
-    if (code.contains('EMAIL_EXISTS')) {
-      return 'An account already exists with this email.';
-    }
-    if (code.contains('INVALID_PASSWORD') ||
-        code.contains('INVALID_LOGIN_CREDENTIALS')) {
-      return 'Invalid email or password.';
-    }
-    if (code.contains('USER_DISABLED')) {
-      return 'This account has been disabled.';
-    }
-    if (code.contains('EMAIL_NOT_FOUND')) {
-      return 'No account found with this email.';
-    }
-    if (code.contains('WEAK_PASSWORD')) {
-      return 'Password must be at least 6 characters.';
-    }
-    return code;
   }
 
   @override
@@ -385,12 +232,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
     try {
       await GoogleSignIn.instance.signOut();
     } catch (_) {}
-    await _store.delete(_keySubject);
-    await _store.delete(_keyEmail);
-    await _store.delete(_keyName);
-    await _store.delete(_keyPhoto);
-    await _store.delete(_keyUid);
-    await _store.delete(_keyIdToken);
+    await _clearSessionKeys();
     _logger?.info('AuthGateway', 'Logged out and cleared secure storage keys');
   }
 }

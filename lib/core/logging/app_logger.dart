@@ -38,10 +38,10 @@ class LogRecord {
   bool get isError => level == LogLevel.error;
 }
 
-// 🛡️ SECURITY: Explicitly include sensitive keys (email, phone, credentials, note, text, body, facts) to prevent PII leakage.
+// 🛡️ SECURITY: Explicitly include sensitive keys (email, phone, credentials, note, text, body, facts, user identifiers) to prevent PII leakage.
 // ⚡ PERFORMANCE: Pre-compiled RegExp avoids looping and repeated string operations.
 final RegExp _sensitiveKeyRegExp = RegExp(
-  r'(credential|secret|token|apikey|api_key|api-key|password|key|phone|phonenumber|phone_number|address|email|note|message|content|body|text|fact|quote)',
+  r'(^sub$|subject|uid|userid|user_id|credential|secret|token|apikey|api_key|api-key|password|key|phone|phonenumber|phone_number|address|email|note|message|content|body|text|fact|quote)',
   caseSensitive: false,
 );
 

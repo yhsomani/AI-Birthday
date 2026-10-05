@@ -91,9 +91,9 @@ class MethodChannelGeminiNanoPlatform implements GeminiNanoPlatform {
     try {
       final res = await _channel.invokeMethod<String>('currentState');
       return switch (res) {
-        'available' => NanoState.available,
+        'ready' || 'available' => NanoState.available,
         'downloadable' => NanoState.downloadable,
-        'downloading' => NanoState.downloading,
+        'downloading' || 'downloading_model' => NanoState.downloading,
         'busy' => NanoState.busy,
         'quotaExceeded' => NanoState.quotaExceeded,
         _ => NanoState.unavailable,
@@ -114,8 +114,8 @@ class MethodChannelGeminiNanoPlatform implements GeminiNanoPlatform {
     try {
       final res = await _channel.invokeMethod<String>('startDownload');
       final state = switch (res) {
-        'available' => NanoState.available,
-        'downloading' => NanoState.downloading,
+        'ready' || 'available' => NanoState.available,
+        'downloading' || 'downloading_model' => NanoState.downloading,
         _ => NanoState.unavailable,
       };
       _stateController.add(state);

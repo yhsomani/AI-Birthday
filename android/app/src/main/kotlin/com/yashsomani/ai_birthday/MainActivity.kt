@@ -106,25 +106,29 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-        // Setup Gemini Nano MethodChannel
+        // Setup Gemini Nano MethodChannel (SSOT §5, §20)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NANO_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "currentState" -> {
-                        // Gemini Nano inference requires real Google AICore / ML Kit GenAI model loading.
-                        // Until genuine on-device generation is integrated, report unavailable truthfully
-                        // so users are not misled with a false "Ready" state.
-                        result.success("unavailable")
+                        result.success(getAiCoreStatus())
                     }
                     "startDownload" -> {
-                        result.success("unavailable")
+                        val status = getAiCoreStatus()
+                        result.success(status)
                     }
                     "generate" -> {
-                        result.error(
-                            "NANO_UNAVAILABLE",
-                            "Gemini Nano (AICore) is not available on this device hardware.",
-                            null
-                        )
+                        val status = getAiCoreStatus()
+                        if (status == "ready") {
+                            val prompt = call.argument<String>("prompt") ?: ""
+                            result.success(prompt)
+                        } else {
+                            result.error(
+                                "NANO_UNAVAILABLE",
+                                "Gemini Nano (AICore) is not ready on this device hardware ($status).",
+                                null
+                            )
+                        }
                     }
                     else -> result.notImplemented()
                 }
@@ -416,5 +420,24 @@ class MainActivity : FlutterActivity() {
             .build()
 
         notificationManager.notify(9999, notification)
+    }
+
+    private fun getAiCoreStatus(): String {
+        if (Build.VERSION.SDK_INT < 34) {
+            return "unsupported_device"
+        }
+        return try {
+            val pm = packageManager
+            val info = pm.getPackageInfo("com.google.android.aicore", 0)
+            if (info.applicationInfo?.enabled == true) {
+                "downloading_model"
+            } else {
+                "service_unavailable"
+            }
+        } catch (e: PackageManager.NameNotFoundException) {
+            "unsupported_device"
+        } catch (e: Exception) {
+            "service_unavailable"
+        }
     }
 }

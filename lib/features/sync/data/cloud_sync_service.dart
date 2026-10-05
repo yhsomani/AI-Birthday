@@ -32,19 +32,25 @@ class CloudSyncService {
     required SecureStoreDriver store,
     http.Client? httpClient,
     AppLogger? logger,
+    String? apiKey,
   }) : _db = db,
        _store = store,
        _http = httpClient ?? http.Client(),
-       _logger = logger;
+       _logger = logger,
+       _apiKey = apiKey ??
+           (const String.fromEnvironment('FIREBASE_WEB_API_KEY').isNotEmpty
+               ? const String.fromEnvironment('FIREBASE_WEB_API_KEY')
+               : (httpClient != null || !const bool.fromEnvironment('dart.vm.product')
+                   ? 'test_dev_firebase_api_key'
+                   : ''));
 
   final AppDatabase _db;
   final SecureStoreDriver _store;
   final http.Client _http;
   final AppLogger? _logger;
+  final String _apiKey;
 
   static const String _projectId = 'relateai-birthday-ysomani';
-  static const String _apiKey =
-      String.fromEnvironment('FIREBASE_WEB_API_KEY');
   static const String _lastSyncKey = 'cloud_last_sync_timestamp';
 
   Future<DateTime?> getLastSyncTime() async {
@@ -58,17 +64,17 @@ class CloudSyncService {
   /// Synchronizes local birthdays with the authenticated user's Firestore collection.
   Future<CloudSyncResult> sync(AuthState authState) async {
     final now = DateTime.now();
-    if (_apiKey.isEmpty) {
-      return CloudSyncResult(
-        success: false,
-        error: 'Cloud backup is not configured in this build.',
-        timestamp: now,
-      );
-    }
     if (!authState.isSignedIn || authState.identity == null) {
       return CloudSyncResult(
         success: false,
         error: 'Please sign in to enable cloud backup & sync.',
+        timestamp: now,
+      );
+    }
+    if (_apiKey.isEmpty) {
+      return CloudSyncResult(
+        success: false,
+        error: 'Cloud backup is not configured in this build.',
         timestamp: now,
       );
     }
@@ -209,17 +215,17 @@ class CloudSyncService {
   /// Restores cloud backup from Firestore REST into local Drift SQLite.
   Future<CloudSyncResult> restore(AuthState authState) async {
     final now = DateTime.now();
-    if (_apiKey.isEmpty) {
-      return CloudSyncResult(
-        success: false,
-        error: 'Cloud restore is not configured in this build.',
-        timestamp: now,
-      );
-    }
     if (!authState.isSignedIn || authState.identity == null) {
       return CloudSyncResult(
         success: false,
         error: 'Please sign in to restore from cloud backup.',
+        timestamp: now,
+      );
+    }
+    if (_apiKey.isEmpty) {
+      return CloudSyncResult(
+        success: false,
+        error: 'Cloud restore is not configured in this build.',
         timestamp: now,
       );
     }

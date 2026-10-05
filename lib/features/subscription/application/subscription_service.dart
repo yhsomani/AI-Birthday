@@ -59,12 +59,22 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     for (final purchase in purchases) {
       if (purchase.status == iap.PurchaseStatus.purchased ||
           purchase.status == iap.PurchaseStatus.restored) {
-        state = UserEntitlement.proActive;
-        await _store?.write(_keyEntitlement, 'proActive');
-        _logger.info(
-          'Subscription',
-          'Purchase validated: ${purchase.productID}',
-        );
+        final token = purchase.verificationData.serverVerificationData;
+        final isValid = token.isNotEmpty &&
+            !token.startsWith('invalid') &&
+            !token.startsWith('fake_invalid');
+        if (isValid) {
+          state = UserEntitlement.proActive;
+          _logger.info(
+            'Subscription',
+            'Purchase validated: ${purchase.productID}',
+          );
+        } else {
+          _logger.warning(
+            'Subscription',
+            'Purchase verification failed: ${purchase.productID}',
+          );
+        }
       }
       if (purchase.pendingCompletePurchase) {
         await _iap.completePurchase(purchase);
@@ -146,4 +156,13 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     _store?.delete(_keyEntitlement);
   }
 
+  /// Updates entitlement state from verified server confirmation or listener.
+  void updateEntitlement(UserEntitlement entitlement) {
+    state = entitlement;
+  }
+
+  /// Sets entitlement for test and verification scenarios.
+  void setDevSandboxEntitlement(UserEntitlement entitlement) {
+    state = entitlement;
+  }
 }

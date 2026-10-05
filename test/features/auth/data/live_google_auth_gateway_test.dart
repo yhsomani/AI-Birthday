@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+// ignore: depend_on_referenced_packages
+import 'package:google_sign_in_platform_interface/google_sign_in_platform_interface.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
@@ -24,12 +26,80 @@ class InMemoryStoreDriver implements SecureStoreDriver {
   }
 }
 
+class TestGoogleSignInPlatform extends GoogleSignInPlatform {
+  TestGoogleSignInPlatform({
+    this.authResults,
+    this.authException,
+  });
+
+  AuthenticationResults? authResults;
+  Object? authException;
+  int signOutCalls = 0;
+  int initCalls = 0;
+
+  @override
+  Future<void> init(InitParameters params) async {
+    initCalls++;
+  }
+
+  @override
+  Future<AuthenticationResults?>? attemptLightweightAuthentication(
+    AttemptLightweightAuthenticationParameters params,
+  ) async => null;
+
+  @override
+  bool supportsAuthenticate() => true;
+
+  @override
+  Future<AuthenticationResults> authenticate(
+    AuthenticateParameters params,
+  ) async {
+    if (authException != null) {
+      throw authException!;
+    }
+    if (authResults != null) {
+      return authResults!;
+    }
+    throw const GoogleSignInException(
+      code: GoogleSignInExceptionCode.canceled,
+      description: 'Sign-in cancelled',
+    );
+  }
+
+  @override
+  bool authorizationRequiresUserInteraction() => false;
+
+  @override
+  Future<ClientAuthorizationTokenData?> clientAuthorizationTokensForScopes(
+    ClientAuthorizationTokensForScopesParameters params,
+  ) async => null;
+
+  @override
+  Future<ServerAuthorizationTokenData?> serverAuthorizationTokensForScopes(
+    ServerAuthorizationTokensForScopesParameters params,
+  ) async => null;
+
+  @override
+  Future<void> signOut(SignOutParams params) async {
+    signOutCalls++;
+  }
+
+  @override
+  Future<void> disconnect(DisconnectParams params) async {}
+}
+
 void main() {
   group('LiveGoogleAuthGateway', () {
     late InMemoryStoreDriver store;
+    late GoogleSignInPlatform originalPlatform;
 
     setUp(() {
       store = InMemoryStoreDriver();
+      originalPlatform = GoogleSignInPlatform.instance;
+    });
+
+    tearDown(() {
+      GoogleSignInPlatform.instance = originalPlatform;
     });
 
     test('isConfigured reports true', () async {
@@ -37,15 +107,22 @@ void main() {
       expect(await gateway.isConfigured(), isTrue);
     });
 
-    test('getStoredIdentity returns null when store is empty', () async {
-      final gateway = LiveGoogleAuthGateway(store: store);
-      expect(await gateway.getStoredIdentity(), isNull);
-    });
+    test(
+      'getStoredIdentity returns null when store is empty or incomplete',
+      () async {
+        final gateway = LiveGoogleAuthGateway(store: store);
+        expect(await gateway.getStoredIdentity(), isNull);
 
-    test('getStoredIdentity restores persisted session', () async {
+        store.data['auth_session_subject'] = 'sub-only';
+        expect(await gateway.getStoredIdentity(), isNull);
+      },
+    );
+
+    test('getStoredIdentity accurately restores session credentials', () async {
       store.data['auth_session_subject'] = 'sub-456';
       store.data['auth_session_email'] = 'test@example.com';
       store.data['auth_session_name'] = 'Test Person';
+      store.data['auth_session_photo'] = 'https://example.com/avatar.png';
       store.data['auth_session_uid'] = 'firebase-uid-456';
       store.data['auth_session_id_token'] = 'token-xyz';
 
@@ -56,34 +133,120 @@ void main() {
       expect(identity!.googleSubject, 'sub-456');
       expect(identity.email, 'test@example.com');
       expect(identity.displayName, 'Test Person');
+      expect(identity.photoUrl, 'https://example.com/avatar.png');
       expect(identity.firebaseUid, 'firebase-uid-456');
       expect(identity.idToken, 'token-xyz');
     });
 
-    test('signOut clears all persisted session keys', () async {
+    test('signOut cleans up all session keys', () async {
+      final testPlatform = TestGoogleSignInPlatform();
+      GoogleSignInPlatform.instance = testPlatform;
+
       store.data['auth_session_subject'] = 'sub-456';
       store.data['auth_session_email'] = 'test@example.com';
       store.data['auth_session_name'] = 'Test Person';
+      store.data['auth_session_photo'] = 'https://example.com/avatar.png';
+      store.data['auth_session_uid'] = 'firebase-uid-456';
+      store.data['auth_session_id_token'] = 'token-xyz';
 
       final gateway = LiveGoogleAuthGateway(store: store);
       await gateway.signOut();
 
       expect(await gateway.getStoredIdentity(), isNull);
       expect(store.data.isEmpty, isTrue);
+      expect(testPlatform.signOutCalls, 1);
     });
 
-    test('signInWithEmail returns SignInSuccess on 200 response', () async {
-      final mockClient = MockClient((request) async {
-        expect(request.url.path, contains('signInWithPassword'));
-        return http.Response(
-          jsonEncode({
-            'localId': 'user-123',
-            'email': 'user@example.com',
-            'displayName': 'User One',
-            'idToken': 'mock-firebase-token',
-          }),
-          200,
+    test(
+      'successful IdP token exchange saves firebaseUid and idToken to secure storage',
+      () async {
+        final testPlatform = TestGoogleSignInPlatform(
+          authResults: const AuthenticationResults(
+            user: GoogleSignInUserData(
+              id: 'google-sub-123',
+              email: 'user@example.com',
+              displayName: 'Test User',
+              photoUrl: 'https://example.com/photo.jpg',
+            ),
+            authenticationTokens: AuthenticationTokenData(
+              idToken: 'raw-google-id-token-abc',
+            ),
+          ),
         );
+        GoogleSignInPlatform.instance = testPlatform;
+
+        final mockClient = MockClient((request) async {
+          expect(request.url.host, 'identitytoolkit.googleapis.com');
+          expect(request.url.path, '/v1/accounts:signInWithIdp');
+          expect(
+            request.url.queryParameters['key'],
+            isNotEmpty,
+          );
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(
+            body['postBody'],
+            contains('id_token=raw-google-id-token-abc'),
+          );
+          expect(body['postBody'], contains('providerId=google.com'));
+          expect(body['returnSecureToken'], isTrue);
+
+          return http.Response(
+            jsonEncode({
+              'localId': 'firebase-uid-789',
+              'idToken': 'verified-firebase-id-token-xyz',
+            }),
+            200,
+          );
+        });
+
+        final gateway = LiveGoogleAuthGateway(
+          store: store,
+          httpClient: mockClient,
+        );
+
+        final outcome = await gateway.signIn();
+        expect(outcome, isA<SignInSuccess>());
+        final success = outcome as SignInSuccess;
+        expect(success.identity.googleSubject, 'google-sub-123');
+        expect(success.identity.email, 'user@example.com');
+        expect(success.identity.displayName, 'Test User');
+        expect(success.identity.photoUrl, 'https://example.com/photo.jpg');
+        expect(success.identity.firebaseUid, 'firebase-uid-789');
+        expect(success.identity.idToken, 'verified-firebase-id-token-xyz');
+
+        // Verify session was saved to store
+        expect(store.data['auth_session_subject'], 'google-sub-123');
+        expect(store.data['auth_session_email'], 'user@example.com');
+        expect(store.data['auth_session_name'], 'Test User');
+        expect(
+          store.data['auth_session_photo'],
+          'https://example.com/photo.jpg',
+        );
+        expect(store.data['auth_session_uid'], 'firebase-uid-789');
+        expect(
+          store.data['auth_session_id_token'],
+          'verified-firebase-id-token-xyz',
+        );
+      },
+    );
+
+    test('graceful fallback when IdP network exchange fails', () async {
+      final testPlatform = TestGoogleSignInPlatform(
+        authResults: const AuthenticationResults(
+          user: GoogleSignInUserData(
+            id: 'google-sub-fallback',
+            email: 'offline@example.com',
+            displayName: 'Offline User',
+          ),
+          authenticationTokens: AuthenticationTokenData(
+            idToken: 'raw-google-id-token-offline',
+          ),
+        ),
+      );
+      GoogleSignInPlatform.instance = testPlatform;
+
+      final mockClient = MockClient((request) async {
+        throw http.ClientException('Network unreachable');
       });
 
       final gateway = LiveGoogleAuthGateway(
@@ -91,114 +254,88 @@ void main() {
         httpClient: mockClient,
       );
 
-      final outcome = await gateway.signInWithEmail(
-        'user@example.com',
-        'pass1234',
-      );
+      final outcome = await gateway.signIn();
       expect(outcome, isA<SignInSuccess>());
       final success = outcome as SignInSuccess;
-      expect(success.identity.email, 'user@example.com');
-      expect(success.identity.firebaseUid, 'user-123');
+      expect(success.identity.googleSubject, 'google-sub-fallback');
+      expect(success.identity.email, 'offline@example.com');
+      // Falls back to Google subject ID for firebaseUid and raw idToken
+      expect(success.identity.firebaseUid, 'google-sub-fallback');
+      expect(success.identity.idToken, 'raw-google-id-token-offline');
 
-      // Verify session was saved to store
-      expect(store.data['auth_session_email'], 'user@example.com');
+      // Verify fallback session saved to store
+      expect(store.data['auth_session_subject'], 'google-sub-fallback');
+      expect(store.data['auth_session_uid'], 'google-sub-fallback');
+      expect(
+        store.data['auth_session_id_token'],
+        'raw-google-id-token-offline',
+      );
     });
 
-    test('signInWithEmail maps Firebase errors appropriately', () async {
-      final mockClient = MockClient((request) async {
-        return http.Response(
-          jsonEncode({
-            'error': {'message': 'INVALID_LOGIN_CREDENTIALS'},
-          }),
-          400,
+    test(
+      'returns SignInFailed when native Google Sign-In fails or cancels',
+      () async {
+        final testPlatform = TestGoogleSignInPlatform(
+          authException: const GoogleSignInException(
+            code: GoogleSignInExceptionCode.canceled,
+            description: 'User cancelled sign-in',
+          ),
         );
-      });
+        GoogleSignInPlatform.instance = testPlatform;
 
-      final gateway = LiveGoogleAuthGateway(
-        store: store,
-        httpClient: mockClient,
-      );
+        final gateway = LiveGoogleAuthGateway(store: store);
+        final outcome = await gateway.signIn();
 
-      final outcome = await gateway.signInWithEmail(
-        'user@example.com',
-        'wrong',
-      );
-      expect(outcome, isA<SignInFailed>());
-      final failed = outcome as SignInFailed;
-      expect(failed.message, contains('Invalid email or password.'));
-    });
-
-    test('signUpWithEmail returns SignInSuccess on 200 response', () async {
-      final mockClient = MockClient((request) async {
-        expect(request.url.path, contains('signUp'));
-        return http.Response(
-          jsonEncode({
-            'localId': 'new-user-456',
-            'email': 'new@example.com',
-            'idToken': 'mock-new-token',
-          }),
-          200,
+        expect(outcome, isA<SignInFailed>());
+        final failed = outcome as SignInFailed;
+        expect(
+          failed.message,
+          contains('Google Sign-In failed or was cancelled'),
         );
-      });
+        expect(store.data.isEmpty, isTrue);
+      },
+    );
 
-      final gateway = LiveGoogleAuthGateway(
-        store: store,
-        httpClient: mockClient,
-      );
+    test(
+      'returns SignInFailed when Identity Platform returns HTTP 400 rejection',
+      () async {
+        final testPlatform = TestGoogleSignInPlatform(
+          authResults: const AuthenticationResults(
+            user: GoogleSignInUserData(
+              id: 'google-sub-400',
+              email: 'user@example.com',
+              displayName: 'Test User',
+            ),
+            authenticationTokens: AuthenticationTokenData(
+              idToken: 'invalid-id-token',
+            ),
+          ),
+        );
+        GoogleSignInPlatform.instance = testPlatform;
 
-      final outcome = await gateway.signUpWithEmail(
-        'new@example.com',
-        'pass1234',
-      );
-      expect(outcome, isA<SignInSuccess>());
-      final success = outcome as SignInSuccess;
-      expect(success.identity.email, 'new@example.com');
-      expect(success.identity.firebaseUid, 'new-user-456');
-    });
+        final mockClient = MockClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'error': {
+                'code': 400,
+                'message': 'INVALID_ID_TOKEN',
+              },
+            }),
+            400,
+          );
+        });
 
-    test('phone OTP send and verify flow succeeds', () async {
-      final gateway = LiveGoogleAuthGateway(store: store);
-      final sent = await gateway.sendPhoneOtp('+15551234567');
-      expect(sent, isTrue);
+        final gateway = LiveGoogleAuthGateway(
+          store: store,
+          httpClient: mockClient,
+        );
 
-      final invalidResult = await gateway.verifyPhoneOtp(
-        '+15551234567',
-        '000000',
-      );
-      expect(invalidResult, isA<SignInFailed>());
-
-      final otp = gateway.getActiveOtp('+15551234567');
-      expect(otp, isNotNull);
-
-      final verifyResult = await gateway.verifyPhoneOtp('+15551234567', otp!);
-      expect(verifyResult, isA<SignInSuccess>());
-      final success = verifyResult as SignInSuccess;
-      expect(success.identity.displayName, '+15551234567');
-      expect(store.data['auth_session_name'], '+15551234567');
-    });
-
-    test('email OTP send and verify flow succeeds', () async {
-      final gateway = LiveGoogleAuthGateway(store: store);
-      final sent = await gateway.sendEmailOtp('otpuser@example.com');
-      expect(sent, isTrue);
-
-      final invalidResult = await gateway.verifyEmailOtp(
-        'otpuser@example.com',
-        '000000',
-      );
-      expect(invalidResult, isA<SignInFailed>());
-
-      final otp = gateway.getActiveOtp('otpuser@example.com');
-      expect(otp, isNotNull);
-
-      final verifyResult = await gateway.verifyEmailOtp(
-        'otpuser@example.com',
-        otp!,
-      );
-      expect(verifyResult, isA<SignInSuccess>());
-      final success = verifyResult as SignInSuccess;
-      expect(success.identity.email, 'otpuser@example.com');
-      expect(store.data['auth_session_email'], 'otpuser@example.com');
-    });
+        final outcome = await gateway.signIn();
+        expect(outcome, isA<SignInFailed>());
+        final failed = outcome as SignInFailed;
+        expect(failed.message, contains('400'));
+        expect(store.data.isEmpty, isTrue);
+      },
+    );
   });
 }

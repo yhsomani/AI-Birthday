@@ -756,11 +756,11 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(
+        padding: EdgeInsets.fromLTRB(
           16,
           16,
           16,
-          AppSpacing.bottomClearance,
+          AppSpacing.bottomClearance + MediaQuery.viewInsetsOf(context).bottom,
         ),
         children: [
           // Recipient Context Card

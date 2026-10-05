@@ -44,89 +44,13 @@ class AuthController extends AsyncNotifier<AuthState> {
         state = AsyncData(
           AuthState(status: AuthStatus.signedIn, identity: identity),
         );
-        _logger.info(
-          'auth',
-          'signed in',
-          params: {'subject': identity.googleSubject},
-        );
+        _logger.info('auth', 'signed in');
       case SignInUnavailable():
         state = const AsyncData(AuthState(status: AuthStatus.unavailable));
       case SignInFailed():
         state = const AsyncData(AuthState(status: AuthStatus.signedOut));
     }
     return outcome;
-  }
-
-  Future<SignInOutcome> signInWithEmail(String email, String password) async {
-    final gateway = _gateway;
-    if (gateway is LiveGoogleAuthGateway) {
-      final outcome = await gateway.signInWithEmail(email, password);
-      if (outcome is SignInSuccess) {
-        state = AsyncData(
-          AuthState(status: AuthStatus.signedIn, identity: outcome.identity),
-        );
-      }
-      return outcome;
-    }
-    return const SignInUnavailable(reason: 'Email sign-in not available');
-  }
-
-  Future<SignInOutcome> signUpWithEmail(String email, String password) async {
-    final gateway = _gateway;
-    if (gateway is LiveGoogleAuthGateway) {
-      final outcome = await gateway.signUpWithEmail(email, password);
-      if (outcome is SignInSuccess) {
-        state = AsyncData(
-          AuthState(status: AuthStatus.signedIn, identity: outcome.identity),
-        );
-      }
-      return outcome;
-    }
-    return const SignInUnavailable(reason: 'Email registration not available');
-  }
-
-  Future<bool> sendPhoneOtp(String phoneNumber) async {
-    final gateway = _gateway;
-    if (gateway is LiveGoogleAuthGateway) {
-      return gateway.sendPhoneOtp(phoneNumber);
-    }
-    return false;
-  }
-
-  Future<SignInOutcome> verifyPhoneOtp(String phoneNumber, String otp) async {
-    final gateway = _gateway;
-    if (gateway is LiveGoogleAuthGateway) {
-      final outcome = await gateway.verifyPhoneOtp(phoneNumber, otp);
-      if (outcome is SignInSuccess) {
-        state = AsyncData(
-          AuthState(status: AuthStatus.signedIn, identity: outcome.identity),
-        );
-      }
-      return outcome;
-    }
-    return const SignInUnavailable(reason: 'Phone verification not available');
-  }
-
-  Future<bool> sendEmailOtp(String email) async {
-    final gateway = _gateway;
-    if (gateway is LiveGoogleAuthGateway) {
-      return gateway.sendEmailOtp(email);
-    }
-    return false;
-  }
-
-  Future<SignInOutcome> verifyEmailOtp(String email, String otp) async {
-    final gateway = _gateway;
-    if (gateway is LiveGoogleAuthGateway) {
-      final outcome = await gateway.verifyEmailOtp(email, otp);
-      if (outcome is SignInSuccess) {
-        state = AsyncData(
-          AuthState(status: AuthStatus.signedIn, identity: outcome.identity),
-        );
-      }
-      return outcome;
-    }
-    return const SignInUnavailable(reason: 'Email verification not available');
   }
 
   Future<void> signOut() async {

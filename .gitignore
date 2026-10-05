@@ -56,3 +56,4 @@ node_modules/
 
 # Test and capture screenshots
 screen_*.png
+.agents/

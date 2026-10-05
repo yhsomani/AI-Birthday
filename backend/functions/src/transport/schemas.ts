@@ -211,3 +211,21 @@ export type CompanionStatusRequest = z.infer<typeof companionStatusSchema>;
 export type CoordinationLifecycleStatusRequest = z.infer<
   typeof coordinationLifecycleStatusSchema
 >;
+
+export const verifyPurchaseSchema = z
+  .object({
+    contractVersion: z.literal(1),
+    purchaseToken: z.string().min(1).max(1024),
+    productId: z.string().min(1).max(128),
+    packageName: z.string().min(1).max(128),
+  })
+  .strict();
+
+export type VerifyPurchaseRequest = z.infer<typeof verifyPurchaseSchema>;
+
+export interface VerifyPurchaseResponse {
+  status: 'active' | 'expired' | 'none';
+  productId: string;
+  expiryDateMs: number;
+  canUseAi: boolean;
+}
