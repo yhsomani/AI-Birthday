@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/core/platform/gemini_nano_platform.dart';
+import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 import 'package:ai_birthday/features/auth/domain/auth_state.dart';
 import 'package:ai_birthday/features/auth/presentation/auth_bottom_sheet.dart';
@@ -27,9 +29,15 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  static const String _geminiApiKeyUrl =
+      'https://aistudio.google.com/app/apikey';
+  static const String _geminiBillingUrl = 'https://ai.google.dev/pricing';
+
   final TextEditingController _apiKeyController = TextEditingController();
   bool _hasKey = false;
   bool _obscureKey = true;
+  bool _isTestingKey = false;
+  GeminiConnectionResult? _connectionResult;
   bool _isPurchasing = false;
   bool _isSyncing = false;
   DateTime? _lastSyncTime;
@@ -114,6 +122,89 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Future<void> _launchExternalUrl(String url) async {
+    final uri = Uri.parse(url);
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open link: $url')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open link: $url')));
+      }
+    }
+  }
+
+  Future<void> _testConnection() async {
+    HapticFeedback.lightImpact();
+    final text = _apiKeyController.text.trim();
+    if (text.isEmpty) {
+      setState(() {
+        _connectionResult = const GeminiConnectionResult.invalidKey(
+          'Please enter an API key to test.',
+        );
+      });
+      return;
+    }
+
+    setState(() {
+      _isTestingKey = true;
+      _connectionResult = null;
+    });
+
+    try {
+      final provider = ref.read(userGeminiApiProvider);
+      final result = await provider.testApiKey(text);
+      if (!mounted) return;
+
+      if (result.status == GeminiConnectionStatus.connected) {
+        await ref.read(credentialStorageProvider).saveGeminiApiKey(text);
+        setState(() {
+          _hasKey = true;
+          _connectionResult = result;
+          _isTestingKey = false;
+        });
+      } else {
+        setState(() {
+          _connectionResult = result;
+          _isTestingKey = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _connectionResult = GeminiConnectionResult.error(
+          'Connection test failed: $e',
+        );
+        _isTestingKey = false;
+      });
+    }
+  }
+
+  void _showGeminiSetupGuide(BuildContext context) {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => _GeminiSetupGuideSheet(
+        onOpenAiStudio: () => _launchExternalUrl(_geminiApiKeyUrl),
+        onOpenBilling: () => _launchExternalUrl(_geminiBillingUrl),
+      ),
+    );
+  }
+
   Future<void> _saveKey() async {
     HapticFeedback.lightImpact();
     final text = _apiKeyController.text.trim();
@@ -121,7 +212,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       if (text.isEmpty) {
         await storage.deleteGeminiApiKey();
-        setState(() => _hasKey = false);
+        setState(() {
+          _hasKey = false;
+          _connectionResult = null;
+        });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Gemini API key removed.')),
@@ -461,39 +555,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                       const Spacer(),
-                      if (_hasKey)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(
-                              0xFF2D5A46,
-                            ).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'Configured',
-                            style: TextStyle(
-                              color: Color(0xFF2D5A46),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
+                      _buildKeyStatusBadge(),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Stored strictly on your device using hardware-backed secure storage. Never logged or sent to external servers.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    'Don\'t have an API key? Get one from Google AI Studio to unlock personalized AI message drafting.',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
                   ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: () => _launchExternalUrl(_geminiApiKeyUrl),
+                        icon: const Icon(Icons.open_in_new, size: 16),
+                        label: const Text('Get Gemini API key ↗'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _showGeminiSetupGuide(context),
+                        icon: const Icon(Icons.help_outline, size: 16),
+                        label: const Text('How to connect'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   TextField(
                     controller: _apiKeyController,
                     obscureText: _obscureKey,
+                    onChanged: (_) {
+                      if (_connectionResult != null) {
+                        setState(() => _connectionResult = null);
+                      }
+                    },
                     decoration: InputDecoration(
-                      labelText: 'Gemini API Key (AIzaSy...)',
+                      labelText: 'Paste your Gemini API key',
+                      hintText: 'AIzaSy...',
+                      border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscureKey ? Icons.visibility : Icons.visibility_off,
@@ -503,11 +602,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  if (_connectionResult != null) ...[
+                    const SizedBox(height: 12),
+                    _buildConnectionResultBanner(_connectionResult!),
+                  ],
+                  const SizedBox(height: 14),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      if (_hasKey) ...[
+                      if (_hasKey)
                         TextButton(
                           onPressed: () {
                             _apiKeyController.clear();
@@ -518,13 +620,72 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             style: TextStyle(color: Colors.red),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                      ],
-                      FilledButton(
+                      const Spacer(),
+                      OutlinedButton(
                         onPressed: _saveKey,
                         child: const Text('Save Key'),
                       ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: _isTestingKey ? null : _testConnection,
+                        icon: _isTestingKey
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.bolt, size: 18),
+                        label: Text(
+                          _isTestingKey ? 'Testing...' : 'Test Connection',
+                        ),
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('🔒 ', style: TextStyle(fontSize: 13)),
+                      Expanded(
+                        child: Text(
+                          'Stored securely on this device. Never included in sync or application logs.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  InkWell(
+                    onTap: () => _launchExternalUrl(_geminiBillingUrl),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.open_in_new,
+                            size: 14,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Gemini API billing, quotas & free limits ↗',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: theme.colorScheme.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -535,33 +696,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // Section 4: On-Device AI / Gemini Nano (SSOT §5, §25)
           _SectionHeader(title: 'On-Device Intelligence'),
           Card(
-            child: ListTile(
-              leading: const Icon(Icons.memory, color: Color(0xFF2D5A46)),
-              title: const Text('Gemini Nano (AICore)'),
-              subtitle: Text(switch (_nanoState) {
-                NanoState.available =>
-                  'Ready on device for offline generation.',
-                NanoState.downloadable =>
-                  'Model available for download on this device.',
-                NanoState.downloading => 'Downloading on-device model...',
-                _ => 'Secondary fallback on supported Android devices.',
-              }),
-              trailing: Chip(
-                label: Text(
-                  _nanoState == NanoState.available ? 'AVAILABLE' : 'STANDBY',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: _nanoState == NanoState.available
-                        ? const Color(0xFF2D5A46)
-                        : Colors.grey[700],
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.memory, color: Color(0xFF2D5A46)),
+                  title: const Text('Gemini Nano (AICore)'),
+                  subtitle: Text(switch (_nanoState) {
+                    NanoState.available =>
+                      'Ready on device for offline generation.',
+                    NanoState.downloadable =>
+                      'Model available for download on this device.',
+                    NanoState.downloading => 'Downloading on-device model...',
+                    _ =>
+                      'Offline AI on supported Android devices with Google AICore.',
+                  }),
+                  trailing: Chip(
+                    label: Text(
+                      _nanoState == NanoState.available
+                          ? 'AVAILABLE'
+                          : 'NOT AVAILABLE',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: _nanoState == NanoState.available
+                            ? const Color(0xFF2D5A46)
+                            : Colors.grey[700],
+                      ),
+                    ),
+                    backgroundColor: _nanoState == NanoState.available
+                        ? const Color(0xFF2D5A46).withValues(alpha: 0.12)
+                        : Colors.grey.withValues(alpha: 0.12),
+                    visualDensity: VisualDensity.compact,
                   ),
                 ),
-                backgroundColor: _nanoState == NanoState.available
-                    ? const Color(0xFF2D5A46).withValues(alpha: 0.12)
-                    : Colors.grey.withValues(alpha: 0.12),
-                visualDensity: VisualDensity.compact,
-              ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: Text(
+                    'AI Provider Priority (SSOT §5): When drafting messages, AI-Birthday first uses your Pro Subscription or Personal Gemini API key. If offline or no key is set, supported Android devices fall back to Gemini Nano on-device.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
@@ -669,6 +844,165 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKeyStatusBadge() {
+    if (_connectionResult?.status == GeminiConnectionStatus.connected) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2D5A46).withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle, size: 12, color: Color(0xFF2D5A46)),
+            SizedBox(width: 4),
+            Text(
+              'Connected',
+              style: TextStyle(
+                color: Color(0xFF2D5A46),
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (_connectionResult?.status == GeminiConnectionStatus.invalidKey) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.red.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          'Invalid Key',
+          style: TextStyle(
+            color: Colors.red,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    } else if (_connectionResult?.status ==
+        GeminiConnectionStatus.quotaExceeded) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.amber.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          'Quota Exceeded',
+          style: TextStyle(
+            color: Colors.amber[900],
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    } else if (_hasKey) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2D5A46).withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          'Configured',
+          style: TextStyle(
+            color: Color(0xFF2D5A46),
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    } else {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.grey.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          'Not Configured',
+          style: TextStyle(
+            color: Colors.grey[700],
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildConnectionResultBanner(GeminiConnectionResult result) {
+    final (
+      Color bgColor,
+      Color borderColor,
+      Color textColor,
+      IconData icon,
+    ) = switch (result.status) {
+      GeminiConnectionStatus.connected => (
+        const Color(0xFF2D5A46).withValues(alpha: 0.12),
+        const Color(0xFF2D5A46),
+        const Color(0xFF2D5A46),
+        Icons.check_circle_outline,
+      ),
+      GeminiConnectionStatus.invalidKey => (
+        Colors.red.withValues(alpha: 0.10),
+        Colors.red,
+        Colors.red[800] ?? Colors.red,
+        Icons.error_outline,
+      ),
+      GeminiConnectionStatus.quotaExceeded => (
+        Colors.amber.withValues(alpha: 0.15),
+        Colors.amber[800] ?? Colors.amber,
+        Colors.amber[900] ?? Colors.black,
+        Icons.warning_amber_rounded,
+      ),
+      GeminiConnectionStatus.networkUnavailable => (
+        Colors.blueGrey.withValues(alpha: 0.12),
+        Colors.blueGrey,
+        Colors.blueGrey[800] ?? Colors.blueGrey,
+        Icons.wifi_off_outlined,
+      ),
+      GeminiConnectionStatus.error => (
+        Colors.red.withValues(alpha: 0.10),
+        Colors.red,
+        Colors.red[800] ?? Colors.red,
+        Icons.error_outline,
+      ),
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: borderColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              result.message,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: textColor,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -782,6 +1116,255 @@ class _AuthTile extends ConsumerWidget {
           },
         ),
       },
+    );
+  }
+}
+
+class _GeminiSetupGuideSheet extends StatelessWidget {
+  const _GeminiSetupGuideSheet({
+    required this.onOpenAiStudio,
+    required this.onOpenBilling,
+  });
+
+  final VoidCallback onOpenAiStudio;
+  final VoidCallback onOpenBilling;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) {
+        return SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[400],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFA64B2A).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome,
+                      color: Color(0xFFA64B2A),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'How to connect Gemini',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Step-by-step setup in Google AI Studio',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Step 1
+              _GuideStepTile(
+                stepNumber: '1',
+                title: 'Open Google AI Studio',
+                description:
+                    'Visit Google AI Studio in your browser and sign in with your Google Account.',
+                action: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: FilledButton.tonalIcon(
+                    onPressed: onOpenAiStudio,
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    label: const Text('Open Google AI Studio ↗'),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Step 2
+              const _GuideStepTile(
+                stepNumber: '2',
+                title: 'Create an API Key',
+                description:
+                    'Click "Create API key" (or "Get API key"). Select an existing Google Cloud project or create a new one instantly.',
+              ),
+              const SizedBox(height: 18),
+
+              // Step 3
+              const _GuideStepTile(
+                stepNumber: '3',
+                title: 'Copy your API Key',
+                description:
+                    'Copy the generated key to your clipboard. It will start with "AIzaSy...".',
+              ),
+              const SizedBox(height: 18),
+
+              // Step 4
+              const _GuideStepTile(
+                stepNumber: '4',
+                title: 'Paste and Test in Settings',
+                description:
+                    'Return to AI-Birthday, paste the key into the Gemini API Key field, and tap "Test Connection" to verify it works.',
+              ),
+              const SizedBox(height: 24),
+
+              // Explanatory note container
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.5,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant.withValues(
+                      alpha: 0.5,
+                    ),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 18,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Important Notes on Usage & Billing',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '• Your key belongs exclusively to your personal Google Cloud project.\n'
+                      '• Google AI Studio includes a generous free tier for Gemini models.\n'
+                      '• Quotas, rate limits, and billing (if enabled) are controlled directly by Google in your account.\n'
+                      '• AI-Birthday connects directly to Google\'s API and never stores or forwards your key to any external server.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: onOpenBilling,
+                        icon: const Icon(Icons.help_outline, size: 16),
+                        label: const Text(
+                          'Learn about Gemini API billing & quotas ↗',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Got it'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _GuideStepTile extends StatelessWidget {
+  const _GuideStepTile({
+    required this.stepNumber,
+    required this.title,
+    required this.description,
+    this.action,
+  });
+
+  final String stepNumber;
+  final String title;
+  final String description;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 14,
+          backgroundColor: const Color(0xFFA64B2A),
+          foregroundColor: Colors.white,
+          child: Text(
+            stepNumber,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+              ),
+              ?action,
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

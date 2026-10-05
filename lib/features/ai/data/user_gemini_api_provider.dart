@@ -30,6 +30,43 @@ class HttpResponsePayload {
   final String body;
 }
 
+enum GeminiConnectionStatus {
+  connected,
+  invalidKey,
+  quotaExceeded,
+  networkUnavailable,
+  error,
+}
+
+class GeminiConnectionResult {
+  const GeminiConnectionResult({required this.status, required this.message});
+
+  final GeminiConnectionStatus status;
+  final String message;
+
+  const GeminiConnectionResult.connected([
+    this.message =
+        'Gemini is ready. Messages will use your personal Gemini API access.',
+  ]) : status = GeminiConnectionStatus.connected;
+
+  const GeminiConnectionResult.invalidKey([
+    this.message =
+        'Google rejected this key. Check the key in Google AI Studio and try again.',
+  ]) : status = GeminiConnectionStatus.invalidKey;
+
+  const GeminiConnectionResult.quotaExceeded([
+    this.message =
+        'Your Google Gemini project has reached its current quota. Check usage or billing in Google AI Studio.',
+  ]) : status = GeminiConnectionStatus.quotaExceeded;
+
+  const GeminiConnectionResult.networkUnavailable([
+    this.message = 'Check your internet connection and try again.',
+  ]) : status = GeminiConnectionStatus.networkUnavailable;
+
+  const GeminiConnectionResult.error(this.message)
+    : status = GeminiConnectionStatus.error;
+}
+
 class UserGeminiApiProvider implements AiMessageProvider {
   UserGeminiApiProvider({
     required CredentialStorage credentialStorage,
@@ -117,6 +154,68 @@ class UserGeminiApiProvider implements AiMessageProvider {
       return _parseSuccess(response.body);
     } else {
       _handleHttpError(response.statusCode, response.body);
+    }
+  }
+
+  /// Tests connection to the Gemini API using the provided [apiKey].
+  ///
+  /// Sends a minimal ping using model [$model] to verify that the key is valid,
+  /// the project has access to Gemini, and sufficient quota remains.
+  Future<GeminiConnectionResult> testApiKey(String apiKey) async {
+    final trimmed = apiKey.trim();
+    if (trimmed.isEmpty) {
+      return const GeminiConnectionResult.invalidKey(
+        'Please enter an API key to test.',
+      );
+    }
+
+    final uri = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$trimmed',
+    );
+
+    final requestBody = jsonEncode({
+      'contents': [
+        {
+          'parts': [
+            {'text': 'Ping'},
+          ],
+        },
+      ],
+      'generationConfig': {'temperature': 0.0, 'maxOutputTokens': 1},
+    });
+
+    try {
+      final response = await _httpSender(uri, {
+        'Content-Type': 'application/json',
+      }, requestBody);
+
+      if (response.statusCode == 200) {
+        return const GeminiConnectionResult.connected();
+      } else if (response.statusCode == 400 ||
+          response.statusCode == 401 ||
+          response.statusCode == 403) {
+        return const GeminiConnectionResult.invalidKey();
+      } else if (response.statusCode == 429) {
+        return const GeminiConnectionResult.quotaExceeded();
+      } else {
+        return GeminiConnectionResult.error(
+          'Google Gemini returned error ${response.statusCode}. Please try again.',
+        );
+      }
+    } on SocketException {
+      return const GeminiConnectionResult.networkUnavailable();
+    } on HttpException {
+      return const GeminiConnectionResult.networkUnavailable();
+    } catch (e) {
+      final str = e.toString().toLowerCase();
+      if (str.contains('socketexception') ||
+          str.contains('failed host lookup') ||
+          str.contains('network') ||
+          str.contains('connection refused') ||
+          str.contains('clientexception')) {
+        return const GeminiConnectionResult.networkUnavailable();
+      }
+      return GeminiConnectionResult.error('Connection error: $e');
     }
   }
 
