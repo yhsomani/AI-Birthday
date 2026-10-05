@@ -39,8 +39,9 @@ void main() {
 
     test('returns failure when authState is signed out', () async {
       final service = CloudSyncService(db: db, store: store);
-      final result =
-          await service.sync(const AuthState(status: AuthStatus.signedOut));
+      final result = await service.sync(
+        const AuthState(status: AuthStatus.signedOut),
+      );
 
       expect(result.success, isFalse);
       expect(result.error, contains('Please sign in'));
@@ -50,7 +51,9 @@ void main() {
       final now = DateTime.now();
 
       // Seed a person and birthday
-      await db.into(db.persons).insert(
+      await db
+          .into(db.persons)
+          .insert(
             PersonsCompanion.insert(
               id: 'p-1',
               name: 'Taylor Swift',
@@ -69,7 +72,9 @@ void main() {
             ),
           );
 
-      await db.into(db.birthdays).insert(
+      await db
+          .into(db.birthdays)
+          .insert(
             BirthdaysCompanion.insert(
               id: 'b-1',
               personId: 'p-1',

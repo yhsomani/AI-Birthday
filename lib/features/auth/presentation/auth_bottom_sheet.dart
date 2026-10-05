@@ -92,7 +92,10 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
   Future<void> _handleSendPhoneOtp() async {
     final phone = _phoneController.text.trim();
     if (phone.length < 8) {
-      setState(() => _errorMessage = 'Please enter a valid phone number with country code (e.g. +1 555-0199 or +91 9876543210).');
+      setState(
+        () => _errorMessage =
+            'Please enter a valid phone number with country code (e.g. +1 555-0199 or +91 9876543210).',
+      );
       return;
     }
 
@@ -102,7 +105,9 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
       _errorMessage = null;
     });
 
-    final sent = await ref.read(authControllerProvider.notifier).sendPhoneOtp(phone);
+    final sent = await ref
+        .read(authControllerProvider.notifier)
+        .sendPhoneOtp(phone);
     if (!mounted) return;
     setState(() {
       _isLoading = false;
@@ -129,7 +134,9 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
       _errorMessage = null;
     });
 
-    final outcome = await ref.read(authControllerProvider.notifier).verifyPhoneOtp(phone, otp);
+    final outcome = await ref
+        .read(authControllerProvider.notifier)
+        .verifyPhoneOtp(phone, otp);
     if (!mounted) return;
     setState(() => _isLoading = false);
 
@@ -156,7 +163,9 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
       _errorMessage = null;
     });
 
-    final sent = await ref.read(authControllerProvider.notifier).sendEmailOtp(email);
+    final sent = await ref
+        .read(authControllerProvider.notifier)
+        .sendEmailOtp(email);
     if (!mounted) return;
     setState(() {
       _isLoading = false;
@@ -183,7 +192,9 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
       _errorMessage = null;
     });
 
-    final outcome = await ref.read(authControllerProvider.notifier).verifyEmailOtp(email, otp);
+    final outcome = await ref
+        .read(authControllerProvider.notifier)
+        .verifyEmailOtp(email, otp);
     if (!mounted) return;
     setState(() => _isLoading = false);
 
@@ -226,7 +237,11 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
 
     switch (outcome) {
       case SignInSuccess():
-        _onSuccess(_isSignUp ? 'Account created and signed in!' : 'Welcome back! Signed in.');
+        _onSuccess(
+          _isSignUp
+              ? 'Account created and signed in!'
+              : 'Welcome back! Signed in.',
+        );
       case SignInFailed(message: final msg):
         setState(() => _errorMessage = msg ?? 'Authentication failed');
       case SignInUnavailable(reason: final r):
@@ -284,7 +299,9 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
             // Tab bar for Google, Phone OTP, Email
             Container(
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.5,
+                ),
                 borderRadius: BorderRadius.circular(12),
               ),
               padding: const EdgeInsets.all(4),
@@ -298,7 +315,10 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
                 ),
                 labelColor: theme.colorScheme.onPrimaryContainer,
                 unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
                 tabs: const [
                   Tab(text: 'Google'),
                   Tab(text: 'Phone OTP'),
@@ -318,7 +338,11 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -359,7 +383,11 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.account_circle_outlined, size: 48, color: Color(0xFFA64B2A)),
+        const Icon(
+          Icons.account_circle_outlined,
+          size: 48,
+          color: Color(0xFFA64B2A),
+        ),
         const SizedBox(height: 12),
         const Text(
           'Continue with your verified Google Account',
@@ -395,7 +423,9 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
           ),
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             side: BorderSide(color: theme.colorScheme.outlineVariant),
           ),
         ),
@@ -415,9 +445,13 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
               labelText: 'Mobile Phone Number',
               hintText: '+1 555-0199 or +91 9876543210',
               prefixIcon: const Icon(Icons.phone_outlined),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.3,
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -427,13 +461,21 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
                   )
                 : const Icon(Icons.send_outlined),
-            label: const Text('Send Verification Code (OTP)', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: const Text(
+              'Send Verification Code (OTP)',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ] else ...[
@@ -442,14 +484,22 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
             keyboardType: TextInputType.number,
             maxLength: 6,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 22,
+              letterSpacing: 8,
+              fontWeight: FontWeight.bold,
+            ),
             decoration: InputDecoration(
               labelText: '6-Digit Verification Code',
               hintText: '123456',
               prefixIcon: const Icon(Icons.lock_clock_outlined),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.3,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -457,15 +507,23 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
             onPressed: _isLoading ? null : _handleVerifyPhoneOtp,
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: _isLoading
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
                   )
-                : const Text('Verify & Sign In', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                : const Text(
+                    'Verify & Sign In',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
           ),
           TextButton(
             onPressed: () => setState(() => _phoneOtpSent = false),
@@ -486,14 +544,22 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
             keyboardType: TextInputType.number,
             maxLength: 6,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 22,
+              letterSpacing: 8,
+              fontWeight: FontWeight.bold,
+            ),
             decoration: InputDecoration(
               labelText: '6-Digit Email Code',
               hintText: '123456',
               prefixIcon: const Icon(Icons.mark_email_read_outlined),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.3,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -501,15 +567,23 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
             onPressed: _isLoading ? null : _handleVerifyEmailOtp,
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: _isLoading
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
                   )
-                : const Text('Verify & Sign In', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                : const Text(
+                    'Verify & Sign In',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
           ),
           TextButton(
             onPressed: () => setState(() => _emailOtpSent = false),
@@ -530,7 +604,9 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
             prefixIcon: const Icon(Icons.email_outlined),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             filled: true,
-            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.3,
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -542,7 +618,9 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
             prefixIcon: const Icon(Icons.lock_outline),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             filled: true,
-            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.3,
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -553,23 +631,36 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
                 onPressed: _isLoading ? null : _handleEmailPasswordAuth,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: _isLoading
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
                       )
-                    : Text(_isSignUp ? 'Sign Up' : 'Sign In', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    : Text(
+                        _isSignUp ? 'Sign Up' : 'Sign In',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
             const SizedBox(width: 8),
             OutlinedButton(
               onPressed: _isLoading ? null : _handleSendEmailOtp,
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: const Text('Send OTP Code'),
             ),
@@ -579,7 +670,9 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
           child: TextButton(
             onPressed: () => setState(() => _isSignUp = !_isSignUp),
             child: Text(
-              _isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up",
+              _isSignUp
+                  ? 'Already have an account? Sign In'
+                  : "Don't have an account? Sign Up",
               style: const TextStyle(fontSize: 12),
             ),
           ),
