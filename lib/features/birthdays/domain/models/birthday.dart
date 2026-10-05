@@ -108,8 +108,9 @@ class Birthday {
       if (!BirthdayEngine.isLeapYear(year)) {
         final resolved = const BirthdayEngine().resolveFeb29(
           year,
-          resolution:
-              preferMar1 ? LeapDayResolution.mar1 : LeapDayResolution.feb28,
+          resolution: preferMar1
+              ? LeapDayResolution.mar1
+              : LeapDayResolution.feb28,
         );
         return DateTime(year, resolved.month, resolved.day);
       }

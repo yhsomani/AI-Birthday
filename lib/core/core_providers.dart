@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'database/app_database.dart';
-import 'database/drift_repositories.dart';
 import 'logging/app_logger.dart';
 
 /// Application-wide providers.
@@ -17,6 +16,5 @@ final loggerProvider = Provider<AppLogger>((ref) {
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase.open();
   ref.onDispose(db.close);
-  seedInitialDataIfEmpty(db);
   return db;
 });

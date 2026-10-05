@@ -242,7 +242,11 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
       } catch (e) {
         ref
             .read(loggerProvider)
-            .warning('MessageStudio', 'Could not launch WhatsApp directly', error: e);
+            .warning(
+              'MessageStudio',
+              'Could not launch WhatsApp directly',
+              error: e,
+            );
       }
 
       // Track handoff status only when launch succeeds; otherwise action required (SSOT §9)
@@ -260,6 +264,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
         _showHandoffConfirmationDialog(
           handoff.uri.toString(),
           wasLaunched: launched,
+          channelName: 'WhatsApp',
         );
       }
     } on AppFailure catch (e) {
@@ -271,9 +276,313 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
     }
   }
 
+  Future<void> _handleSmsSend() async {
+    final message = _messageController.text.trim();
+    if (message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter or generate a message first.'),
+        ),
+      );
+      return;
+    }
+
+    final phone = _person?.phoneNumber;
+    await _saveDraft(status: DraftStatus.ready);
+    final smsService = ref.read(smsDeliveryServiceProvider);
+    final launched = await smsService.sendSms(
+      phoneNumber: phone,
+      message: message,
+    );
+
+    if (launched) {
+      await ref
+          .read(birthdaysRepositoryProvider)
+          .updateBirthdayStatus(widget.birthdayId, BirthdayStatus.handedOff);
+    }
+
+    if (mounted) {
+      _showHandoffConfirmationDialog(
+        phone != null ? 'Recipient: $phone' : 'Prepared message in SMS app',
+        wasLaunched: launched,
+        channelName: 'SMS',
+      );
+    }
+  }
+
+  Future<void> _handleShareSend() async {
+    final message = _messageController.text.trim();
+    if (message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter or generate a message first.'),
+        ),
+      );
+      return;
+    }
+
+    await _saveDraft(status: DraftStatus.ready);
+    final shareService = ref.read(nativeShareServiceProvider);
+    final launched = await shareService.shareText(
+      text: message,
+      title: 'Birthday greeting for ${_person?.name}',
+    );
+
+    if (launched) {
+      await ref
+          .read(birthdaysRepositoryProvider)
+          .updateBirthdayStatus(widget.birthdayId, BirthdayStatus.handedOff);
+    }
+
+    if (mounted) {
+      _showHandoffConfirmationDialog(
+        'Shared via Android chooser',
+        wasLaunched: launched,
+        channelName: 'Share Sheet',
+      );
+    }
+  }
+
+  Future<void> _rewriteMessage({
+    MessageLength? length,
+    String? customInstruction,
+    String? targetLanguage,
+    String? languageName,
+  }) async {
+    if (_person == null) return;
+    final currentText = _messageController.text.trim();
+    if (currentText.isEmpty) {
+      await _generateWithAi();
+      return;
+    }
+
+    setState(() {
+      _isGenerating = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final aiRouter = ref.read(aiRouterProvider);
+      final entitlement = ref.read(entitlementProvider);
+
+      final request = AiGenerationRequest(
+        person: _person!,
+        tone: _selectedTone,
+        length: length ?? _selectedLength,
+        customInstruction: customInstruction,
+        existingMessage: currentText,
+        targetLanguage: targetLanguage,
+      );
+
+      final result = await aiRouter.generate(
+        request: request,
+        entitlement: entitlement,
+      );
+
+      _messageController.text = result.message;
+      if (length != null) {
+        _selectedLength = length;
+      }
+
+      await _saveDraft();
+
+      if (mounted) {
+        final label = languageName != null
+            ? 'Translated to $languageName ✨'
+            : (length == MessageLength.short
+                  ? 'Message shortened ✂️'
+                  : length == MessageLength.expanded
+                  ? 'Message expanded 📝'
+                  : 'Message refined ✨');
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(label)));
+      }
+    } on AppFailure catch (e) {
+      setState(() {
+        _errorMessage = '${e.message}: ${e.detail ?? ''} ${e.action ?? ''}';
+      });
+    } catch (e, st) {
+      ref
+          .read(loggerProvider)
+          .error(
+            'MessageStudio',
+            'Unexpected error rewriting message',
+            error: e,
+            stackTrace: st,
+          );
+      setState(() {
+        _errorMessage = 'An error occurred while rewriting the message.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isGenerating = false);
+      }
+    }
+  }
+
+  Future<void> _generateVariations() async {
+    if (_person == null) return;
+    setState(() {
+      _isGenerating = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final aiRouter = ref.read(aiRouterProvider);
+      final entitlement = ref.read(entitlementProvider);
+
+      final tones = [
+        MessageTone.warm,
+        MessageTone.funny,
+        MessageTone.emotional,
+      ];
+      final variations = <MapEntry<MessageTone, String>>[];
+
+      for (final t in tones) {
+        final req = AiGenerationRequest(
+          person: _person!,
+          tone: t,
+          length: _selectedLength,
+        );
+        final res = await aiRouter.generate(
+          request: req,
+          entitlement: entitlement,
+        );
+        variations.add(MapEntry(t, res.message));
+      }
+
+      if (!mounted) return;
+      setState(() => _isGenerating = false);
+
+      final selected = await showModalBottomSheet<String>(
+        context: context,
+        isScrollControlled: true,
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.auto_awesome, color: Color(0xFFD9822B)),
+                    SizedBox(width: 8),
+                    Text(
+                      'Select a Variation',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                for (final v in variations) ...[
+                  Card(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => Navigator.of(ctx).pop(v.value),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Chip(
+                                  label: Text(v.key.displayName),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                const Spacer(),
+                                const Text(
+                                  'Tap to choose',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(v.value, style: const TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+
+      if (selected != null && mounted) {
+        _messageController.text = selected;
+        await _saveDraft();
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Variation applied! ✨')));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Could not generate variations: $e';
+          _isGenerating = false;
+        });
+      }
+    }
+  }
+
+  void _showTranslateDialog() {
+    final languages = [
+      {'code': 'es', 'name': 'Spanish (Español)'},
+      {'code': 'fr', 'name': 'French (Français)'},
+      {'code': 'de', 'name': 'German (Deutsch)'},
+      {'code': 'hi', 'name': 'Hindi (हिन्दी)'},
+      {'code': 'it', 'name': 'Italian (Italiano)'},
+      {'code': 'ja', 'name': 'Japanese (日本語)'},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Translate Greeting To',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            for (final lang in languages)
+              ListTile(
+                title: Text(lang['name']!),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _rewriteMessage(
+                    targetLanguage: lang['code'],
+                    languageName: lang['name'],
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showHandoffConfirmationDialog(
-    String waUrl, {
+    String detailInfo, {
     required bool wasLaunched,
+    String channelName = 'WhatsApp',
   }) {
     showDialog(
       context: context,
@@ -286,7 +595,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
                 color: const Color(0xFF2D5A46),
               ),
               const SizedBox(width: 8),
-              const Text('WhatsApp Handoff'),
+              Text('$channelName Handoff'),
             ],
           ),
           content: Column(
@@ -295,8 +604,8 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
             children: [
               Text(
                 wasLaunched
-                    ? 'WhatsApp opened with your pre-filled message. Once you have tapped Send in WhatsApp, confirm below to update your celebration tracker.'
-                    : 'WhatsApp could not be opened automatically. You can use the link below or copy the message to your clipboard:',
+                    ? '$channelName opened with your message. Once you have dispatched it in $channelName, confirm below to update your celebration tracker.'
+                    : '$channelName could not be opened automatically. You can copy the message to your clipboard:',
               ),
               const SizedBox(height: 12),
               Container(
@@ -307,7 +616,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
                   border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
                 ),
                 child: SelectableText(
-                  waUrl,
+                  detailInfo,
                   style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
                 ),
               ),
@@ -465,6 +774,30 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
               label: Text(_isGenerating ? 'Drafting...' : 'Generate with AI'),
             ),
           ),
+          const SizedBox(height: AppSpacing.sm),
+          // Alternate delivery channels (SSOT §10)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _handleSmsSend,
+                icon: const Icon(Icons.sms_outlined, size: 18),
+                label: const Text('Send via SMS'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _handleShareSend,
+                icon: const Icon(Icons.share_outlined, size: 18),
+                label: const Text('Share Sheet'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _copyToClipboard,
+                icon: const Icon(Icons.copy_outlined, size: 18),
+                label: const Text('Copy Text'),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -582,17 +915,58 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Message Body (User review required):',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Message Body (User review required):',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text(
+              '${_messageController.text.length} chars',
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         TextField(
           controller: _messageController,
           maxLines: 5,
+          onChanged: (_) => setState(() {}),
           decoration: const InputDecoration(
             hintText: 'Write a birthday greeting or tap Generate with AI...',
           ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            ActionChip(
+              avatar: const Icon(Icons.compress, size: 16),
+              label: const Text('Shorten'),
+              onPressed: _isGenerating
+                  ? null
+                  : () => _rewriteMessage(length: MessageLength.short),
+            ),
+            ActionChip(
+              avatar: const Icon(Icons.expand, size: 16),
+              label: const Text('Expand'),
+              onPressed: _isGenerating
+                  ? null
+                  : () => _rewriteMessage(length: MessageLength.expanded),
+            ),
+            ActionChip(
+              avatar: const Icon(Icons.translate, size: 16),
+              label: const Text('Translate'),
+              onPressed: _isGenerating ? null : _showTranslateDialog,
+            ),
+            ActionChip(
+              avatar: const Icon(Icons.casino_outlined, size: 16),
+              label: const Text('Variations'),
+              onPressed: _isGenerating ? null : _generateVariations,
+            ),
+          ],
         ),
       ],
     );

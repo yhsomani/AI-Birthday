@@ -6,6 +6,9 @@ import 'package:intl/intl.dart';
 
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
+import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart'
+    as b_models;
+import 'package:ai_birthday/features/people/data/contact_csv_service.dart';
 import 'package:ai_birthday/features/people/data/person_providers.dart'
     show personServiceProvider;
 import 'package:ai_birthday/features/people/domain/models/person.dart';
@@ -28,6 +31,379 @@ class PeopleScreen extends ConsumerWidget {
     if (next.daysUntil == 1) return 'Tomorrow';
     if (next.daysUntil <= 90) return 'In ${next.daysUntil} days';
     return 'In ${(next.daysUntil / 30).ceil()} months';
+  }
+
+  Future<void> _exportCsv(
+    BuildContext context,
+    WidgetRef ref,
+    List<Person> people,
+  ) async {
+    HapticFeedback.lightImpact();
+    if (people.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No contacts to export.')));
+      return;
+    }
+
+    final csvService = ref.read(contactCsvServiceProvider);
+    final csvText = csvService.exportToCsv(people);
+
+    await Clipboard.setData(ClipboardData(text: csvText));
+
+    final shareService = ref.read(nativeShareServiceProvider);
+    await shareService.shareText(
+      text: csvText,
+      title: 'AI-Birthday Contacts Export (${people.length})',
+    );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Exported ${people.length} contacts to CSV (copied to clipboard)! 📋',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showImportCsvSheet(
+    BuildContext context,
+    WidgetRef ref,
+    List<Person> currentPeople,
+  ) async {
+    final textController = TextEditingController();
+    final parsedCandidates = await showModalBottomSheet<List<ParsedContactCandidate>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (ctx, setModalState) => SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Import Contacts (CSV)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        textController.text =
+                            'Name,Birthday Month,Birthday Day,Birth Year,Phone Number,Relationship\n'
+                            'Alex Rivera,6,15,1990,+15552345678,Friend\n'
+                            'Taylor Brooks,11,28,1988,+15558765432,Colleague';
+                        setModalState(() {});
+                      },
+                      child: const Text('Load Sample'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Paste CSV with columns: Name, Month, Day, Year, Phone, Relationship.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: textController,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'Sarah,10,7,1992,+14155552671,Friend\n...',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {
+                      final csvService = ref.read(contactCsvServiceProvider);
+                      final candidates = csvService.parseAndNormalizeCsv(
+                        textController.text,
+                        existingPeople: currentPeople,
+                      );
+                      Navigator.of(sheetContext).pop(candidates);
+                    },
+                    child: const Text('Parse & Review Candidates'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (parsedCandidates == null || !context.mounted) return;
+
+    if (parsedCandidates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No valid contact entries found in CSV.')),
+      );
+      return;
+    }
+
+    await _reviewAndImportCandidates(
+      context,
+      ref,
+      parsedCandidates,
+      title: 'Review CSV Contacts',
+    );
+  }
+
+  Future<void> _reviewAndImportCandidates(
+    BuildContext context,
+    WidgetRef ref,
+    List<ParsedContactCandidate> parsedCandidates, {
+    required String title,
+  }) async {
+    if (parsedCandidates.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No contacts to review.')));
+      return;
+    }
+
+    final selectedIndices = <int>{
+      for (int i = 0; i < parsedCandidates.length; i++)
+        if (!parsedCandidates[i].isPotentialDuplicate) i,
+    };
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (reviewContext) => StatefulBuilder(
+        builder: (ctx, setReviewState) => SafeArea(
+          child: Container(
+            height: MediaQuery.of(ctx).size.height * 0.7,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '$title (${parsedCandidates.length})',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setReviewState(() {
+                          if (selectedIndices.length ==
+                              parsedCandidates.length) {
+                            selectedIndices.clear();
+                          } else {
+                            selectedIndices.addAll(
+                              List.generate(parsedCandidates.length, (i) => i),
+                            );
+                          }
+                        });
+                      },
+                      child: Text(
+                        selectedIndices.length == parsedCandidates.length
+                            ? 'Deselect All'
+                            : 'Select All',
+                      ),
+                    ),
+                  ],
+                ),
+                const Text(
+                  'Duplicate candidates are unselected by default (SSOT §18: Never auto-merge).',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const Divider(),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: parsedCandidates.length,
+                    itemBuilder: (ctx, i) {
+                      final c = parsedCandidates[i];
+                      final isSelected = selectedIndices.contains(i);
+                      return CheckboxListTile(
+                        value: isSelected,
+                        onChanged: (val) {
+                          setReviewState(() {
+                            if (val == true) {
+                              selectedIndices.add(i);
+                            } else {
+                              selectedIndices.remove(i);
+                            }
+                          });
+                        },
+                        title: Text(
+                          c.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Birthday: ${c.birthdayMonth}/${c.birthdayDay}'
+                              '${c.birthYear != null ? ' (${c.birthYear})' : ''}'
+                              ' • ${c.relationship.displayName}'
+                              '${c.phoneNumber != null ? ' • ${c.phoneNumber}' : ''}',
+                            ),
+                            if (c.isPotentialDuplicate) ...[
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: Colors.amber),
+                                ),
+                                child: Text(
+                                  '⚠️ ${c.duplicateWarning}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.brown,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: selectedIndices.isEmpty
+                        ? null
+                        : () => Navigator.of(reviewContext).pop(true),
+                    child: Text('Import Selected (${selectedIndices.length})'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final peopleRepo = ref.read(peopleRepositoryProvider);
+    final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
+    final now = DateTime.now();
+    int importedCount = 0;
+
+    for (final index in selectedIndices) {
+      final candidate = parsedCandidates[index];
+      final person = candidate.toPerson();
+      await peopleRepo.savePerson(person);
+
+      final nextDate = b_models.Birthday.nextBirthdayDate(
+        month: person.birthdayMonth,
+        day: person.birthdayDay,
+        from: now,
+      );
+      final isToday =
+          nextDate.year == now.year &&
+          nextDate.month == now.month &&
+          nextDate.day == now.day;
+
+      final birthday = b_models.Birthday(
+        id: 'birthday-${person.id}',
+        personId: person.id,
+        cycleYear: nextDate.year,
+        date: nextDate,
+        status: isToday
+            ? b_models.BirthdayStatus.reminderDue
+            : b_models.BirthdayStatus.upcoming,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await birthdaysRepo.saveBirthday(birthday);
+      importedCount++;
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Successfully imported $importedCount contacts! 🎉'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _syncDeviceContacts(
+    BuildContext context,
+    WidgetRef ref,
+    List<Person> currentPeople,
+  ) async {
+    HapticFeedback.lightImpact();
+    final contactsService = ref.read(deviceContactsServiceProvider);
+
+    final hasPerm = await contactsService.hasPermission();
+    if (!hasPerm) {
+      final granted = await contactsService.requestPermission();
+      if (!granted) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Contacts permission is required to sync phone contacts.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Reading device contacts...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+
+    final deviceContacts = await contactsService.fetchDeviceContacts();
+    if (!context.mounted) return;
+
+    if (deviceContacts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No contacts found on this device.')),
+      );
+      return;
+    }
+
+    final candidates = deviceContacts
+        .map((dc) => dc.toCandidate(existingPeople: currentPeople))
+        .toList();
+
+    await _reviewAndImportCandidates(
+      context,
+      ref,
+      candidates,
+      title: 'Sync Device Contacts',
+    );
   }
 
   Future<void> _confirmAndDelete(
@@ -97,6 +473,7 @@ class PeopleScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final peopleAsync = ref.watch(peopleStreamProvider);
+    final currentPeople = peopleAsync.valueOrNull ?? [];
 
     return Scaffold(
       appBar: AppBar(
@@ -109,6 +486,50 @@ class PeopleScreen extends ConsumerWidget {
               HapticFeedback.lightImpact();
               context.push('/people/add');
             },
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'More actions',
+            onSelected: (val) {
+              if (val == 'sync_phone') {
+                _syncDeviceContacts(context, ref, currentPeople);
+              } else if (val == 'import') {
+                _showImportCsvSheet(context, ref, currentPeople);
+              } else if (val == 'export') {
+                _exportCsv(context, ref, currentPeople);
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'sync_phone',
+                child: Row(
+                  children: [
+                    Icon(Icons.contact_phone_outlined, size: 20),
+                    SizedBox(width: 8),
+                    Text('Sync Phone Contacts'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'import',
+                child: Row(
+                  children: [
+                    Icon(Icons.file_download_outlined, size: 20),
+                    SizedBox(width: 8),
+                    Text('Import CSV'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'export',
+                child: Row(
+                  children: [
+                    Icon(Icons.file_upload_outlined, size: 20),
+                    SizedBox(width: 8),
+                    Text('Export CSV'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -125,8 +546,17 @@ class PeopleScreen extends ConsumerWidget {
                     color: Colors.grey,
                   ),
                   const SizedBox(height: 16),
-                  const Text('No contacts added yet'),
-                  const SizedBox(height: 12),
+                  const Text(
+                    'No contacts added yet',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Add contacts manually or sync birthdays directly from your phone.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: () {
                       HapticFeedback.lightImpact();
@@ -134,6 +564,13 @@ class PeopleScreen extends ConsumerWidget {
                     },
                     icon: const Icon(Icons.add),
                     label: const Text('Add Birthday Contact'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () =>
+                        _syncDeviceContacts(context, ref, currentPeople),
+                    icon: const Icon(Icons.contact_phone_outlined),
+                    label: const Text('Sync Phone Contacts'),
                   ),
                 ],
               ),

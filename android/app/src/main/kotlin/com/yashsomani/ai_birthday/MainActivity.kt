@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.ContactsContract
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -20,8 +21,11 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val NOTIFICATIONS_CHANNEL = "com.yashsomani.ai_birthday/notifications"
     private val NANO_CHANNEL = "com.yashsomani.ai_birthday/nano"
+    private val SHARE_CHANNEL = "com.yashsomani.ai_birthday/share"
+    private val CONTACTS_CHANNEL = "com.yashsomani.ai_birthday/contacts"
 
     private var pendingNotificationResult: MethodChannel.Result? = null
+    private var pendingContactsResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -102,6 +106,69 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // Setup Share MethodChannel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SHARE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                if (call.method == "shareText") {
+                    val text = call.argument<String>("text") ?: ""
+                    val title = call.argument<String>("title") ?: "Share Birthday Message"
+                    val sendIntent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_TEXT, text)
+                        type = "text/plain"
+                    }
+                    val shareIntent = Intent.createChooser(sendIntent, title)
+                    startActivity(shareIntent)
+                    result.success(true)
+                } else {
+                    result.notImplemented()
+                }
+            }
+
+        // Setup Contacts MethodChannel (SSOT §18)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CONTACTS_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "hasPermission" -> {
+                        val granted = ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission.READ_CONTACTS
+                        ) == PackageManager.PERMISSION_GRANTED
+                        result.success(granted)
+                    }
+                    "requestPermission" -> {
+                        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS)
+                            == PackageManager.PERMISSION_GRANTED) {
+                            result.success(true)
+                        } else {
+                            pendingContactsResult = result
+                            ActivityCompat.requestPermissions(
+                                this,
+                                arrayOf(Manifest.permission.READ_CONTACTS),
+                                1002
+                            )
+                        }
+                    }
+                    "fetchDeviceContacts" -> {
+                        val granted = ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission.READ_CONTACTS
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (!granted) {
+                            result.error("PERMISSION_DENIED", "READ_CONTACTS permission is required.", null)
+                        } else {
+                            try {
+                                val contacts = fetchDeviceContacts()
+                                result.success(contacts)
+                            } catch (e: Exception) {
+                                result.error("QUERY_FAILED", e.message, null)
+                            }
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
     }
 
     override fun onRequestPermissionsResult(
@@ -114,7 +181,99 @@ class MainActivity : FlutterActivity() {
             val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
             pendingNotificationResult?.success(granted)
             pendingNotificationResult = null
+        } else if (requestCode == 1002) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            pendingContactsResult?.success(granted)
+            pendingContactsResult = null
         }
+    }
+
+    private fun fetchDeviceContacts(): List<Map<String, Any?>> {
+        val contactMap = mutableMapOf<String, MutableMap<String, Any?>>()
+        val cr = contentResolver ?: return emptyList()
+
+        // 1. Query contact names and IDs
+        val cursor = cr.query(
+            ContactsContract.Contacts.CONTENT_URI,
+            arrayOf(
+                ContactsContract.Contacts._ID,
+                ContactsContract.Contacts.DISPLAY_NAME_PRIMARY
+            ),
+            null,
+            null,
+            ContactsContract.Contacts.DISPLAY_NAME_PRIMARY + " ASC"
+        )
+
+        cursor?.use { c ->
+            val idIdx = c.getColumnIndex(ContactsContract.Contacts._ID)
+            val nameIdx = c.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
+            while (c.moveToNext()) {
+                val id = if (idIdx >= 0) c.getString(idIdx) else null ?: continue
+                val name = if (nameIdx >= 0) c.getString(nameIdx) else null ?: continue
+                if (name.isBlank()) continue
+                contactMap[id] = mutableMapOf(
+                    "id" to id,
+                    "name" to name.trim(),
+                    "phone" to null,
+                    "birthday" to null
+                )
+            }
+        }
+
+        // 2. Query phone numbers
+        val phoneCursor = cr.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            arrayOf(
+                ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
+                ContactsContract.CommonDataKinds.Phone.NUMBER
+            ),
+            null,
+            null,
+            null
+        )
+
+        phoneCursor?.use { pc ->
+            val contactIdIdx = pc.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
+            val numberIdx = pc.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+            while (pc.moveToNext()) {
+                val contactId = if (contactIdIdx >= 0) pc.getString(contactIdIdx) else null ?: continue
+                val number = if (numberIdx >= 0) pc.getString(numberIdx) else null
+                val entry = contactMap[contactId]
+                if (entry != null && entry["phone"] == null && !number.isNullOrBlank()) {
+                    entry["phone"] = number.trim()
+                }
+            }
+        }
+
+        // 3. Query birthdays from ContactsContract.Data
+        val birthdayCursor = cr.query(
+            ContactsContract.Data.CONTENT_URI,
+            arrayOf(
+                ContactsContract.Data.CONTACT_ID,
+                ContactsContract.CommonDataKinds.Event.START_DATE
+            ),
+            "${ContactsContract.Data.MIMETYPE} = ? AND ${ContactsContract.CommonDataKinds.Event.TYPE} = ?",
+            arrayOf(
+                ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
+                ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY.toString()
+            ),
+            null
+        )
+
+        birthdayCursor?.use { bc ->
+            val contactIdIdx = bc.getColumnIndex(ContactsContract.Data.CONTACT_ID)
+            val dateIdx = bc.getColumnIndex(ContactsContract.CommonDataKinds.Event.START_DATE)
+            while (bc.moveToNext()) {
+                val contactId = if (contactIdIdx >= 0) bc.getString(contactIdIdx) else null ?: continue
+                val date = if (dateIdx >= 0) bc.getString(dateIdx) else null
+                val entry = contactMap[contactId]
+                if (entry != null && !date.isNullOrBlank()) {
+                    entry["birthday"] = date.trim()
+                }
+            }
+        }
+
+        return contactMap.values.toList()
     }
 
     private fun scheduleTriggers(triggers: List<Map<String, Any>>) {

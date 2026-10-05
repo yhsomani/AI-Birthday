@@ -11,6 +11,10 @@ import 'package:ai_birthday/features/ai/domain/ai_router.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_repository.dart';
 import 'package:ai_birthday/features/delivery/data/whatsapp_handoff_builder.dart';
+import 'package:ai_birthday/features/delivery/data/native_share_service.dart';
+import 'package:ai_birthday/features/delivery/data/sms_delivery_service.dart';
+import 'package:ai_birthday/features/people/data/contact_csv_service.dart';
+import 'package:ai_birthday/features/people/data/device_contacts_service.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
@@ -62,6 +66,26 @@ final entitlementProvider = Provider<UserEntitlement>((ref) {
 /// WhatsApp Handoff Builder provider.
 final whatsappHandoffBuilderProvider = Provider<WhatsAppHandoffBuilder>((ref) {
   return const WhatsAppHandoffBuilder();
+});
+
+/// SMS Delivery Service provider (SSOT §10).
+final smsDeliveryServiceProvider = Provider<SmsDeliveryService>((ref) {
+  return const SmsDeliveryService();
+});
+
+/// Native Share Service provider (SSOT §10).
+final nativeShareServiceProvider = Provider<NativeShareService>((ref) {
+  return const NativeShareService();
+});
+
+/// Contact CSV Service provider (SSOT §18).
+final contactCsvServiceProvider = Provider<ContactCsvService>((ref) {
+  return const ContactCsvService();
+});
+
+/// Device Contacts Service provider (SSOT §18, §25).
+final deviceContactsServiceProvider = Provider<DeviceContactsService>((ref) {
+  return const DeviceContactsService();
 });
 
 /// Gemini Nano Platform provider.
