@@ -107,7 +107,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       SnackBar(
         content: Text(
           result.success
-              ? 'Cloud sync complete! ${result.uploadedCount} birthdays backed up.'
+              ? 'Cloud sync complete! ${result.uploadedCount} records backed up to Firestore.'
               : 'Sync failed: ${result.error ?? 'Unknown error'}',
         ),
       ),

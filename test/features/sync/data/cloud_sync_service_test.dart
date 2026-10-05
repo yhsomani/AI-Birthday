@@ -84,15 +84,25 @@ void main() {
       var patchCount = 0;
       final mockClient = MockClient((request) async {
         expect(request.method, 'PATCH');
-        expect(request.url.path, contains('/users/uid-test/birthdays/b-1'));
         expect(request.url.queryParameters['key'], isNotEmpty);
         final body = jsonDecode(request.body) as Map<String, dynamic>;
-        expect(body['fields']['personName']['stringValue'], 'Taylor Swift');
-        patchCount++;
-        return http.Response(
-          jsonEncode({'name': 'projects/.../documents/b-1'}),
-          200,
-        );
+
+        if (request.url.path.contains('/users/uid-test/people/p-1')) {
+          expect(body['fields']['name']['stringValue'], 'Taylor Swift');
+          patchCount++;
+          return http.Response(
+            jsonEncode({'name': 'projects/.../documents/p-1'}),
+            200,
+          );
+        } else if (request.url.path.contains('/users/uid-test/birthdays/b-1')) {
+          expect(body['fields']['personName']['stringValue'], 'Taylor Swift');
+          patchCount++;
+          return http.Response(
+            jsonEncode({'name': 'projects/.../documents/b-1'}),
+            200,
+          );
+        }
+        return http.Response('Not Found', 404);
       });
 
       final service = CloudSyncService(
@@ -113,8 +123,8 @@ void main() {
 
       final result = await service.sync(auth);
       expect(result.success, isTrue);
-      expect(result.uploadedCount, 1);
-      expect(patchCount, 1);
+      expect(result.uploadedCount, 2);
+      expect(patchCount, 2);
 
       // Verify timestamp stored
       final lastSync = await service.getLastSyncTime();

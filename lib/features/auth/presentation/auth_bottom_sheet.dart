@@ -21,18 +21,51 @@ class AuthBottomSheet extends ConsumerStatefulWidget {
   ConsumerState<AuthBottomSheet> createState() => _AuthBottomSheetState();
 }
 
-class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
+class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  // Phone OTP state
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _phoneOtpController = TextEditingController();
+  bool _phoneOtpSent = false;
+
+  // Email state
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _emailOtpController = TextEditingController();
+  bool _emailOtpSent = false;
   bool _isSignUp = false;
+
   bool _isLoading = false;
   String? _errorMessage;
 
   @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
   void dispose() {
+    _tabController.dispose();
+    _phoneController.dispose();
+    _phoneOtpController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _emailOtpController.dispose();
     super.dispose();
+  }
+
+  void _onSuccess(String message) {
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$message 🎉'),
+        backgroundColor: const Color(0xFF2D5A46),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _handleGoogleSignIn() async {
@@ -48,10 +81,7 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
 
     switch (outcome) {
       case SignInSuccess():
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Successfully signed in with Google! 🎉')),
-        );
+        _onSuccess('Successfully signed in with Google!');
       case SignInFailed(message: final msg):
         setState(() => _errorMessage = msg ?? 'Sign in failed');
       case SignInUnavailable(reason: final r):
@@ -59,7 +89,115 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
     }
   }
 
-  Future<void> _handleEmailAuth() async {
+  Future<void> _handleSendPhoneOtp() async {
+    final phone = _phoneController.text.trim();
+    if (phone.length < 8) {
+      setState(() => _errorMessage = 'Please enter a valid phone number with country code (e.g. +1 555-0199 or +91 9876543210).');
+      return;
+    }
+
+    HapticFeedback.lightImpact();
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final sent = await ref.read(authControllerProvider.notifier).sendPhoneOtp(phone);
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      if (sent) {
+        _phoneOtpSent = true;
+        _errorMessage = null;
+      } else {
+        _errorMessage = 'Failed sending OTP. Please check your phone number.';
+      }
+    });
+  }
+
+  Future<void> _handleVerifyPhoneOtp() async {
+    final phone = _phoneController.text.trim();
+    final otp = _phoneOtpController.text.trim();
+    if (otp.length < 4) {
+      setState(() => _errorMessage = 'Please enter the 6-digit OTP code.');
+      return;
+    }
+
+    HapticFeedback.lightImpact();
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final outcome = await ref.read(authControllerProvider.notifier).verifyPhoneOtp(phone, otp);
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    switch (outcome) {
+      case SignInSuccess():
+        _onSuccess('Phone verified and logged in!');
+      case SignInFailed(message: final msg):
+        setState(() => _errorMessage = msg ?? 'Verification failed');
+      case SignInUnavailable(reason: final r):
+        setState(() => _errorMessage = r ?? 'Verification unavailable');
+    }
+  }
+
+  Future<void> _handleSendEmailOtp() async {
+    final email = _emailController.text.trim();
+    if (!email.contains('@')) {
+      setState(() => _errorMessage = 'Please enter a valid email address.');
+      return;
+    }
+
+    HapticFeedback.lightImpact();
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final sent = await ref.read(authControllerProvider.notifier).sendEmailOtp(email);
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      if (sent) {
+        _emailOtpSent = true;
+        _errorMessage = null;
+      } else {
+        _errorMessage = 'Failed sending verification code.';
+      }
+    });
+  }
+
+  Future<void> _handleVerifyEmailOtp() async {
+    final email = _emailController.text.trim();
+    final otp = _emailOtpController.text.trim();
+    if (otp.length < 4) {
+      setState(() => _errorMessage = 'Please enter the 6-digit code.');
+      return;
+    }
+
+    HapticFeedback.lightImpact();
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final outcome = await ref.read(authControllerProvider.notifier).verifyEmailOtp(email, otp);
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    switch (outcome) {
+      case SignInSuccess():
+        _onSuccess('Email verified and logged in!');
+      case SignInFailed(message: final msg):
+        setState(() => _errorMessage = msg ?? 'Verification failed');
+      case SignInUnavailable(reason: final r):
+        setState(() => _errorMessage = r ?? 'Verification unavailable');
+    }
+  }
+
+  Future<void> _handleEmailPasswordAuth() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
@@ -88,16 +226,7 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
 
     switch (outcome) {
       case SignInSuccess():
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _isSignUp
-                  ? 'Account created and signed in! 🎉'
-                  : 'Welcome back! Signed in. 🎉',
-            ),
-          ),
-        );
+        _onSuccess(_isSignUp ? 'Account created and signed in!' : 'Welcome back! Signed in.');
       case SignInFailed(message: final msg):
         setState(() => _errorMessage = msg ?? 'Authentication failed');
       case SignInUnavailable(reason: final r):
@@ -108,6 +237,7 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Container(
       decoration: BoxDecoration(
@@ -117,8 +247,8 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
       padding: EdgeInsets.only(
         left: 20,
         right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        top: 16,
+        bottom: bottomInset + 20,
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -127,7 +257,7 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
           children: [
             Center(
               child: Container(
-                width: 40,
+                width: 44,
                 height: 4,
                 decoration: BoxDecoration(
                   color: Colors.grey.withValues(alpha: 0.3),
@@ -137,7 +267,7 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
             ),
             const SizedBox(height: 16),
             Text(
-              _isSignUp ? 'Create an Account' : 'Welcome to AI-Birthday',
+              'Sign In & Cloud Sync',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -145,11 +275,38 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Sign in to sync your birthdays across devices and unlock cloud backups.',
+              'Securely sync birthdays across devices and unlock cloud backups.',
               style: TextStyle(fontSize: 13, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // Tab bar for Google, Phone OTP, Email
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: TabBar(
+                controller: _tabController,
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                indicator: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                labelColor: theme.colorScheme.onPrimaryContainer,
+                unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                tabs: const [
+                  Tab(text: 'Google'),
+                  Tab(text: 'Phone OTP'),
+                  Tab(text: 'Email'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
 
             if (_errorMessage != null) ...[
               Container(
@@ -159,122 +316,275 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                 ),
-                child: Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: Colors.red, fontSize: 13),
-                  textAlign: TextAlign.center,
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red, fontSize: 13),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
             ],
 
-            // Google Sign-In Button
-            OutlinedButton.icon(
-              onPressed: _isLoading ? null : _handleGoogleSignIn,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: _isLoading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.g_mobiledata, size: 28),
-              label: const Text(
-                'Continue with Google',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-            ),
+            SizedBox(
+              height: 240,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Tab 0: Google Sign-In
+                  _buildGoogleTab(theme),
 
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Expanded(child: Divider()),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'OR EMAIL',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ),
-                const Expanded(child: Divider()),
-              ],
-            ),
-            const SizedBox(height: 16),
+                  // Tab 1: Phone OTP
+                  _buildPhoneOtpTab(theme),
 
-            TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: 'Email Address',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Password',
-                prefixIcon: Icon(Icons.lock_outline),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            FilledButton(
-              onPressed: _isLoading ? null : _handleEmailAuth,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(
-                      _isSignUp ? 'Sign Up with Email' : 'Sign In with Email',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-            ),
-
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                setState(() {
-                  _isSignUp = !_isSignUp;
-                  _errorMessage = null;
-                });
-              },
-              child: Text(
-                _isSignUp
-                    ? 'Already have an account? Sign In'
-                    : "Don't have an account? Create one",
+                  // Tab 2: Email & Password / OTP
+                  _buildEmailTab(theme),
+                ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildGoogleTab(ThemeData theme) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Icon(Icons.account_circle_outlined, size: 48, color: Color(0xFFA64B2A)),
+        const SizedBox(height: 12),
+        const Text(
+          'Continue with your verified Google Account',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'One-tap sign-in with automatic cloud sync',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 24),
+        OutlinedButton.icon(
+          onPressed: _isLoading ? null : _handleGoogleSignIn,
+          icon: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text(
+                  'G',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFA64B2A),
+                  ),
+                ),
+          label: const Text(
+            'Continue with Google',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            side: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhoneOtpTab(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!_phoneOtpSent) ...[
+          TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              labelText: 'Mobile Phone Number',
+              hintText: '+1 555-0199 or +91 9876543210',
+              prefixIcon: const Icon(Icons.phone_outlined),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _isLoading ? null : _handleSendPhoneOtp,
+            icon: _isLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Icon(Icons.send_outlined),
+            label: const Text('Send Verification Code (OTP)', style: TextStyle(fontWeight: FontWeight.bold)),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ] else ...[
+          TextField(
+            controller: _phoneOtpController,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              labelText: '6-Digit Verification Code',
+              hintText: '123456',
+              prefixIcon: const Icon(Icons.lock_clock_outlined),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: _isLoading ? null : _handleVerifyPhoneOtp,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text('Verify & Sign In', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
+          TextButton(
+            onPressed: () => setState(() => _phoneOtpSent = false),
+            child: const Text('Change Phone Number'),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildEmailTab(ThemeData theme) {
+    if (_emailOtpSent) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _emailOtpController,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              labelText: '6-Digit Email Code',
+              hintText: '123456',
+              prefixIcon: const Icon(Icons.mark_email_read_outlined),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: _isLoading ? null : _handleVerifyEmailOtp,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text('Verify & Sign In', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
+          TextButton(
+            onPressed: () => setState(() => _emailOtpSent = false),
+            child: const Text('Use Password Instead'),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            labelText: 'Email Address',
+            prefixIcon: const Icon(Icons.email_outlined),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _passwordController,
+          obscureText: true,
+          decoration: InputDecoration(
+            labelText: 'Password',
+            prefixIcon: const Icon(Icons.lock_outline),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton(
+                onPressed: _isLoading ? null : _handleEmailPasswordAuth,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : Text(_isSignUp ? 'Sign Up' : 'Sign In', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton(
+              onPressed: _isLoading ? null : _handleSendEmailOtp,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Send OTP Code'),
+            ),
+          ],
+        ),
+        Center(
+          child: TextButton(
+            onPressed: () => setState(() => _isSignUp = !_isSignUp),
+            child: Text(
+              _isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up",
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

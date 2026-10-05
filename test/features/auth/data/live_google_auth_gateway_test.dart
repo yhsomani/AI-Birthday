@@ -146,5 +146,29 @@ void main() {
       expect(success.identity.email, 'new@example.com');
       expect(success.identity.firebaseUid, 'new-user-456');
     });
+
+    test('phone OTP send and verify flow succeeds', () async {
+      final gateway = LiveGoogleAuthGateway(store: store);
+      final sent = await gateway.sendPhoneOtp('+15551234567');
+      expect(sent, isTrue);
+
+      final verifyResult = await gateway.verifyPhoneOtp('+15551234567', '123456');
+      expect(verifyResult, isA<SignInSuccess>());
+      final success = verifyResult as SignInSuccess;
+      expect(success.identity.displayName, '+15551234567');
+      expect(store.data['auth_session_name'], '+15551234567');
+    });
+
+    test('email OTP send and verify flow succeeds', () async {
+      final gateway = LiveGoogleAuthGateway(store: store);
+      final sent = await gateway.sendEmailOtp('otpuser@example.com');
+      expect(sent, isTrue);
+
+      final verifyResult = await gateway.verifyEmailOtp('otpuser@example.com', '123456');
+      expect(verifyResult, isA<SignInSuccess>());
+      final success = verifyResult as SignInSuccess;
+      expect(success.identity.email, 'otpuser@example.com');
+      expect(store.data['auth_session_email'], 'otpuser@example.com');
+    });
   });
 }

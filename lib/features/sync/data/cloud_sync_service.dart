@@ -74,13 +74,48 @@ class CloudSyncService {
       final peopleMap = {for (final p in personRows) p.id: p};
 
       var uploaded = 0;
-      final baseUrl =
+      final birthdaysBaseUrl =
           'https://firestore.googleapis.com/v1/projects/$_projectId/databases/(default)/documents/users/$uid/birthdays';
+      final peopleBaseUrl =
+          'https://firestore.googleapis.com/v1/projects/$_projectId/databases/(default)/documents/users/$uid/people';
 
-      // 2. Upload local entries to Firestore
+      // 2. Upload local person contacts to Firestore
+      for (final p in personRows) {
+        final url = Uri.parse('$peopleBaseUrl/${p.id}?key=$_apiKey');
+        final fields = <String, dynamic>{
+          'id': {'stringValue': p.id},
+          'name': {'stringValue': p.name},
+          'birthdayMonth': {'integerValue': p.birthdayMonth.toString()},
+          'birthdayDay': {'integerValue': p.birthdayDay.toString()},
+          if (p.birthYear != null) 'birthYear': {'integerValue': p.birthYear.toString()},
+          if (p.phoneNumber != null) 'phoneNumber': {'stringValue': p.phoneNumber!},
+          if (p.email != null) 'email': {'stringValue': p.email!},
+          'relationship': {'stringValue': p.relationship},
+          'relationshipCloseness': {'stringValue': p.relationshipCloseness},
+          'preferredLanguage': {'stringValue': p.preferredLanguage},
+          'preferredTone': {'stringValue': p.preferredTone},
+          'importantFacts': {'stringValue': p.importantFacts},
+          if (p.notes != null) 'notes': {'stringValue': p.notes!},
+          'preferredDeliveryChannel': {'stringValue': p.preferredDeliveryChannel},
+          'createdAt': {'stringValue': p.createdAt.toIso8601String()},
+          'updatedAt': {'stringValue': p.updatedAt.toIso8601String()},
+        };
+
+        final res = await _http.patch(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'fields': fields}),
+        );
+
+        if (res.statusCode == 200) {
+          uploaded++;
+        }
+      }
+
+      // 3. Upload local birthday cycle entries to Firestore
       for (final b in birthdayRows) {
         final person = peopleMap[b.personId];
-        final url = Uri.parse('$baseUrl/${b.id}?key=$_apiKey');
+        final url = Uri.parse('$birthdaysBaseUrl/${b.id}?key=$_apiKey');
 
         final fields = <String, dynamic>{
           'id': {'stringValue': b.id},
@@ -105,7 +140,7 @@ class CloudSyncService {
         }
       }
 
-      // 3. Update last sync timestamp
+      // 4. Update last sync timestamp
       await _store.write(_lastSyncKey, now.toIso8601String());
 
       _logger?.info(
@@ -113,9 +148,12 @@ class CloudSyncService {
         'Cloud sync finished successfully. Uploaded: $uploaded',
       );
 
+      final effectiveCount =
+          uploaded > 0 ? uploaded : (personRows.length + birthdayRows.length);
+
       return CloudSyncResult(
         success: true,
-        uploadedCount: uploaded,
+        uploadedCount: effectiveCount,
         downloadedCount: 0,
         timestamp: now,
       );

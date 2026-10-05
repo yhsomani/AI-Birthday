@@ -85,6 +85,50 @@ class AuthController extends AsyncNotifier<AuthState> {
     return const SignInUnavailable(reason: 'Email registration not available');
   }
 
+  Future<bool> sendPhoneOtp(String phoneNumber) async {
+    final gateway = _gateway;
+    if (gateway is LiveGoogleAuthGateway) {
+      return gateway.sendPhoneOtp(phoneNumber);
+    }
+    return false;
+  }
+
+  Future<SignInOutcome> verifyPhoneOtp(String phoneNumber, String otp) async {
+    final gateway = _gateway;
+    if (gateway is LiveGoogleAuthGateway) {
+      final outcome = await gateway.verifyPhoneOtp(phoneNumber, otp);
+      if (outcome is SignInSuccess) {
+        state = AsyncData(
+          AuthState(status: AuthStatus.signedIn, identity: outcome.identity),
+        );
+      }
+      return outcome;
+    }
+    return const SignInUnavailable(reason: 'Phone verification not available');
+  }
+
+  Future<bool> sendEmailOtp(String email) async {
+    final gateway = _gateway;
+    if (gateway is LiveGoogleAuthGateway) {
+      return gateway.sendEmailOtp(email);
+    }
+    return false;
+  }
+
+  Future<SignInOutcome> verifyEmailOtp(String email, String otp) async {
+    final gateway = _gateway;
+    if (gateway is LiveGoogleAuthGateway) {
+      final outcome = await gateway.verifyEmailOtp(email, otp);
+      if (outcome is SignInSuccess) {
+        state = AsyncData(
+          AuthState(status: AuthStatus.signedIn, identity: outcome.identity),
+        );
+      }
+      return outcome;
+    }
+    return const SignInUnavailable(reason: 'Email verification not available');
+  }
+
   Future<void> signOut() async {
     await _gateway.signOut();
     _logger.info('auth', 'signed out');
