@@ -38,19 +38,16 @@ class AiRouter {
     required UserEntitlement entitlement,
     bool forceNano = false,
   }) async {
-    final hasUserKey = await _credentialStorage.hasGeminiApiKey();
-
-    // 1. Entitlement Check (unlocked if user has active Pro entitlement OR personal Gemini key)
-    if (!entitlement.canUseAi && !hasUserKey) {
-      _logger.info(
-        'AiRouter',
-        'AI request blocked: No active entitlement and no personal API key',
-      );
+    // Application entitlement is always checked before provider lookup.
+    // A personal Gemini key never bypasses the application's AI entitlement.
+    if (!entitlement.canUseAi) {
+      _logger.info('AiRouter', 'AI request blocked: no active entitlement');
       throw const AppFailure.lockedAi(
-        action:
-            'Subscribe to AI-Birthday Pro or configure your personal Gemini API key in Settings.',
+        action: 'Subscribe to AI-Birthday Pro to use AI-powered drafting.',
       );
     }
+
+    final hasUserKey = await _credentialStorage.hasGeminiApiKey();
 
     // If explicit Nano requested or no user key configured, check Nano
     if (forceNano || !hasUserKey) {
