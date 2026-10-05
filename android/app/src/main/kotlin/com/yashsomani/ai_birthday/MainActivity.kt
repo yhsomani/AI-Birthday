@@ -80,18 +80,10 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "currentState" -> {
-                        // Check if Google AICore is installed on device hardware
-                        val isAiCoreInstalled = try {
-                            packageManager.getPackageInfo("com.google.android.aicore", 0)
-                            true
-                        } catch (e: Exception) {
-                            false
-                        }
-                        if (isAiCoreInstalled) {
-                            result.success("available")
-                        } else {
-                            result.success("unavailable")
-                        }
+                        // Gemini Nano inference requires real Google AICore / ML Kit GenAI model loading.
+                        // Until genuine on-device generation is integrated, report unavailable truthfully
+                        // so users are not misled with a false "Ready" state.
+                        result.success("unavailable")
                     }
                     "startDownload" -> {
                         result.success("unavailable")
@@ -279,6 +271,12 @@ class MainActivity : FlutterActivity() {
     private fun scheduleTriggers(triggers: List<Map<String, Any>>) {
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val now = System.currentTimeMillis()
+        val prefs = getSharedPreferences("scheduled_reminders_prefs", Context.MODE_PRIVATE)
+
+        // Cancel previous alarms first to avoid duplicate pending intents
+        cancelAllReminders()
+
+        val scheduledIds = mutableSetOf<String>()
 
         for (trigger in triggers) {
             val id = (trigger["id"] as? Number)?.toInt() ?: continue
@@ -290,6 +288,7 @@ class MainActivity : FlutterActivity() {
             val personId = trigger["personId"] as? String
 
             val intent = Intent(this, BirthdayNotificationReceiver::class.java).apply {
+                action = BirthdayNotificationReceiver.ACTION_BIRTHDAY_REMINDER
                 putExtra(BirthdayNotificationReceiver.EXTRA_ID, id)
                 putExtra(BirthdayNotificationReceiver.EXTRA_TITLE, title)
                 putExtra(BirthdayNotificationReceiver.EXTRA_BODY, body)
@@ -309,13 +308,41 @@ class MainActivity : FlutterActivity() {
                 } else {
                     alarmManager.set(AlarmManager.RTC_WAKEUP, timestampMs, pendingIntent)
                 }
+                scheduledIds.add(id.toString())
             } catch (e: SecurityException) {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, timestampMs, pendingIntent)
+                scheduledIds.add(id.toString())
             }
         }
+
+        prefs.edit().putStringSet("scheduled_alarm_ids", scheduledIds).apply()
     }
 
     private fun cancelAllReminders() {
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+        val prefs = getSharedPreferences("scheduled_reminders_prefs", Context.MODE_PRIVATE)
+        val scheduledIds = prefs.getStringSet("scheduled_alarm_ids", emptySet()) ?: emptySet()
+
+        if (alarmManager != null) {
+            for (idStr in scheduledIds) {
+                val id = idStr.toIntOrNull() ?: continue
+                val intent = Intent(this, BirthdayNotificationReceiver::class.java).apply {
+                    action = BirthdayNotificationReceiver.ACTION_BIRTHDAY_REMINDER
+                }
+                val pendingIntent = PendingIntent.getBroadcast(
+                    this,
+                    id,
+                    intent,
+                    PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+                )
+                if (pendingIntent != null) {
+                    alarmManager.cancel(pendingIntent)
+                    pendingIntent.cancel()
+                }
+            }
+        }
+        prefs.edit().remove("scheduled_alarm_ids").apply()
+
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         notificationManager?.cancelAll()
     }

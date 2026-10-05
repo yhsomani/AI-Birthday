@@ -83,29 +83,36 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     super.dispose();
   }
 
-  /// Initiates Google Play Billing for Pro Monthly, with fallback for environments without Play Store.
+  /// Initiates Google Play Billing for Pro Monthly.
   Future<bool> purchaseProMonthly() async {
     _logger.info('Subscription', 'Starting Pro Monthly purchase flow');
     _purchaseStatus = PurchaseStatus.purchasing;
 
     try {
       final isAvailable = await _iap.isAvailable();
-      if (isAvailable) {
-        final response = await _iap.queryProductDetails({_kProMonthlyId});
-        if (response.productDetails.isNotEmpty) {
-          final product = response.productDetails.first;
-          final purchaseParam = iap.PurchaseParam(productDetails: product);
-          _purchaseStatus = PurchaseStatus.verifying;
-          return await _iap.buyNonConsumable(purchaseParam: purchaseParam);
-        }
+      if (!isAvailable) {
+        _purchaseStatus = PurchaseStatus.error;
+        _logger.warning(
+          'Subscription',
+          'Play Billing is unavailable on this device.',
+        );
+        return false;
       }
 
-      // Standalone/Direct activation fallback
-      state = UserEntitlement.proActive;
-      await _store?.write(_keyEntitlement, 'proActive');
-      _purchaseStatus = PurchaseStatus.success;
-      _logger.info('Subscription', 'Entitlement upgraded to Pro.');
-      return true;
+      final response = await _iap.queryProductDetails({_kProMonthlyId});
+      if (response.productDetails.isEmpty) {
+        _purchaseStatus = PurchaseStatus.error;
+        _logger.warning(
+          'Subscription',
+          'Product $_kProMonthlyId not found in store.',
+        );
+        return false;
+      }
+
+      final product = response.productDetails.first;
+      final purchaseParam = iap.PurchaseParam(productDetails: product);
+      _purchaseStatus = PurchaseStatus.verifying;
+      return await _iap.buyNonConsumable(purchaseParam: purchaseParam);
     } catch (e, st) {
       _purchaseStatus = PurchaseStatus.error;
       _logger.error(

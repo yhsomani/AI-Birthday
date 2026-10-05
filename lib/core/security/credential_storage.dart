@@ -20,6 +20,8 @@ abstract interface class CredentialStorage {
   Future<void> saveGeminiApiKey(String apiKey);
   Future<void> deleteGeminiApiKey();
   Future<bool> hasGeminiApiKey();
+  Future<bool> hasCompletedOnboarding();
+  Future<void> setCompletedOnboarding(bool completed);
 }
 
 /// Implementation using a [SecureStoreDriver].
@@ -29,6 +31,7 @@ class SecureCredentialStorage implements CredentialStorage {
   final SecureStoreDriver _driver;
 
   static const String _geminiApiKeyKey = 'ai_birthday_user_gemini_api_key';
+  static const String _onboardingKey = 'ai_birthday_onboarding_completed';
 
   @override
   Future<String?> getGeminiApiKey() async {
@@ -56,13 +59,33 @@ class SecureCredentialStorage implements CredentialStorage {
     final key = await getGeminiApiKey();
     return key != null && key.isNotEmpty;
   }
+
+  @override
+  Future<bool> hasCompletedOnboarding() async {
+    final flag = await _driver.read(_onboardingKey);
+    return flag == 'true';
+  }
+
+  @override
+  Future<void> setCompletedOnboarding(bool completed) async {
+    if (completed) {
+      await _driver.write(_onboardingKey, 'true');
+    } else {
+      await _driver.delete(_onboardingKey);
+    }
+  }
 }
 
 /// In-memory storage for unit and widget testing.
 class InMemoryCredentialStorage implements CredentialStorage {
-  InMemoryCredentialStorage({String? initialKey}) : _key = initialKey;
+  InMemoryCredentialStorage({
+    String? initialKey,
+    bool initialOnboardingCompleted = false,
+  })  : _key = initialKey,
+        _onboardingCompleted = initialOnboardingCompleted;
 
   String? _key;
+  bool _onboardingCompleted;
 
   @override
   Future<String?> getGeminiApiKey() async => _key;
@@ -79,4 +102,12 @@ class InMemoryCredentialStorage implements CredentialStorage {
 
   @override
   Future<bool> hasGeminiApiKey() async => _key != null && _key!.isNotEmpty;
+
+  @override
+  Future<bool> hasCompletedOnboarding() async => _onboardingCompleted;
+
+  @override
+  Future<void> setCompletedOnboarding(bool completed) async {
+    _onboardingCompleted = completed;
+  }
 }

@@ -80,6 +80,12 @@ class CloudSyncService {
       final peopleBaseUrl =
           'https://firestore.googleapis.com/v1/projects/$_projectId/databases/(default)/documents/users/$uid/people';
 
+      final requestHeaders = <String, String>{
+        'Content-Type': 'application/json',
+        if (authState.identity?.idToken != null)
+          'Authorization': 'Bearer ${authState.identity!.idToken}',
+      };
+
       // 2. Upload local person contacts to Firestore
       for (final p in personRows) {
         final url = Uri.parse('$peopleBaseUrl/${p.id}?key=$_apiKey');
@@ -110,7 +116,7 @@ class CloudSyncService {
 
         final res = await _http.patch(
           url,
-          headers: {'Content-Type': 'application/json'},
+          headers: requestHeaders,
           body: jsonEncode({'fields': fields}),
         );
 
@@ -138,7 +144,7 @@ class CloudSyncService {
 
         final res = await _http.patch(
           url,
-          headers: {'Content-Type': 'application/json'},
+          headers: requestHeaders,
           body: jsonEncode({'fields': fields}),
         );
 
@@ -147,21 +153,32 @@ class CloudSyncService {
         }
       }
 
-      // 4. Update last sync timestamp
+      final totalItems = personRows.length + birthdayRows.length;
+      if (totalItems > 0 && uploaded < totalItems) {
+        final errorMsg = uploaded == 0
+            ? 'Cloud backup failed: none of the $totalItems items could be saved to cloud storage.'
+            : 'Partial backup: only $uploaded of $totalItems items were saved to cloud storage.';
+        _logger?.warning('CloudBackup', errorMsg);
+        return CloudSyncResult(
+          success: false,
+          uploadedCount: uploaded,
+          downloadedCount: 0,
+          error: errorMsg,
+          timestamp: now,
+        );
+      }
+
+      // 4. Update last sync timestamp only on true success
       await _store.write(_lastSyncKey, now.toIso8601String());
 
       _logger?.info(
-        'CloudSync',
-        'Cloud sync finished successfully. Uploaded: $uploaded',
+        'CloudBackup',
+        'Cloud backup finished successfully. Uploaded: $uploaded',
       );
-
-      final effectiveCount = uploaded > 0
-          ? uploaded
-          : (personRows.length + birthdayRows.length);
 
       return CloudSyncResult(
         success: true,
-        uploadedCount: effectiveCount,
+        uploadedCount: uploaded,
         downloadedCount: 0,
         timestamp: now,
       );

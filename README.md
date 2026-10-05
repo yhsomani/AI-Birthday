@@ -9,14 +9,14 @@ AI-Birthday is a Flutter & Android application engineered to help you remember i
 ## 🌟 Key Highlights & Architecture Principles
 
 - **Local-First SQLite Persistence**: Powered by [Drift](https://drift.simonbinder.eu/) SQLite on-device storage. Fast queries, offline-first reliability, and reactive UI streams.
-- **Privacy & Zero-Cloud PII**: Contact names, phone numbers, birthdates, and private notes are **never** synced to third-party tracking servers or cloud analytics.
-- **Hardware-Backed Credential Security**: User API keys (Gemini BYOK) are stored in Android's hardware-backed KeyStore via `EncryptedSharedPreferences` (`FlutterSecureStorage`).
+- **Privacy & Transparent Data Architecture**: Contact names, phone numbers, birthdates, and private notes reside locally on your physical device by default. Cloud Backup (Firestore) is strictly opt-in and transparently uploads to the user's authenticated Google Cloud storage with clear disclosures. Zero tracking telemetry or 3rd-party ad SDKs.
+- **Hardware-Backed Credential Security**: User API keys (Gemini BYOK) are stored in Android's hardware-backed KeyStore via `EncryptedSharedPreferences` (`FlutterSecureStorage`). Requests connect directly to Google's Gemini endpoint without passing through intermediate servers.
 - **Bring-Your-Own-Key (BYOK) & On-Device AI Routing**:
   - Direct client-to-API inference via Google Gemini Flash Lite.
-  - Native Android platform channel bridge for Gemini Nano (Google AICore / ML Kit GenAI).
+  - Native Android platform channel bridge for Gemini Nano (Google AICore / ML Kit GenAI), truthfully reported as unavailable until on-device model weights are loaded and verified.
   - Strict Prompt Boundary: The AI prompt contains *only* verified facts provided by the user; private notes and untrusted inputs are never injected as instructions.
-- **Native Android Notification Delivery**: Real exact alarms scheduled via `AlarmManager` with high-priority notification channels and customizable Quiet Hours (e.g., 22:00–08:00) that respect sleep schedules.
-- **Human-in-the-Loop WhatsApp Handoff**: The application never sends messages autonomously. It constructs pre-filled WhatsApp deep links (`https://wa.me/`), opens native WhatsApp for user inspection, and marks birthdays as completed only upon explicit user confirmation.
+- **Native Android Notification Delivery**: Real exact alarms scheduled via `AlarmManager` with high-priority notification channels and customizable Quiet Hours (e.g., 22:00–08:00) that respect sleep schedules. Clean cancellation of scheduled `PendingIntent`s upon disabling.
+- **Human-in-the-Loop WhatsApp Handoff**: The application never sends messages autonomously. It constructs pre-filled WhatsApp deep links (`https://wa.me/`), opens native WhatsApp for user inspection, marks drafts as "Opened in WhatsApp", and transitions to "Sent" only upon explicit user confirmation.
 
 ---
 
@@ -147,14 +147,18 @@ flowchart TD
 
 The repository maintains strict quality gates:
 
-- **100% Static Analysis Compliance**: 0 errors, warnings, or lints (`dart analyze`).
-- **119 Automated Flutter Tests**: Unit, domain, repository, widget, and integration tests covering:
+- **100% Static Analysis Compliance**: 0 errors, warnings, or lints (`flutter analyze`).
+- **160 Automated Flutter Tests**: Unit, domain, repository, widget, and integration tests covering:
+  - Guided 3-step onboarding flow and state persistence
   - Calendar math and leap year resolution (`BirthdayEngine`)
-  - Drift SQLite persistence & sync envelope
+  - Drift SQLite persistence & sync envelope with version increments and field preservation
   - Redaction of sensitive credentials (`AppLogger`, `SecureCredentialStorage`)
+  - Subscription verification truthfulness (no local Pro fallback grants)
+  - Cloud Backup verified write success checks and auth headers
+  - Delivery status truthfulness (`handedOff` vs `confirmedSent`)
   - AI prompt construction and model fallback routing
   - WhatsApp deep-link generation and validation
-  - Reminder scheduler and quiet-hours windowing
+  - Reminder scheduler, exact alarm pending intent cancellation, and quiet-hours windowing
   - Full UI flows and widget navigation
 - **Backend Verification**: 68 Vitest tests validating Firebase Firestore security rules, deletion orchestrators, and privacy policies.
 

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:ai_birthday/app/providers.dart';
@@ -20,6 +21,7 @@ import 'package:ai_birthday/features/reminders/application/reminder_settings_con
 import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
 import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
+import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -115,8 +117,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       SnackBar(
         content: Text(
           result.success
-              ? 'Cloud sync complete! ${result.uploadedCount} records backed up to Firestore.'
-              : 'Sync failed: ${result.error ?? 'Unknown error'}',
+              ? 'Cloud backup complete! ${result.uploadedCount} records saved to Firestore.'
+              : 'Backup failed: ${result.error ?? 'Unknown error'}',
         ),
       ),
     );
@@ -328,8 +330,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Card(child: const _AuthTile()),
           const SizedBox(height: 20),
 
-          // Section 1.5: Cloud Backup & Sync (SSOT §13)
-          _SectionHeader(title: 'Cloud Backup & Sync'),
+          // Section 1.5: Cloud Backup (SSOT §13)
+          _SectionHeader(title: 'Cloud Backup'),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -339,12 +341,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Row(
                     children: [
                       const Icon(
-                        Icons.cloud_sync_outlined,
-                        color: Color(0xFF2D5A46),
+                        Icons.cloud_upload_outlined,
+                        color: AppColors.accentForest,
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        'Cloud Sync (Firestore)',
+                        'Cloud Backup (Firestore)',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -354,16 +356,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       if (_lastSyncTime != null)
                         Chip(
                           label: const Text(
-                            'SYNCED',
+                            'BACKED UP',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF2D5A46),
+                              color: AppColors.accentForest,
                             ),
                           ),
-                          backgroundColor: const Color(
-                            0xFF2D5A46,
-                          ).withValues(alpha: 0.12),
+                          backgroundColor: AppColors.accentForestContainer,
                           visualDensity: VisualDensity.compact,
                         ),
                     ],
@@ -371,9 +371,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     _lastSyncTime != null
-                        ? 'Last backed up to cloud: ${DateFormat.yMMMd().add_jm().format(_lastSyncTime!)}'
-                        : 'Securely sync your birthdays and greetings to Google Cloud Firestore so you never lose them.',
+                        ? 'Last backed up: ${DateFormat.yMMMd().add_jm().format(_lastSyncTime!)}'
+                        : 'Upload a backup of your birthdays to your private Google Cloud account so you can recover them.',
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Privacy note: Backing up uploads your saved recipient names, birthdays, phone numbers, and notes to your Google Cloud storage.',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500], fontStyle: FontStyle.italic),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -389,8 +394,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Icon(Icons.sync, size: 18),
-                        label: Text(_isSyncing ? 'Syncing...' : 'Sync Now'),
+                            : const Icon(Icons.cloud_upload, size: 18),
+                        label: Text(_isSyncing ? 'Backing up...' : 'Back Up Now'),
                       ),
                     ],
                   ),
@@ -415,14 +420,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ? Icons.verified
                             : Icons.lock_outline,
                         color: entitlement.canUseAi
-                            ? const Color(0xFFD9822B)
+                            ? AppColors.accentAmber
                             : Colors.grey,
                       ),
                       const SizedBox(width: 10),
                       Text(
                         entitlement.status.displayName,
                         style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
                       ),
@@ -434,12 +439,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: entitlement.canUseAi
-                                ? const Color(0xFF2D5A46)
+                                ? AppColors.accentForest
                                 : Colors.grey[700],
                           ),
                         ),
                         backgroundColor: entitlement.canUseAi
-                            ? const Color(0xFF2D5A46).withValues(alpha: 0.12)
+                            ? AppColors.accentForestContainer
                             : Colors.grey.withValues(alpha: 0.12),
                         visualDensity: VisualDensity.compact,
                       ),
@@ -545,7 +550,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.key, color: Color(0xFFA64B2A)),
+                      const Icon(Icons.key, color: AppColors.primaryTerracotta),
                       const SizedBox(width: 8),
                       const Text(
                         'Personal Gemini API Key',
@@ -652,7 +657,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const Text('🔒 ', style: TextStyle(fontSize: 13)),
                       Expanded(
                         child: Text(
-                          'Stored securely on this device. Never included in sync or application logs.',
+                          'Stored securely on this device in hardware-backed encrypted storage. Sent directly to Google Gemini API only when generating messages, and never to AI-Birthday servers. Never included in sync or application logs.',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
@@ -699,7 +704,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.memory, color: Color(0xFF2D5A46)),
+                  leading: const Icon(Icons.memory, color: AppColors.accentForest),
                   title: const Text('Gemini Nano (AICore)'),
                   subtitle: Text(switch (_nanoState) {
                     NanoState.available =>
@@ -719,12 +724,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         color: _nanoState == NanoState.available
-                            ? const Color(0xFF2D5A46)
+                            ? AppColors.accentForest
                             : Colors.grey[700],
                       ),
                     ),
                     backgroundColor: _nanoState == NanoState.available
-                        ? const Color(0xFF2D5A46).withValues(alpha: 0.12)
+                        ? AppColors.accentForest.withValues(alpha: 0.12)
                         : Colors.grey.withValues(alpha: 0.12),
                     visualDensity: VisualDensity.compact,
                   ),
@@ -782,7 +787,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     subtitle: Text(
                       'No delivery between '
                       '${_formatTime(reminderSettings.quietHours.start)} and '
-                      '${_formatTime(reminderSettings.quietHours.end)}',
+                      '${_formatTime(reminderSettings.quietHours.end)} (shifted to 8:00 AM)',
                     ),
                     onTap: () => _editQuietHours(reminderSettings.quietHours),
                   ),
@@ -819,18 +824,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 20),
 
           // Section 6: Display & Appearance
-          _SectionHeader(title: 'Appearance'),
+          _SectionHeader(title: 'Appearance & Help'),
           Card(
-            child: SwitchListTile(
-              secondary: const Icon(Icons.dark_mode_outlined),
-              title: const Text('Dark Mode'),
-              value: themeMode == ThemeMode.dark,
-              onChanged: (val) {
-                HapticFeedback.lightImpact();
-                ref.read(themeModeProvider.notifier).state = val
-                    ? ThemeMode.dark
-                    : ThemeMode.light;
-              },
+            child: Column(
+              children: [
+                SwitchListTile(
+                  secondary: const Icon(Icons.dark_mode_outlined),
+                  title: const Text('Dark Mode'),
+                  value: themeMode == ThemeMode.dark,
+                  onChanged: (val) {
+                    HapticFeedback.lightImpact();
+                    ref.read(themeModeProvider.notifier).state = val
+                        ? ThemeMode.dark
+                        : ThemeMode.light;
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.explore_outlined),
+                  title: const Text('Replay App Onboarding'),
+                  subtitle: const Text('View the 5-step loop and feature guide'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    context.push('/onboarding');
+                  },
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),
@@ -854,18 +874,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFF2D5A46).withValues(alpha: 0.12),
+          color: AppColors.accentForest.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle, size: 12, color: Color(0xFF2D5A46)),
+            Icon(Icons.check_circle, size: 12, color: AppColors.accentForest),
             SizedBox(width: 4),
             Text(
               'Connected',
               style: TextStyle(
-                color: Color(0xFF2D5A46),
+                color: AppColors.accentForest,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
@@ -910,13 +930,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFF2D5A46).withValues(alpha: 0.12),
+          color: AppColors.accentForest.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         child: const Text(
           'Configured',
           style: TextStyle(
-            color: Color(0xFF2D5A46),
+            color: AppColors.accentForest,
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),
@@ -949,9 +969,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       IconData icon,
     ) = switch (result.status) {
       GeminiConnectionStatus.connected => (
-        const Color(0xFF2D5A46).withValues(alpha: 0.12),
-        const Color(0xFF2D5A46),
-        const Color(0xFF2D5A46),
+        AppColors.accentForest.withValues(alpha: 0.12),
+        AppColors.accentForest,
+        AppColors.accentForest,
         Icons.check_circle_outline,
       ),
       GeminiConnectionStatus.invalidKey => (
@@ -1024,7 +1044,7 @@ class _SectionHeader extends StatelessWidget {
           fontWeight: FontWeight.bold,
           fontSize: 13,
           letterSpacing: 0.5,
-          color: Color(0xFFA64B2A),
+          color: AppColors.primaryTerracotta,
         ),
       ),
     );
@@ -1056,7 +1076,7 @@ class _AuthTile extends ConsumerWidget {
           title: Text('Sign in with Google'),
         ),
         AuthStatus.signedOut => ListTile(
-          leading: const Icon(Icons.login, color: Color(0xFFA64B2A)),
+          leading: const Icon(Icons.login, color: AppColors.primaryTerracotta),
           title: const Text('Sign in with Google'),
           subtitle: const Text('Sync, backups and delivery'),
           trailing: FilledButton.tonal(
@@ -1073,8 +1093,8 @@ class _AuthTile extends ConsumerWidget {
         ),
         AuthStatus.signedIn => ListTile(
           leading: CircleAvatar(
-            backgroundColor: const Color(0xFF2D5A46).withValues(alpha: 0.15),
-            foregroundColor: const Color(0xFF2D5A46),
+            backgroundColor: AppColors.accentForest.withValues(alpha: 0.15),
+            foregroundColor: AppColors.accentForest,
             backgroundImage: state.identity?.photoUrl != null
                 ? NetworkImage(state.identity!.photoUrl!)
                 : null,
@@ -1161,12 +1181,12 @@ class _GeminiSetupGuideSheet extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFA64B2A).withValues(alpha: 0.12),
+                      color: AppColors.primaryTerracotta.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
                       Icons.auto_awesome,
-                      color: Color(0xFFA64B2A),
+                      color: AppColors.primaryTerracotta,
                       size: 24,
                     ),
                   ),
@@ -1336,7 +1356,7 @@ class _GuideStepTile extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 14,
-          backgroundColor: const Color(0xFFA64B2A),
+          backgroundColor: AppColors.primaryTerracotta,
           foregroundColor: Colors.white,
           child: Text(
             stepNumber,

@@ -28,6 +28,12 @@ class InMemoryCredentialStorage implements CredentialStorage {
   Future<void> saveGeminiApiKey(String apiKey) async {
     key = apiKey;
   }
+
+  @override
+  Future<bool> hasCompletedOnboarding() async => false;
+
+  @override
+  Future<void> setCompletedOnboarding(bool completed) async {}
 }
 
 void main() {
@@ -73,7 +79,7 @@ void main() {
       expect(find.byIcon(Icons.bolt), findsOneWidget);
       expect(
         find.text(
-          'Stored securely on this device. Never included in sync or application logs.',
+          'Stored securely on this device in hardware-backed encrypted storage. Sent directly to Google Gemini API only when generating messages, and never to AI-Birthday servers. Never included in sync or application logs.',
         ),
         findsOneWidget,
       );

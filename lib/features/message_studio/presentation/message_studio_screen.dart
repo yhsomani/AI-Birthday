@@ -1,6 +1,7 @@
 /// Message Studio for AI generation, editing, and delivery handoff (SSOT §16).
 library;
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,7 +27,8 @@ class MessageStudioScreen extends ConsumerStatefulWidget {
       _MessageStudioScreenState();
 }
 
-class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
+class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final TextEditingController _customInstructionController =
       TextEditingController();
@@ -38,20 +40,58 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
   bool _isGenerating = false;
   String? _errorMessage;
 
+  Timer? _autosaveTimer;
+  bool _isSaving = false;
+  DateTime? _lastSavedTime;
+
   MessageTone _selectedTone = MessageTone.warm;
   MessageLength _selectedLength = MessageLength.standard;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadData();
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _autosaveTimer?.cancel();
+      _performAutosave();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _autosaveTimer?.cancel();
+    if (_messageController.text.isNotEmpty && _person != null) {
+      _saveDraft(status: _draft?.status ?? DraftStatus.draft);
+    }
     _messageController.dispose();
     _customInstructionController.dispose();
     super.dispose();
+  }
+
+  void _onMessageChanged(String text) {
+    setState(() {});
+    _autosaveTimer?.cancel();
+    _autosaveTimer = Timer(const Duration(milliseconds: 750), () {
+      _performAutosave();
+    });
+  }
+
+  Future<void> _performAutosave() async {
+    if (_person == null || !mounted) return;
+    setState(() => _isSaving = true);
+    await _saveDraft(status: _draft?.status ?? DraftStatus.draft);
+    if (mounted) {
+      setState(() {
+        _isSaving = false;
+        _lastSavedTime = DateTime.now();
+      });
+    }
   }
 
   Future<void> _loadData() async {
@@ -467,7 +507,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.auto_awesome, color: Color(0xFFD9822B)),
+                    Icon(Icons.auto_awesome, color: AppColors.accentAmber),
                     SizedBox(width: 8),
                     Text(
                       'Select a Variation',
@@ -592,7 +632,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
             children: [
               Icon(
                 wasLaunched ? Icons.mark_chat_read_outlined : Icons.open_in_new,
-                color: const Color(0xFF2D5A46),
+                color: AppColors.accentForest,
               ),
               const SizedBox(width: 8),
               Text('$channelName Handoff'),
@@ -919,22 +959,48 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Message Body (User review required):',
+              'Your message',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            Text(
-              '${_messageController.text.length} chars',
-              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isSaving)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: Text(
+                      'Saving...',
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                  )
+                else if (_lastSavedTime != null)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: Text(
+                      'Saved',
+                      style: TextStyle(fontSize: 11, color: Colors.green),
+                    ),
+                  ),
+                Text(
+                  '${_messageController.text.length} chars',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                ),
+              ],
             ),
           ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Review and edit this before sending.',
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         ),
         const SizedBox(height: 8),
         TextField(
           controller: _messageController,
           maxLines: 5,
-          onChanged: (_) => setState(() {}),
+          onChanged: _onMessageChanged,
           decoration: const InputDecoration(
-            hintText: 'Write a birthday greeting or tap Generate with AI...',
+            hintText: 'Write a birthday greeting or tap Create message...',
           ),
         ),
         const SizedBox(height: 8),

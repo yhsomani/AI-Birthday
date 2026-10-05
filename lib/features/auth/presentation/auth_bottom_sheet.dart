@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:ai_birthday/shared/design_system/design_system.dart';
+
 import '../application/auth_controller.dart';
 import '../domain/google_identity.dart';
 
@@ -62,7 +64,7 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('$message 🎉'),
-        backgroundColor: const Color(0xFF2D5A46),
+        backgroundColor: AppColors.accentForest,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -386,7 +388,7 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
         const Icon(
           Icons.account_circle_outlined,
           size: 48,
-          color: Color(0xFFA64B2A),
+          color: AppColors.primaryTerracotta,
         ),
         const SizedBox(height: 12),
         const Text(
@@ -414,7 +416,7 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet>
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFA64B2A),
+                    color: AppColors.primaryTerracotta,
                   ),
                 ),
           label: const Text(

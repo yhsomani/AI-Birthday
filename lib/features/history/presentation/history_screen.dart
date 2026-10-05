@@ -47,9 +47,21 @@ class HistoryScreen extends ConsumerWidget {
               final draft = drafts[index];
               final person = peopleMap[draft.personId];
               final recipientName = person?.name ?? 'Birthday Recipient';
-              final isSent =
-                  draft.status == DraftStatus.confirmedSent ||
-                  draft.status == DraftStatus.handedOff;
+              final statusColor = switch (draft.status) {
+                DraftStatus.confirmedSent => Colors.green[800] ?? Colors.green,
+                DraftStatus.handedOff => Colors.orange[800] ?? Colors.orange,
+                DraftStatus.ready => Theme.of(context).colorScheme.primary,
+                DraftStatus.reviewed => Colors.teal[800] ?? Colors.teal,
+                DraftStatus.draft => Colors.grey[700] ?? Colors.grey,
+              };
+
+              final (statusIcon, statusLabel) = switch (draft.status) {
+                DraftStatus.confirmedSent => (Icons.check_circle_outline, 'Sent'),
+                DraftStatus.handedOff => (Icons.open_in_new, 'Opened in WhatsApp'),
+                DraftStatus.ready => (Icons.send_outlined, 'Ready to Send'),
+                DraftStatus.reviewed => (Icons.rate_review_outlined, 'Reviewed'),
+                DraftStatus.draft => (Icons.edit_note_outlined, 'Draft'),
+              };
 
               return Card(
                 elevation: 0,
@@ -104,39 +116,24 @@ class HistoryScreen extends ConsumerWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: isSent
-                                  ? Colors.green.withValues(alpha: 0.12)
-                                  : Theme.of(context)
-                                        .colorScheme
-                                        .primaryContainer
-                                        .withValues(alpha: 0.5),
+                              color: statusColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  isSent
-                                      ? Icons.check_circle_outline
-                                      : Icons.edit_note_outlined,
+                                  statusIcon,
                                   size: 14,
-                                  color: isSent
-                                      ? Colors.green[800]
-                                      : Theme.of(context).colorScheme.primary,
+                                  color: statusColor,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  isSent
-                                      ? 'Sent'
-                                      : draft.status == DraftStatus.ready
-                                      ? 'Ready'
-                                      : 'Draft',
+                                  statusLabel,
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: isSent
-                                        ? Colors.green[800]
-                                        : Theme.of(context).colorScheme.primary,
+                                    color: statusColor,
                                   ),
                                 ),
                               ],

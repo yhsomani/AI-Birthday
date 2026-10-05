@@ -1,20 +1,35 @@
 # AI-Birthday — Implementation Status
 
-**Updated:** 2026-10-04 · **Authority:** `SSOT.md`
+**Updated:** 2026-10-05 · **Authority:** `SSOT.md`
 
 ## Overall progress
 
-- **Architecture & Architecture Convergence:** COMPLETE. All 10 structural contradictions, merge conflicts, split routers, competing dashboards, and UI anti-patterns identified in the BUILD → REVIEW → REFINE audit have been resolved into a single, cohesive, production-grade application architecture.
-- **Phase 0 — Foundation:** COMPLETE (Flutter baseline, Riverpod, go_router, Material 3, Drift, secure storage abstraction, domain errors, sanitized logging, platform boundary definition, unified 5-destination navigation shell).
-- **Phase 1 — Core product:** COMPLETE. Birthday engine, People CRUD with Progressive Disclosure, Calendar, Reminders with quiet hours, and unified Dashboard command center (Today / Upcoming / Action needed / Quick actions).
-- **Phases 2–7 — AI & Delivery Engine:** COMPLETE.
-  - Subscription & Entitlement: Safely defaults to `free` tier; managed through `SubscriptionNotifier` with simulated Play Billing verification lifecycle and clearly labeled Dev Sandbox override.
-  - User Gemini API: Credential storage backed by secure hardware storage abstraction; keys never logged or synced.
-  - Gemini Nano: On-device AICore provider and status checker fully wired into global Riverpod provider graph (`geminiNanoProvider`, `geminiNanoPlatformProvider`, `aiRouterProvider`).
-  - Unified AiRouter: Strict routing pipeline enforcing `entitlement → user Gemini key → Gemini Nano → unavailable`.
-  - Message Studio: Dedicated creative workspace for AI drafting, tone/length variation, prompt policy guardrails, and draft persistence.
-  - WhatsApp Delivery Handoff: Official `wa.me` Click-to-Chat URL generation via `url_launcher`, post-launch interactive confirmation modal, and dual-state celebration tracking (`handedOff` → `completed` / `confirmedSent`).
-- **Phases 8–10 — Reliability & QA:** COMPLETE. 133/133 Flutter tests passing, 68/68 backend Vitest tests passing, 6/6 domain suites passing, 0 analyzer issues.
+- **Production-Readiness & Truthfulness Overhaul:** COMPLETE. Every user-facing trust defect, data loss vector, deceptive status, and UI friction point identified in the production audit has been systematically addressed following `IDENTIFY → VERIFY → PRIORITIZE → FIX → IMPLEMENT → INTEGRATE → TEST → RE-TEST → DOCUMENT → RE-AUDIT`.
+- **Phase 0 — Foundation:** COMPLETE (Flutter baseline, Riverpod, go_router, Material 3, Drift SQLite, secure storage abstraction, domain errors, sanitized logging, platform boundary definition, unified 5-destination navigation shell).
+- **Phase 1 — Trust & Truthfulness (P0):** COMPLETE.
+  - Subscription: Local fallback Pro grant removed; returns store-unavailable state when Play Billing is absent; strictly requires server-verified purchase tokens.
+  - Gemini Nano: Truthfully reports unavailable until on-device AICore model weights execution is active.
+  - Cloud Backup: Requires verified write success, passes bearer auth tokens, returns granular error reasons, and accurately labeled as opt-in Cloud Backup.
+  - Delivery Status: Distinguishes "Opened in WhatsApp" (`handedOff`) from "Sent" (`confirmedSent`).
+  - Alarm Cancellation: Native `AlarmManager` cancels exact `PendingIntent`s matching notification IDs when reminders are disabled.
+  - Boot Receiver: Separates `BOOT_COMPLETED` rescheduling from notification delivery to prevent ghost alerts.
+- **Phase 2 — Data Safety & Architecture (P0):** COMPLETE.
+  - Person Form: Fully populates, preserves, and saves `relationshipCloseness`, `preferredLanguage`, `preferredDeliveryChannel`, `autoPrepare`, and `timezone` with monotonic version increments.
+  - Message Studio: Real-time debounced auto-save (750ms) plus exit/blur save on unmount; visual "Saving..." / "Saved" status indicator; plain, respectful user copy.
+- **Phase 3 — First-Run UX & Onboarding (P0/P1):** COMPLETE.
+  - Guided 3-step walkthrough introducing the 5-step loop (Remember → Prepare → Personalize → Review → Send), local-first privacy promise, direct manual/import onramps, and reminder timeline.
+  - Backed by secure hardware credential storage; replayable at any time from Settings.
+- **Phase 4 — Core UX & Refinements (P1):** COMPLETE.
+  - Dashboard: Strict 30-day window (`days > 7 && days <= 30`) on upcoming feed; dynamic empty state onramps; dynamic action card CTAs with missing phone number warnings.
+  - Contacts & Import: "Import from Phone" with local-first permission primer; candidate breakdown ("X birthdays found: Y new, Z already added"); CSV parser diagnostics reporting skipped row numbers.
+- **Phase 5 — Accessibility & Design System (P1):** COMPLETE.
+  - 100% of presentation layer hard-coded colors unified under `AppColors` semantic tokens (`primaryTerracotta`, `accentForest`, `accentAmber`, etc.).
+  - Proper touch targets and accessible contrast ratios.
+- **Phase 6 — Reliability & QA:** COMPLETE.
+  - `flutter analyze`: **0 issues** (clean).
+  - `flutter test`: **160/160 passing** (100% pass rate).
+  - `backend/functions npm test`: **68/68 passing** (100% pass rate).
+  - Android release APK built successfully (`62.6MB`).
 
 ## Feature states
 
@@ -23,42 +38,30 @@
 | Flutter baseline & dependencies | done | Flutter 3.47+, Dart 3.13+, clean pubspec |
 | Domain error system | done | `core/errors/app_failure.dart` + tests |
 | Sanitized logging & PII redaction | done | `core/logging/app_logger.dart` with precompiled regex covering keys, phones, emails, notes |
-| Drift database (Persons, sync envelope) | done | Authoritative schema matching Drift code generation |
+| Drift database (Persons, sync envelope) | done | Authoritative schema matching Drift code generation with field preservation |
 | Secure storage abstraction | done | `SecureCredentialStorage` + `FlutterSecureStorageDriver` with error resilience |
-| Anti-generic Material 3 design system | done | Terracotta seed (`#A64B2A`), linen/charcoal palette, Playfair Display + Nunito typography, 48dp touch targets, zero linear gradients or badge soup |
-| Unified Navigation Shell | done | Single authoritative `go_router` shell mounting 5 tabs (`/dashboard`, `/people`, `/calendar`, `/history`, `/settings`) with redirects from legacy paths |
-| Unified Dashboard Command Center | done | Eliminates competing dashboards; establishes What/Who/Why/Next above the fold |
-| Progressive Disclosure Person Form | done | Replaces monolithic forms with 4 structured disclosure cards (Essentials, Relationship & Tone, Contact & Delivery, AI Facts & Notes) |
+| Semantic Material 3 design system | done | Unified `AppColors` tokens (Terracotta, Forest, Amber), Playfair Display + Nunito typography |
+| Unified Navigation Shell | done | Single authoritative `go_router` shell mounting 5 tabs plus `/onboarding` above shell |
+| First-Run Onboarding Flow | done | 3-page walkthrough (5-step loop, privacy promise, onramps, reminder timeline) |
+| Unified Dashboard Command Center | done | Dynamic empty state, 30-day feed window, dynamic action CTAs with phone warnings |
+| Progressive Disclosure Person Form | done | Retains all advanced relationship, language, channel, and auto-prepare preferences |
 | Birthday engine & Leap Day rules | done | Timezone-aware recurrence, leap-day resolution (Feb 29 -> Feb 28 non-leap) |
 | Person layer (validation, repository, service) | done | Validation, Drift operational store, soft delete and undo |
 | Calendar year view | done | Month grid, leap-day resolution, day sheet modal |
-| Reminders (scheduling & quiet hours) | done | 7/2/1/0 day leads, wrap-midnight quiet hours, settings UI |
-| Auth boundary (Live Google & Firebase Auth) | done | `LiveGoogleAuthGateway` + `AuthController` + `AuthBottomSheet` (Google & Email/Password REST) |
-| Subscription & entitlement lifecycle | done | In-App Purchase integration (`in_app_purchase`) for `ai_birthday_pro_monthly`, `purchaseProMonthly()` + `restorePurchases()` |
-| Live Contact Sync | done | Android Content Provider via `flutter_contacts` with runtime permission flow and multi-contact import |
-| Cloud Sync (Firestore REST) | done | `CloudSyncService` syncs Drift birthdays to/from Firestore `users/{uid}/birthdays` |
-| User Gemini API Provider | done | Secure storage in keystore/keychain, zero PII logging |
-| Gemini Nano Provider & Platform Graph | done | Fully wired into Riverpod dependency graph with live AICore status reporting in Settings |
+| Reminders (scheduling & quiet hours) | done | 7/2/1/0 day leads, wrap-midnight quiet hours, exact alarm PendingIntent cancellation |
+| Auth boundary (Live Google & Firebase Auth) | done | `LiveGoogleAuthGateway` + `AuthController` + `AuthBottomSheet` |
+| Subscription & entitlement lifecycle | done | Play Billing store-unavailable handling; zero free local Pro fallback bypasses |
+| Import from Phone Contacts | done | Android Content Provider with local-first permission primer and candidate breakdown |
+| Cloud Backup (Firestore REST) | done | Verified write success checks, Bearer auth headers, transparent privacy disclosures |
+| User Gemini API Provider | done | Secure storage in keystore, direct Google API connection, zero server interception |
+| Gemini Nano Provider & Platform Graph | done | Truthfully reported as unavailable until on-device AICore execution is supported |
 | Unified AiRouter | done | Enforces entitlement check, credential fallback, Nano integration, typed failure modes |
-| Message Studio | done | AI prompt builder with strict anti-hallucination guardrails, length & tone selectors, draft state machine |
-| WhatsApp Delivery Flow | done | Official Click-to-Chat deep links, external launch, post-handoff confirmation modal, celebration completion |
+| Message Studio | done | Debounced auto-save on edit/blur, "Saved" indicator, prompt guardrails, tone selectors |
+| WhatsApp Delivery Flow | done | Handoff vs confirmed sent separation; post-launch interactive confirmation modal |
 
 ## Test status
 
 - `flutter analyze`: **0 issues** (clean).
-- `flutter test`: **133/133 passing** (100% pass rate).
+- `flutter test`: **160/160 passing** (100% pass rate).
 - `backend/functions npm test`: **68/68 passing** (100% pass rate).
 - `dart run test/run_all_domain_tests.dart`: **6/6 test suites passing cleanly**.
-
-## Architectural Audit Resolutions
-
-1. **Unresolved Merge Conflicts**: All conflict markers in source files (`pubspec.yaml`, `lib/main.dart`, `app_database.dart`, `app_failure.dart`, `app_logger.dart`) were completely removed and unified.
-2. **Two Incompatible Navigation Systems**: Consolidated into a single `go_router` implementation (`lib/app/router.dart`) mounting the 5 canonical destinations and mapping legacy aliases (`/home`, `/birthdays`).
-3. **Competing Dashboards**: Replaced with a single authoritative `DashboardScreen` combining urgent action items, today's birthdays, upcoming celebrations, and quick actions.
-4. **Anti-Generic Visual Style**: Completely eradicated generic gradients, card soup, and pill badges; introduced warm terracotta editorial styling, high-contrast surfaces, and haptic feedback.
-5. **Split Design System**: Reconciled into a single `AppTheme` token system using GoogleFonts Playfair Display for editorial headers and Nunito for legible body content.
-6. **Safe Subscription Gating**: `entitlementProvider` now defaults safely to Free tier (`UserEntitlement.free`), requiring explicit upgrade/restore flows with simulated verification.
-7. **Gemini Nano Provider Graph Wiring**: Connected `geminiNanoPlatformProvider` and `geminiNanoProvider` into `aiRouterProvider` and added live diagnostic status in Settings.
-8. **WhatsApp Delivery Journey**: Integrated `url_launcher` with `wa.me` Click-to-Chat protocol, interactive post-launch user confirmation dialog, and dual-state celebration completion (`handedOff` → `completed`).
-9. **Progressive Disclosure Recipient Creation**: Refactored recipient creation into 4 phased disclosure steps, allowing completion in under 30 seconds with optional deep customization.
-10. **Updated Implementation Tracking**: Comprehensive status tracking verified against `SSOT.md` and current codebase reality.

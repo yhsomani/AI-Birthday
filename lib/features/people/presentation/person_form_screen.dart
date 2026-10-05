@@ -13,11 +13,16 @@ import 'package:ai_birthday/features/people/domain/models/person.dart'
     as p_models;
 import 'package:ai_birthday/features/people/domain/models/relationship.dart'
     as p_rel;
+import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart'
+    as d_chan;
 import 'package:ai_birthday/features/people/domain/models/tone.dart' as p_tone;
 import 'package:ai_birthday/features/people/domain/person.dart';
-import 'package:ai_birthday/features/people/domain/person_enums.dart';
+import 'package:ai_birthday/features/people/domain/person_enums.dart'
+    hide DeliveryChannel, RelationshipCloseness;
+import 'package:ai_birthday/features/people/domain/person_enums.dart' as p_enums;
 import 'package:ai_birthday/features/people/domain/person_input.dart';
 import 'package:ai_birthday/features/people/domain/person_input_validator.dart';
+import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 /// Add / edit recipient form with Progressive Disclosure (SSOT §7, §14).
 ///
@@ -61,6 +66,11 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
   int? _month;
   int? _day;
   PreferredTone _tone = PreferredTone.warm;
+  p_models.Person? _existingPerson;
+  p_rel.RelationshipCloseness _closeness = p_rel.RelationshipCloseness.casual;
+  String _preferredLanguage = 'en';
+  d_chan.DeliveryChannel _deliveryChannel = d_chan.DeliveryChannel.whatsapp;
+  bool _autoPrepare = true;
   Person? _loaded;
   PersonValidation? _validation;
   bool _saving = false;
@@ -74,34 +84,36 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
     if (id != null) {
       ref.read(personByIdProvider(id).future).then((person) async {
         if (!mounted) return;
+        final memPerson = await ref
+            .read(peopleRepositoryProvider)
+            .getPerson(id);
+        if (memPerson != null) {
+          _existingPerson = memPerson;
+        }
         var p = person;
-        if (p == null) {
-          final memPerson = await ref
-              .read(peopleRepositoryProvider)
-              .getPerson(id);
-          if (memPerson != null) {
-            p = Person(
-              id: memPerson.id,
-              name: memPerson.name,
-              birthdayMonth: memPerson.birthdayMonth,
-              birthdayDay: memPerson.birthdayDay,
-              birthYear: memPerson.birthYear,
-              phoneNumber: memPerson.phoneNumber,
-              email: memPerson.email,
-              relationship: memPerson.relationship.displayName,
-              preferredTone: PreferredTone.values.firstWhere(
-                (t) =>
-                    t.name.toLowerCase() ==
-                    memPerson.preferredTone.name.toLowerCase(),
-                orElse: () => PreferredTone.warm,
-              ),
-              importantFacts: memPerson.importantFacts,
-              notes: memPerson.notes,
-              createdAt: memPerson.createdAt,
-              updatedAt: memPerson.updatedAt,
-              version: 1,
-            );
-          }
+        if (p == null && memPerson != null) {
+          p = Person(
+            id: memPerson.id,
+            name: memPerson.name,
+            birthdayMonth: memPerson.birthdayMonth,
+            birthdayDay: memPerson.birthdayDay,
+            birthYear: memPerson.birthYear,
+            phoneNumber: memPerson.phoneNumber,
+            email: memPerson.email,
+            relationship: memPerson.relationship.displayName,
+            preferredTone: PreferredTone.values.firstWhere(
+              (t) =>
+                  t.name.toLowerCase() ==
+                  memPerson.preferredTone.name.toLowerCase(),
+              orElse: () => PreferredTone.warm,
+            ),
+            importantFacts: memPerson.importantFacts,
+            notes: memPerson.notes,
+            timezone: memPerson.timezone,
+            createdAt: memPerson.createdAt,
+            updatedAt: memPerson.updatedAt,
+            version: memPerson.version,
+          );
         }
         if (!mounted) return;
         if (p == null) {
@@ -143,6 +155,13 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
     _notes.text = person.notes ?? '';
     _timezone.text = person.timezone ?? '';
     _tone = person.preferredTone;
+    _closeness = _existingPerson?.relationshipCloseness ??
+        p_rel.RelationshipCloseness.fromString(person.relationshipCloseness.name);
+    _preferredLanguage = _existingPerson?.preferredLanguage ??
+        (person.preferredLanguage.isNotEmpty ? person.preferredLanguage : 'en');
+    _deliveryChannel = _existingPerson?.preferredDeliveryChannel ??
+        d_chan.DeliveryChannel.fromString(person.preferredDeliveryChannel.name);
+    _autoPrepare = _existingPerson?.autoPrepare ?? person.autoPrepare;
     _facts
       ..clear()
       ..addAll(
@@ -199,13 +218,17 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       phoneNumber: emptyToNull(_phone.text),
       email: emptyToNull(_email.text),
       relationship: _relationship.text.trim(),
+      relationshipCloseness: p_enums.RelationshipCloseness.parse(_closeness.name),
+      preferredLanguage: _preferredLanguage,
       preferredTone: _tone,
       importantFacts: _facts
           .map((c) => c.text.trim())
           .where((f) => f.isNotEmpty)
           .toList(),
       notes: emptyToNull(_notes.text),
+      preferredDeliveryChannel: p_enums.DeliveryChannel.parse(_deliveryChannel.name),
       timezone: emptyToNull(_timezone.text),
+      autoPrepare: _autoPrepare,
     );
   }
 
@@ -241,13 +264,19 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
           relationship: p_rel.RelationshipCategory.fromString(
             saved.relationship,
           ),
+          relationshipCloseness: _closeness,
+          preferredLanguage: _preferredLanguage,
           preferredTone: p_tone.MessageTone.fromString(
             saved.preferredTone.name,
           ),
           importantFacts: saved.importantFacts,
           notes: saved.notes,
-          createdAt: saved.createdAt,
-          updatedAt: saved.updatedAt,
+          preferredDeliveryChannel: _deliveryChannel,
+          timezone: saved.timezone,
+          autoPrepare: _autoPrepare,
+          createdAt: _existingPerson?.createdAt ?? saved.createdAt,
+          updatedAt: DateTime.now().toUtc(),
+          version: (_existingPerson?.version ?? 0) + 1,
         );
         await peopleRepo.savePerson(personModel);
 
@@ -331,7 +360,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.8,
-                        color: Color(0xFFA64B2A),
+                        color: AppColors.primaryTerracotta,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -440,6 +469,41 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                             labelText: 'Preferred tone',
                           ),
                         ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<p_rel.RelationshipCloseness>(
+                          initialValue: _closeness,
+                          items: [
+                            for (final c in p_rel.RelationshipCloseness.values)
+                              DropdownMenuItem(
+                                value: c,
+                                child: Text(c.displayName),
+                              ),
+                          ],
+                          onChanged: (value) => setState(
+                            () => _closeness =
+                                value ?? p_rel.RelationshipCloseness.casual,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Closeness',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: _preferredLanguage,
+                          items: const [
+                            DropdownMenuItem(value: 'en', child: Text('English')),
+                            DropdownMenuItem(value: 'hi', child: Text('Hindi')),
+                            DropdownMenuItem(value: 'es', child: Text('Spanish')),
+                            DropdownMenuItem(value: 'fr', child: Text('French')),
+                            DropdownMenuItem(value: 'de', child: Text('German')),
+                          ],
+                          onChanged: (value) => setState(
+                            () => _preferredLanguage = value ?? 'en',
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Preferred language',
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -485,6 +549,34 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                             hintText: 'e.g. priya@example.com',
                             errorText: _errorFor(PersonField.email),
                           ),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<d_chan.DeliveryChannel>(
+                          initialValue: _deliveryChannel,
+                          items: [
+                            for (final ch in d_chan.DeliveryChannel.values)
+                              DropdownMenuItem(
+                                value: ch,
+                                child: Text(ch.displayName),
+                              ),
+                          ],
+                          onChanged: (value) => setState(
+                            () => _deliveryChannel =
+                                value ?? d_chan.DeliveryChannel.whatsapp,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Preferred delivery channel',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Prepare drafts automatically'),
+                          subtitle: const Text(
+                            'Drafts will be generated ahead of birthday for your review',
+                          ),
+                          value: _autoPrepare,
+                          onChanged: (v) => setState(() => _autoPrepare = v),
                         ),
                         const SizedBox(height: 12),
                         TextField(

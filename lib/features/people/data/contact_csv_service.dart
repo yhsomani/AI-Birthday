@@ -68,6 +68,17 @@ class ParsedContactCandidate {
   }
 }
 
+/// Result of a CSV parse operation containing valid candidates and details on skipped rows.
+class CsvParseResult {
+  const CsvParseResult({
+    required this.candidates,
+    this.invalidRows = const [],
+  });
+
+  final List<ParsedContactCandidate> candidates;
+  final List<String> invalidRows;
+}
+
 class ContactCsvService {
   const ContactCsvService();
 
@@ -102,13 +113,24 @@ class ContactCsvService {
     String csvContent, {
     List<Person> existingPeople = const [],
   }) {
+    return parseCsvWithResult(csvContent, existingPeople: existingPeople).candidates;
+  }
+
+  /// Parses CSV [csvContent] and returns candidates plus detailed invalid row messages.
+  CsvParseResult parseCsvWithResult(
+    String csvContent, {
+    List<Person> existingPeople = const [],
+  }) {
     final lines = csvContent.split(RegExp(r'\r?\n'));
-    if (lines.isEmpty) return [];
+    if (lines.isEmpty) return const CsvParseResult(candidates: []);
 
     final candidates = <ParsedContactCandidate>[];
+    final invalidRows = <String>[];
     bool isFirstLine = true;
+    int rowNumber = 0;
 
     for (final rawLine in lines) {
+      rowNumber++;
       final line = rawLine.trim();
       if (line.isEmpty) continue;
 
@@ -125,7 +147,10 @@ class ContactCsvService {
       }
 
       final name = fields.isNotEmpty ? fields[0].trim() : '';
-      if (name.isEmpty) continue;
+      if (name.isEmpty) {
+        invalidRows.add('Row $rowNumber: Name is missing');
+        continue;
+      }
 
       int? month;
       int? day;
@@ -160,6 +185,7 @@ class ContactCsvService {
           month > 12 ||
           day < 1 ||
           day > 31) {
+        invalidRows.add('Row $rowNumber ("$name"): Missing or invalid birthday');
         continue;
       }
 
@@ -230,7 +256,10 @@ class ContactCsvService {
       );
     }
 
-    return candidates;
+    return CsvParseResult(
+      candidates: candidates,
+      invalidRows: invalidRows,
+    );
   }
 
   static String _cleanPhone(String phone) =>

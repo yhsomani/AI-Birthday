@@ -136,5 +136,54 @@ void main() {
       final lastSync = await service.getLastSyncTime();
       expect(lastSync, isNotNull);
     });
+
+    test('returns failure and does not store timestamp when cloud writes fail', () async {
+      final now = DateTime.now();
+
+      await db.into(db.persons).insert(
+            PersonsCompanion.insert(
+              id: 'p-fail',
+              name: 'Failed User',
+              relationship: 'Friend',
+              relationshipCloseness: 'close',
+              preferredLanguage: 'en',
+              preferredTone: 'warm',
+              importantFacts: 'None',
+              preferredDeliveryChannel: 'WhatsApp',
+              autoSendPolicy: 'manual',
+              createdAt: now,
+              updatedAt: now,
+              version: 1,
+            ),
+          );
+
+      final failingClient = MockClient((request) async {
+        return http.Response('Forbidden', 403);
+      });
+
+      final service = CloudSyncService(
+        db: db,
+        store: store,
+        httpClient: failingClient,
+      );
+
+      final auth = const AuthState(
+        status: AuthStatus.signedIn,
+        identity: GoogleIdentity(
+          googleSubject: 'sub-test',
+          email: 'user@example.com',
+          displayName: 'User',
+          firebaseUid: 'uid-test',
+        ),
+      );
+
+      final result = await service.sync(auth);
+      expect(result.success, isFalse);
+      expect(result.uploadedCount, 0);
+      expect(result.error, contains('Cloud backup failed'));
+
+      final lastSync = await service.getLastSyncTime();
+      expect(lastSync, isNull);
+    });
   });
 }

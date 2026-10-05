@@ -52,8 +52,6 @@ class PeopleScreen extends ConsumerWidget {
     final csvService = ref.read(contactCsvServiceProvider);
     final csvText = csvService.exportToCsv(people);
 
-    await Clipboard.setData(ClipboardData(text: csvText));
-
     final shareService = ref.read(nativeShareServiceProvider);
     await shareService.shareText(
       text: csvText,
@@ -64,7 +62,7 @@ class PeopleScreen extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Exported ${people.length} contacts to CSV (copied to clipboard)! 📋',
+            'Exported ${people.length} contacts to CSV file. 📋',
           ),
         ),
       );
@@ -77,7 +75,7 @@ class PeopleScreen extends ConsumerWidget {
     List<Person> currentPeople,
   ) async {
     final textController = TextEditingController();
-    final parsedCandidates = await showModalBottomSheet<List<ParsedContactCandidate>>(
+    final parsedCandidates = await showModalBottomSheet<CsvParseResult>(
       context: context,
       isScrollControlled: true,
       builder: (sheetContext) => StatefulBuilder(
@@ -103,15 +101,9 @@ class PeopleScreen extends ConsumerWidget {
                         fontSize: 18,
                       ),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        textController.text =
-                            'Name,Birthday Month,Birthday Day,Birth Year,Phone Number,Relationship\n'
-                            'Alex Rivera,6,15,1990,+15552345678,Friend\n'
-                            'Taylor Brooks,11,28,1988,+15558765432,Colleague';
-                        setModalState(() {});
-                      },
-                      child: const Text('Load Sample'),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(sheetContext).pop(),
                     ),
                   ],
                 ),
@@ -135,11 +127,11 @@ class PeopleScreen extends ConsumerWidget {
                   child: FilledButton(
                     onPressed: () {
                       final csvService = ref.read(contactCsvServiceProvider);
-                      final candidates = csvService.parseAndNormalizeCsv(
+                      final parseResult = csvService.parseCsvWithResult(
                         textController.text,
                         existingPeople: currentPeople,
                       );
-                      Navigator.of(sheetContext).pop(candidates);
+                      Navigator.of(sheetContext).pop(parseResult);
                     },
                     child: const Text('Parse & Review Candidates'),
                   ),
@@ -153,7 +145,18 @@ class PeopleScreen extends ConsumerWidget {
 
     if (parsedCandidates == null || !context.mounted) return;
 
-    if (parsedCandidates.isEmpty) {
+    if (parsedCandidates.invalidRows.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Skipped ${parsedCandidates.invalidRows.length} invalid rows (e.g. ${parsedCandidates.invalidRows.first})',
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+
+    if (parsedCandidates.candidates.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No valid contact entries found in CSV.')),
       );
@@ -163,7 +166,7 @@ class PeopleScreen extends ConsumerWidget {
     await _reviewAndImportCandidates(
       context,
       ref,
-      parsedCandidates,
+      parsedCandidates.candidates,
       title: 'Review CSV Contacts',
     );
   }
@@ -228,9 +231,18 @@ class PeopleScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
+                Text(
+                  '${parsedCandidates.length} birthdays found: ${parsedCandidates.where((c) => !c.isPotentialDuplicate).length} new, ${parsedCandidates.where((c) => c.isPotentialDuplicate).length} already added.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.accentForest,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
                 const Text(
-                  'Duplicate candidates are unselected by default (SSOT §18: Never auto-merge).',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  'Potential duplicates are unselected by default for safety.',
+                  style: TextStyle(fontSize: 11, color: Colors.grey),
                 ),
                 const Divider(),
                 Expanded(
@@ -369,13 +381,42 @@ class PeopleScreen extends ConsumerWidget {
 
     final hasPerm = await contactsService.hasPermission();
     if (!hasPerm) {
+      if (!context.mounted) return;
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          icon: const Icon(
+            Icons.contact_phone_outlined,
+            size: 36,
+            color: AppColors.primaryTerracotta,
+          ),
+          title: const Text('Import Birthdays from Phone'),
+          content: const Text(
+            'AI-Birthday scans your device contacts only to locate names, phone numbers, and birthdays. '
+            'Everything runs locally on your phone — no contact data is ever uploaded or sent to any server.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(true),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+
+      if (proceed != true) return;
+
       final granted = await contactsService.requestPermission();
       if (!granted) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Contacts permission is required to sync phone contacts.',
+                'Contacts permission is required to import phone birthdays.',
               ),
             ),
           );
@@ -410,7 +451,7 @@ class PeopleScreen extends ConsumerWidget {
       context,
       ref,
       candidates,
-      title: 'Sync Device Contacts',
+      title: 'Import Birthdays from Phone',
     );
   }
 
@@ -513,7 +554,7 @@ class PeopleScreen extends ConsumerWidget {
                   children: [
                     Icon(Icons.contact_phone_outlined, size: 20),
                     SizedBox(width: 8),
-                    Text('Sync Phone Contacts'),
+                    Text('Import from Phone'),
                   ],
                 ),
               ),
@@ -560,7 +601,7 @@ class PeopleScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Add contacts manually or sync birthdays directly from your phone.',
+                    'Add contacts manually or import birthdays directly from your phone.',
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                     textAlign: TextAlign.center,
                   ),
@@ -578,7 +619,7 @@ class PeopleScreen extends ConsumerWidget {
                     onPressed: () =>
                         _syncDeviceContacts(context, ref, currentPeople),
                     icon: const Icon(Icons.contact_phone_outlined),
-                    label: const Text('Sync Phone Contacts'),
+                    label: const Text('Import from Phone'),
                   ),
                 ],
               ),

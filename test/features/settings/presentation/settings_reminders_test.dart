@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   Future<void> pumpSettings(WidgetTester tester) async {
-    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -32,7 +32,10 @@ void main() {
   ) async {
     await pumpSettings(tester);
 
-    await tester.tap(find.byType(SwitchListTile).first);
+    final remindersSwitch = find.widgetWithText(SwitchListTile, 'Birthday reminders');
+    await tester.ensureVisible(remindersSwitch);
+    await tester.pumpAndSettle();
+    await tester.tap(remindersSwitch);
     await tester.pumpAndSettle();
 
     expect(find.text('7 days before'), findsOneWidget);
@@ -46,10 +49,17 @@ void main() {
   testWidgets('leads can be individually toggled off', (tester) async {
     await pumpSettings(tester);
 
-    await tester.tap(find.byType(SwitchListTile).first);
+    final remindersSwitch = find.widgetWithText(SwitchListTile, 'Birthday reminders');
+    await tester.ensureVisible(remindersSwitch);
+    await tester.pumpAndSettle();
+    await tester.tap(remindersSwitch);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(SwitchListTile, 'Approaching'));
+    final approachingFinder =
+        find.widgetWithText(SwitchListTile, 'Approaching');
+    await tester.ensureVisible(approachingFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(approachingFinder);
     await tester.pumpAndSettle();
 
     final controller = ProviderScope.containerOf(
@@ -61,7 +71,10 @@ void main() {
 
   testWidgets('quiet hours picker updates the stored window', (tester) async {
     await pumpSettings(tester);
-    await tester.tap(find.byType(SwitchListTile).first);
+    final remindersSwitch = find.widgetWithText(SwitchListTile, 'Birthday reminders');
+    await tester.ensureVisible(remindersSwitch);
+    await tester.pumpAndSettle();
+    await tester.tap(remindersSwitch);
     await tester.pumpAndSettle();
 
     final quietFinder = find.textContaining('No delivery between');

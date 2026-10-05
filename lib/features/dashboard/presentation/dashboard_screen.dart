@@ -70,7 +70,7 @@ class DashboardScreen extends ConsumerWidget {
                   b.status == BirthdayStatus.messageDrafted) {
                 actionNeededBirthdays.add(b);
               }
-            } else if (days > 7) {
+            } else if (days > 7 && days <= 30) {
               upcomingBirthdays.add(b);
             }
           }
@@ -213,7 +213,7 @@ class DashboardScreen extends ConsumerWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.8,
-                  color: Color(0xFFA64B2A),
+                  color: AppColors.primaryTerracotta,
                 ),
               ),
               Text(
@@ -228,23 +228,52 @@ class DashboardScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            todayCount > 0
-                ? '$todayCount ${todayCount == 1 ? 'Birthday' : 'Birthdays'} Today'
-                : 'All Celebrations On Track',
+            totalTracked == 0
+                ? "Let's add your first birthday"
+                : todayCount > 0
+                    ? '$todayCount ${todayCount == 1 ? 'Birthday' : 'Birthdays'} Today'
+                    : 'All Celebrations On Track',
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            actionNeededCount > 0
-                ? '$actionNeededCount greeting ${actionNeededCount == 1 ? 'requires' : 'require'} review before sending.'
-                : 'No urgent actions needed. Messages will be prepared ahead of upcoming dates.',
+            totalTracked == 0
+                ? 'Add friends and family so AI-Birthday can prepare personalized greetings right on time.'
+                : actionNeededCount > 0
+                    ? '$actionNeededCount greeting ${actionNeededCount == 1 ? 'requires' : 'require'} review before sending.'
+                    : 'No urgent actions needed. Messages will be prepared ahead of upcoming dates.',
             style: TextStyle(
               fontSize: 14,
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
+          if (totalTracked == 0) ...[
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    context.push('/people/add');
+                  },
+                  icon: const Icon(Icons.person_add, size: 16),
+                  label: const Text('Add Birthday'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    context.push('/people');
+                  },
+                  icon: const Icon(Icons.contacts_outlined, size: 16),
+                  label: const Text('Import Contacts'),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -321,10 +350,28 @@ class DashboardScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Flexible(
-                  child: Text(
-                    'Channel: ${person?.preferredDeliveryChannel.displayName ?? 'WhatsApp'}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Channel: ${person?.preferredDeliveryChannel.displayName ?? 'WhatsApp'}',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (person != null &&
+                          (person.phoneNumber == null ||
+                              person.phoneNumber!.trim().isEmpty)) ...[
+                        const SizedBox(height: 2),
+                        const Text(
+                          '⚠️ No phone number',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.accentAmber,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
@@ -333,8 +380,8 @@ class DashboardScreen extends ConsumerWidget {
                     HapticFeedback.lightImpact();
                     context.push('/message-studio/${birthday.id}');
                   },
-                  icon: const Icon(Icons.arrow_forward, size: 16),
-                  label: const Text('Review & Send'),
+                  icon: Icon(_actionButtonIcon(birthday.status), size: 16),
+                  label: Text(_actionButtonLabel(birthday.status, person)),
                 ),
               ],
             ),
@@ -342,6 +389,30 @@ class DashboardScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  IconData _actionButtonIcon(BirthdayStatus status) {
+    return switch (status) {
+      BirthdayStatus.messageNotPrepared => Icons.edit_note_rounded,
+      BirthdayStatus.messageDrafted => Icons.rate_review_outlined,
+      BirthdayStatus.messageReviewed ||
+      BirthdayStatus.readyForDelivery =>
+        Icons.send_rounded,
+      BirthdayStatus.handedOff => Icons.check_circle_outline,
+      _ => Icons.arrow_forward,
+    };
+  }
+
+  String _actionButtonLabel(BirthdayStatus status, Person? person) {
+    return switch (status) {
+      BirthdayStatus.messageNotPrepared => 'Draft Greeting',
+      BirthdayStatus.messageDrafted => 'Review Draft',
+      BirthdayStatus.messageReviewed ||
+      BirthdayStatus.readyForDelivery =>
+        'Send via ${person?.preferredDeliveryChannel.displayName ?? 'WhatsApp'}',
+      BirthdayStatus.handedOff => 'Confirm Sent',
+      _ => 'Review & Send',
+    };
   }
 
   Widget _buildCelebrationCard(
@@ -381,7 +452,7 @@ class DashboardScreen extends ConsumerWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.8,
-                color: Color(0xFFA64B2A),
+                color: AppColors.primaryTerracotta,
               ),
             ),
             const SizedBox(height: 12),

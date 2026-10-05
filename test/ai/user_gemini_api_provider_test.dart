@@ -26,6 +26,12 @@ class FakeCredentialStorage implements CredentialStorage {
   Future<void> saveGeminiApiKey(String apiKey) async {
     key = apiKey;
   }
+
+  @override
+  Future<bool> hasCompletedOnboarding() async => false;
+
+  @override
+  Future<void> setCompletedOnboarding(bool completed) async {}
 }
 
 void main() {
