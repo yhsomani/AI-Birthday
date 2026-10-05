@@ -368,7 +368,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final reminderSettings = ref.watch(reminderSettingsProvider);
-    final themeMode = ref.watch(themeModeProvider);
     final entitlement = ref.watch(entitlementProvider);
 
     return Scaffold(
@@ -910,36 +909,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Section 6: Display & Appearance
-          _SectionHeader(title: 'Appearance & Help'),
+          // Section 6: Help & Guide
+          _SectionHeader(title: 'Help & Guide'),
           Card(
-            child: Column(
-              children: [
-                SwitchListTile(
-                  secondary: const Icon(Icons.dark_mode_outlined),
-                  title: const Text('Dark Mode'),
-                  value: themeMode == ThemeMode.dark,
-                  onChanged: (val) {
-                    HapticFeedback.lightImpact();
-                    ref.read(themeModeProvider.notifier).state = val
-                        ? ThemeMode.dark
-                        : ThemeMode.light;
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.explore_outlined),
-                  title: const Text('Replay App Onboarding'),
-                  subtitle: const Text(
-                    'View the 5-step loop and feature guide',
-                  ),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    context.push('/onboarding');
-                  },
-                ),
-              ],
+            child: ListTile(
+              leading: const Icon(Icons.explore_outlined),
+              title: const Text('Replay App Onboarding'),
+              subtitle: const Text('View the 5-step loop and feature guide'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                context.push('/onboarding');
+              },
             ),
           ),
           const SizedBox(height: 24),

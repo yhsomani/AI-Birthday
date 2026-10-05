@@ -1,7 +1,6 @@
 /// Global Riverpod dependency injection and service providers (SSOT §3, §24, §28).
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ai_birthday/core/logging/app_logger.dart';
@@ -42,11 +41,6 @@ final credentialStorageProvider = Provider<CredentialStorage>((ref) {
   return SecureCredentialStorage(
     FlutterSecureStorageDriver(const FlutterSecureStorage(), logger),
   );
-});
-
-/// Theme Mode state provider.
-final themeModeProvider = StateProvider<ThemeMode>((ref) {
-  return ThemeMode.system;
 });
 
 /// Subscription Notifier managing entitlement through purchase & verification lifecycle (SSOT §11).

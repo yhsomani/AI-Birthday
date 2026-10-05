@@ -101,4 +101,16 @@ void main() {
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
   });
+
+  testWidgets(
+    'settings does not expose theme toggle and retains system theme policy',
+    (tester) async {
+      await pumpSettings(tester);
+
+      expect(find.text('Dark Mode'), findsNothing);
+      expect(find.byIcon(Icons.dark_mode_outlined), findsNothing);
+      expect(find.text('Help & Guide'), findsOneWidget);
+      expect(find.text('Replay App Onboarding'), findsOneWidget);
+    },
+  );
 }

@@ -4,7 +4,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/app/router.dart';
 import 'package:ai_birthday/app/theme/app_theme.dart';
 
@@ -13,7 +12,6 @@ class AiBirthdayApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(themeModeProvider);
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
@@ -22,7 +20,7 @@ class AiBirthdayApp extends ConsumerWidget {
       routerConfig: router,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: themeMode,
+      themeMode: ThemeMode.system,
     );
   }
 }

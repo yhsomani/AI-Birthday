@@ -68,6 +68,10 @@ void main() {
       // Verify app title in AppBar
       expect(find.text('AI-Birthday'), findsOneWidget);
 
+      // Verify system theme enforcement
+      final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
+      expect(materialApp.themeMode, ThemeMode.system);
+
       // Verify navigation destinations
       expect(find.text('Dashboard'), findsOneWidget);
       expect(find.text('People'), findsOneWidget);
