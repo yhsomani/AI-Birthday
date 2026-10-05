@@ -1,5 +1,5 @@
 /// Authoritative Settings screen for Account, Reminders, AI Credentials,
-/// Subscription Entitlement, and Appearance (SSOT §5, §11, §17, §20).
+/// Subscription Entitlement, and Help & Guide (SSOT §5, §11, §17, §20).
 library;
 
 import 'package:flutter/foundation.dart';
