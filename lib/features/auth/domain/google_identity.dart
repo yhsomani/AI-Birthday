@@ -7,6 +7,9 @@ class GoogleIdentity {
     required this.googleSubject,
     required this.email,
     required this.displayName,
+    this.photoUrl,
+    this.firebaseUid,
+    this.idToken,
   });
 
   /// Stable Google `sub` — the identifier used to scope the application
@@ -15,6 +18,9 @@ class GoogleIdentity {
 
   final String email;
   final String displayName;
+  final String? photoUrl;
+  final String? firebaseUid;
+  final String? idToken;
 }
 
 /// Result of a sign-in attempt.

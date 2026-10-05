@@ -21,6 +21,7 @@ import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/core/security/flutter_secure_storage_driver.dart';
 import 'package:ai_birthday/features/people/domain/repositories/people_repository.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
+import 'package:ai_birthday/features/sync/data/cloud_sync_service.dart';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ai_birthday/core/core_providers.dart';
@@ -54,6 +55,10 @@ final subscriptionNotifierProvider =
       final logger = ref.watch(loggerProvider);
       return SubscriptionNotifier(
         initial: UserEntitlement.free,
+        store: FlutterSecureStorageDriver(
+          const FlutterSecureStorage(),
+          logger,
+        ),
         logger: logger,
       );
     });
@@ -86,6 +91,21 @@ final contactCsvServiceProvider = Provider<ContactCsvService>((ref) {
 /// Device Contacts Service provider (SSOT §18, §25).
 final deviceContactsServiceProvider = Provider<DeviceContactsService>((ref) {
   return const DeviceContactsService();
+});
+
+/// Cloud Sync Service provider (SSOT §13).
+final cloudSyncServiceProvider = Provider<CloudSyncService>((ref) {
+  final db = ref.watch(databaseProvider);
+  final logger = ref.watch(loggerProvider);
+  final store = FlutterSecureStorageDriver(
+    const FlutterSecureStorage(),
+    logger,
+  );
+  return CloudSyncService(
+    db: db,
+    store: store,
+    logger: logger,
+  );
 });
 
 /// Gemini Nano Platform provider.

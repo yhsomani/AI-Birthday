@@ -17,6 +17,9 @@ abstract class GoogleAuthGateway {
 
   /// Signs the current Google/Firebase session out.
   Future<void> signOut();
+
+  /// Retrieves any previously persisted active session identity.
+  Future<GoogleIdentity?> getStoredIdentity();
 }
 
 /// Truthful adapter for builds without Firebase configured (the current host
@@ -36,4 +39,7 @@ class UnavailableGoogleAuthGateway implements GoogleAuthGateway {
 
   @override
   Future<void> signOut() async {}
+
+  @override
+  Future<GoogleIdentity?> getStoredIdentity() async => null;
 }

@@ -78,4 +78,23 @@ void main() {
       const AuthState(status: AuthStatus.signedOut),
     );
   });
+
+  test('restores persisted session on initial build', () async {
+    final gateway = FakeAuthGateway(
+      storedIdentity: const GoogleIdentity(
+        googleSubject: 'sub-persisted',
+        email: 'saved@example.com',
+        displayName: 'Saved User',
+      ),
+    );
+    final container = ProviderContainer(
+      overrides: [googleAuthGatewayProvider.overrideWithValue(gateway)],
+    );
+    addTearDown(container.dispose);
+
+    final state = await container.read(authControllerProvider.future);
+    expect(state.isSignedIn, isTrue);
+    expect(state.identity?.email, 'saved@example.com');
+    expect(state.identity?.displayName, 'Saved User');
+  });
 }

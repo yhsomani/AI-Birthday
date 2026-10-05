@@ -1,19 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../core/logging/app_logger.dart';
+import '../../../core/security/flutter_secure_storage_driver.dart';
+import '../data/live_google_auth_gateway.dart';
 import '../domain/auth_state.dart';
 import '../domain/google_identity.dart';
 import 'google_auth_gateway.dart';
 
-/// The application auth gateway. Defaults to the truthful unavailable adapter
-/// for the current host build; device builds override with the real
-/// Google/Firebase gateway (see `firebase/reference/FirebaseIdentityRuntime.kt`).
-final googleAuthGatewayProvider = Provider<GoogleAuthGateway>(
-  (ref) => const UnavailableGoogleAuthGateway(),
-);
+/// The application auth gateway. Defaults to [LiveGoogleAuthGateway] for
+/// device and production runtime; test environments override with test doubles.
+final googleAuthGatewayProvider = Provider<GoogleAuthGateway>((ref) {
+  return LiveGoogleAuthGateway(
+    store: const FlutterSecureStorageDriver(FlutterSecureStorage()),
+    logger: ConsoleAppLogger(),
+  );
+});
 
-/// Application auth state, mutated only through the gateway. build() awaits a
-/// real configuration report from the gateway — status is never invented.
+/// Application auth state, mutated only through the gateway. build() checks
+/// gateway configuration and restores any previously persisted session identity.
 class AuthController extends AsyncNotifier<AuthState> {
   AuthController({AppLogger? logger}) : _logger = logger ?? const NoopLogger();
 
@@ -25,7 +30,10 @@ class AuthController extends AsyncNotifier<AuthState> {
   Future<AuthState> build() async {
     final ok = await _gateway.isConfigured();
     if (!ok) return const AuthState(status: AuthStatus.unavailable);
-    // No persisted session in this phase; signing in is user-initiated.
+    final stored = await _gateway.getStoredIdentity();
+    if (stored != null) {
+      return AuthState(status: AuthStatus.signedIn, identity: stored);
+    }
     return const AuthState(status: AuthStatus.signedOut);
   }
 
@@ -47,6 +55,34 @@ class AuthController extends AsyncNotifier<AuthState> {
         state = const AsyncData(AuthState(status: AuthStatus.signedOut));
     }
     return outcome;
+  }
+
+  Future<SignInOutcome> signInWithEmail(String email, String password) async {
+    final gateway = _gateway;
+    if (gateway is LiveGoogleAuthGateway) {
+      final outcome = await gateway.signInWithEmail(email, password);
+      if (outcome is SignInSuccess) {
+        state = AsyncData(
+          AuthState(status: AuthStatus.signedIn, identity: outcome.identity),
+        );
+      }
+      return outcome;
+    }
+    return const SignInUnavailable(reason: 'Email sign-in not available');
+  }
+
+  Future<SignInOutcome> signUpWithEmail(String email, String password) async {
+    final gateway = _gateway;
+    if (gateway is LiveGoogleAuthGateway) {
+      final outcome = await gateway.signUpWithEmail(email, password);
+      if (outcome is SignInSuccess) {
+        state = AsyncData(
+          AuthState(status: AuthStatus.signedIn, identity: outcome.identity),
+        );
+      }
+      return outcome;
+    }
+    return const SignInUnavailable(reason: 'Email registration not available');
   }
 
   Future<void> signOut() async {

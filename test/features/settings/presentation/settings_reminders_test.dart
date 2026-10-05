@@ -64,7 +64,11 @@ void main() {
     await tester.tap(find.byType(SwitchListTile).first);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.textContaining('No delivery between'));
+    final quietFinder = find.textContaining('No delivery between');
+    await tester.ensureVisible(quietFinder);
+    await tester.pumpAndSettle();
+
+    await tester.tap(quietFinder);
     await tester.pumpAndSettle();
 
     // The time picker opens for the start bound first.

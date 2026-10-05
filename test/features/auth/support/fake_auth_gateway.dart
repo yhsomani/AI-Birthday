@@ -3,10 +3,11 @@ import 'package:ai_birthday/features/auth/domain/google_identity.dart';
 
 /// Test double only; the product ships the abstract gateway, never a fake.
 class FakeAuthGateway implements GoogleAuthGateway {
-  FakeAuthGateway({this.configured = true, this.outcome});
+  FakeAuthGateway({this.configured = true, this.outcome, this.storedIdentity});
 
   bool configured;
   SignInOutcome? outcome;
+  GoogleIdentity? storedIdentity;
   int signOutCalls = 0;
 
   static const identity = GoogleIdentity(
@@ -26,4 +27,7 @@ class FakeAuthGateway implements GoogleAuthGateway {
   Future<void> signOut() async {
     signOutCalls++;
   }
+
+  @override
+  Future<GoogleIdentity?> getStoredIdentity() async => storedIdentity;
 }

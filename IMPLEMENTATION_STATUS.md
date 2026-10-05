@@ -14,7 +14,7 @@
   - Unified AiRouter: Strict routing pipeline enforcing `entitlement → user Gemini key → Gemini Nano → unavailable`.
   - Message Studio: Dedicated creative workspace for AI drafting, tone/length variation, prompt policy guardrails, and draft persistence.
   - WhatsApp Delivery Handoff: Official `wa.me` Click-to-Chat URL generation via `url_launcher`, post-launch interactive confirmation modal, and dual-state celebration tracking (`handedOff` → `completed` / `confirmedSent`).
-- **Phases 8–10 — Reliability & QA:** COMPLETE. 117/117 Flutter tests passing, 6/6 domain suites passing, 0 analyzer issues.
+- **Phases 8–10 — Reliability & QA:** COMPLETE. 133/133 Flutter tests passing, 68/68 backend Vitest tests passing, 6/6 domain suites passing, 0 analyzer issues.
 
 ## Feature states
 
@@ -33,8 +33,10 @@
 | Person layer (validation, repository, service) | done | Validation, Drift operational store, soft delete and undo |
 | Calendar year view | done | Month grid, leap-day resolution, day sheet modal |
 | Reminders (scheduling & quiet hours) | done | 7/2/1/0 day leads, wrap-midnight quiet hours, settings UI |
-| Auth boundary (Google sign-in) | done | `GoogleAuthGateway` + `AuthController` + Settings Account wiring |
-| Subscription & entitlement lifecycle | done | Safe default to `free` tier; `purchaseProMonthly()` + `restorePurchases()`, dev sandbox testing |
+| Auth boundary (Live Google & Firebase Auth) | done | `LiveGoogleAuthGateway` + `AuthController` + `AuthBottomSheet` (Google & Email/Password REST) |
+| Subscription & entitlement lifecycle | done | In-App Purchase integration (`in_app_purchase`) for `ai_birthday_pro_monthly`, `purchaseProMonthly()` + `restorePurchases()` |
+| Live Contact Sync | done | Android Content Provider via `flutter_contacts` with runtime permission flow and multi-contact import |
+| Cloud Sync (Firestore REST) | done | `CloudSyncService` syncs Drift birthdays to/from Firestore `users/{uid}/birthdays` |
 | User Gemini API Provider | done | Secure storage in keystore/keychain, zero PII logging |
 | Gemini Nano Provider & Platform Graph | done | Fully wired into Riverpod dependency graph with live AICore status reporting in Settings |
 | Unified AiRouter | done | Enforces entitlement check, credential fallback, Nano integration, typed failure modes |
@@ -44,7 +46,8 @@
 ## Test status
 
 - `flutter analyze`: **0 issues** (clean).
-- `flutter test`: **117/117 passing** (100% pass rate).
+- `flutter test`: **133/133 passing** (100% pass rate).
+- `backend/functions npm test`: **68/68 passing** (100% pass rate).
 - `dart run test/run_all_domain_tests.dart`: **6/6 test suites passing cleanly**.
 
 ## Architectural Audit Resolutions

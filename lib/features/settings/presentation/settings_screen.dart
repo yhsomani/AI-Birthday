@@ -6,11 +6,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/core/platform/gemini_nano_platform.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 import 'package:ai_birthday/features/auth/domain/auth_state.dart';
+import 'package:ai_birthday/features/auth/presentation/auth_bottom_sheet.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_providers.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
 import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
@@ -29,6 +31,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _hasKey = false;
   bool _obscureKey = true;
   bool _isPurchasing = false;
+  bool _isSyncing = false;
+  DateTime? _lastSyncTime;
   NanoState _nanoState = NanoState.unavailable;
 
   @override
@@ -36,6 +40,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     super.initState();
     _checkStoredKey();
     _checkNanoState();
+    _loadLastSyncTime();
   }
 
   @override
@@ -67,6 +72,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         setState(() => _nanoState = state);
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadLastSyncTime() async {
+    try {
+      final syncService = ref.read(cloudSyncServiceProvider);
+      final time = await syncService.getLastSyncTime();
+      if (mounted) {
+        setState(() => _lastSyncTime = time);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _handleCloudSync() async {
+    HapticFeedback.lightImpact();
+    final auth = ref.read(authControllerProvider).valueOrNull;
+    if (auth == null || !auth.isSignedIn) {
+      AuthBottomSheet.show(context);
+      return;
+    }
+
+    setState(() => _isSyncing = true);
+    final syncService = ref.read(cloudSyncServiceProvider);
+    final result = await syncService.sync(auth);
+    if (!mounted) return;
+    setState(() {
+      _isSyncing = false;
+      if (result.success) {
+        _lastSyncTime = result.timestamp;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.success
+              ? 'Cloud sync complete! ${result.uploadedCount} birthdays backed up.'
+              : 'Sync failed: ${result.error ?? 'Unknown error'}',
+        ),
+      ),
+    );
   }
 
   Future<void> _saveKey() async {
@@ -187,6 +232,78 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // Section 1: Account
           _SectionHeader(title: 'Account'),
           Card(child: const _AuthTile()),
+          const SizedBox(height: 20),
+
+          // Section 1.5: Cloud Backup & Sync (SSOT §13)
+          _SectionHeader(title: 'Cloud Backup & Sync'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.cloud_sync_outlined,
+                        color: Color(0xFF2D5A46),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Cloud Sync (Firestore)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_lastSyncTime != null)
+                        Chip(
+                          label: const Text(
+                            'SYNCED',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2D5A46),
+                            ),
+                          ),
+                          backgroundColor: const Color(
+                            0xFF2D5A46,
+                          ).withValues(alpha: 0.12),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _lastSyncTime != null
+                        ? 'Last backed up to cloud: ${DateFormat.yMMMd().add_jm().format(_lastSyncTime!)}'
+                        : 'Securely sync your birthdays and greetings to Google Cloud Firestore so you never lose them.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: _isSyncing ? null : _handleCloudSync,
+                        icon: _isSyncing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.sync, size: 18),
+                        label: Text(_isSyncing ? 'Syncing...' : 'Sync Now'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
 
           // Section 2: Subscription & Entitlement (SSOT §11)
@@ -605,19 +722,50 @@ class _AuthTile extends ConsumerWidget {
           title: Text('Sign in with Google'),
         ),
         AuthStatus.signedOut => ListTile(
-          leading: const Icon(Icons.login),
+          leading: const Icon(Icons.login, color: Color(0xFFA64B2A)),
           title: const Text('Sign in with Google'),
           subtitle: const Text('Sync, backups and delivery'),
+          trailing: FilledButton.tonal(
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              AuthBottomSheet.show(context);
+            },
+            child: const Text('Sign in'),
+          ),
           onTap: () {
             HapticFeedback.lightImpact();
             ref.read(authControllerProvider.notifier).signIn();
           },
         ),
         AuthStatus.signedIn => ListTile(
-          leading: const Icon(Icons.account_circle_outlined),
-          title: Text(state.identity?.displayName ?? 'Signed in'),
+          leading: CircleAvatar(
+            backgroundColor: const Color(
+              0xFF2D5A46,
+            ).withValues(alpha: 0.15),
+            foregroundColor: const Color(0xFF2D5A46),
+            backgroundImage: state.identity?.photoUrl != null
+                ? NetworkImage(state.identity!.photoUrl!)
+                : null,
+            child: state.identity?.photoUrl == null
+                ? Text(
+                    (state.identity?.displayName.isNotEmpty == true
+                            ? state.identity!.displayName[0]
+                            : state.identity?.email.isNotEmpty == true
+                            ? state.identity!.email[0]
+                            : 'U')
+                        .toUpperCase(),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  )
+                : null,
+          ),
+          title: Text(
+            state.identity?.displayName.isNotEmpty == true
+                ? state.identity!.displayName
+                : 'Signed in',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           subtitle: Text(state.identity?.email ?? ''),
-          trailing: TextButton(
+          trailing: OutlinedButton(
             onPressed: () {
               HapticFeedback.lightImpact();
               ref.read(authControllerProvider.notifier).signOut();
@@ -625,11 +773,15 @@ class _AuthTile extends ConsumerWidget {
             child: const Text('Sign out'),
           ),
         ),
-        AuthStatus.unavailable => const ListTile(
-          leading: Icon(Icons.login),
-          title: Text('Sign in with Google'),
-          subtitle: Text('Available on device'),
+        AuthStatus.unavailable => ListTile(
+          leading: const Icon(Icons.login),
+          title: const Text('Sign in with Google'),
+          subtitle: const Text('Available on device'),
           enabled: false,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            AuthBottomSheet.show(context);
+          },
         ),
       },
     );
