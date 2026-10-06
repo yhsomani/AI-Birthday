@@ -27,7 +27,7 @@ abstract class NotificationSchedulerGateway {
   Future<bool> cancelAll();
 
   /// Send an immediate test notification to verify delivery (QA & user testing).
-  Future<void> sendTestNotification({
+  Future<bool> sendTestNotification({
     required String title,
     required String body,
   }) async {}
