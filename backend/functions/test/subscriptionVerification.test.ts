@@ -118,6 +118,7 @@ describe('Subscription Verification Service', () => {
     expect(result.expiryDateMs).toBeGreaterThan(Date.now());
     expect(savedData.status).toBe('active');
     expect(savedData.canUseAi).toBe(true);
+    expect(savedData.isAutoRenewing).toBe(true);
   });
 
   it('does not grant entitlement for expired subscriptions', async () => {
