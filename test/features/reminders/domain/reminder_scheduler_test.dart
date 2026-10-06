@@ -50,6 +50,25 @@ void main() {
     expect(byKind[ReminderKind.birthday]!.at, DateTime(2026, 3, 20, 9));
   });
 
+  test('skips lead reminders that have already passed', () {
+    const scheduler = ReminderScheduler();
+    final plan = scheduler.plan(
+      people: [person(month: 3, day: 20)],
+      reference: DateTime.utc(2026, 3, 18, 8),
+      enabled: ReminderKind.values.toSet(),
+    );
+
+    expect(plan.active.map((t) => t.kind), [
+      ReminderKind.ready,
+      ReminderKind.birthday,
+    ]);
+    expect(
+      plan.active.every((trigger) => trigger.at.isAfter(plan.active.first.at)),
+      isFalse,
+      reason: 'Triggers should not be manufactured for passed lead dates.',
+    );
+  });
+
   test('plans only the enabled leads', () {
     const scheduler = ReminderScheduler();
     final plan = scheduler.plan(
