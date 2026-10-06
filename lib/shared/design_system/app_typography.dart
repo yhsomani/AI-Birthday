@@ -5,14 +5,14 @@ import 'app_colors.dart';
 
 /// Centralized editorial typography scale for AI-Birthday (SSOT §3, §22).
 ///
-/// Pairs a warm editorial serif (Playfair Display) for headlines with a readable,
-/// humanistic sans-serif (Nunito) for body and UI elements.
+/// Pairs a warm editorial sans-serif (Outfit) for headlines with a readable,
+/// humanistic sans-sans-serif (Nunito) for body and UI elements.
 class AppTypography {
   const AppTypography._();
 
   static TextStyle headlineXl({Color? color}) {
     try {
-      return GoogleFonts.playfairDisplay(
+      return GoogleFonts.outfit(
         fontSize: 32,
         fontWeight: FontWeight.w700,
         height: 1.25,
@@ -21,7 +21,7 @@ class AppTypography {
       );
     } catch (_) {
       return TextStyle(
-        fontFamily: 'serif',
+        fontFamily: 'sans-serif',
         fontSize: 32,
         fontWeight: FontWeight.w700,
         height: 1.25,
@@ -33,7 +33,7 @@ class AppTypography {
 
   static TextStyle headlineLg({Color? color}) {
     try {
-      return GoogleFonts.playfairDisplay(
+      return GoogleFonts.outfit(
         fontSize: 24,
         fontWeight: FontWeight.w700,
         height: 1.33,
@@ -42,7 +42,7 @@ class AppTypography {
       );
     } catch (_) {
       return TextStyle(
-        fontFamily: 'serif',
+        fontFamily: 'sans-serif',
         fontSize: 24,
         fontWeight: FontWeight.w700,
         height: 1.33,
@@ -54,7 +54,7 @@ class AppTypography {
 
   static TextStyle headlineMd({Color? color}) {
     try {
-      return GoogleFonts.playfairDisplay(
+      return GoogleFonts.outfit(
         fontSize: 20,
         fontWeight: FontWeight.w600,
         height: 1.4,
@@ -63,7 +63,7 @@ class AppTypography {
       );
     } catch (_) {
       return TextStyle(
-        fontFamily: 'serif',
+        fontFamily: 'sans-serif',
         fontSize: 20,
         fontWeight: FontWeight.w600,
         height: 1.4,
@@ -155,7 +155,7 @@ class AppTypography {
     Color? color,
   }) {
     try {
-      return GoogleFonts.nunito(
+      return GoogleFonts.outfit(
         fontSize: fontSize,
         fontWeight: fontWeight,
         height: height,
