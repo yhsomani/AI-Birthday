@@ -2,106 +2,181 @@ import type { DocumentReference, Firestore } from 'firebase-admin/firestore';
 import { describe, expect, it } from 'vitest';
 
 import {
+  GooglePlayApiError,
+  type GooglePlaySubscriptionSnapshot,
+} from '../src/services/googlePlaySubscriptionClient.js';
+import {
   EXPECTED_PACKAGE_NAME,
   PRO_PRODUCT_ID,
   SubscriptionVerificationService,
+  type GooglePlaySubscriptionVerifier,
 } from '../src/services/subscriptionVerification.js';
 import { verifyPurchaseSchema } from '../src/transport/schemas.js';
 
+const ACCOUNT_BINDING = 'acct-binding-test-123456';
+
+function mockDb(
+  sink: (data: Record<string, unknown>) => void,
+): Firestore {
+  return {
+    doc: (_path: string) =>
+      ({
+        set: (data: Record<string, unknown>): Promise<void> => {
+          sink(data);
+          return Promise.resolve();
+        },
+      }) as unknown as DocumentReference,
+  } as unknown as Firestore;
+}
+
+function verifier(
+  snapshot: GooglePlaySubscriptionSnapshot,
+): GooglePlaySubscriptionVerifier {
+  return {
+    getSubscription: async () => snapshot,
+  };
+}
+
+const activeSnapshot = (): GooglePlaySubscriptionSnapshot => ({
+  subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+  acknowledgementState: 'ACKNOWLEDGEMENT_STATE_PENDING',
+  obfuscatedExternalAccountId: ACCOUNT_BINDING,
+  lineItems: [
+    {
+      productId: PRO_PRODUCT_ID,
+      expiryTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  ],
+});
+
 describe('Subscription Verification Service', () => {
-  it('validates correct request schema', () => {
+  it('validates the complete request schema', () => {
     const valid = {
       contractVersion: 1,
-      purchaseToken: 'valid_token_123',
+      purchaseToken: 'play_token_valid',
       productId: PRO_PRODUCT_ID,
       packageName: EXPECTED_PACKAGE_NAME,
+      accountBinding: ACCOUNT_BINDING,
     };
+
     expect(verifyPurchaseSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('rejects unexpected package or missing contract version', () => {
+  it('rejects requests that omit the account binding', () => {
     expect(
       verifyPurchaseSchema.safeParse({
-        contractVersion: 2,
-        purchaseToken: 'token',
+        contractVersion: 1,
+        purchaseToken: 'play_token',
         productId: PRO_PRODUCT_ID,
         packageName: EXPECTED_PACKAGE_NAME,
       }).success,
     ).toBe(false);
-
-    expect(
-      verifyPurchaseSchema.safeParse({
-        contractVersion: 1,
-        purchaseToken: 'token',
-        productId: PRO_PRODUCT_ID,
-        packageName: 'com.other.app',
-      }).success,
-    ).toBe(true);
   });
 
-  it('verifies purchase token and sets active entitlement in Firestore', async () => {
-    let savedPath = '';
+  it('grants entitlement only for an active Play subscription bound to the account', async () => {
     let savedData: Record<string, unknown> = {};
+    const service = new SubscriptionVerificationService(
+      mockDb(data => {
+        savedData = data;
+      }),
+      verifier(activeSnapshot()),
+    );
 
-    const mockDb = {
-      doc: (path: string) =>
-        ({
-          set: (data: Record<string, unknown>): Promise<void> => {
-            savedPath = path;
-            savedData = data;
-            return Promise.resolve();
-          },
-        }) as unknown as DocumentReference,
-    } as unknown as Firestore;
-
-    const service = new SubscriptionVerificationService(mockDb);
     const result = await service.verifyPurchase('user-abc', {
       contractVersion: 1,
       purchaseToken: 'play_token_valid',
       productId: PRO_PRODUCT_ID,
       packageName: EXPECTED_PACKAGE_NAME,
+      accountBinding: ACCOUNT_BINDING,
     });
 
     expect(result.status).toBe('active');
     expect(result.canUseAi).toBe(true);
     expect(result.productId).toBe(PRO_PRODUCT_ID);
     expect(result.expiryDateMs).toBeGreaterThan(Date.now());
-
-    expect(savedPath).toBe('users/user-abc/entitlement/status');
     expect(savedData.status).toBe('active');
     expect(savedData.canUseAi).toBe(true);
   });
 
-  it('rejects invalid purchase tokens by setting status to none', async () => {
-    let savedData: Record<string, unknown> = {};
+  it('does not grant entitlement for expired subscriptions', async () => {
+    const snapshot: GooglePlaySubscriptionSnapshot = {
+      ...activeSnapshot(),
+      subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED',
+      lineItems: [
+        {
+          productId: PRO_PRODUCT_ID,
+          expiryTime: new Date(Date.now() - 60_000).toISOString(),
+        },
+      ],
+    };
 
-    const mockDb = {
-      doc: () =>
-        ({
-          set: (data: Record<string, unknown>): Promise<void> => {
-            savedData = data;
-            return Promise.resolve();
-          },
-        }) as unknown as DocumentReference,
-    } as unknown as Firestore;
-
-    const service = new SubscriptionVerificationService(mockDb);
-    const result = await service.verifyPurchase('user-abc', {
+    const result = await new SubscriptionVerificationService(
+      mockDb(() => {}),
+      verifier(snapshot),
+    ).verifyPurchase('user-abc', {
       contractVersion: 1,
-      purchaseToken: 'invalid_token_test',
+      purchaseToken: 'expired_token',
       productId: PRO_PRODUCT_ID,
       packageName: EXPECTED_PACKAGE_NAME,
+      accountBinding: ACCOUNT_BINDING,
+    });
+
+    expect(result.status).toBe('expired');
+    expect(result.canUseAi).toBe(false);
+  });
+
+  it('rejects a purchase bound to a different app account', async () => {
+    const service = new SubscriptionVerificationService(
+      mockDb(() => {}),
+      verifier({
+        ...activeSnapshot(),
+        obfuscatedExternalAccountId: 'different-account',
+      }),
+    );
+
+    await expect(
+      service.verifyPurchase('user-abc', {
+        contractVersion: 1,
+        purchaseToken: 'play_token',
+        productId: PRO_PRODUCT_ID,
+        packageName: EXPECTED_PACKAGE_NAME,
+        accountBinding: ACCOUNT_BINDING,
+      }),
+    ).rejects.toThrow('PURCHASE_ACCOUNT_MISMATCH');
+  });
+
+  it('marks invalid Play tokens as unentitled', async () => {
+    const result = await new SubscriptionVerificationService(
+      mockDb(() => {}),
+      {
+        getSubscription: async () => {
+          throw new GooglePlayApiError(
+            'GOOGLE_PLAY_SUBSCRIPTION_LOOKUP_FAILED',
+            404,
+          );
+        },
+      },
+    ).verifyPurchase('user-abc', {
+      contractVersion: 1,
+      purchaseToken: 'not-a-real-token',
+      productId: PRO_PRODUCT_ID,
+      packageName: EXPECTED_PACKAGE_NAME,
+      accountBinding: ACCOUNT_BINDING,
     });
 
     expect(result.status).toBe('none');
     expect(result.canUseAi).toBe(false);
-    expect(savedData.status).toBe('none');
-    expect(savedData.canUseAi).toBe(false);
   });
 
-  it('throws PACKAGE_MISMATCH when package name differs', async () => {
-    const mockDb = {} as unknown as Firestore;
-    const service = new SubscriptionVerificationService(mockDb);
+  it('throws PACKAGE_MISMATCH before contacting Google Play', async () => {
+    const service = new SubscriptionVerificationService(
+      mockDb(() => {}),
+      {
+        getSubscription: async () => {
+          throw new Error('should not be called');
+        },
+      },
+    );
 
     await expect(
       service.verifyPurchase('user-abc', {
@@ -109,6 +184,7 @@ describe('Subscription Verification Service', () => {
         purchaseToken: 'play_token',
         productId: PRO_PRODUCT_ID,
         packageName: 'com.wrong.pkg',
+        accountBinding: ACCOUNT_BINDING,
       }),
     ).rejects.toThrow('PACKAGE_MISMATCH');
   });
