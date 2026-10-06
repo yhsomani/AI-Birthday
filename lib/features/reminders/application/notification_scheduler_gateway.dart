@@ -21,10 +21,10 @@ abstract class NotificationSchedulerGateway {
   Future<bool> requestPermission();
 
   /// Replace outstanding reminders with [plan]'s active triggers.
-  Future<void> apply(ReminderPlan plan);
+  Future<bool> apply(ReminderPlan plan);
 
   /// Clear all scheduled reminders.
-  Future<void> cancelAll();
+  Future<bool> cancelAll();
 
   /// Send an immediate test notification to verify delivery (QA & user testing).
   Future<void> sendTestNotification({
