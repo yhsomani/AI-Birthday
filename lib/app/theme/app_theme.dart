@@ -50,9 +50,11 @@ class AppTheme {
           letterSpacing: -0.5,
         );
 
-    final baseTextTheme = (isDark ? ThemeData.dark() : ThemeData.light())
-        .textTheme;
-    final textTheme = baseTextTheme.apply(fontFamily: bodyFont).copyWith(
+    final baseTextTheme =
+        (isDark ? ThemeData.dark() : ThemeData.light()).textTheme;
+    final textTheme = baseTextTheme
+        .apply(fontFamily: bodyFont)
+        .copyWith(
           displayLarge: display(baseTextTheme.displayLarge),
           displayMedium: display(baseTextTheme.displayMedium),
           displaySmall: display(baseTextTheme.displaySmall),

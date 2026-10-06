@@ -1,0 +1,6 @@
+# Test configuration for AI-Birthday.
+tags:
+  # Golden tests are a LOCAL-ONLY gate (deviation agreed in the redesign plan):
+  # CI runs `flutter test --coverage --exclude-tags golden`.
+  # Regenerate with `flutter test --update-goldens test/ui/goldens`.
+  golden:

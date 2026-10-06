@@ -71,6 +71,29 @@ void main() {
         expectPass('accent on surface', p.accent, p.surface, 3.0);
         expectPass('info on surface', p.info, p.surface, 3.0);
       });
+
+      test('tone accents on surfaceAlt ≥ 3:1', () {
+        // Icons/banner accents: non-text but meaningful (WCAG 1.4.11).
+        for (final tone in AppTone.values) {
+          expectPass(
+            '${tone.name} ink on surfaceAlt',
+            tone.ink(p),
+            p.surfaceAlt,
+            3.0,
+          );
+        }
+      });
+
+      test('info as chip label on surfaceAlt ≥ 4.5:1', () {
+        // AppTone.info is the only tone whose label sits on surfaceAlt as text
+        // (others' label/fill pairs are covered by the tests above).
+        expectPass(
+          'info label on fill',
+          AppTone.info.label(p),
+          AppTone.info.fill(p),
+          4.5,
+        );
+      });
     });
   }
 }

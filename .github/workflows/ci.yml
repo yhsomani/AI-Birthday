@@ -36,7 +36,9 @@ jobs:
         run: flutter analyze
 
       - name: Run Flutter Test Suite
-        run: flutter test --coverage
+        # Golden tests are a local-only gate (tagged `golden`); regenerate with
+        # `flutter test --update-goldens test/ui/goldens` and review the PNGs.
+        run: flutter test --coverage --exclude-tags golden
 
       - name: Build Android Release APK (unsigned CI artifact)
         env:
