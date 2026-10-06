@@ -852,10 +852,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .errorContainer
-                          .withValues(alpha: 0.55),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.errorContainer.withValues(alpha: 0.55),
                       borderRadius: AppSpacing.roundedMd,
                     ),
                     child: Row(
@@ -870,7 +869,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           child: Text(
                             reminderSettings.syncError!,
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onErrorContainer,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onErrorContainer,
                             ),
                           ),
                         ),
