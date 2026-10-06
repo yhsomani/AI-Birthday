@@ -1,4 +1,9 @@
-import type { DocumentReference, Firestore } from 'firebase-admin/firestore';
+import type {
+  DocumentReference,
+  DocumentSnapshot,
+  Firestore,
+} from 'firebase-admin/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -16,17 +21,34 @@ import { verifyPurchaseSchema } from '../src/transport/schemas.js';
 const ACCOUNT_BINDING = 'acct-binding-test-123456';
 
 function mockDb(
-  sink: (data: Record<string, unknown>) => void,
+  sink: (path: string, data: Record<string, unknown>) => void,
+  owners: Map<string, string> = new Map(),
 ): Firestore {
-  return {
-    doc: (_path: string) =>
-      ({
-        set: (data: Record<string, unknown>): Promise<void> => {
-          sink(data);
-          return Promise.resolve();
-        },
-      }) as unknown as DocumentReference,
-  } as unknown as Firestore;
+  const doc = (path: string) =>
+    ({
+      set: (data: Record<string, unknown>): Promise<void> => {
+        sink(path, data);
+        return Promise.resolve();
+      },
+      create: (data: Record<string, unknown>): Promise<void> => {
+        if (owners.has(path)) {
+          return Promise.reject(
+            Object.assign(new Error('ALREADY_EXISTS'), { code: 6 }),
+          );
+        }
+        owners.set(path, String(data.uid));
+        return Promise.resolve();
+      },
+      get: async (): Promise<DocumentSnapshot> => {
+        const uid = owners.get(path);
+        return {
+          exists: uid !== undefined,
+          data: () => (uid === undefined ? undefined : { uid }),
+        } as unknown as DocumentSnapshot;
+      },
+    }) as unknown as DocumentReference;
+
+  return { doc } as unknown as Firestore;
 }
 
 function verifier(
@@ -40,7 +62,7 @@ function verifier(
 const activeSnapshot = (): GooglePlaySubscriptionSnapshot => ({
   subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
   acknowledgementState: 'ACKNOWLEDGEMENT_STATE_PENDING',
-  obfuscatedExternalAccountId: ACCOUNT_BINDING,
+  obfuscatedExternalAccountId: null,
   lineItems: [
     {
       productId: PRO_PRODUCT_ID,
@@ -73,12 +95,13 @@ describe('Subscription Verification Service', () => {
     ).toBe(false);
   });
 
-  it('grants entitlement only for an active Play subscription bound to the account', async () => {
+  it('grants entitlement only for a verified active Play subscription', async () => {
     let savedData: Record<string, unknown> = {};
+    const owners = new Map<string, string>();
     const service = new SubscriptionVerificationService(
-      mockDb(data => {
+      mockDb((_, data) => {
         savedData = data;
-      }),
+      }, owners),
       verifier(activeSnapshot()),
     );
 
@@ -125,19 +148,31 @@ describe('Subscription Verification Service', () => {
     expect(result.canUseAi).toBe(false);
   });
 
-  it('rejects a purchase bound to a different app account', async () => {
-    const service = new SubscriptionVerificationService(
-      mockDb(() => {}),
-      verifier({
-        ...activeSnapshot(),
-        obfuscatedExternalAccountId: 'different-account',
-      }),
+  it('binds a verified purchase token to the first authenticated account', async () => {
+    const owners = new Map<string, string>();
+    const db = mockDb(() => {}, owners);
+
+    const firstUser = new SubscriptionVerificationService(
+      db,
+      verifier(activeSnapshot()),
+    );
+    await firstUser.verifyPurchase('user-one', {
+      contractVersion: 1,
+      purchaseToken: 'shared-token',
+      productId: PRO_PRODUCT_ID,
+      packageName: EXPECTED_PACKAGE_NAME,
+      accountBinding: ACCOUNT_BINDING,
+    });
+
+    const secondUser = new SubscriptionVerificationService(
+      db,
+      verifier(activeSnapshot()),
     );
 
     await expect(
-      service.verifyPurchase('user-abc', {
+      secondUser.verifyPurchase('user-two', {
         contractVersion: 1,
-        purchaseToken: 'play_token',
+        purchaseToken: 'shared-token',
         productId: PRO_PRODUCT_ID,
         packageName: EXPECTED_PACKAGE_NAME,
         accountBinding: ACCOUNT_BINDING,
