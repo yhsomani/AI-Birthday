@@ -29,7 +29,12 @@ jobs:
       - name: Install Flutter Dependencies
         run: flutter pub get
 
-      - name: Probe Reminder & Backup Format\n        run: |\n          dart format --output=show test/features/reminders/domain/reminder_scheduler_test.dart\n          dart format --output=show test/features/sync/data/cloud_sync_service_test.dart\n\n      - name: Verify Formatting
+      - name: Probe Reminder & Backup Format
+        run: |
+          dart format --output=show test/features/reminders/domain/reminder_scheduler_test.dart
+          dart format --output=show test/features/sync/data/cloud_sync_service_test.dart
+
+      - name: Verify Formatting
         run: dart format --output=none --set-exit-if-changed .
 
       - name: Static Analysis
