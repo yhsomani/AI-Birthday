@@ -30,13 +30,15 @@ class RecordingGateway implements NotificationSchedulerGateway {
   Future<bool> requestExactAlarmPermission() async => granted;
 
   @override
-  Future<void> apply(ReminderPlan plan) async {
+  Future<bool> apply(ReminderPlan plan) async {
     applied.add(plan);
+    return true;
   }
 
   @override
-  Future<void> cancelAll() async {
+  Future<bool> cancelAll() async {
     cancelAllCalls++;
+    return true;
   }
 
   @override
