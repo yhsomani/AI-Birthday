@@ -193,4 +193,78 @@ void main() {
       },
     );
   });
+
+    test('restore preserves existing local reminder preferences', () async {
+      await db
+          .into(db.reminderSettingsEntries)
+          .insert(
+            ReminderSettingsEntriesCompanion.insert(
+              key: 'default',
+              enabled: true,
+              kinds: 'birthday',
+              quietHoursStartMinutes: 120,
+              quietHoursEndMinutes: 360,
+            ),
+          );
+
+      final mockClient = MockClient((request) async {
+        expect(request.method, 'GET');
+        if (request.url.path.endsWith('/people') ||
+            request.url.path.endsWith('/birthdays') ||
+            request.url.path.endsWith('/drafts')) {
+          return http.Response(jsonEncode({'documents': []}), 200);
+        }
+        if (request.url.path.endsWith('/reminderSettings')) {
+          return http.Response(
+            jsonEncode({
+              'documents': [
+                {
+                  'name':
+                      'projects/test/databases/(default)/documents/users/uid-test/reminderSettings/default',
+                  'fields': {
+                    'key': {'stringValue': 'default'},
+                    'enabled': {'booleanValue': false},
+                    'kinds': {'stringValue': 'prepare'},
+                    'quietHoursStartMinutes': {'integerValue': '900'},
+                    'quietHoursEndMinutes': {'integerValue': '1020'},
+                  },
+                },
+              ],
+            }),
+            200,
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final service = CloudSyncService(
+        db: db,
+        store: store,
+        httpClient: mockClient,
+      );
+
+      final auth = const AuthState(
+        status: AuthStatus.signedIn,
+        identity: GoogleIdentity(
+          googleSubject: 'sub-test',
+          email: 'user@example.com',
+          displayName: 'User',
+          firebaseUid: 'uid-test',
+          idToken: 'test-id-token',
+        ),
+      );
+
+      final result = await service.restore(auth);
+      expect(result.success, isTrue);
+      expect(result.downloadedCount, 0);
+
+      final local = await (db.select(
+        db.reminderSettingsEntries,
+      )..where((row) => row.key.equals('default'))).getSingle();
+      expect(local.enabled, isTrue);
+      expect(local.kinds, 'birthday');
+      expect(local.quietHoursStartMinutes, 120);
+      expect(local.quietHoursEndMinutes, 360);
+    });
+
 }
