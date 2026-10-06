@@ -209,7 +209,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Message drafted with AI ✨')),
+          const SnackBar(content: Text('Message drafted with AI.')),
         );
       }
     } on AppFailure catch (e) {
@@ -585,7 +585,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Variation applied! ✨')));
+          ).showSnackBar(const SnackBar(content: Text('Variation applied.')));
         }
       }
     } catch (e) {
@@ -708,7 +708,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                   context.pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Celebration confirmed as sent! 🎉'),
+                      content: Text('Message marked as sent.'),
                     ),
                   );
                 }
@@ -727,7 +727,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       Clipboard.setData(ClipboardData(text: text));
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Copied to clipboard 📋')));
+      ).showSnackBar(const SnackBar(content: Text('Copied to clipboard.')));
     }
   }
 
@@ -767,7 +767,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           _buildRecipientCard(),
           const SizedBox(height: AppSpacing.md),
 
-          // Tone & Length Controls
+          const AppSectionHeader(title: 'Personalize'),
           _buildControlsCard(),
           const SizedBox(height: AppSpacing.md),
 
@@ -1000,8 +1000,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             TextField(
               controller: _customInstructionController,
               decoration: const InputDecoration(
-                hintText:
-                    'Optional tweak (e.g. "rhyme", "mention weekend party")',
+                hintText: 'Add a detail or writing preference (optional)',
                 isDense: true,
               ),
             ),
@@ -1051,7 +1050,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         ),
         const SizedBox(height: 2),
         Text(
-          'Review and edit this before sending.',
+          'Make it yours before you send it.',
           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         ),
         const SizedBox(height: 8),
