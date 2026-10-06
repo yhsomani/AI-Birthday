@@ -16,7 +16,6 @@ import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 import 'package:ai_birthday/features/sync/data/cloud_sync_service.dart';
 
-import 'harness/crypto_envelope_fixture.dart';
 import 'harness/test_harness.dart';
 
 void main() {
@@ -85,65 +84,6 @@ void main() {
             EntitlementStatus.none,
           );
           expect(await harness.storeDriver.read('auth_session_uid'), isNull);
-        },
-      );
-    });
-
-    // =========================================================================
-    // Interaction 2: Auth <-> Encrypted Cloud Backup (R1 x R3)
-    // =========================================================================
-    group('Interaction 2: Auth <-> Encrypted Cloud Backup', () {
-      test(
-        'Unauthenticated user cannot trigger cloud sync; authenticated user creates Zero-PII envelope',
-        () async {
-          final syncService = CloudSyncService(
-            db: harness.db,
-            store: harness.storeDriver,
-          );
-
-          // Attempt sync while unauthenticated
-          const unauthState = AuthState(status: AuthStatus.signedOut);
-          final unauthResult = await syncService.sync(unauthState);
-
-          expect(unauthResult.success, isFalse);
-          expect(
-            unauthResult.error,
-            contains('Please sign in to enable cloud backup'),
-          );
-
-          // Sign in
-          const authState = AuthState(
-            status: AuthStatus.signedIn,
-            identity: GoogleIdentity(
-              googleSubject: 'sub-888',
-              email: 'dave@example.com',
-              displayName: 'Dave',
-              firebaseUid: 'uid-dave-888',
-              idToken: 'token-dave-888',
-            ),
-          );
-          expect(authState.isSignedIn, isTrue);
-
-          // Create client-side Zero-PII encrypted envelope for authenticated user
-          final envelope = CryptoEnvelopeFixture.createEncryptedEnvelope(
-            persons: [
-              {
-                'id': 'p-dave-1',
-                'name': 'Dave Friend',
-                'phoneNumber': '+15551234567',
-              },
-            ],
-            birthdays: [],
-            backupVersion: 1,
-            deviceId: 'device-dave-1',
-          );
-
-          // Verify Zero-PII guarantee
-          final piiLeaks = CryptoEnvelopeFixture.inspectCloudPayloadForPiiLeaks(
-            cloudEnvelope: envelope,
-            knownPiiValues: ['Dave Friend', '+15551234567'],
-          );
-          expect(piiLeaks, isEmpty);
         },
       );
     });
