@@ -73,8 +73,8 @@ class AndroidNotificationSchedulerGateway
   }
 
   @override
-  Future<void> apply(ReminderPlan plan) async {
-    if (!_isLiveAndroid) return;
+  Future<bool> apply(ReminderPlan plan) async {
+    if (!_isLiveAndroid) return true;
     try {
       final triggers = plan.active.map((t) {
         final whenText = switch (t.kind) {
@@ -96,19 +96,23 @@ class AndroidNotificationSchedulerGateway
         };
       }).toList();
 
-      await _channel.invokeMethod('apply', {'triggers': triggers});
+      final result = await _channel.invokeMethod<bool>('apply', {
+        'triggers': triggers,
+      });
+      return result ?? false;
     } catch (_) {
-      // Ignored on test / unsupported platform environments
+      return false;
     }
   }
 
   @override
-  Future<void> cancelAll() async {
-    if (!_isLiveAndroid) return;
+  Future<bool> cancelAll() async {
+    if (!_isLiveAndroid) return true;
     try {
-      await _channel.invokeMethod('cancelAll');
+      final result = await _channel.invokeMethod<bool>('cancelAll');
+      return result ?? false;
     } catch (_) {
-      // Ignored
+      return false;
     }
   }
 
