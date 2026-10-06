@@ -361,7 +361,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   }
 
   /// Creates a stable non-PII binding used by Google Play's account field.
-  static String? readBindingFromStore(
+  static Future<String?> readBindingFromStore(
     SecureStoreDriver? store,
     String googleSubject,
   ) async {
