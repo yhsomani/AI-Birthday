@@ -4,7 +4,7 @@
 
 ## Overall progress
 
-- **Production-Readiness & Truthfulness Overhaul:** COMPLETE. Every user-facing trust defect, data loss vector, deceptive status, and UI friction point identified in the production audit has been systematically addressed following `IDENTIFY → VERIFY → PRIORITIZE → FIX → IMPLEMENT → INTEGRATE → TEST → RE-TEST → DOCUMENT → RE-AUDIT`.
+- **Production-Readiness & Truthfulness Overhaul:** CORE HARDENING COMPLETE; FINAL RELEASE GATE PENDING. Every user-facing trust defect, data loss vector, deceptive status, and UI friction point identified in the production audit has been systematically addressed following `IDENTIFY → VERIFY → PRIORITIZE → FIX → IMPLEMENT → INTEGRATE → TEST → RE-TEST → DOCUMENT → RE-AUDIT`.
 - **Phase 0 — Foundation:** COMPLETE (Flutter baseline, Riverpod, go_router, Material 3, Drift SQLite, secure storage abstraction, domain errors, sanitized logging, platform boundary definition, unified 5-destination navigation shell).
 - **Phase 1 — Trust & Truthfulness (P0):** COMPLETE.
   - Subscription: Local fallback Pro grant removed; returns store-unavailable state when Play Billing is absent; strictly requires server-verified purchase tokens.
@@ -29,12 +29,12 @@
 - **Phase 5 — Security & Auth Hardening (P0):** COMPLETE.
   - Elimination of synthetic identities: removed all hardcoded identities and credentials.
   - Elimination of OTP backdoors: cryptographically secure random codes in production, test-only inspection hooks for unit tests.
-- **Phase 6 — Reliability & QA:** COMPLETE.
-  - `dart format .`: **0 changed** (100% compliant).
-  - `flutter analyze`: **0 issues** (clean).
-  - `flutter test`: **161/161 passing** (100% pass rate).
-  - `backend/functions npm test`: **68/68 passing** (100% pass rate).
-- **Phase 7 — Physical Android Device Verification:** COMPLETE.
+- **Phase 6 — Reliability & QA:** CURRENT STATE PENDING FINAL PR CI VERIFICATION.
+  - Main CI (`37424805712`): formatting gate **passed**.
+  - Main CI (`37424805712`): static analysis **passed**.
+  - Main CI (`37424805712`): **229 passed, 4 failed**. The failing tests are reminder fixture expectations and one prompt-contract wording assertion.
+  - Main CI (`37424805712`): backend verification job **passed**.
+- **Phase 7 — Physical Android Device Verification:** HISTORICAL EVIDENCE PRESENT; REPEAT VALIDATION PENDING.
   - Target: Physical Device `23049PCD8I` (ID `1b87b5db`), Android 15 / API 35.
   - Flows tested & confirmed end-to-end: First-run Onboarding, SQLite contact persistence (Sarah), bottom sheet detail modal, Bring-Your-Own-Key Gemini settings, live AI generation via `gemini-2.5-flash-lite`, WhatsApp handoff validation, and clipboard copying.
   - Two real-device RenderFlex overflow bugs identified and remediated in `settings_screen.dart`.
