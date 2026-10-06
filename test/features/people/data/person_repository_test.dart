@@ -67,7 +67,9 @@ void main() {
 
     final all = await store.getAll(includeDeleted: true);
     expect(all, hasLength(3));
-    expect(all.firstWhere((p) => p.id == 'z').deletedAt, isNotNull);
+    final deleted = all.firstWhere((p) => p.id == 'z');
+    expect(deleted.deletedAt, isNotNull);
+    expect(deleted.version, 2);
   });
 
   test('watchAll emits updates', () async {
@@ -89,10 +91,12 @@ void main() {
     await store.softDelete('p1');
     final hidden = await store.getById('p1');
     expect(hidden!.deletedAt, isNotNull);
+    expect(hidden.version, 2);
 
     await store.restore('p1');
     final restored = await store.getById('p1');
     expect(restored!.deletedAt, isNull);
+    expect(restored.version, 3);
   });
 
   test('save is idempotent by id and replaces the row', () async {
