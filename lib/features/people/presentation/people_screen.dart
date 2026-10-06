@@ -105,7 +105,11 @@ class PeopleScreen extends ConsumerWidget {
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      tooltip: 'Close',
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.of(sheetContext).pop();
+                      },
                     ),
                   ],
                 ),
