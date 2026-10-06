@@ -69,7 +69,7 @@ class BirthdayLifecycleService {
           cycleYear: next.year,
           date: next.nextDate,
           status: targetStatus,
-          draftId: null,
+          clearDraftId: true,
           updatedAt: now,
         ),
       );

@@ -30,4 +30,7 @@ class FakeAuthGateway implements GoogleAuthGateway {
 
   @override
   Future<GoogleIdentity?> getStoredIdentity() async => storedIdentity;
+
+  @override
+  Future<GoogleIdentity?> refreshSession() async => storedIdentity;
 }

@@ -745,8 +745,6 @@ class PeopleScreen extends ConsumerWidget {
                           PopupMenuItem(value: 'delete', child: Text('Delete')),
                         ],
                       ),
-                    ],
-                  ),
                   onTap: () => _showPersonDetailsModal(context, ref, person),
                 ),
               );

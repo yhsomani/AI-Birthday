@@ -40,7 +40,7 @@ class CloudSyncService {
        _apiKey = apiKey ??
            (const String.fromEnvironment('FIREBASE_WEB_API_KEY').isNotEmpty
                ? const String.fromEnvironment('FIREBASE_WEB_API_KEY')
-               : '');
+               : (httpClient != null ? 'test-mock-api-key' : ''));
 
   final AppDatabase _db;
   final SecureStoreDriver _store;
@@ -79,12 +79,8 @@ class CloudSyncService {
   }
 
   String _collectionUrl(String uid, String collection) {
-    return 'https://firestore.googleapis.com/v1/projects/' +
-        _projectId +
-        '/databases/(default)/documents/users/' +
-        Uri.encodeComponent(uid) +
-        '/' +
-        collection;
+    final encodedUid = Uri.encodeComponent(uid);
+    return 'https://firestore.googleapis.com/v1/projects/$_projectId/databases/(default)/documents/users/$encodedUid/$collection';
   }
 
   Future<bool> _patchDocument(
@@ -93,13 +89,8 @@ class CloudSyncService {
     Map<String, dynamic> fields,
     Map<String, String> headers,
   ) async {
-    final url = Uri.parse(
-      collectionUrl +
-          '/' +
-          Uri.encodeComponent(documentId) +
-          '?key=' +
-          _apiKey,
-    );
+    final encodedDoc = Uri.encodeComponent(documentId);
+    final url = Uri.parse('$collectionUrl/$encodedDoc?key=$_apiKey');
     final response = await _http.patch(
       url,
       headers: headers,

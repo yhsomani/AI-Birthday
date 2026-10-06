@@ -68,6 +68,13 @@ function requireAuthenticated(request: CallableRequest<unknown>): string {
   return request.auth.uid;
 }
 
+function requireAuthOnly(request: CallableRequest<unknown>): string {
+  if (request.auth === undefined) {
+    throw new HttpsError('unauthenticated', 'AUTHENTICATION_REQUIRED');
+  }
+  return request.auth.uid;
+}
+
 function requireAppChecked(request: CallableRequest<unknown>): void {
   if (request.app === undefined) {
     throw new HttpsError('unauthenticated', 'APP_CHECK_REQUIRED');
@@ -297,17 +304,22 @@ export const companionStatus = onCall(commonOptions, async request => {
   return safeCall(() => withoutSecret().companionStatus(uid, input));
 });
 
+const enforceAppCheckOnPurchase =
+  process.env.ENFORCE_APP_CHECK_ON_PURCHASE === 'true';
+
 // Purchase verification uses Firebase Auth plus a cryptographically verified
-// Google Play purchase token. App Check is currently disabled for this endpoint
-// because the Flutter client does not yet initialize Firebase App Check.
+// Google Play purchase token. App Check is configurable via ENFORCE_APP_CHECK_ON_PURCHASE
+// (defaulting to false for clients prior to native App Check provider initialization).
 export const verifyPurchase = onCall(
   {
     ...commonOptions,
-    enforceAppCheck: false,
-    consumeAppCheckToken: false,
+    enforceAppCheck: enforceAppCheckOnPurchase,
+    consumeAppCheckToken: enforceAppCheckOnPurchase,
   },
   async request => {
-    const uid = requireAuthenticated(request);
+    const uid = enforceAppCheckOnPurchase
+      ? requireAuthenticated(request)
+      : requireAuthOnly(request);
     const input = parseRequest(verifyPurchaseSchema, request.data);
     return safeCall(() =>
       new SubscriptionVerificationService(db).verifyPurchase(uid, input),

@@ -20,6 +20,9 @@ abstract class GoogleAuthGateway {
 
   /// Retrieves any previously persisted active session identity.
   Future<GoogleIdentity?> getStoredIdentity();
+
+  /// Refreshes the active session ID token using the persisted refresh token.
+  Future<GoogleIdentity?> refreshSession();
 }
 
 /// Truthful adapter for builds without Firebase configured (the current host
@@ -42,4 +45,7 @@ class UnavailableGoogleAuthGateway implements GoogleAuthGateway {
 
   @override
   Future<GoogleIdentity?> getStoredIdentity() async => null;
+
+  @override
+  Future<GoogleIdentity?> refreshSession() async => null;
 }

@@ -337,5 +337,62 @@ void main() {
         expect(store.data.isEmpty, isTrue);
       },
     );
+
+    test(
+      'refreshSession exchanges refresh token via Secure Token API and updates stored idToken',
+      () async {
+        store.data['auth_session_subject'] = 'sub-ref-123';
+        store.data['auth_session_email'] = 'refresh@example.com';
+        store.data['auth_session_name'] = 'Refresh User';
+        store.data['auth_session_uid'] = 'uid-ref-123';
+        store.data['auth_session_id_token'] = 'old-expired-id-token';
+        store.data['auth_session_refresh_token'] = 'valid-refresh-token-456';
+
+        final mockClient = MockClient((request) async {
+          expect(
+            request.url.toString(),
+            contains('securetoken.googleapis.com/v1/token'),
+          );
+          expect(request.body, contains('grant_type=refresh_token'));
+          expect(request.body, contains('valid-refresh-token-456'));
+          return http.Response(
+            jsonEncode({
+              'id_token': 'new-fresh-id-token-789',
+              'refresh_token': 'new-fresh-refresh-token-999',
+              'expires_in': '3600',
+            }),
+            200,
+          );
+        });
+
+        final gateway = LiveGoogleAuthGateway(
+          store: store,
+          httpClient: mockClient,
+          firebaseApiKey: 'test-api-key',
+        );
+
+        final updatedIdentity = await gateway.refreshSession();
+        expect(updatedIdentity, isNotNull);
+        expect(updatedIdentity!.idToken, 'new-fresh-id-token-789');
+        expect(store.data['auth_session_id_token'], 'new-fresh-id-token-789');
+        expect(
+          store.data['auth_session_refresh_token'],
+          'new-fresh-refresh-token-999',
+        );
+      },
+    );
+
+    test('signOut removes auth_session_refresh_token from secure store', () async {
+      store.data['auth_session_subject'] = 'sub-1';
+      store.data['auth_session_email'] = 'test@example.com';
+      store.data['auth_session_name'] = 'Test';
+      store.data['auth_session_refresh_token'] = 'refresh-token-xyz';
+
+      final gateway = LiveGoogleAuthGateway(store: store);
+      await gateway.signOut();
+
+      expect(store.data['auth_session_refresh_token'], isNull);
+      expect(store.data.isEmpty, isTrue);
+    });
   });
 }

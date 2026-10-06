@@ -153,6 +153,7 @@ class Birthday {
     DateTime? date,
     BirthdayStatus? status,
     String? draftId,
+    bool clearDraftId = false,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -162,7 +163,7 @@ class Birthday {
       cycleYear: cycleYear ?? this.cycleYear,
       date: date ?? this.date,
       status: status ?? this.status,
-      draftId: draftId ?? this.draftId,
+      draftId: clearDraftId ? null : (draftId ?? this.draftId),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

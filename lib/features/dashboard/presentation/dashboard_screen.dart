@@ -54,7 +54,7 @@ class DashboardScreen extends ConsumerWidget {
                 child: CircularProgressIndicator(),
               ),
             ),
-            error: (_, __) => const Center(
+            error: (err, stack) => const Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(

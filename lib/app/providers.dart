@@ -3,7 +3,6 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/core/security/credential_storage.dart';
 import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
 import 'package:ai_birthday/features/ai/domain/ai_router.dart';
@@ -56,6 +55,10 @@ final subscriptionNotifierProvider =
         store: secureStore,
         logger: logger,
         authTokenProvider: () async {
+          final refreshed = await ref
+              .read(authControllerProvider.notifier)
+              .getValidIdToken();
+          if (refreshed != null && refreshed.isNotEmpty) return refreshed;
           final auth = await ref.read(authControllerProvider.future);
           return auth.identity?.idToken;
         },
@@ -103,7 +106,7 @@ final deviceContactsServiceProvider = Provider<DeviceContactsService>((ref) {
 
 /// Cloud Sync Service provider (SSOT §13).
 final cloudSyncServiceProvider = Provider<CloudSyncService>((ref) {
-  final db = ref.watch(databaseProvider);
+  final db = ref.watch(core.databaseProvider);
   final logger = ref.watch(loggerProvider);
   final store = FlutterSecureStorageDriver(
     const FlutterSecureStorage(),
@@ -160,19 +163,19 @@ final aiRouterProvider = Provider<AiRouter>((ref) {
 
 /// People Repository provider backed by operational Drift/SQLite (SSOT §13).
 final peopleRepositoryProvider = Provider<PeopleRepository>((ref) {
-  final db = ref.watch(databaseProvider);
+  final db = ref.watch(core.databaseProvider);
   return DriftPeopleRepository(db);
 });
 
 /// Birthdays Repository provider backed by operational Drift/SQLite (SSOT §13).
 final birthdaysRepositoryProvider = Provider<BirthdaysRepository>((ref) {
-  final db = ref.watch(databaseProvider);
+  final db = ref.watch(core.databaseProvider);
   return DriftBirthdaysRepository(db);
 });
 
 /// Drafts Repository provider backed by operational Drift/SQLite (SSOT §13).
 final draftsRepositoryProvider = Provider<DraftsRepository>((ref) {
-  final db = ref.watch(databaseProvider);
+  final db = ref.watch(core.databaseProvider);
   return DriftDraftsRepository(db);
 });
 

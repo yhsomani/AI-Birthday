@@ -45,6 +45,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
   static const String _keyPhoto = 'auth_session_photo';
   static const String _keyUid = 'auth_session_uid';
   static const String _keyIdToken = 'auth_session_id_token';
+  static const String _keyRefreshToken = 'auth_session_refresh_token';
 
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
@@ -120,6 +121,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
       final idToken = account.authentication.idToken;
       String? firebaseUid = account.id;
       String? verifiedIdToken = idToken;
+      String? refreshToken;
 
       if (_firebaseApiKey.isNotEmpty && idToken != null && idToken.isNotEmpty) {
         try {
@@ -149,12 +151,14 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
             final data = jsonDecode(res.body) as Map<String, dynamic>;
             final localId = data['localId'] as String?;
             final returnedToken = data['idToken'] as String?;
+            final returnedRefreshToken = data['refreshToken'] as String?;
             if (localId != null &&
                 localId.isNotEmpty &&
                 returnedToken != null &&
                 returnedToken.isNotEmpty) {
               firebaseUid = localId;
               verifiedIdToken = returnedToken;
+              refreshToken = returnedRefreshToken;
             } else {
               _logger?.warning(
                 'AuthGateway',
@@ -184,7 +188,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
         idToken: verifiedIdToken,
       );
 
-      await _saveSession(identity);
+      await _saveSession(identity, refreshToken: refreshToken);
       _logger?.info('AuthGateway', 'Sign in successful');
       return SignInSuccess(identity);
     } catch (e, st) {
@@ -205,9 +209,13 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
     await _store.delete(_keyPhoto);
     await _store.delete(_keyUid);
     await _store.delete(_keyIdToken);
+    await _store.delete(_keyRefreshToken);
   }
 
-  Future<void> _saveSession(GoogleIdentity identity) async {
+  Future<void> _saveSession(
+    GoogleIdentity identity, {
+    String? refreshToken,
+  }) async {
     // 🛡️ SECURITY: Purge all session keys prior to writing new identity data
     // to prevent cross-user credential or avatar leakage when switching accounts.
     await _clearSessionKeys();
@@ -225,6 +233,60 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
     if (identity.idToken != null && identity.idToken!.trim().isNotEmpty) {
       await _store.write(_keyIdToken, identity.idToken!.trim());
     }
+    if (refreshToken != null && refreshToken.trim().isNotEmpty) {
+      await _store.write(_keyRefreshToken, refreshToken.trim());
+    }
+  }
+
+  @override
+  Future<GoogleIdentity?> refreshSession() async {
+    final refreshToken = await _store.read(_keyRefreshToken);
+    if (refreshToken == null ||
+        refreshToken.trim().isEmpty ||
+        _firebaseApiKey.isEmpty) {
+      return getStoredIdentity();
+    }
+
+    try {
+      final res = await _http.post(
+        Uri.parse(
+          'https://securetoken.googleapis.com/v1/token?key=$_firebaseApiKey',
+        ),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body:
+            'grant_type=refresh_token&refresh_token=${Uri.encodeComponent(refreshToken.trim())}',
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final newIdToken = data['id_token'] as String?;
+        final newRefreshToken = data['refresh_token'] as String?;
+        if (newIdToken != null && newIdToken.isNotEmpty) {
+          await _store.write(_keyIdToken, newIdToken);
+          if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
+            await _store.write(_keyRefreshToken, newRefreshToken);
+          }
+          _logger?.info(
+            'AuthGateway',
+            'Firebase ID token refreshed successfully',
+          );
+        }
+      } else {
+        _logger?.warning(
+          'AuthGateway',
+          'Firebase secure token refresh returned HTTP ${res.statusCode}',
+        );
+      }
+    } catch (e, st) {
+      _logger?.error(
+        'AuthGateway',
+        'Firebase secure token refresh failed',
+        error: e,
+        stackTrace: st,
+      );
+    }
+
+    return getStoredIdentity();
   }
 
   @override

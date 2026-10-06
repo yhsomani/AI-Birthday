@@ -97,6 +97,7 @@ void main() {
             'purchaseToken': 'valid_google_play_purchase_token_123',
             'productId': 'ai_birthday_pro_monthly',
             'packageName': 'com.yashsomani.ai_birthday',
+            'accountBinding': 'acct-binding-test-123456',
           },
           authHeader: 'Bearer valid-firebase-token',
         );

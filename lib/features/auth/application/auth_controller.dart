@@ -58,6 +58,19 @@ class AuthController extends AsyncNotifier<AuthState> {
     _logger.info('auth', 'signed out');
     state = const AsyncData(AuthState(status: AuthStatus.signedOut));
   }
+
+  Future<String?> getValidIdToken() async {
+    final current = state.value;
+    if (current == null || !current.isSignedIn) return null;
+    final refreshed = await _gateway.refreshSession();
+    if (refreshed != null) {
+      state = AsyncData(
+        AuthState(status: AuthStatus.signedIn, identity: refreshed),
+      );
+      return refreshed.idToken;
+    }
+    return current.identity?.idToken;
+  }
 }
 
 final authControllerProvider = AsyncNotifierProvider<AuthController, AuthState>(
