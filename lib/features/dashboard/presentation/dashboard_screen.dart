@@ -47,16 +47,32 @@ class DashboardScreen extends ConsumerWidget {
       ),
       body: birthdaysAsync.when(
         data: (birthdays) {
-          final people = peopleAsync.value ?? [];
-          final peopleMap = {for (final p in people) p.id: p};
-          final now = DateTime.now();
+          return peopleAsync.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(40),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+            error: (_, __) => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Could not load your contacts. Your birthday data is safe; retry from People.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+            data: (people) {
+              final peopleMap = {for (final p in people) p.id: p};
+              final now = DateTime.now();
 
           // Categorize birthdays
           final todayBirthdays = <Birthday>[];
           final upcomingBirthdays = <Birthday>[];
-          final actionNeededBirthdays = <Birthday>[];
+              final actionNeededBirthdays = <Birthday>[];
 
-          for (final b in birthdays) {
+              for (final b in birthdays) {
             final days = b.daysUntil(now);
             if (days == 0) {
               todayBirthdays.add(b);
@@ -67,7 +83,8 @@ class DashboardScreen extends ConsumerWidget {
               upcomingBirthdays.add(b);
               if (b.status == BirthdayStatus.reminderDue ||
                   b.status == BirthdayStatus.messageNotPrepared ||
-                  b.status == BirthdayStatus.messageDrafted) {
+                  b.status == BirthdayStatus.messageDrafted ||
+                  b.status == BirthdayStatus.failed) {
                 actionNeededBirthdays.add(b);
               }
             } else if (days > 7 && days <= 30) {
@@ -141,7 +158,9 @@ class DashboardScreen extends ConsumerWidget {
                     child: Center(
                       child: Text(
                         'No upcoming birthdays tracked in the next 30 days.',
-                        style: TextStyle(color: Colors.grey[600]),
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ),
@@ -163,8 +182,10 @@ class DashboardScreen extends ConsumerWidget {
               _buildQuickActions(context),
               const SizedBox(height: AppSpacing.xl),
             ],
-          );
-        },
+            );
+          },
+        );
+      },
         loading: () => const Center(
           child: Padding(
             padding: EdgeInsets.all(40),
@@ -346,44 +367,62 @@ class DashboardScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.sm),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Channel: ${person?.preferredDeliveryChannel.displayName ?? 'WhatsApp'}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                        overflow: TextOverflow.ellipsis,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+                final stacked = constraints.maxWidth < 430 || textScale >= 1.15;
+                final details = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Channel: ${person?.preferredDeliveryChannel.displayName ?? 'WhatsApp'}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                      if (person != null &&
-                          (person.phoneNumber == null ||
-                              person.phoneNumber!.trim().isEmpty)) ...[
-                        const SizedBox(height: 2),
-                        const Text(
-                          '⚠️ No phone number',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.accentAmber,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (person != null &&
+                        (person.phoneNumber == null ||
+                            person.phoneNumber!.trim().isEmpty)) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'No phone number',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.tertiary,
+                          fontWeight: FontWeight.w600,
                         ),
-                      ],
+                      ),
                     ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                FilledButton.icon(
+                  ],
+                );
+                final action = FilledButton.icon(
                   onPressed: () {
                     HapticFeedback.lightImpact();
                     context.push('/message-studio/${birthday.id}');
                   },
                   icon: Icon(_actionButtonIcon(birthday.status), size: 16),
                   label: Text(_actionButtonLabel(birthday.status, person)),
-                ),
-              ],
+                );
+                if (stacked) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      details,
+                      const SizedBox(height: AppSpacing.sm),
+                      action,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: details),
+                    const SizedBox(width: AppSpacing.sm),
+                    Flexible(child: action),
+                  ],
+                );
+              },
             ),
           ],
         ),
