@@ -18,11 +18,13 @@ class _VerifiedEntitlement {
     required this.status,
     required this.productId,
     required this.expiryDateMs,
+    required this.isAutoRenewing,
   });
 
   final EntitlementStatus status;
   final String productId;
   final int expiryDateMs;
+  final bool isAutoRenewing;
 }
 
 /// Purchase/entitlement manager.
@@ -122,7 +124,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
               verified.expiryDateMs,
               isUtc: true,
             ),
-            isAutoRenewing: verified.status == EntitlementStatus.active,
+            isAutoRenewing: verified.isAutoRenewing,
           );
           _purchaseStatus = PurchaseStatus.success;
         } else {
@@ -209,9 +211,11 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
       final status = data['status'];
       final expiryDateMs = data['expiryDateMs'];
       final productId = data['productId'];
+      final isAutoRenewing = data['isAutoRenewing'];
       if (status is! String ||
           expiryDateMs is! num ||
           productId is! String ||
+          isAutoRenewing is! bool ||
           productId != _kProMonthlyId) {
         return null;
       }
@@ -224,6 +228,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
           status: EntitlementStatus.active,
           productId: productId,
           expiryDateMs: expiry,
+          isAutoRenewing: isAutoRenewing,
         );
       }
 
@@ -233,6 +238,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
             : EntitlementStatus.none,
         productId: productId,
         expiryDateMs: expiry,
+        isAutoRenewing: isAutoRenewing,
       );
     } catch (error, stackTrace) {
       _logger.warning(
