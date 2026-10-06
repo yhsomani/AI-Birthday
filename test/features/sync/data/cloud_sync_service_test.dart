@@ -192,7 +192,6 @@ void main() {
         expect(lastSync, isNull);
       },
     );
-  });
 
     test('restore preserves existing local reminder preferences', () async {
       await db
