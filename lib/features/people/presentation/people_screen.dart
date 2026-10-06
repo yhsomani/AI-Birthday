@@ -293,7 +293,7 @@ class PeopleScreen extends ConsumerWidget {
                                   border: Border.all(color: Colors.amber),
                                 ),
                                 child: Text(
-                                  '⚠️ ${c.duplicateWarning}',
+                                  c.duplicateWarning,
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: Colors.brown,
@@ -367,7 +367,7 @@ class PeopleScreen extends ConsumerWidget {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Successfully imported $importedCount contacts! 🎉'),
+          content: Text('Successfully imported $importedCount contacts.'),
         ),
       );
     }
@@ -395,7 +395,7 @@ class PeopleScreen extends ConsumerWidget {
           title: const Text('Import Birthdays from Phone'),
           content: const Text(
             'AI-Birthday scans your device contacts only to locate names, phone numbers, and birthdays. '
-            'Everything runs locally on your phone — no contact data is ever uploaded or sent to any server.',
+            'Imported contact data stays on this device unless you explicitly use Cloud Backup.',
           ),
           actions: [
             TextButton(
