@@ -38,7 +38,7 @@ void main() {
     );
 
     expect(find.text('Sign in with Google'), findsOneWidget);
-    expect(find.text('Available on device'), findsOneWidget);
+    expect(find.text('Not configured for this build'), findsOneWidget);
     expect(find.text('Signed in'), findsNothing);
   });
 
@@ -53,7 +53,12 @@ void main() {
 
     expect(find.text('Sign in with Google'), findsOneWidget);
 
+    // Row and button both open the sheet; the sheet owns the sign-in action.
     await tester.tap(find.text('Sign in with Google'));
+    await tester.pumpAndSettle();
+    expect(find.text('Continue with Google'), findsOneWidget);
+
+    await tester.tap(find.text('Continue with Google'));
     await tester.pumpAndSettle();
 
     expect(find.text('Ana'), findsOneWidget);
@@ -76,8 +81,11 @@ void main() {
 
     await tester.tap(find.text('Sign in with Google'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
 
     expect(find.text('Sign in with Google'), findsOneWidget);
+    expect(find.text('cancelled'), findsOneWidget); // error stays in the sheet
     expect(find.text('Ana'), findsNothing);
   });
 }

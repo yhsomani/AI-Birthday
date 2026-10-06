@@ -288,13 +288,6 @@ class DriftDraftsRepository implements DraftsRepository {
         );
   }
 
-  @override
-  Future<void> deleteDraft(String id) async {
-    await (_database.delete(
-      _database.messageDrafts,
-    )..where((r) => r.id.equals(id))).go();
-  }
-
   static MessageDraft _draftFromRow(db.MessageDraft row) {
     return MessageDraft(
       id: row.id,

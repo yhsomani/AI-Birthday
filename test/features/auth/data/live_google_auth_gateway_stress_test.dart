@@ -160,7 +160,15 @@ void main() {
           // Verify that gateway rejects 400 with SignInFailed:
           expect(outcome, isA<SignInFailed>());
           final failed = outcome as SignInFailed;
-          expect(failed.message, contains('400'));
+          // Raw HTTP codes stay in logs; the user gets actionable copy.
+          expect(failed.message, contains('rejected this app build'));
+          expect(failed.message, isNot(contains('400')));
+          expect(
+            logMessages.any(
+              (m) => m.contains('HTTP 400') && m.contains('INVALID_ID_TOKEN'),
+            ),
+            isTrue,
+          );
           expect(store.data.isEmpty, isTrue);
         },
       );
@@ -200,7 +208,14 @@ void main() {
           final outcome = await gateway.signIn();
           expect(outcome, isA<SignInFailed>());
           final failed = outcome as SignInFailed;
-          expect(failed.message, contains('401'));
+          expect(failed.message, contains('rejected this app build'));
+          expect(failed.message, isNot(contains('401')));
+          expect(
+            logMessages.any(
+              (m) => m.contains('HTTP 401') && m.contains('API_KEY_INVALID'),
+            ),
+            isTrue,
+          );
           expect(store.data.isEmpty, isTrue);
         },
       );

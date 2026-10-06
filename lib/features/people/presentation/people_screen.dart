@@ -508,8 +508,9 @@ class PeopleScreen extends ConsumerWidget {
       await ref.read(personServiceProvider).remove(person.id);
     } catch (_) {}
 
-    if (!context.mounted) return;
-
+    // ponytail: show from the messenger captured above, not `context` — the
+    // caller passes the list item's context, which is unmounted as soon as
+    // the person is deleted, so a context.mounted guard drops the Undo bar.
     messenger.showSnackBar(
       SnackBar(
         content: Text('Deleted ${person.name}.'),

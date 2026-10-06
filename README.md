@@ -141,6 +141,34 @@ flowchart TD
    flutter run -d <device_id>
    ```
 
+### Google Sign-In setup (SHA-1 fingerprints)
+
+Google Sign-In fails on a device if the signing certificate (SHA-1) of the
+build you run is not registered for the Firebase/Google Cloud project. The
+typical symptom is `GoogleSignInException ... [16] Account reauth failed.`
+right after picking an account.
+
+1. Read the SHA-1 of every keystore you sign with:
+
+   ```bash
+   # Debug keystore (~/.android/debug.keystore), password "android"
+   keytool -list -v -keystore "%USERPROFILE%\.android\debug.keystore" -alias androiddebugkey -storepass android
+
+   # Release keystore
+   keytool -list -v -keystore /path/to/release.keystore -alias <alias>
+   ```
+
+2. In [Firebase Console](https://console.firebase.google.com/) → Project
+   settings → Your apps → Android app (`com.yashsomani.ai_birthday`), add each
+   SHA-1. Register the debug SHA-1 too — without it, `flutter run` builds can
+   never sign in, only release builds can.
+3. Download the updated `google-services.json` into `android/app/` if the
+   console offers it, then rebuild.
+
+The Firebase web API key ships in `google-services.json` and is a public
+project identifier, not a secret. Release/CI builds may override it with
+`--dart-define=FIREBASE_WEB_API_KEY=...`.
+
 ---
 
 ## 🧪 Quality Assurance & Test Suite

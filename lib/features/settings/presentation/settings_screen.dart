@@ -1220,9 +1220,11 @@ class _AuthTile extends ConsumerWidget {
             },
             child: const Text('Sign in'),
           ),
+          // Single entry point: the row and the button open the same sheet,
+          // so the sign-in flow always explains itself before starting.
           onTap: () {
             HapticFeedback.lightImpact();
-            ref.read(authControllerProvider.notifier).signIn();
+            AuthBottomSheet.show(context);
           },
         ),
         AuthStatus.signedIn => ListTile(
@@ -1259,15 +1261,11 @@ class _AuthTile extends ConsumerWidget {
             child: const Text('Sign out'),
           ),
         ),
-        AuthStatus.unavailable => ListTile(
-          leading: const Icon(Icons.login),
-          title: const Text('Sign in with Google'),
-          subtitle: const Text('Available on device'),
+        AuthStatus.unavailable => const ListTile(
+          leading: Icon(Icons.login),
+          title: Text('Sign in with Google'),
+          subtitle: Text('Not configured for this build'),
           enabled: false,
-          onTap: () {
-            HapticFeedback.lightImpact();
-            AuthBottomSheet.show(context);
-          },
         ),
       },
     );

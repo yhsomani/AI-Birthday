@@ -13,6 +13,7 @@ import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
+import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
@@ -45,6 +46,11 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   bool _isLoading = true;
   bool _isGenerating = false;
   String? _errorMessage;
+
+  // Captured at load: dispose() runs after ref becomes unusable, but the
+  // final draft save still needs the repository.
+  // ponytail: captured repo instead of ProviderContainer access; revisit if more providers are needed in dispose
+  DraftsRepository? _draftsRepo;
 
   Timer? _autosaveTimer;
   bool _isSaving = false;
@@ -109,6 +115,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     final bRepo = ref.read(birthdaysRepositoryProvider);
     final pRepo = ref.read(peopleRepositoryProvider);
     final dRepo = ref.read(draftsRepositoryProvider);
+    _draftsRepo = dRepo;
 
     Birthday? birthday;
     if (widget.birthdayId != null && widget.birthdayId!.isNotEmpty) {
@@ -237,6 +244,8 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
 
   Future<void> _saveDraft({DraftStatus status = DraftStatus.draft}) async {
     if (_person == null) return;
+    final repo = _draftsRepo;
+    if (repo == null) return;
     final draftId =
         _draft?.id ?? 'draft-${DateTime.now().millisecondsSinceEpoch}';
     final updatedDraft = MessageDraft(
@@ -252,7 +261,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       updatedAt: DateTime.now(),
     );
 
-    await ref.read(draftsRepositoryProvider).saveDraft(updatedDraft);
+    await repo.saveDraft(updatedDraft);
     if (mounted) {
       setState(() {
         _draft = updatedDraft;

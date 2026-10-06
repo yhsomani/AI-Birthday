@@ -46,6 +46,8 @@ void main() {
 
         expect(find.text('Opened in WhatsApp'), findsOneWidget);
         expect(find.text('Sent'), findsOneWidget);
+        // Both drafts point at contacts that no longer exist.
+        expect(find.text('Removed contact'), findsNWidgets(2));
       },
     );
   });

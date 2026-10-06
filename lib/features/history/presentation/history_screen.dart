@@ -54,7 +54,9 @@ class HistoryScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final draft = drafts[index];
               final person = peopleMap[draft.personId];
-              final recipientName = person?.name ?? 'Birthday Recipient';
+              // The contact may have been deleted; say so instead of showing
+              // a placeholder name that reads like a real recipient.
+              final recipientName = person?.name ?? 'Removed contact';
               final statusColor = switch (draft.status) {
                 DraftStatus.confirmedSent => Colors.green[800] ?? Colors.green,
                 DraftStatus.handedOff => Colors.orange[800] ?? Colors.orange,

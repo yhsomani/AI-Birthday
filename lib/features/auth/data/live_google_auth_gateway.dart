@@ -27,10 +27,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
            firebaseApiKey ??
            (const String.fromEnvironment('FIREBASE_WEB_API_KEY').isNotEmpty
                ? const String.fromEnvironment('FIREBASE_WEB_API_KEY')
-               : (httpClient != null ||
-                         !const bool.fromEnvironment('dart.vm.product')
-                     ? 'test_dev_firebase_api_key'
-                     : ''));
+               : _defaultFirebaseApiKey);
 
   final SecureStoreDriver _store;
   final http.Client _http;
@@ -40,6 +37,13 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
 
   static const String _serverClientId =
       '339889410493-g5klr4838kfibddoqvk1rbbt39dblffp.apps.googleusercontent.com';
+
+  /// Firebase web API key of the shipped project. This is a public identifier,
+  /// not a secret: the same value ships in `google-services.json` and in every
+  /// installed binary. It only names the project; requests still need a token.
+  /// `--dart-define=FIREBASE_WEB_API_KEY=...` overrides it when needed.
+  static const String _defaultFirebaseApiKey =
+      'AIzaSyDUgbmii4EH0PCHVOxO9TXvGeXyFpyxWNQ';
 
   static const String _keySubject = 'auth_session_subject';
   static const String _keyEmail = 'auth_session_email';
@@ -118,7 +122,21 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
       } catch (e) {
         _logger?.warning('AuthGateway', 'Native GoogleSignIn failed: $e');
         // 🛡️ SECURITY: Prevent internal exception strings from leaking into the UI.
-        return const SignInFailed('Google Sign-In failed or was cancelled.');
+        if (e.toString().contains('reauth')) {
+          // google_sign_in surfaces `[16] Account reauth failed.` when this
+          // build's signing certificate SHA-1 is not registered for the
+          // Firebase/Google Cloud project — a config problem, not a user one.
+          return const SignInFailed(
+            'Google rejected this app build. Its signing certificate (SHA-1) '
+            'is not registered for this project — see README "Google Sign-In '
+            'setup".',
+          );
+        }
+        if (e is GoogleSignInException &&
+            e.code == GoogleSignInExceptionCode.canceled) {
+          return const SignInFailed('Sign-in was cancelled.');
+        }
+        return const SignInFailed('Google Sign-In failed. Please try again.');
       }
 
       final idToken = account.authentication.idToken;
@@ -143,10 +161,12 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
           if (res.statusCode >= 400 && res.statusCode < 500) {
             _logger?.warning(
               'AuthGateway',
-              'Firebase IdP rejected token: HTTP ${res.statusCode}',
+              'Firebase IdP rejected token: HTTP ${res.statusCode} '
+                  '${_idpErrorDetail(res.body)}',
             );
-            return SignInFailed(
-              'Authentication failed: Identity Provider returned ${res.statusCode}',
+            return const SignInFailed(
+              'Could not complete sign-in: the account server rejected this '
+              'app build.',
             );
           }
 
@@ -203,6 +223,17 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
       );
       return const SignInFailed('Sign-in failed. Please try again.');
     }
+  }
+
+  /// Extracts identitytoolkit's `error.message` for logging only — never
+  /// shown to users.
+  static String? _idpErrorDetail(String body) {
+    try {
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      final err = data['error'];
+      if (err is Map<String, dynamic>) return err['message']?.toString();
+    } catch (_) {}
+    return null;
   }
 
   Future<void> _clearSessionKeys() async {

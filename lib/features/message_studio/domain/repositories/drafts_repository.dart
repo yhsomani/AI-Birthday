@@ -8,7 +8,6 @@ abstract interface class DraftsRepository {
   Future<MessageDraft?> getDraft(String id);
   Future<MessageDraft?> getDraftForBirthday(String birthdayId);
   Future<void> saveDraft(MessageDraft draft);
-  Future<void> deleteDraft(String id);
 }
 
 /// In-memory implementation of [DraftsRepository] for testing and offline prototyping.
@@ -48,12 +47,6 @@ class InMemoryDraftsRepository implements DraftsRepository {
   @override
   Future<void> saveDraft(MessageDraft draft) async {
     _store[draft.id] = draft;
-    _controller.add(_sortedDrafts());
-  }
-
-  @override
-  Future<void> deleteDraft(String id) async {
-    _store.remove(id);
     _controller.add(_sortedDrafts());
   }
 

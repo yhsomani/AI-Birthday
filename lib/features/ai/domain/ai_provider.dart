@@ -14,7 +14,7 @@ class AiGenerationResult {
   /// The generated birthday greeting.
   final String message;
 
-  /// Identifier of the provider ('user_gemini', 'gemini_nano', 'mock').
+  /// Identifier of the provider ('user_gemini' or 'gemini_nano').
   final String providerType;
 
   /// Optional model name reported by the engine.

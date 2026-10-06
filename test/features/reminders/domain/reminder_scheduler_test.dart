@@ -54,7 +54,10 @@ void main() {
     const scheduler = ReminderScheduler();
     final plan = scheduler.plan(
       people: [person(month: 3, day: 20)],
-      reference: DateTime.utc(2026, 3, 18, 10),
+      // Local frame on purpose: trigger `at` values are local wall-clock
+      // DateTimes when a person has no timezone, and mixed UTC/local frames
+      // shift the "already passed" cutoff by the machine's UTC offset.
+      reference: DateTime(2026, 3, 18, 10),
       enabled: ReminderKind.values.toSet(),
     );
 

@@ -8,9 +8,8 @@ import '../domain/google_identity.dart';
 
 /// Consumer-grade Google Sign-In bottom sheet.
 ///
-/// Features:
 /// - Official Google Sign-In entry point.
-/// - Clear privacy guarantees (Zero-PII, local-first).
+/// - Plain-language description of what sign-in is used for.
 /// - Resilient error handling and accessibility support.
 class AuthBottomSheet extends ConsumerStatefulWidget {
   const AuthBottomSheet({super.key});
@@ -148,25 +147,28 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
             _buildFeatureTile(
               context,
               icon: Icons.cloud_done_outlined,
-              title: 'Encrypted Cloud Backup',
+              title: 'Cloud Backup',
               description:
-                  'Keep your birthdays safely backed up across device resets.',
+                  'Back up people, birthdays and drafts to your account over '
+                  'HTTPS, and restore them on a new device.',
             ),
             const SizedBox(height: 12),
             _buildFeatureTile(
               context,
               icon: Icons.star_outline_rounded,
-              title: 'Sync Pro Subscription',
+              title: 'Pro subscription',
               description:
-                  'Restore and access your AI drafting entitlement anywhere.',
+                  'Pro is tied to your Play Store account — restore purchases '
+                  'after reinstalling.',
             ),
             const SizedBox(height: 12),
             _buildFeatureTile(
               context,
               icon: Icons.lock_outline_rounded,
-              title: 'Zero-PII Privacy Promise',
+              title: 'What sign-in is used for',
               description:
-                  'Your data is encrypted. We never sell or share your contacts.',
+                  'Your Google account is used for sign-in and cloud backup '
+                  'only. Your data is never sold or used for ads.',
             ),
             const SizedBox(height: 20),
 

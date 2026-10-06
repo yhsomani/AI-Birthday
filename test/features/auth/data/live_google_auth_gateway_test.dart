@@ -282,9 +282,27 @@ void main() {
 
         expect(outcome, isA<SignInFailed>());
         final failed = outcome as SignInFailed;
+        expect(failed.message, contains('Sign-in was cancelled'));
+        expect(store.data.isEmpty, isTrue);
+      },
+    );
+
+    test(
+      'returns SHA-1 guidance when native sign-in fails with reauth error',
+      () async {
+        GoogleSignInPlatform.instance = TestGoogleSignInPlatform(
+          authException: const GoogleSignInException(
+            code: GoogleSignInExceptionCode.canceled,
+            description: '[16] Account reauth failed.',
+          ),
+        );
+
+        final outcome = await LiveGoogleAuthGateway(store: store).signIn();
+
+        expect(outcome, isA<SignInFailed>());
         expect(
-          failed.message,
-          contains('Google Sign-In failed or was cancelled'),
+          (outcome as SignInFailed).message,
+          contains('signing certificate (SHA-1)'),
         );
         expect(store.data.isEmpty, isTrue);
       },
@@ -324,7 +342,9 @@ void main() {
         final outcome = await gateway.signIn();
         expect(outcome, isA<SignInFailed>());
         final failed = outcome as SignInFailed;
-        expect(failed.message, contains('400'));
+        // Truthful, actionable copy — raw HTTP codes stay in the logs.
+        expect(failed.message, contains('rejected this app build'));
+        expect(failed.message, isNot(contains('400')));
         expect(store.data.isEmpty, isTrue);
       },
     );

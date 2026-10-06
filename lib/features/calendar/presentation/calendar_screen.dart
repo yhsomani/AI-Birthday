@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../birthdays/domain/birthday_engine.dart';
@@ -79,6 +80,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         for (final person in people)
           ListTile(
             contentPadding: EdgeInsets.zero,
+            onTap: () {
+              Navigator.of(context).pop();
+              context.push('/message-studio/person/${person.id}');
+            },
             leading: CircleAvatar(
               backgroundColor: AppColors.primaryTerracottaContainer,
               foregroundColor: AppColors.primaryTerracotta,

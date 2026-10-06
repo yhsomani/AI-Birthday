@@ -127,8 +127,6 @@ GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
   );
 }
 
-final appRouter = createAppRouter();
-
 /// Riverpod provider for GoRouter instance with onboarding guard.
 final routerProvider = Provider<GoRouter>((ref) {
   final storage = ref.watch(credentialStorageProvider);
