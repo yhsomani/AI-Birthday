@@ -61,6 +61,27 @@ void main() {
       },
     );
 
+    test('promotes an existing upcoming birthday to reminder due today', () async {
+      final repo = InMemoryBirthdaysRepository(
+        initialBirthdays: [
+          Birthday(
+            id: 'birthday-person-1',
+            personId: 'person-1',
+            cycleYear: 2026,
+            date: DateTime(2026, 10, 5),
+            status: BirthdayStatus.upcoming,
+            createdAt: DateTime(2026, 1, 1),
+            updatedAt: DateTime(2026, 10, 4),
+          ),
+        ],
+      );
+
+      await service.refresh(people: [person(month: 10, day: 5)], birthdaysRepository: repo);
+
+      final birthday = await repo.getBirthdayForPerson('person-1');
+      expect(birthday!.status, BirthdayStatus.reminderDue);
+    });
+
     test('preserves completed state for the same active cycle', () async {
       final repo = InMemoryBirthdaysRepository(
         initialBirthdays: [
