@@ -29,6 +29,12 @@ jobs:
       - name: Install Flutter Dependencies
         run: flutter pub get
 
+
+      - name: Probe Dart Formatter Output
+        run: |
+          dart format --output=show lib/features/reminders/application/android_notification_scheduler_gateway.dart
+          dart format --output=show test/features/birthdays/application/birthday_lifecycle_service_test.dart
+
       - name: Verify Formatting
         run: dart format --output=none --set-exit-if-changed .
 
