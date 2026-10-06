@@ -1333,7 +1333,7 @@ class _GeminiSetupGuideSheet extends StatelessWidget {
                 stepNumber: '2',
                 title: 'Create an API Key',
                 description:
-                    'Click "Create API key" (or "Get API key"). Select an existing Google Cloud project or create a new one instantly.',
+                    'Select "Create API key" in Google AI Studio. Follow the project and access options Google shows for your account.',
               ),
               const SizedBox(height: 18),
 
@@ -1342,7 +1342,7 @@ class _GeminiSetupGuideSheet extends StatelessWidget {
                 stepNumber: '3',
                 title: 'Copy your API Key',
                 description:
-                    'Copy the generated key to your clipboard. It will start with "AIzaSy...".',
+                    'Copy the new key, then return here and paste it into the field below. Google may use different key formats as its key system changes.',
               ),
               const SizedBox(height: 18),
 
@@ -1351,7 +1351,7 @@ class _GeminiSetupGuideSheet extends StatelessWidget {
                 stepNumber: '4',
                 title: 'Paste and Test in Settings',
                 description:
-                    'Return to AI-Birthday, paste the key into the Gemini API Key field, and tap "Test Connection" to verify it works.',
+                    'Return to AI-Birthday, paste the key into the Gemini API Key field, and tap "Test Connection". We will verify access before saving it.',
               ),
               const SizedBox(height: 24),
 
