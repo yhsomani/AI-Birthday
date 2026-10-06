@@ -99,6 +99,37 @@ class MainActivity : FlutterActivity() {
                             result.success(enabled)
                         }
                     }
+                    "hasExactAlarmPermission" -> {
+                        result.success(
+                            Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                                (getSystemService(Context.ALARM_SERVICE) as? AlarmManager)
+                                    ?.canScheduleExactAlarms() == true
+                        )
+                    }
+                    "requestExactAlarmPermission" -> {
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                            result.success(true)
+                        } else {
+                            val alarmManager =
+                                getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                            if (alarmManager?.canScheduleExactAlarms() == true) {
+                                result.success(true)
+                            } else {
+                                try {
+                                    val intent = Intent(
+                                        android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
+                                    ).apply {
+                                        data = android.net.Uri.parse("package:$packageName")
+                                    }
+                                    startActivity(intent)
+                                } catch (_: Exception) {
+                                    result.success(false)
+                                    return@setMethodCallHandler
+                                }
+                                result.success(false)
+                            }
+                        }
+                    }
                     "apply" -> {
                         val triggers = call.argument<List<Map<String, Any>>>("triggers") ?: emptyList()
                         scheduleTriggers(triggers)
