@@ -26,12 +26,30 @@ afterAll(async () => {
   await environment.cleanup();
 });
 
-describe('server-only Firestore rules', () => {
+describe('Firestore authorization rules', () => {
   it('denies unauthenticated direct reads and writes', async () => {
     const db = environment.unauthenticatedContext().firestore();
     await assertFails(getDoc(doc(db, 'globalControl/current')));
     await assertFails(
       setDoc(doc(db, 'accounts/uid-one'), { mode: 'TEST_ONLY' }),
+    );
+  });
+
+  it('allows authenticated owners to access only their own opt-in backup collections', async () => {
+    const ownerDb = environment
+      .authenticatedContext('uid-one', { email_verified: true })
+      .firestore();
+    const otherDb = environment
+      .authenticatedContext('uid-two', { email_verified: true })
+      .firestore();
+
+    await setDoc(doc(ownerDb, 'users/uid-one/people/person-1'), {
+      name: 'Test',
+    });
+
+    await assertFails(getDoc(doc(otherDb, 'users/uid-one/people/person-1')));
+    await assertFails(
+      setDoc(doc(otherDb, 'users/uid-one/people/person-1'), { name: 'Other' }),
     );
   });
 
