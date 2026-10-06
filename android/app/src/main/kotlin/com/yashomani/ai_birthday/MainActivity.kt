@@ -141,8 +141,7 @@ class MainActivity : FlutterActivity() {
                         val title = call.argument<String>("title") ?: "Birthday Reminder"
                         val body = call.argument<String>("body") ?: "Testing notification delivery"
                         val personId = call.argument<String>("personId")
-                        showImmediateNotification(title, body, personId)
-                        result.success(null)
+                        result.success(showImmediateNotification(title, body, personId))
                     }
                     else -> result.notImplemented()
                 }
@@ -534,8 +533,8 @@ class MainActivity : FlutterActivity() {
         return allCancelled
     }
 
-    private fun showImmediateNotification(title: String, body: String, personId: String? = null) {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+    private fun showImmediateNotification(title: String, body: String, personId: String? = null): Boolean {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 BirthdayNotificationReceiver.CHANNEL_ID,
@@ -546,6 +545,10 @@ class MainActivity : FlutterActivity() {
                 enableVibration(true)
             }
             notificationManager.createNotificationChannel(channel)
+        }
+
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            return false
         }
 
         val launchIntent = Intent(this, MainActivity::class.java).apply {
@@ -572,6 +575,7 @@ class MainActivity : FlutterActivity() {
             .build()
 
         notificationManager.notify(9999, notification)
+        return true
     }
 
     private fun mapFeatureStatus(status: Int): String {
