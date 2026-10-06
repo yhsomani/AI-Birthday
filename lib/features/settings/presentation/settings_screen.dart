@@ -663,8 +663,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         icon: Icon(
                           _obscureKey ? Icons.visibility : Icons.visibility_off,
                         ),
-                        onPressed: () =>
-                            setState(() => _obscureKey = !_obscureKey),
+                        tooltip: _obscureKey ? 'Show API key' : 'Hide API key',
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          setState(() => _obscureKey = !_obscureKey);
+                        },
                       ),
                     ),
                   ),
