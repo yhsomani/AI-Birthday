@@ -53,7 +53,7 @@ class PeopleScreen extends ConsumerWidget {
     final csvText = csvService.exportToCsv(people);
 
     final shareService = ref.read(nativeShareServiceProvider);
-    await shareService.shareText(
+    final shared = await shareService.shareText(
       text: csvText,
       title: 'AI-Birthday Contacts Export (${people.length})',
     );
@@ -61,7 +61,11 @@ class PeopleScreen extends ConsumerWidget {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Exported ${people.length} contacts to CSV file. 📋'),
+          content: Text(
+            shared
+                ? 'CSV export is ready to share.'
+                : 'Could not open the share sheet. Your contact data was not exported.',
+          ),
         ),
       );
     }
@@ -638,11 +642,12 @@ class PeopleScreen extends ConsumerWidget {
               final next = _next(person);
               final dateStr = person.hasBirthday
                   ? DateFormat.MMMMd().format(
-                      DateTime(
-                        2026,
-                        person.birthdayMonth!,
-                        person.birthdayDay!,
-                      ),
+                      next?.nextDate ??
+                          DateTime(
+                            DateTime.now().year,
+                            person.birthdayMonth!,
+                            person.birthdayDay!,
+                          ),
                     )
                   : 'No birthday set';
               final ageTurn =
@@ -683,6 +688,17 @@ class PeopleScreen extends ConsumerWidget {
                       Text(
                         '$dateStr$ageTurn • ${person.relationship.displayName}',
                       ),
+                      if (next != null) ...[
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: CountdownChip(
+                            daysUntil: next.daysUntil,
+                            isToday: next.isToday,
+                            customLabel: _countdownLabel(next),
+                          ),
+                        ),
+                      ],
                       if (person.importantFacts.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -697,16 +713,7 @@ class PeopleScreen extends ConsumerWidget {
                       ],
                     ],
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (next != null)
-                        CountdownChip(
-                          daysUntil: next.daysUntil,
-                          isToday: next.isToday,
-                          customLabel: _countdownLabel(next),
-                        ),
-                      PopupMenuButton<String>(
+                  trailing: PopupMenuButton<String>(
                         tooltip: 'Person actions',
                         onSelected: (action) async {
                           if (action == 'message') {
@@ -808,7 +815,12 @@ class PeopleScreen extends ConsumerWidget {
           'Birthday',
           person.hasBirthday
               ? DateFormat.MMMMd().format(
-                  DateTime(2026, person.birthdayMonth!, person.birthdayDay!),
+                  _next(person)?.nextDate ??
+                      DateTime(
+                        DateTime.now().year,
+                        person.birthdayMonth!,
+                        person.birthdayDay!,
+                      ),
                 )
               : 'Not set',
         ),
