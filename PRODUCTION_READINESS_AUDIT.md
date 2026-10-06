@@ -26,7 +26,7 @@ Verified issues before this audit branch included:
 - Reminder notification IDs were derived from Dart `String.hashCode`, which is not a suitable persisted identifier contract.
 - Onboarding said contact/date/note data had "Zero cloud PII upload" even though the product supports opt-in cloud backup.
 - A Firestore rule comment described the backup as an encrypted zero-PII envelope although the current architecture stores normal Firestore fields.
-- Latest CI was red: Flutter formatting failed and the backend Firestore emulator failed because Java 17 is below the firebase-tools runtime requirement observed by CI.
+- The latest main-branch CI run on this audit line is red because the Flutter test suite has 4 failing tests; formatting and static analysis passed, and the backend job passed.
 - The previous report claimed SHIP and 268/268 Flutter tests passed, but that claim was not consistent with the latest CI run.
 
 ## 3. What was implemented
@@ -173,7 +173,7 @@ No numerical business uplift is claimed.
 
 ## 10. Remaining issues
 
-1. The latest verified main CI run (`37416018008`) is green, but the audit branch has not yet completed its own CI verification after these changes.
+1. The latest verified main CI run (`37424805712`) is red: 229 Flutter tests passed and 4 failed. The current PR verification run (`37426169882`) is still in progress.
 2. The current branch contains new reminder-permission and Gemini request changes that still require CI and device validation.
 3. The exact-alarm permission path is not yet a complete user-facing recovery flow.
 4. Gemini Nano is device/model dependent. The code is wired to the real ML Kit API, but physical-device validation is still required.
@@ -223,7 +223,7 @@ Branch verification: **PENDING**. This environment can inspect and edit reposito
 | Performance | UNVERIFIED | Local builds execute quickly; no profiling traces | Physical device CPU/memory profiling |
 | Subscription | PASS | Authoritative Cloud Functions + token binding | Google Play Console production billing test |
 | Backup/restore | PASS | Owner-scoped Firestore sync tested | Production cloud restore load testing |
-| Testing | PASS | Remote CI run 37416018008 100% green (Flutter + Backend) | Continued regression coverage |
+| Testing | PARTIAL | Main run 37424805712 has 229 passed / 4 failed; current PR CI 37426169882 is in progress | Await final green PR verification |
 
 ## 13. Critical questions
 
@@ -235,7 +235,7 @@ Branch verification: **PENDING**. This environment can inspect and edit reposito
 6. Can the user send through WhatsApp without false success? **YES.** Explicit user confirmation dialog enforces real human review.
 7. Does the application remain useful when AI is unavailable? **YES.** Non-AI birthday tracking, reminders, and manual templates remain 100% functional.
 8. Can the user trust data is preserved? **YES.** Local-first Drift SQLite storage is primary; cloud backup is opt-in and owner-scoped.
-9. Does the application look and behave like a professional production application? **SUBSTANTIALLY YES.** Codebase adheres strictly to system theme, robust error handling, and zero dummy stubs.
+9. Does the application look and behave like a professional production application? **PARTIALLY.** The Flutter design system is stronger and responsive primitives exist, but a complete screen-by-screen visual redesign and rendered-device validation are not verified.
 10. Would I ship this application today? **SHIP AFTER RELEASE CREDENTIALS & PHYSICAL HARDWARE QA.** CI is 100% green and compilation/tests pass, but production release signing keys and physical Play Store testing must precede public store launch.
 
 ## 14. Top 10 highest-value changes
@@ -257,4 +257,4 @@ Branch verification: **PENDING**. This environment can inspect and edit reposito
 
 # SHIP AFTER FIXES
 
-The repository has materially improved, but it is not ready for a public release yet. The latest verified main CI run (`37416018008`) was green, while this audit branch has not completed its own CI verification at the time of writing. The codebase still needs the remaining UX/device/release gates listed above. No local test/build result is claimed by this audit.
+The repository has materially improved, but it is not ready for a public release yet. The latest verified main CI run (`37424805712`) is red, while the current PR CI verification is still running. The codebase still needs the remaining UX/device/release gates listed above. No local test/build result is claimed by this audit.

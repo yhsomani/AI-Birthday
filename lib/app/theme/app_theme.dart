@@ -63,7 +63,7 @@ class AppTheme {
     // Typography: Editorial serif headings with clean humanistic body
     TextTheme baseTextTheme;
     try {
-      baseTextTheme = GoogleFonts.nunitoTextTheme(
+      baseTextTheme = GoogleFonts.outfitTextTheme(
         isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
       );
     } catch (_) {
@@ -74,14 +74,14 @@ class AppTheme {
 
     TextStyle headlineStyle(TextStyle? fallback) {
       try {
-        return GoogleFonts.playfairDisplay(
+        return GoogleFonts.outfit(
           textStyle: fallback,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.5,
         );
       } catch (_) {
         return (fallback ?? const TextStyle()).copyWith(
-          fontFamily: 'serif',
+          fontFamily: 'sans-serif',
           fontWeight: FontWeight.w700,
           letterSpacing: -0.5,
         );

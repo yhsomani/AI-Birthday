@@ -32,7 +32,7 @@ void main() {
   }
 
   test('plans each enabled lead at 9:00 on the right day', () {
-    final reference = DateTime.utc(2026, 3, 14);
+    final reference = DateTime.utc(2026, 3, 12);
     const scheduler = ReminderScheduler();
     final plan = scheduler.plan(
       people: [person()],
@@ -70,7 +70,7 @@ void main() {
     const scheduler = ReminderScheduler();
     final plan = scheduler.plan(
       people: [person()],
-      reference: DateTime.utc(2026, 3, 14),
+      reference: DateTime.utc(2026, 3, 12),
       enabled: const {ReminderKind.prepare, ReminderKind.birthday},
     );
     expect(plan.active.map((t) => t.kind).toSet(), {
@@ -83,7 +83,7 @@ void main() {
     const scheduler = ReminderScheduler();
     final plan = scheduler.plan(
       people: [person(), person()],
-      reference: DateTime.utc(2026, 3, 14),
+      reference: DateTime.utc(2026, 3, 12),
       enabled: ReminderKind.values.toSet(),
     );
     expect(plan.active, hasLength(4));
@@ -109,7 +109,7 @@ void main() {
     );
     final plan = scheduler.plan(
       people: [person()],
-      reference: DateTime.utc(2026, 3, 14),
+      reference: DateTime.utc(2026, 3, 12),
       enabled: ReminderKind.values.toSet(),
       quietHours: quiet,
     );
@@ -145,7 +145,7 @@ void main() {
     );
     final plan = scheduler.plan(
       people: [noBdayPerson],
-      reference: DateTime.utc(2026, 3, 14),
+      reference: DateTime.utc(2026, 3, 12),
       enabled: ReminderKind.values.toSet(),
     );
     expect(plan.active, isEmpty);
