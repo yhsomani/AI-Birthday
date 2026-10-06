@@ -195,6 +195,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _manageExactAlarmAccess() async {
+    HapticFeedback.lightImpact();
+    final gateway = ref.read(notificationSchedulerGatewayProvider);
+    final granted = await gateway.hasExactAlarmPermission();
+    if (granted && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Precise reminder access is already enabled.')),
+      );
+      return;
+    }
+    final opened = await gateway.requestExactAlarmPermission();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          opened
+              ? 'Precise reminder access is enabled.'
+              : 'Allow precise reminders in Android settings, then return to AI-Birthday.',
+        ),
+      ),
+    );
+    await _checkReminderAccess();
+  }
+
+  Future<void> _checkReminderAccess() async {
+    // Refreshing this screen after the system-settings handoff prevents stale permission UI.
+    if (!mounted) return;
+    setState(() {});
+  }
+
   Future<void> _testConnection() async {
     HapticFeedback.lightImpact();
     final text = _apiKeyController.text.trim();
