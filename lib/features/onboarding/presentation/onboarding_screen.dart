@@ -143,9 +143,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           const SizedBox(height: 16),
           _buildFeatureRow(
             icon: Icons.shield_outlined,
-            title: 'Strictly Local-First Privacy',
+            title: 'Local by Default',
             description:
-                'Your contacts, dates, and notes stay on your device. Zero cloud PII upload.',
+                'Your birthday data stays on this device unless you explicitly choose cloud backup or an external service.',
           ),
         ],
       ),
