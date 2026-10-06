@@ -4,8 +4,8 @@
 AI-Birthday is a Flutter mobile application with a Firebase Cloud Functions backend.
 - **Frontend Core**: Flutter (Dart) with Riverpod state management, Drift SQLite local database, `flutter_secure_storage` for key material, and `google_sign_in` + Firebase Auth REST for authentication.
 - **On-Device AI Engine**: Native Android Kotlin platform channel (`com.yashsomani.ai_birthday/nano`) interfacing with Google Play Services AICore (`com.google.android.aicore`) on Android 14+ devices.
-- **Cloud Infrastructure**: Firebase Cloud Functions (Node.js/TypeScript) for backend operations, Firestore for server-authoritative entitlement records (`/users/{uid}/entitlement/status`) and encrypted zero-PII cloud backup envelopes (`/users/{uid}/backup/envelope`).
-- **Security & Privacy Boundary**: Client-side AES-256-GCM encryption ensures zero plaintext PII leaves the client device. Server-side rules enforce read-only entitlement access for clients and server-only writes.
+- **Cloud Infrastructure**: Firebase Cloud Functions (Node.js/TypeScript) for backend operations, with Firestore for server-authoritative entitlement records and opt-in account-scoped backup collections.
+- **Security & Privacy Boundary**: Birthday/contact data is local by default. When the user enables Cloud Backup, saved people, birthday cycles, message drafts, and reminder settings are written as Firestore fields under the authenticated user's UID. Server-side rules scope access to that owner.
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
@@ -17,9 +17,9 @@ AI-Birthday is a Flutter mobile application with a Firebase Cloud Functions back
 | F5 | Firestore Entitlement Security Rules | Allow authenticated user read access to `users/{uid}/entitlement/status` while enforcing server-only writes. | M2 | ORIGINAL_REQUEST R2 |
 | F6 | Server-Authoritative SubscriptionService | Client listens to Firestore entitlement stream; treats local storage strictly as offline fallback; removes "Simulate Pro" backdoor. | M2 | ORIGINAL_REQUEST R2 |
 | F7 | Drift Database Schema Evolution | Add `version` (int) and `deletedAt` (nullable DateTime) to Birthdays table in `app_database.dart` for monotonic synchronization. | M3 | ORIGINAL_REQUEST R3 |
-| F8 | Hardware-Derived AES-256-GCM Crypto Envelope | Client-side encrypt recipient birthday payloads using AES-256-GCM with hardware-secured keys before transmitting to Firestore. | M3 | ORIGINAL_REQUEST R3 |
+| F8 | Hardware-Derived AES-256-GCM Crypto Envelope | Deferred; not implemented in the current CloudSyncService. | M3 | ORIGINAL_REQUEST R3 |
 | F9 | Deterministic Conflict Resolution & Restore | Implement version vector checks to prevent overwriting newer local edits with older backups; decrypt cleanly into Drift SQLite. | M3 | ORIGINAL_REQUEST R3 |
-| F10 | Cloud Sync Zero-PII UI & Log Redaction | Update settings UI privacy notice; scrub all recipient names, phones, notes, and UIDs from sync logging pipelines. | M3 | ORIGINAL_REQUEST R3 |
+| F10 | Cloud Sync Privacy Disclosure & Log Redaction | Implemented as owner-scoped opt-in backup with truthful UI disclosure and sensitive log redaction; cloud backup is not an encrypted zero-PII envelope. | M3 | ORIGINAL_REQUEST R3 |
 | F11 | Android Manifest AICore Package Visibility | Add `<package android:name="com.google.android.aicore" />` to `<queries>` in `AndroidManifest.xml` for Android 11+ visibility. | M4 | ORIGINAL_REQUEST R4 |
 | F12 | Native Kotlin AICore MethodChannel Bridge | Implement state evaluation (`ready`, `downloading_model`, `unsupported_device`, `service_unavailable`) and inference delegation in `MainActivity.kt`. | M4 | ORIGINAL_REQUEST R4 |
 | F13 | Flutter NanoState Integration & Canned Text Purge | Update `gemini_nano_platform.dart` to map typed states; purge canned mock birthday greeting from `DefaultGeminiNanoPlatform`. | M4 | ORIGINAL_REQUEST R4 |
