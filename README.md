@@ -107,7 +107,7 @@ flowchart TD
 ## 🛠️ Development Setup
 
 ### Prerequisites
-- [Flutter SDK](https://flutter.dev/docs/get-started/install) (3.11.0+)
+- [Flutter SDK](https://flutter.dev/docs/get-started/install) compatible with the repository SDK constraint (`Dart >=3.11.0`); CI currently verifies with Flutter 3.47.6
 - [Android SDK](https://developer.android.com/studio) with API 35 (Android 15) and build-tools
 - Java 17 (Zulu or OpenJDK)
 - Physical Android device or Emulator
