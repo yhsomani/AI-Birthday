@@ -853,8 +853,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 FutureBuilder<bool>(
                   future: ref
-              .read(notificationSchedulerGatewayProvider)
-              .hasExactAlarmPermission(),
+                      .read(notificationSchedulerGatewayProvider)
+                      .hasExactAlarmPermission(),
                   builder: (context, snapshot) {
                     final exactReady = snapshot.data != false;
                     return ListTile(
