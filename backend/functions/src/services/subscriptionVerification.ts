@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { Firestore } from 'firebase-admin/firestore';
 import { Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -69,12 +71,11 @@ export class SubscriptionVerificationService {
       );
     }
 
-    if (
-      purchase.obfuscatedExternalAccountId == null ||
-      purchase.obfuscatedExternalAccountId !== request.accountBinding
-    ) {
-      throw new HttpsError('permission-denied', 'PURCHASE_ACCOUNT_MISMATCH');
-    }
+    const purchaseTokenHash = createHash('sha256')
+      .update(request.purchaseToken, 'utf8')
+      .digest('hex');
+
+    await this.claimPurchaseOwnership(uid, purchaseTokenHash);
 
     const matchingItem = purchase.lineItems
       .filter(item => item.productId === request.productId)
@@ -101,15 +102,17 @@ export class SubscriptionVerificationService {
         ? 'expired'
         : 'none';
 
-    await this.db.doc(`users/${uid}/entitlement/status`).set(
+    await this.db.doc('users/' + uid + '/entitlement/status').set(
       {
         status,
         productId: request.productId,
         expiryDateMs,
         canUseAi,
-        isAutoRenewing: purchase.subscriptionState === 'SUBSCRIPTION_STATE_ACTIVE',
+        isAutoRenewing:
+          purchase.subscriptionState === 'SUBSCRIPTION_STATE_ACTIVE',
         acknowledgementState: purchase.acknowledgementState,
         accountBinding: request.accountBinding,
+        purchaseTokenHash,
         verifiedAtMs: nowMs,
         updatedAt: Timestamp.now(),
       },
@@ -124,12 +127,50 @@ export class SubscriptionVerificationService {
     };
   }
 
+  private async claimPurchaseOwnership(
+    uid: string,
+    purchaseTokenHash: string,
+  ): Promise<void> {
+    const ownershipRef = this.db.doc(
+      'subscriptionPurchaseOwnership/' + purchaseTokenHash,
+    );
+
+    try {
+      await ownershipRef.create({
+        uid,
+        createdAt: Timestamp.now(),
+      });
+      return;
+    } catch (error) {
+      const code =
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        typeof error.code === 'number'
+          ? error.code
+          : null;
+
+      if (code !== 6) {
+        throw new HttpsError(
+          'unavailable',
+          'SUBSCRIPTION_OWNERSHIP_STORE_UNAVAILABLE',
+        );
+      }
+    }
+
+    const existing = await ownershipRef.get();
+    const ownerUid = existing.data()?.['uid'];
+    if (ownerUid !== uid) {
+      throw new HttpsError('permission-denied', 'PURCHASE_ACCOUNT_MISMATCH');
+    }
+  }
+
   private async writeNone(
     uid: string,
     productId: string,
   ): Promise<VerifyPurchaseResponse> {
     const nowMs = Date.now();
-    await this.db.doc(`users/${uid}/entitlement/status`).set(
+    await this.db.doc('users/' + uid + '/entitlement/status').set(
       {
         status: 'none',
         productId,
