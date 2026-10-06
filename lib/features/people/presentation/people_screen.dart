@@ -293,7 +293,7 @@ class PeopleScreen extends ConsumerWidget {
                                   border: Border.all(color: Colors.amber),
                                 ),
                                 child: Text(
-                                  c.duplicateWarning,
+                                  c.duplicateWarning ?? 'Potential duplicate',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: Colors.brown,

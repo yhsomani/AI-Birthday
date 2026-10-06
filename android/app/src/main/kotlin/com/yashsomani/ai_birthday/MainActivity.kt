@@ -596,6 +596,7 @@ class MainActivity : FlutterActivity() {
             Log.e("BirthdayReminder", "Test notification was rejected", e)
             false
         }
+    }
 
     private fun mapFeatureStatus(status: Int): String {
         return when (status) {
