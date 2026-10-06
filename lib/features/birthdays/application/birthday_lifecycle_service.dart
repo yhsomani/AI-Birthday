@@ -1,5 +1,3 @@
-import 'package:clock/clock.dart' as clock;
-
 import '../../people/domain/models/person.dart';
 import '../domain/birthday_engine.dart';
 import '../domain/models/birthday.dart';
@@ -15,7 +13,7 @@ class BirthdayLifecycleService {
   const BirthdayLifecycleService({
     this.engine = const BirthdayEngine(),
     DateTime Function()? now,
-  }) : _now = now ?? clock.clock.now;
+  }) : _now = now ?? DateTime.now;
 
   final BirthdayEngine engine;
   final DateTime Function() _now;
