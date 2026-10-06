@@ -124,6 +124,7 @@ void main() {
           email: 'taylor@example.com',
           displayName: 'Taylor',
           firebaseUid: 'uid-test',
+          idToken: 'test-id-token',
         ),
       );
 
@@ -133,7 +134,7 @@ void main() {
       expect(patchCount, 2);
 
       // Verify timestamp stored
-      final lastSync = await service.getLastSyncTime();
+      final lastSync = await service.getLastSyncTime('uid-test');
       expect(lastSync, isNotNull);
     });
 
@@ -186,7 +187,7 @@ void main() {
         expect(result.uploadedCount, 0);
         expect(result.error, contains('Cloud backup failed'));
 
-        final lastSync = await service.getLastSyncTime();
+        final lastSync = await service.getLastSyncTime('uid-test');
         expect(lastSync, isNull);
       },
     );
