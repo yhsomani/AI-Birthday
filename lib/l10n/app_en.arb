@@ -1,0 +1,13 @@
+{
+  "@@locale": "en",
+  "navDashboard": "Dashboard",
+  "@navDashboard": { "description": "Bottom navigation destination: birthday dashboard" },
+  "navPeople": "People",
+  "@navPeople": { "description": "Bottom navigation destination: tracked people list" },
+  "navCalendar": "Calendar",
+  "@navCalendar": { "description": "Bottom navigation destination: birthday calendar" },
+  "navHistory": "History",
+  "@navHistory": { "description": "Bottom navigation destination: message history" },
+  "navSettings": "Settings",
+  "@navSettings": { "description": "Bottom navigation destination: settings" }
+}

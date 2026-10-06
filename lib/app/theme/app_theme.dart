@@ -1,36 +1,22 @@
-/// Authoritative Material 3 Design System for AI-Birthday (SSOT §3, §22).
+/// Material 3 theme for AI-Birthday — "Confetti, but grown-up".
 ///
-/// Eliminates generic AI/SaaS templates (no arbitrary gradients, no bubbly pill
-/// badges, no repetitive card soup). Uses a warm, distinctive editorial aesthetic:
-/// warm terracotta and vintage amber tones on linen surfaces, robust serif headlines,
-/// crisp structural borders, and strict 48dp+ accessible touch targets.
+/// All colors come from [AppPalette] (design tokens), typography from the
+/// bundled fonts (Bricolage Grotesque display, Outfit body) — no network
+/// font fetching. Touch targets are strictly 48dp+.
 library;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../shared/design_system/app_colors.dart';
+import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
 class AppTheme {
   const AppTheme._();
 
-  // Distinctive celebratory palette (warm terracotta, vintage amber, forest green accents)
-  static const Color primaryTerracotta = AppColors.primaryTerracotta;
-  static const Color primaryTerracottaDark = AppColors.primaryTerracottaLight;
-  static const Color accentAmber = AppColors.accentAmber;
-  static const Color accentForest = AppColors.accentForest;
+  /// Bundled display font (headlines, app bar titles).
+  static const String displayFont = 'BricolageGrotesque';
 
-  // Surface colors - Light (Linen / Editorial)
-  static const Color lightBackground = AppColors.lightBackground;
-  static const Color lightSurface = AppColors.lightSurface;
-  static const Color lightSurfaceVariant = AppColors.lightSurfaceVariant;
-  static const Color lightBorder = AppColors.lightBorder;
-
-  // Surface colors - Dark (Warm Charcoal / Espresso)
-  static const Color darkBackground = AppColors.darkBackground;
-  static const Color darkSurface = AppColors.darkSurface;
-  static const Color darkSurfaceVariant = AppColors.darkSurfaceVariant;
-  static const Color darkBorder = AppColors.darkBorder;
+  /// Bundled body font.
+  static const String bodyFont = 'Outfit';
 
   /// Material 3 Light Theme
   static ThemeData get light => _buildTheme(Brightness.light);
@@ -38,98 +24,75 @@ class AppTheme {
   /// Material 3 Dark Theme
   static ThemeData get dark => _buildTheme(Brightness.dark);
 
-  // Backward compatibility with method syntax
-  static ThemeData lightTheme() => light;
-  static ThemeData darkTheme() => dark;
-
   static ThemeData _buildTheme(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
-
-    final primary = isDark ? primaryTerracottaDark : primaryTerracotta;
-    final background = isDark ? darkBackground : lightBackground;
-    final surface = isDark ? darkSurface : lightSurface;
-    final surfaceVariant = isDark ? darkSurfaceVariant : lightSurfaceVariant;
-    final border = isDark ? darkBorder : lightBorder;
+    final palette = isDark ? AppPalette.dark : AppPalette.light;
 
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: primaryTerracotta,
+      seedColor: palette.primary,
       brightness: brightness,
-      primary: primary,
-      secondary: accentAmber,
-      tertiary: accentForest,
-      surface: surface,
+      primary: palette.primary,
+      onPrimary: palette.onPrimary,
+      primaryContainer: palette.primaryContainer,
+      onPrimaryContainer: palette.onPrimaryContainer,
+      secondary: palette.accent,
+      surface: palette.surface,
+      onSurface: palette.textPrimary,
+      outline: palette.border,
+      error: palette.danger,
+      onError: palette.onDanger,
     );
 
-    // Typography: Editorial serif headings with clean humanistic body
-    TextTheme baseTextTheme;
-    try {
-      baseTextTheme = GoogleFonts.outfitTextTheme(
-        isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
-      );
-    } catch (_) {
-      baseTextTheme = isDark
-          ? ThemeData.dark().textTheme
-          : ThemeData.light().textTheme;
-    }
-
-    TextStyle headlineStyle(TextStyle? fallback) {
-      try {
-        return GoogleFonts.outfit(
-          textStyle: fallback,
-          fontWeight: FontWeight.w700,
+    TextStyle display(TextStyle? base, {FontWeight weight = FontWeight.w700}) =>
+        (base ?? const TextStyle()).copyWith(
+          fontFamily: displayFont,
+          fontWeight: weight,
           letterSpacing: -0.5,
         );
-      } catch (_) {
-        return (fallback ?? const TextStyle()).copyWith(
-          fontFamily: 'sans-serif',
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.5,
-        );
-      }
-    }
 
-    final textTheme = baseTextTheme.copyWith(
-      displayLarge: headlineStyle(baseTextTheme.displayLarge),
-      displayMedium: headlineStyle(baseTextTheme.displayMedium),
-      displaySmall: headlineStyle(baseTextTheme.displaySmall),
-      headlineLarge: headlineStyle(baseTextTheme.headlineLarge),
-      headlineMedium: headlineStyle(baseTextTheme.headlineMedium),
-      headlineSmall: headlineStyle(baseTextTheme.headlineSmall),
-      titleLarge: baseTextTheme.titleLarge?.copyWith(
-        fontWeight: FontWeight.w700,
-        letterSpacing: -0.2,
-      ),
-      titleMedium: baseTextTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
-      titleSmall: baseTextTheme.titleSmall?.copyWith(
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.5,
-      ),
-    );
+    final baseTextTheme = (isDark ? ThemeData.dark() : ThemeData.light())
+        .textTheme;
+    final textTheme = baseTextTheme.apply(fontFamily: bodyFont).copyWith(
+          displayLarge: display(baseTextTheme.displayLarge),
+          displayMedium: display(baseTextTheme.displayMedium),
+          displaySmall: display(baseTextTheme.displaySmall),
+          headlineLarge: display(baseTextTheme.headlineLarge),
+          headlineMedium: display(baseTextTheme.headlineMedium),
+          headlineSmall: display(baseTextTheme.headlineSmall),
+          titleLarge: display(
+            baseTextTheme.titleLarge,
+          ).copyWith(letterSpacing: -0.2),
+          titleMedium: baseTextTheme.titleMedium?.copyWith(
+            fontFamily: displayFont,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.2,
+          ),
+        );
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: background,
+      scaffoldBackgroundColor: palette.background,
       textTheme: textTheme,
+      extensions: [palette],
       appBarTheme: AppBarTheme(
-        backgroundColor: background,
-        foregroundColor: isDark ? Colors.white : const Color(0xFF1C1917),
+        backgroundColor: palette.background,
+        foregroundColor: palette.textPrimary,
         elevation: 0,
         scrolledUnderElevation: 1,
         centerTitle: false,
         titleTextStyle: textTheme.titleLarge?.copyWith(
-          color: isDark ? Colors.white : const Color(0xFF1C1917),
+          fontFamily: displayFont,
+          color: palette.textPrimary,
         ),
       ),
       cardTheme: CardThemeData(
-        color: surface,
+        color: palette.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: border, width: 1),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          side: BorderSide(color: palette.border, width: 1),
         ),
         margin: EdgeInsets.zero,
       ),
@@ -139,9 +102,12 @@ class AppTheme {
             64,
             48,
           ), // Strict 48dp accessible touch target
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.lg,
+            vertical: AppSpace.md,
+          ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
@@ -149,10 +115,13 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(64, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          side: BorderSide(color: border, width: 1.2),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.lg,
+            vertical: AppSpace.md,
+          ),
+          side: BorderSide(color: palette.border, width: 1.2),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
@@ -160,8 +129,13 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           minimumSize: const Size(48, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.lg,
+            vertical: AppSpace.md,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
@@ -169,35 +143,41 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surfaceVariant,
+        fillColor: palette.surfaceAlt,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
+          horizontal: AppSpace.lg,
           vertical: 14,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: border),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          borderSide: BorderSide(color: palette.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: border),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          borderSide: BorderSide(color: palette.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: primary, width: 2),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          borderSide: BorderSide(color: palette.primary, width: 2),
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 68,
-        backgroundColor: surface,
+        backgroundColor: palette.surface,
         elevation: 0,
-        indicatorColor: primary.withValues(alpha: 0.15),
+        indicatorColor: palette.primary.withValues(alpha: 0.15),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       ),
-      dividerTheme: DividerThemeData(color: border, thickness: 1, space: 24),
+      dividerTheme: DividerThemeData(
+        color: palette.border,
+        thickness: 1,
+        space: AppSpace.xl,
+      ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
       ),
     );
   }
