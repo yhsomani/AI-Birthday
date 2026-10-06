@@ -1,22 +1,22 @@
 # AI-Birthday 🎂
 
-> **A Privacy-First, Local-First Personal Birthday Assistant with AI-Assisted, User-Controlled Messaging.**
+> **A local-first personal birthday assistant with AI-assisted, user-controlled messaging.**
 
-AI-Birthday is a Flutter & Android application engineered to help you remember important birthdays and compose heartfelt, personalized wishes tailored to each relationship. Built with a strict **Local-First, Zero-Cloud PII** philosophy, all recipient details and birthday dates reside exclusively on your physical device.
+AI-Birthday is a Flutter & Android application engineered to help you remember important birthdays and compose personalized wishes tailored to each relationship. Birthday and contact data is stored locally by default. Cloud backup is optional and, when enabled, stores the selected backup records in the app's Firestore project under the signed-in user's account.
 
 ---
 
 ## 🌟 Key Highlights & Architecture Principles
 
 - **Local-First SQLite Persistence**: Powered by [Drift](https://drift.simonbinder.eu/) SQLite on-device storage. Fast queries, offline-first reliability, and reactive UI streams.
-- **Privacy & Transparent Data Architecture**: Contact names, phone numbers, birthdates, and private notes reside locally on your physical device by default. Cloud Backup (Firestore) is strictly opt-in and transparently uploads to the user's authenticated Google Cloud storage with clear disclosures. Zero tracking telemetry or 3rd-party ad SDKs.
-- **Hardware-Backed Credential Security**: User API keys (Gemini BYOK) are stored in Android's hardware-backed KeyStore via `EncryptedSharedPreferences` (`FlutterSecureStorage`). Requests connect directly to Google's Gemini endpoint without passing through intermediate servers.
+- **Privacy & Transparent Data Architecture**: Contact names, phone numbers, birthdates, notes, drafts, and reminder settings remain local by default. Cloud Backup is opt-in and account-scoped to the authenticated Firebase UID.
+- **Credential Security**: User Gemini API keys are stored through `flutter_secure_storage` and are not written to the SQLite database or cloud backup.
 - **Bring-Your-Own-Key (BYOK) & On-Device AI Routing**:
   - Direct client-to-API inference via Google Gemini Flash Lite.
   - Native Android platform channel bridge for Gemini Nano (Google AICore / ML Kit GenAI), truthfully reported as unavailable until on-device model weights are loaded and verified.
   - Strict Prompt Boundary: The AI prompt contains *only* verified facts provided by the user; private notes and untrusted inputs are never injected as instructions.
 - **Native Android Notification Delivery**: Real exact alarms scheduled via `AlarmManager` with high-priority notification channels and customizable Quiet Hours (e.g., 22:00–08:00) that respect sleep schedules. Clean cancellation of scheduled `PendingIntent`s upon disabling.
-- **Human-in-the-Loop WhatsApp Handoff**: The application never sends messages autonomously. It constructs pre-filled WhatsApp deep links (`https://wa.me/`), opens native WhatsApp for user inspection, marks drafts as "Opened in WhatsApp", and transitions to "Sent" only upon explicit user confirmation.
+- **Human-in-the-Loop WhatsApp Handoff**: The application never sends messages autonomously. It constructs pre-filled WhatsApp deep links, opens native WhatsApp for user inspection, and transitions to completed only after explicit user confirmation.
 
 ---
 
@@ -87,7 +87,7 @@ flowchart TD
 - Bottom sheet breakdown of all celebrations occurring in the selected month.
 
 ### 4. Message Studio
-- **Personalized AI Generation**: Leverages Google Gemini (`gemini-2.5-flash-lite`) using your personal Gemini API key.
+- **Personalized AI Generation**: Uses the configured AI route, subject to the app's subscription entitlement. When a user Gemini API key is configured, requests go directly to Google's Gemini API; Gemini Nano is used when the supported on-device route is available.
 - **Tone Selector**: Warm, Playful, Formal, Short, or Heartfelt.
 - **Relationship Context**: Incorporates relationship closeness and verified user facts.
 - **Editing & Polishing**: Full draft editing, copy-to-clipboard, and regenerate controls.
@@ -145,10 +145,7 @@ flowchart TD
 
 ## 🧪 Quality Assurance & Test Suite
 
-The repository maintains strict quality gates:
-
-- **100% Static Analysis Compliance**: 0 errors, warnings, or lints (`flutter analyze`).
-- **160 Automated Flutter Tests**: Unit, domain, repository, widget, and integration tests covering:
+The repository contains unit, domain, repository, widget, integration, E2E, and backend tests covering:
   - Guided 3-step onboarding flow and state persistence
   - Calendar math and leap year resolution (`BirthdayEngine`)
   - Drift SQLite persistence & sync envelope with version increments and field preservation
@@ -160,16 +157,16 @@ The repository maintains strict quality gates:
   - WhatsApp deep-link generation and validation
   - Reminder scheduler, exact alarm pending intent cancellation, and quiet-hours windowing
   - Full UI flows and widget navigation
-- **Backend Verification**: 68 Vitest tests validating Firebase Firestore security rules, deletion orchestrators, and privacy policies.
+- **Backend Verification**: Vitest coverage includes Firestore authorization rules, deletion workflows, privacy policies, transport validation, and subscription verification. CI must be used as the execution evidence for current pass/fail status.
 
 ---
 
 ## 🔒 Security & Privacy Practices
 
-1. **Zero Contact Telemetry**: Contact names, relationships, phone numbers, and birth dates never leave the local SQLite database.
-2. **Encrypted API Keys**: Gemini API keys are encrypted at rest using AES-256 via Android KeyStore / Keystore-backed shared preferences.
+1. **Default Local Storage**: Contact names, relationships, phone numbers, and birth dates remain local unless the user explicitly uses cloud backup or an external delivery/AI feature that requires the data.
+2. **Secure API Key Storage**: Gemini API keys are stored through `flutter_secure_storage`; the key is not included in normal database or cloud-backup records.
 3. **Structured Log Redaction**: Internal logger (`ConsoleAppLogger`) automatically redacts API keys, phone numbers, and authentication tokens before printing.
-4. **Release Signing**: Production builds utilize standard release signing configs and R8/ProGuard obfuscation rules (`android/app/build.gradle.kts`).
+4. **Release Signing**: Release builds do not fall back to the debug signing key. A Play-ready signed artifact requires release keystore configuration in the build environment.
 
 ---
 
