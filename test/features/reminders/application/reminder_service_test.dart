@@ -42,10 +42,10 @@ class RecordingGateway implements NotificationSchedulerGateway {
   }
 
   @override
-  Future<void> sendTestNotification({
+  Future<bool> sendTestNotification({
     required String title,
     required String body,
-  }) async {}
+  }) async => true;
 
   @override
   Future<String?> getInitialNotificationPersonId() async => null;
