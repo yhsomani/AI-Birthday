@@ -1,10 +1,14 @@
-import 'person_enums.dart';
+/// Canonical recipient domain model for AI-Birthday.
+library;
 
-/// A person (birthday recipient) as defined by SSOT §7.
+import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
+import 'package:ai_birthday/features/people/domain/models/relationship.dart';
+import 'package:ai_birthday/features/people/domain/models/tone.dart';
+
+/// A birthday recipient stored locally and optionally synced to the user's cloud account.
 ///
-/// Timestamps and [version] form the sync envelope. [importantFacts] are the
-/// only recipient facts that may be presented to AI as factual context;
-/// [notes] are untrusted data and never treated as instructions.
+/// This is the single application/domain representation of a person. Persistence,
+/// AI, reminders, delivery, and presentation layers should all depend on this model.
 class Person {
   const Person({
     required this.id,
@@ -14,15 +18,15 @@ class Person {
     this.birthYear,
     this.phoneNumber,
     this.email,
-    this.relationship = '',
-    this.relationshipCloseness = RelationshipCloseness.other,
+    this.relationship = RelationshipCategory.friend,
+    this.relationshipCloseness = RelationshipCloseness.casual,
     this.preferredLanguage = 'en',
-    this.preferredTone = PreferredTone.warm,
+    this.preferredTone = MessageTone.warm,
     this.importantFacts = const [],
     this.notes,
-    this.preferredDeliveryChannel = DeliveryChannel.none,
+    this.preferredDeliveryChannel = DeliveryChannel.whatsapp,
     this.timezone,
-    this.autoPrepare = false,
+    this.autoPrepare = true,
     this.autoSendPolicy = AutoSendPolicy.manualOnly,
     required this.createdAt,
     required this.updatedAt,
@@ -37,10 +41,10 @@ class Person {
   final int? birthYear;
   final String? phoneNumber;
   final String? email;
-  final String relationship;
+  final RelationshipCategory relationship;
   final RelationshipCloseness relationshipCloseness;
   final String preferredLanguage;
-  final PreferredTone preferredTone;
+  final MessageTone preferredTone;
   final List<String> importantFacts;
   final String? notes;
   final DeliveryChannel preferredDeliveryChannel;
@@ -52,7 +56,6 @@ class Person {
   final int version;
   final DateTime? deletedAt;
 
-  /// Returns true if this person has a valid birthday specified.
   bool get hasBirthday =>
       birthdayMonth != null &&
       birthdayDay != null &&
@@ -61,7 +64,8 @@ class Person {
       birthdayDay! >= 1 &&
       birthdayDay! <= 31;
 
-  /// Copies this person applying the given updates, bumping [version].
+  bool get isLeapDayBirthday => birthdayMonth == 2 && birthdayDay == 29;
+
   Person copyWith({
     String? id,
     String? name,
@@ -72,10 +76,10 @@ class Person {
     bool clearBirthYear = false,
     String? phoneNumber,
     String? email,
-    String? relationship,
+    RelationshipCategory? relationship,
     RelationshipCloseness? relationshipCloseness,
     String? preferredLanguage,
-    PreferredTone? preferredTone,
+    MessageTone? preferredTone,
     List<String>? importantFacts,
     String? notes,
     DeliveryChannel? preferredDeliveryChannel,
@@ -87,20 +91,18 @@ class Person {
     DateTime? updatedAt,
     int? version,
     DateTime? deletedAt,
+    bool clearDeletedAt = false,
   }) {
     return Person(
       id: id ?? this.id,
       name: name ?? this.name,
-      birthdayMonth: clearBirthday
-          ? null
-          : (birthdayMonth ?? this.birthdayMonth),
+      birthdayMonth: clearBirthday ? null : (birthdayMonth ?? this.birthdayMonth),
       birthdayDay: clearBirthday ? null : (birthdayDay ?? this.birthdayDay),
       birthYear: clearBirthYear ? null : (birthYear ?? this.birthYear),
       phoneNumber: phoneNumber ?? this.phoneNumber,
       email: email ?? this.email,
       relationship: relationship ?? this.relationship,
-      relationshipCloseness:
-          relationshipCloseness ?? this.relationshipCloseness,
+      relationshipCloseness: relationshipCloseness ?? this.relationshipCloseness,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       preferredTone: preferredTone ?? this.preferredTone,
       importantFacts: importantFacts ?? this.importantFacts,
@@ -113,7 +115,73 @@ class Person {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       version: version ?? this.version,
-      deletedAt: deletedAt ?? this.deletedAt,
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        if (birthdayMonth != null) 'birthdayMonth': birthdayMonth,
+        if (birthdayDay != null) 'birthdayDay': birthdayDay,
+        if (birthYear != null) 'birthYear': birthYear,
+        if (phoneNumber != null) 'phoneNumber': phoneNumber,
+        if (email != null) 'email': email,
+        'relationship': relationship.name,
+        'relationshipCloseness': relationshipCloseness.name,
+        'preferredLanguage': preferredLanguage,
+        'preferredTone': preferredTone.name,
+        'importantFacts': importantFacts,
+        if (notes != null) 'notes': notes,
+        'preferredDeliveryChannel': preferredDeliveryChannel.name,
+        if (timezone != null) 'timezone': timezone,
+        'autoPrepare': autoPrepare,
+        'autoSendPolicy': autoSendPolicy.name,
+        'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+        'version': version,
+        if (deletedAt != null) 'deletedAt': deletedAt!.toIso8601String(),
+      };
+
+  factory Person.fromJson(Map<String, dynamic> json) {
+    return Person(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      birthdayMonth: json['birthdayMonth'] as int?,
+      birthdayDay: json['birthdayDay'] as int?,
+      birthYear: json['birthYear'] as int?,
+      phoneNumber: json['phoneNumber'] as String?,
+      email: json['email'] as String?,
+      relationship: RelationshipCategory.fromString(
+        json['relationship'] as String?,
+      ),
+      relationshipCloseness: RelationshipCloseness.fromString(
+        json['relationshipCloseness'] as String?,
+      ),
+      preferredLanguage: (json['preferredLanguage'] as String?) ?? 'en',
+      preferredTone: MessageTone.fromString(
+        json['preferredTone'] as String?,
+      ),
+      importantFacts:
+          (json['importantFacts'] as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              const [],
+      notes: json['notes'] as String?,
+      preferredDeliveryChannel: DeliveryChannel.fromString(
+        json['preferredDeliveryChannel'] as String?,
+      ),
+      timezone: json['timezone'] as String?,
+      autoPrepare: (json['autoPrepare'] as bool?) ?? true,
+      autoSendPolicy: AutoSendPolicy.fromString(
+        json['autoSendPolicy'] as String?,
+      ),
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      version: (json['version'] as int?) ?? 1,
+      deletedAt: json['deletedAt'] == null
+          ? null
+          : DateTime.parse(json['deletedAt'] as String),
     );
   }
 }
