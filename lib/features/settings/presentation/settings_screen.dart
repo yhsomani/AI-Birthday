@@ -184,13 +184,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!launched && mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Could not open link: $url')));
+        ).showSnackBar(SnackBar(content: const Text('Could not open that link. Please try again.')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Could not open link: $url')));
+        ).showSnackBar(SnackBar(content: const Text('Could not open that link. Please try again.')));
       }
     }
   }
