@@ -767,7 +767,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           _buildRecipientCard(),
           const SizedBox(height: AppSpacing.md),
 
-          const AppSectionHeader(title: 'Personalize'),
+          // Tone & Length Controls
           _buildControlsCard(),
           const SizedBox(height: AppSpacing.md),
 
@@ -1000,7 +1000,8 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             TextField(
               controller: _customInstructionController,
               decoration: const InputDecoration(
-                hintText: 'Add a detail or writing preference (optional)',
+                hintText:
+                    'Optional tweak (e.g. "rhyme", "mention weekend party")',
                 isDense: true,
               ),
             ),
@@ -1050,7 +1051,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         ),
         const SizedBox(height: 2),
         Text(
-          'Make it yours before you send it.',
+          'Review and edit this before sending.',
           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         ),
         const SizedBox(height: 8),
