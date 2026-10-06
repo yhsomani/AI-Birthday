@@ -84,8 +84,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _loadLastSyncTime() async {
     try {
+      final auth = ref.read(authControllerProvider).valueOrNull;
+      final identity = auth?.identity;
+      final accountId =
+          identity?.firebaseUid ?? identity?.googleSubject;
+      if (accountId == null || accountId.isEmpty) return;
+
       final syncService = ref.read(cloudSyncServiceProvider);
-      final time = await syncService.getLastSyncTime();
+      final time = await syncService.getLastSyncTime(accountId);
       if (mounted) {
         setState(() => _lastSyncTime = time);
       }
@@ -115,7 +121,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       SnackBar(
         content: Text(
           result.success
-              ? 'Cloud backup complete! ${result.uploadedCount} records saved to Firestore.'
+              ? 'Cloud backup complete. ${result.uploadedCount} records saved.'
               : 'Backup failed: ${result.error ?? 'Unknown error'}',
         ),
       ),
