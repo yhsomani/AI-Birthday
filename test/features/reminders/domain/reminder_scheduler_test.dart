@@ -58,10 +58,10 @@ void main() {
       enabled: ReminderKind.values.toSet(),
     );
 
-    expect(
-      plan.active.map((trigger) => trigger.kind).toSet(),
-      {ReminderKind.ready, ReminderKind.birthday},
-    );
+    expect(plan.active.map((trigger) => trigger.kind).toSet(), {
+      ReminderKind.ready,
+      ReminderKind.birthday,
+    });
     expect(plan.suppressed, isEmpty);
     expect(plan.active, hasLength(2));
   });
