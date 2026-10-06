@@ -140,7 +140,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Restore from Cloud Backup?'),
         content: const Text(
-          'This will download your saved birthdays and contacts from the cloud and merge them into your device. Existing records with matching IDs will be updated.',
+          'This will merge your cloud data into this device. New records will be restored and newer matching records may update local data. Existing reminder preferences on this device are preserved.',
         ),
         actions: [
           TextButton(
