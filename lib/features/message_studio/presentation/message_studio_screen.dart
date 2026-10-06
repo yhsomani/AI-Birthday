@@ -209,7 +209,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Message drafted with AI.')),
+          const SnackBar(content: Text('Message drafted with AI ✨')),
         );
       }
     } on AppFailure catch (e) {
@@ -585,7 +585,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Variation applied.')));
+          ).showSnackBar(const SnackBar(content: Text('Variation applied! ✨')));
         }
       }
     } catch (e) {
@@ -708,7 +708,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                   context.pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Message marked as sent.'),
+                      content: Text('Celebration confirmed as sent! 🎉'),
                     ),
                   );
                 }
@@ -727,7 +727,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       Clipboard.setData(ClipboardData(text: text));
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Copied to clipboard.')));
+      ).showSnackBar(const SnackBar(content: Text('Copied to clipboard 📋')));
     }
   }
 
