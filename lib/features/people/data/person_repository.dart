@@ -70,6 +70,8 @@ class DriftPeopleStore implements PeopleStore {
 
   @override
   Future<void> softDelete(String id) async {
+    final existing = await getById(id);
+    if (existing == null) return;
     final now = _now();
     await (_database.update(
       _database.persons,
@@ -77,13 +79,15 @@ class DriftPeopleStore implements PeopleStore {
       db.PersonsCompanion(
         deletedAt: drift.Value(now.toUtc()),
         updatedAt: drift.Value(now.toUtc()),
-        version: drift.CustomExpression<int>('version + 1'),
+        version: drift.Value(existing.version + 1),
       ),
     );
   }
 
   @override
   Future<void> restore(String id) async {
+    final existing = await getById(id);
+    if (existing == null) return;
     final now = _now();
     await (_database.update(
       _database.persons,
@@ -91,7 +95,7 @@ class DriftPeopleStore implements PeopleStore {
       db.PersonsCompanion(
         deletedAt: drift.Value(null),
         updatedAt: drift.Value(now.toUtc()),
-        version: drift.CustomExpression<int>('version + 1'),
+        version: drift.Value(existing.version + 1),
       ),
     );
   }
