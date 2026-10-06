@@ -767,7 +767,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                   child: Text(
-                    'AI Provider Priority (SSOT §5): When drafting messages, AI-Birthday first uses your Pro Subscription or Personal Gemini API key. If offline or no key is set, supported Android devices fall back to Gemini Nano on-device.',
+                    'AI provider: your active AI-Birthday Pro access is required. When available, AI-Birthday uses your saved Gemini key; otherwise supported Android devices can use Gemini Nano on-device.',
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ),
