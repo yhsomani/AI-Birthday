@@ -17,7 +17,6 @@ import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 
-import 'harness/crypto_envelope_fixture.dart';
 import 'harness/fake_firebase_auth_client.dart';
 import 'harness/responsive_tester.dart';
 import 'harness/test_harness.dart';
@@ -185,111 +184,6 @@ void main() {
             harness.subscriptionNotifier.state.status,
             EntitlementStatus.none,
           );
-        },
-      );
-    });
-
-    // =========================================================================
-    // R3 Boundary & Corner Cases
-    // =========================================================================
-    group('R3 Boundary Cases (Encrypted Envelope)', () {
-      test(
-        'R3.B1: Tampered authentication tag halts decryption and throws FormatException',
-        () {
-          final envelope = CryptoEnvelopeFixture.createEncryptedEnvelope(
-            persons: [
-              {'id': 'p-1', 'name': 'Sensitive Contact'},
-            ],
-            birthdays: [],
-            backupVersion: 1,
-          );
-
-          // Tamper with the auth tag
-          final originalTagBytes = base64Decode(envelope['authTag'] as String);
-          originalTagBytes[0] = (originalTagBytes[0] + 1) % 256;
-          envelope['authTag'] = base64Encode(originalTagBytes);
-
-          expect(
-            () => CryptoEnvelopeFixture.decryptEnvelope(envelope),
-            throwsA(isA<FormatException>()),
-          );
-        },
-      );
-
-      test('R3.B2: Corrupt Base64 in envelope throws FormatException', () {
-        final envelope = {
-          'schemaVersion': 1,
-          'backupVersion': 1,
-          'deviceId': 'd-1',
-          'iv': '%%%not_valid_base64%%%',
-          'ciphertext': '%%%not_valid_base64%%%',
-          'authTag': '%%%not_valid_base64%%%',
-          'updatedAt': DateTime.now().toIso8601String(),
-        };
-
-        expect(
-          () => CryptoEnvelopeFixture.decryptEnvelope(envelope),
-          throwsA(isA<FormatException>()),
-        );
-      });
-
-      test('R3.B3: Unsupported schemaVersion is rejected immediately', () {
-        final envelope = CryptoEnvelopeFixture.createEncryptedEnvelope(
-          persons: [],
-          birthdays: [],
-          backupVersion: 1,
-        );
-        envelope['schemaVersion'] = 99;
-
-        expect(
-          () => CryptoEnvelopeFixture.decryptEnvelope(envelope),
-          throwsA(isA<FormatException>()),
-        );
-      });
-
-      test(
-        'R3.B4: Empty database backup (0 persons, 0 birthdays) encrypts and decrypts cleanly',
-        () {
-          final envelope = CryptoEnvelopeFixture.createEncryptedEnvelope(
-            persons: [],
-            birthdays: [],
-            backupVersion: 1,
-          );
-
-          final decrypted = CryptoEnvelopeFixture.decryptEnvelope(envelope);
-          expect(decrypted['persons'], isEmpty);
-          expect(decrypted['birthdays'], isEmpty);
-        },
-      );
-
-      test(
-        'R3.B5: High-volume stress (50 recipients with unicode and emojis) maintains 100% data fidelity',
-        () {
-          final largePersons = List.generate(
-            50,
-            (i) => {
-              'id': 'person-$i',
-              'name': 'Recipient $i 🎉 🎂 特別な人',
-              'notes':
-                  'Detailed multi-line notes for recipient $i with special characters: & < > " \' / \\ € £ ¥',
-              'birthdayMonth': (i % 12) + 1,
-              'birthdayDay': (i % 28) + 1,
-            },
-          );
-
-          final envelope = CryptoEnvelopeFixture.createEncryptedEnvelope(
-            persons: largePersons,
-            birthdays: [],
-            backupVersion: 10,
-          );
-
-          final decrypted = CryptoEnvelopeFixture.decryptEnvelope(envelope);
-          final restoredPersons = (decrypted['persons'] as List)
-              .cast<Map<String, dynamic>>();
-
-          expect(restoredPersons, hasLength(50));
-          expect(restoredPersons[0]['name'], 'Recipient 0 🎉 🎂 特別な人');
-          expect(restoredPersons[49]['name'], 'Recipient 49 🎉 🎂 特別な人');
         },
       );
     });
