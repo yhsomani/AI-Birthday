@@ -199,7 +199,7 @@ void main() {
           .insert(
             ReminderSettingsEntriesCompanion.insert(
               key: 'default',
-              enabled: true,
+              enabled: const Value(true),
               kinds: 'birthday',
               quietHoursStartMinutes: 120,
               quietHoursEndMinutes: 360,
