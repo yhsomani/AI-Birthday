@@ -2,7 +2,7 @@
 
 > **A local-first personal birthday assistant with AI-assisted, user-controlled messaging.**
 
-AI-Birthday is a Flutter & Android application engineered to help you remember important birthdays and compose personalized wishes tailored to each relationship. Birthday and contact data is stored locally by default. Cloud backup is optional and, when enabled, stores the selected backup records in the app's Firestore project under the signed-in user's account.
+AI-Birthday is a Flutter & Android application engineered to help you remember important birthdays and compose personalized wishes tailored to each relationship. Birthday and contact data is stored locally by default. Cloud backup is optional and, when enabled, stores the app's saved people, birthday cycles, message drafts, and reminder settings in the app's Firestore project under the signed-in user's account.
 
 ---
 
@@ -12,9 +12,9 @@ AI-Birthday is a Flutter & Android application engineered to help you remember i
 - **Privacy & Transparent Data Architecture**: Contact names, phone numbers, birthdates, notes, drafts, and reminder settings remain local by default. Cloud Backup is opt-in and account-scoped to the authenticated Firebase UID.
 - **Credential Security**: User Gemini API keys are stored through `flutter_secure_storage` and are not written to the SQLite database or cloud backup.
 - **Bring-Your-Own-Key (BYOK) & On-Device AI Routing**:
-  - Direct client-to-API inference via Google Gemini Flash Lite.
+  - Direct client-to-API inference via a current stable Google Gemini Flash-Lite model.
   - Native Android platform channel bridge for Gemini Nano (Google AICore / ML Kit GenAI), truthfully reported as unavailable until on-device model weights are loaded and verified.
-  - Strict Prompt Boundary: The AI prompt contains *only* verified facts provided by the user; private notes and untrusted inputs are never injected as instructions.
+  - Strict Prompt Boundary: recipient facts, drafts, and custom rewrite requests are passed as user data, not executable instructions; the prompt explicitly forbids invented personal details.
 - **Native Android Notification Delivery**: Real exact alarms scheduled via `AlarmManager` with high-priority notification channels and customizable Quiet Hours (e.g., 22:00–08:00) that respect sleep schedules. Clean cancellation of scheduled `PendingIntent`s upon disabling.
 - **Human-in-the-Loop WhatsApp Handoff**: The application never sends messages autonomously. It constructs pre-filled WhatsApp deep links, opens native WhatsApp for user inspection, and transitions to completed only after explicit user confirmation.
 
