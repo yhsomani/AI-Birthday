@@ -28,7 +28,8 @@ android {
         applicationId = "com.yashsomani.ai_birthday"
         // Release signing is configured only when android/key.properties is present.
         // See https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // ML Kit GenAI Prompt API requires Android API 26+.
+        minSdk = maxOf(flutter.minSdkVersion, 26)
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
@@ -81,6 +82,13 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    // Real on-device Gemini Nano integration through ML Kit GenAI Prompt API.
+    implementation("com.google.mlkit:genai-prompt:1.0.0-beta4")
+    // ML Kit GenAI beta4 may fail at runtime when coroutines resolve to 1.10.x or older.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 }
 
 flutter {
