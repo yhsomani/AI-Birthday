@@ -71,10 +71,7 @@ class BirthdayLifecycleService {
         if (needsTodayStatus) {
           final now = _now();
           await birthdaysRepository.saveBirthday(
-            existing.copyWith(
-              status: targetStatus,
-              updatedAt: now,
-            ),
+            existing.copyWith(status: targetStatus, updatedAt: now),
           );
         }
         continue;
