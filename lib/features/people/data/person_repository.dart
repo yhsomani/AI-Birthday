@@ -77,6 +77,7 @@ class DriftPeopleStore implements PeopleStore {
       db.PersonsCompanion(
         deletedAt: drift.Value(now.toUtc()),
         updatedAt: drift.Value(now.toUtc()),
+        version: drift.CustomExpression<int>('version + 1'),
       ),
     );
   }
@@ -90,6 +91,7 @@ class DriftPeopleStore implements PeopleStore {
       db.PersonsCompanion(
         deletedAt: drift.Value(null),
         updatedAt: drift.Value(now.toUtc()),
+        version: drift.CustomExpression<int>('version + 1'),
       ),
     );
   }
