@@ -148,7 +148,10 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
         await _iap.completePurchase(purchase);
       }
 
-      _restoreCompleter?.complete(state.canUseAi);
+      final completer = _restoreCompleter;
+      if (completer != null && !completer.isCompleted) {
+        completer.complete(state.canUseAi);
+      }
     }
 
     _purchaseStatus = PurchaseStatus.idle;
@@ -347,7 +350,10 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   void resetToFreeTier() {
     _logger.info('Subscription', 'Resetting entitlement to Free tier');
     state = UserEntitlement.free;
-    _store?.delete('user_subscription_entitlement');
+    final store = _store;
+    if (store != null) {
+      unawaited(store.delete('user_subscription_entitlement'));
+    }
   }
 
   /// Test hook for deterministic provider tests.
