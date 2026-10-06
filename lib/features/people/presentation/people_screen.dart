@@ -750,7 +750,15 @@ class PeopleScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error loading contacts: $err')),
+        error: (_, _) => const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'We could not load your contacts right now. Your saved birthdays have not been deleted. Try again later.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
