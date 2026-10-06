@@ -466,7 +466,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Privacy note: Backing up uploads your saved recipient names, birthdays, phone numbers, and notes to this app\'s Firestore project under your signed-in account.',
+                    'Privacy note: Cloud backup uploads your saved people, birthdays, message drafts, reminder settings, and related contact and personalization fields to this app\'s Firestore project under your signed-in account.',
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.grey[500],
