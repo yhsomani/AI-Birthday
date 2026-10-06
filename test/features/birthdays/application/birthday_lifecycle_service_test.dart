@@ -76,7 +76,10 @@ void main() {
         ],
       );
 
-      await service.refresh(people: [person(month: 10, day: 5)], birthdaysRepository: repo);
+      await service.refresh(
+        people: [person(month: 10, day: 5)],
+        birthdaysRepository: repo,
+      );
 
       final birthday = await repo.getBirthdayForPerson('person-1');
       expect(birthday!.status, BirthdayStatus.reminderDue);
