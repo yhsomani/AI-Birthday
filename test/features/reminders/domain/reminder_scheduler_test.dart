@@ -58,15 +58,12 @@ void main() {
       enabled: ReminderKind.values.toSet(),
     );
 
-    expect(plan.active.map((t) => t.kind), [
-      ReminderKind.ready,
-      ReminderKind.birthday,
-    ]);
     expect(
-      plan.active.every((trigger) => trigger.at.isAfter(plan.active.first.at)),
-      isFalse,
-      reason: 'Triggers should not be manufactured for passed lead dates.',
+      plan.active.map((trigger) => trigger.kind).toSet(),
+      {ReminderKind.ready, ReminderKind.birthday},
     );
+    expect(plan.suppressed, isEmpty);
+    expect(plan.active, hasLength(2));
   });
 
   test('plans only the enabled leads', () {
