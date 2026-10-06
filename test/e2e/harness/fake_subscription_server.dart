@@ -9,6 +9,7 @@ class FakeSubscriptionServer {
     this.productId = 'ai_birthday_pro_monthly',
     this.expectedPackageName = 'com.yashsomani.ai_birthday',
     this.validPurchaseToken = 'valid_google_play_purchase_token_123',
+    this.expectedAccountBinding = 'acct-binding-test-123456',
     this.shouldSimulateServerOutage = false,
   });
 
@@ -16,6 +17,7 @@ class FakeSubscriptionServer {
   String productId;
   String expectedPackageName;
   String validPurchaseToken;
+  String expectedAccountBinding;
   bool shouldSimulateServerOutage;
 
   int verificationRequests = 0;
@@ -43,6 +45,7 @@ class FakeSubscriptionServer {
     final purchaseToken = body['purchaseToken'];
     final reqProductId = body['productId'];
     final packageName = body['packageName'];
+    final accountBinding = body['accountBinding'];
 
     if (contractVersion != 1) {
       return {
@@ -65,6 +68,14 @@ class FakeSubscriptionServer {
         'error': 'INVALID_PRODUCT',
         'message': 'Unknown product ID: $reqProductId',
         'statusCode': 400,
+      };
+    }
+
+    if (accountBinding != expectedAccountBinding) {
+      return {
+        'error': 'PURCHASE_ACCOUNT_MISMATCH',
+        'message': 'Purchase is not bound to this app account.',
+        'statusCode': 403,
       };
     }
 

@@ -297,13 +297,23 @@ export const companionStatus = onCall(commonOptions, async request => {
   return safeCall(() => withoutSecret().companionStatus(uid, input));
 });
 
-export const verifyPurchase = onCall(commonOptions, async request => {
-  const uid = requireAuthenticated(request);
-  const input = parseRequest(verifyPurchaseSchema, request.data);
-  return safeCall(() =>
-    new SubscriptionVerificationService(db).verifyPurchase(uid, input),
-  );
-});
+// Purchase verification uses Firebase Auth plus a cryptographically verified
+// Google Play purchase token. App Check is currently disabled for this endpoint
+// because the Flutter client does not yet initialize Firebase App Check.
+export const verifyPurchase = onCall(
+  {
+    ...commonOptions,
+    enforceAppCheck: false,
+    consumeAppCheckToken: false,
+  },
+  async request => {
+    const uid = requireAuthenticated(request);
+    const input = parseRequest(verifyPurchaseSchema, request.data);
+    return safeCall(() =>
+      new SubscriptionVerificationService(db).verifyPurchase(uid, input),
+    );
+  },
+);
 
 export const sweepDeletionDrains = onSchedule(
   {

@@ -44,20 +44,35 @@ android {
             val keyPasswordProp = keystoreProperties["keyPassword"] as String?
             val storeFileProp = keystoreProperties["storeFile"] as String?
             val storePasswordProp = keystoreProperties["storePassword"] as String?
-            if (keyAliasProp != null && keyPasswordProp != null && storeFileProp != null && storePasswordProp != null) {
+
+            if (
+                keyAliasProp != null &&
+                keyPasswordProp != null &&
+                storeFileProp != null &&
+                storePasswordProp != null
+            ) {
                 keyAlias = keyAliasProp
                 keyPassword = keyPasswordProp
                 storeFile = file(storeFileProp)
                 storePassword = storePasswordProp
-            } else {
-                initWith(signingConfigs.getByName("debug"))
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Never silently sign a release artifact with the debug key.
+            val hasReleaseSigning = keystorePropertiesFile.exists() &&
+                keystoreProperties["keyAlias"] != null &&
+                keystoreProperties["keyPassword"] != null &&
+                keystoreProperties["storeFile"] != null &&
+                keystoreProperties["storePassword"] != null
+
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                null
+            }
         }
     }
 }

@@ -218,6 +218,11 @@ export const verifyPurchaseSchema = z
     purchaseToken: z.string().min(1).max(1024),
     productId: z.string().min(1).max(128),
     packageName: z.string().min(1).max(128),
+    accountBinding: z
+      .string()
+      .min(16)
+      .max(128)
+      .regex(/^[A-Za-z0-9._-]+$/u),
   })
   .strict();
 

@@ -8,6 +8,7 @@ import 'package:ai_birthday/core/security/credential_storage.dart';
 import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
 import 'package:ai_birthday/features/ai/domain/ai_router.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
+import 'package:ai_birthday/features/birthdays/application/birthday_lifecycle_service.dart';
 import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_repository.dart';
 import 'package:ai_birthday/features/delivery/data/whatsapp_handoff_builder.dart';
 import 'package:ai_birthday/features/delivery/data/native_share_service.dart';
@@ -23,17 +24,16 @@ import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 import 'package:ai_birthday/features/sync/data/cloud_sync_service.dart';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:ai_birthday/core/core_providers.dart';
+import 'package:ai_birthday/core/core_providers.dart' as core;
 import 'package:ai_birthday/core/database/drift_repositories.dart';
 import 'package:ai_birthday/core/platform/gemini_nano_platform.dart';
 import 'package:ai_birthday/features/ai/domain/ai_provider.dart';
 import 'package:ai_birthday/features/ai/data/gemini_nano_provider.dart';
 import 'package:ai_birthday/features/subscription/application/subscription_service.dart';
+import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 
-/// App Logger provider.
-final loggerProvider = Provider<AppLogger>((ref) {
-  return ConsoleAppLogger();
-});
+/// App-wide logger provider. Keep one logger instance across app and core layers.
+final loggerProvider = core.loggerProvider;
 
 /// Credential Storage provider.
 final credentialStorageProvider = Provider<CredentialStorage>((ref) {
@@ -47,10 +47,27 @@ final credentialStorageProvider = Provider<CredentialStorage>((ref) {
 final subscriptionNotifierProvider =
     StateNotifierProvider<SubscriptionNotifier, UserEntitlement>((ref) {
       final logger = ref.watch(loggerProvider);
+      final secureStore = FlutterSecureStorageDriver(
+        const FlutterSecureStorage(),
+        logger,
+      );
       return SubscriptionNotifier(
         initial: UserEntitlement.free,
-        store: FlutterSecureStorageDriver(const FlutterSecureStorage(), logger),
+        store: secureStore,
         logger: logger,
+        authTokenProvider: () async {
+          final auth = await ref.read(authControllerProvider.future);
+          return auth.identity?.idToken;
+        },
+        accountBindingProvider: () async {
+          final auth = await ref.read(authControllerProvider.future);
+          final subject = auth.identity?.googleSubject;
+          if (subject == null || subject.isEmpty) return null;
+          return SubscriptionNotifier.readBindingFromStore(
+            secureStore,
+            subject,
+          );
+        },
       );
     });
 
@@ -166,9 +183,18 @@ final peopleStreamProvider = StreamProvider<List<Person>>((ref) {
 });
 
 /// Stream of all tracked birthdays.
-final birthdaysStreamProvider = StreamProvider<List<Birthday>>((ref) {
-  final repo = ref.watch(birthdaysRepositoryProvider);
-  return repo.watchBirthdays();
+final birthdaysStreamProvider = StreamProvider<List<Birthday>>((ref) async* {
+  final birthdayRepo = ref.watch(birthdaysRepositoryProvider);
+  final peopleRepo = ref.watch(peopleRepositoryProvider);
+
+  // Reconcile the active occurrence before any screen consumes birthday data.
+  final people = await peopleRepo.getPeople();
+  await const BirthdayLifecycleService().refresh(
+    people: people,
+    birthdaysRepository: birthdayRepo,
+  );
+
+  yield* birthdayRepo.watchBirthdays();
 });
 
 /// Stream of all message drafts.

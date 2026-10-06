@@ -84,8 +84,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _loadLastSyncTime() async {
     try {
+      final auth = ref.read(authControllerProvider).valueOrNull;
+      final identity = auth?.identity;
+      final accountId =
+          identity?.firebaseUid ?? identity?.googleSubject;
+      if (accountId == null || accountId.isEmpty) return;
+
       final syncService = ref.read(cloudSyncServiceProvider);
-      final time = await syncService.getLastSyncTime();
+      final time = await syncService.getLastSyncTime(accountId);
       if (mounted) {
         setState(() => _lastSyncTime = time);
       }
@@ -115,7 +121,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       SnackBar(
         content: Text(
           result.success
-              ? 'Cloud backup complete! ${result.uploadedCount} records saved to Firestore.'
+              ? 'Cloud backup complete. ${result.uploadedCount} records saved.'
               : 'Backup failed: ${result.error ?? 'Unknown error'}',
         ),
       ),
@@ -274,7 +280,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Gemini API key saved in secure hardware storage.'),
+              content: Text('Gemini API key saved in secure device storage.'),
             ),
           );
         }
@@ -338,8 +344,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       SnackBar(
         content: Text(
           success
-              ? 'Pro Subscription Activated! AI message drafting is now unlocked. ✨'
-              : 'Purchase could not be completed.',
+              ? 'Purchase flow opened. Google Play will verify the subscription before AI is unlocked.'
+              : 'Purchase could not be started. Sign in and try again.',
         ),
       ),
     );
@@ -355,8 +361,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       SnackBar(
         content: Text(
           restored
-              ? 'Existing Pro subscription restored!'
-              : 'No active purchases found to restore.',
+              ? 'Verified Pro subscription restored.'
+              : 'No verified active subscription was found.',
         ),
       ),
     );
@@ -404,7 +410,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       if (_lastSyncTime != null)
                         Chip(
                           label: const Text(
-                            'BACKED UP',
+                            'LAST SUCCESSFUL',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
@@ -420,12 +426,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Text(
                     _lastSyncTime != null
                         ? 'Last backed up: ${DateFormat.yMMMd().add_jm().format(_lastSyncTime!)}'
-                        : 'Upload a backup of your birthdays to your private Google Cloud account so you can recover them.',
+                        : 'Save a recoverable copy of your birthdays and contacts to your signed-in cloud account.',
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Privacy note: Backing up uploads your saved recipient names, birthdays, phone numbers, and notes to your Google Cloud storage.',
+                    'Privacy note: Backing up uploads your saved recipient names, birthdays, phone numbers, and notes to this app\'s Firestore project under your signed-in account.',
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.grey[500],

@@ -13,8 +13,14 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // The coordination ledger and all other collections are server-only.
-    // Authenticated mobile clients use callable Functions and never receive direct Firestore capability.
+    // The mobile app's opt-in cloud backup data is scoped to the signed-in owner.
+    // This data is intentionally stored in separate collections from server-only coordination state.
+    match /users/{userId}/{collection}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId &&
+        collection in ['people', 'birthdays', 'drafts', 'reminderSettings'];
+    }
+
+    // The coordination ledger, entitlement writes, and unknown collections are server-only.
     match /{document=**} {
       allow read, write: if false;
     }
