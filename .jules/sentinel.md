@@ -21,3 +21,7 @@
 **Vulnerability:** Use of Buffer.allocUnsafe exposes uninitialized memory which could lead to information leakage if the buffer is read before being fully overwritten.
 **Learning:** While Buffer.allocUnsafe can be faster, it skips zeroing out memory. Unless there is a strict, proven performance bottleneck requiring it, always default to Buffer.alloc to ensure memory hygiene.
 **Prevention:** Use Buffer.alloc() instead of Buffer.allocUnsafe() as a secure default for memory allocation in Node.js applications.
+## 2024-10-27 - Raw Exception Leakage to UI States
+**Vulnerability:** Raw exceptions (`e.toString()` or string interpolated `$e`) were being caught in providers/gateways and directly passed into error domains (`AppFailure`, `SignInFailed`, `GeminiConnectionResult.error`) which propagate to the user interface.
+**Learning:** Returning exception stack traces or raw messages can expose internals (like internal network details, missing files, model path, or underlying library details).
+**Prevention:** Always log the full exception (`error: e, stackTrace: st`) internally but return a static, sanitized string to domain models.

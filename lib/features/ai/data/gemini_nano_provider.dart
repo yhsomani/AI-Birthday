@@ -75,8 +75,9 @@ class GeminiNanoProvider implements AiMessageProvider {
         error: e,
         stackTrace: st,
       );
-      throw AppFailure.providerError(
-        detail: 'On-device model error: ${e.toString()}',
+      // 🛡️ SECURITY: Prevent internal exception strings from leaking into the UI.
+      throw const AppFailure.providerError(
+        detail: 'An error occurred with the on-device model.',
       );
     }
   }

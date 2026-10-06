@@ -117,7 +117,8 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
         account = await GoogleSignIn.instance.authenticate();
       } catch (e) {
         _logger?.warning('AuthGateway', 'Native GoogleSignIn failed: $e');
-        return SignInFailed('Google Sign-In failed or was cancelled: $e');
+        // 🛡️ SECURITY: Prevent internal exception strings from leaking into the UI.
+        return const SignInFailed('Google Sign-In failed or was cancelled.');
       }
 
       final idToken = account.authentication.idToken;
