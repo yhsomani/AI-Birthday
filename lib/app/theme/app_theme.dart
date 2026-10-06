@@ -163,11 +163,27 @@ class AppTheme {
           borderSide: BorderSide(color: palette.primary, width: 2),
         ),
       ),
+      // Bottom navigation shell: height is set at the widget site
+      // (AppScaffold) so it grows with text scale — the Phase 0 audit flagged
+      // the old fixed 68dp as a 200%-scale clipping risk. Selected/unselected
+      // states use token colors only.
       navigationBarTheme: NavigationBarThemeData(
-        height: 68,
         backgroundColor: palette.surface,
         elevation: 0,
-        indicatorColor: palette.primary.withValues(alpha: 0.15),
+        indicatorColor: palette.primaryContainer,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return textTheme.labelSmall?.copyWith(
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected ? palette.textPrimary : palette.textSecondary,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected ? palette.primary : palette.textSecondary,
+          );
+        }),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       ),
       dividerTheme: DividerThemeData(

@@ -5,34 +5,14 @@
 @Tags(['golden'])
 library;
 
-import 'dart:io';
-
-import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../component_gallery.dart';
-
-/// flutter_test does not load the app's pubspec fonts; load them explicitly
-/// so goldens render the bundled Outfit / Bricolage Grotesque, deterministically.
-Future<void> _loadAppFonts() async {
-  const fonts = <String, String>{
-    'BricolageGrotesque': 'assets/fonts/BricolageGrotesque-VariableFont.ttf',
-    'Outfit': 'assets/fonts/Outfit-VariableFont_wght.ttf',
-  };
-  for (final entry in fonts.entries) {
-    final bytes = File(entry.value).readAsBytesSync();
-    final loader = FontLoader(entry.key);
-    loader.addFont(
-      Future<ByteData>.value(
-        ByteData.view(bytes.buffer, bytes.offsetInBytes, bytes.lengthInBytes),
-      ),
-    );
-    await loader.load();
-  }
-}
+import 'app_fonts.dart';
 
 void main() {
-  setUpAll(_loadAppFonts);
+  setUpAll(loadAppFonts);
 
   for (final entry in const <String, Brightness>{
     'light': Brightness.light,
