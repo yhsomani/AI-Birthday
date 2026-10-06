@@ -132,12 +132,10 @@ class MainActivity : FlutterActivity() {
                     }
                     "apply" -> {
                         val triggers = call.argument<List<Map<String, Any>>>("triggers") ?: emptyList()
-                        scheduleTriggers(triggers)
-                        result.success(null)
+                        result.success(scheduleTriggers(triggers))
                     }
                     "cancelAll" -> {
-                        cancelAllReminders()
-                        result.success(null)
+                        result.success(cancelAllReminders())
                     }
                     "testNotification" -> {
                         val title = call.argument<String>("title") ?: "Birthday Reminder"
@@ -404,21 +402,31 @@ class MainActivity : FlutterActivity() {
         return contactMap.values.toList()
     }
 
-    private fun scheduleTriggers(triggers: List<Map<String, Any>>) {
-        val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+    private fun scheduleTriggers(triggers: List<Map<String, Any>>): Boolean {
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return false
         val now = System.currentTimeMillis()
         val prefs = getSharedPreferences(BirthdayNotificationReceiver.PREFS_NAME, Context.MODE_PRIVATE)
 
         // Cancel previous alarms first to avoid duplicate pending intents.
-        cancelAllReminders()
+        var allScheduled = cancelAllReminders()
 
         val scheduledIds = mutableSetOf<String>()
         val scheduledTriggers = JSONArray()
-
         for (trigger in triggers) {
-            val id = (trigger["id"] as? Number)?.toInt() ?: continue
-            val timestampMs = (trigger["timestampMs"] as? Number)?.toLong() ?: continue
-            if (timestampMs <= now) continue
+            val id = (trigger["id"] as? Number)?.toInt()
+            if (id == null) {
+                allScheduled = false
+                continue
+            }
+            val timestampMs = (trigger["timestampMs"] as? Number)?.toLong()
+            if (timestampMs == null) {
+                allScheduled = false
+                continue
+            }
+            if (timestampMs <= now) {
+                allScheduled = false
+                continue
+            }
 
             val title = trigger["title"] as? String ?: "Birthday Reminder"
             val body = trigger["body"] as? String ?: ""
@@ -444,6 +452,7 @@ class MainActivity : FlutterActivity() {
                     !alarmManager.canScheduleExactAlarms()
                 ) {
                     Log.w("BirthdayReminder", "Exact alarm permission is unavailable; skipping id=$id")
+                    allScheduled = false
                     continue
                 }
 
@@ -469,6 +478,7 @@ class MainActivity : FlutterActivity() {
                 )
             } catch (e: SecurityException) {
                 Log.e("BirthdayReminder", "Exact alarm scheduling rejected for id=$id", e)
+                allScheduled = false
             }
         }
 
@@ -476,15 +486,18 @@ class MainActivity : FlutterActivity() {
             .putStringSet(BirthdayNotificationReceiver.KEY_SCHEDULED_ALARM_IDS, scheduledIds)
             .putString(BirthdayNotificationReceiver.KEY_SCHEDULED_TRIGGERS_JSON, scheduledTriggers.toString())
             .apply()
+
+        return allScheduled
     }
 
-    private fun cancelAllReminders() {
+    private fun cancelAllReminders(): Boolean {
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
         val prefs = getSharedPreferences(BirthdayNotificationReceiver.PREFS_NAME, Context.MODE_PRIVATE)
         val scheduledIds = prefs.getStringSet(
             BirthdayNotificationReceiver.KEY_SCHEDULED_ALARM_IDS,
             emptySet()
         ) ?: emptySet()
+        var allCancelled = true
 
         if (alarmManager != null) {
             for (idStr in scheduledIds) {
@@ -499,8 +512,13 @@ class MainActivity : FlutterActivity() {
                     PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
                 )
                 if (pendingIntent != null) {
-                    alarmManager.cancel(pendingIntent)
-                    pendingIntent.cancel()
+                    try {
+                        alarmManager.cancel(pendingIntent)
+                        pendingIntent.cancel()
+                    } catch (e: Exception) {
+                        Log.e("BirthdayReminder", "Failed to cancel reminder id=$id", e)
+                        allCancelled = false
+                    }
                 }
             }
         }
@@ -510,7 +528,13 @@ class MainActivity : FlutterActivity() {
             .apply()
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-        notificationManager?.cancelAll()
+        try {
+            notificationManager?.cancelAll()
+        } catch (e: Exception) {
+            Log.e("BirthdayReminder", "Failed to clear posted notifications", e)
+            allCancelled = false
+        }
+        return allCancelled
     }
 
     private fun showImmediateNotification(title: String, body: String, personId: String? = null) {
