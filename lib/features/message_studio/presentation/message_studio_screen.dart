@@ -448,11 +448,11 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       if (mounted) {
         final label = languageName != null
             ? 'Translated to $languageName.'
-            : (length == MessageLength.short
-                  ? 'Message shortened.'
-                  : length == MessageLength.expanded
-                  ? 'Message expanded.'
-                  : 'Message refined.');
+            : length == MessageLength.short
+                ? 'Message shortened.'
+                : length == MessageLength.expanded
+                    ? 'Message expanded.'
+                    : 'Message refined.'
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(label)));
