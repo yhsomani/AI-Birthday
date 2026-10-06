@@ -9,6 +9,14 @@ abstract class NotificationSchedulerGateway {
   /// Whether the app may currently post notifications.
   Future<bool> hasPermission();
 
+  /// Whether the app may schedule precise birthday reminders on Android.
+  /// Non-Android implementations should return true.
+  Future<bool> hasExactAlarmPermission() async => true;
+
+  /// Opens the system page where precise alarm access can be granted.
+  /// Returns false when the platform cannot provide that page.
+  Future<bool> requestExactAlarmPermission() async => false;
+
   /// Request the notification permission from the user.
   Future<bool> requestPermission();
 

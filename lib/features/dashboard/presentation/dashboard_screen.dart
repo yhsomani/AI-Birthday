@@ -192,10 +192,13 @@ class DashboardScreen extends ConsumerWidget {
             child: CircularProgressIndicator(),
           ),
         ),
-        error: (err, _) => Center(
+        error: (err, _) => const Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('Error loading birthdays: $err'),
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'We could not load your birthdays right now. Your saved data has not been deleted. Try again from the dashboard.',
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
       ),

@@ -38,6 +38,28 @@ class AndroidNotificationSchedulerGateway
   }
 
   @override
+  Future<bool> hasExactAlarmPermission() async {
+    if (!_isLiveAndroid) return true;
+    try {
+      final res = await _channel.invokeMethod<bool>('hasExactAlarmPermission');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> requestExactAlarmPermission() async {
+    if (!_isLiveAndroid) return true;
+    try {
+      final res = await _channel.invokeMethod<bool>('requestExactAlarmPermission');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
   Future<bool> requestPermission() async {
     if (!_isLiveAndroid) return true;
     try {

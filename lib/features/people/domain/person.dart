@@ -39,8 +39,8 @@ class Person {
   final String? email;
   final String relationship;
   final RelationshipCloseness relationshipCloseness;
-  final String preferredLanguage;
   final PreferredTone preferredTone;
+  final String preferredLanguage;
   final List<String> importantFacts;
   final String? notes;
   final DeliveryChannel preferredDeliveryChannel;
@@ -74,8 +74,8 @@ class Person {
     String? email,
     String? relationship,
     RelationshipCloseness? relationshipCloseness,
-    String? preferredLanguage,
     PreferredTone? preferredTone,
+    String? preferredLanguage,
     List<String>? importantFacts,
     String? notes,
     DeliveryChannel? preferredDeliveryChannel,

@@ -173,8 +173,8 @@ No numerical business uplift is claimed.
 
 ## 10. Remaining issues
 
-1. Latest main CI is still not green because the formatter gate currently detects 22 files that would be changed by `dart format`. The branch has not yet been CI-verified after the audit edits.
-2. Backend emulator tests previously failed under Java 17; this branch changes the job to Java 21, but the fix still requires a new CI run for verification.
+1. The latest verified main CI run (`37416018008`) is green, but the audit branch has not yet completed its own CI verification after these changes.
+2. The current branch contains new reminder-permission and Gemini request changes that still require CI and device validation.
 3. The exact-alarm permission path is not yet a complete user-facing recovery flow.
 4. Gemini Nano is device/model dependent. The code is wired to the real ML Kit API, but physical-device validation is still required.
 5. The repository still needs a complete visual redesign pass and rendered-screen validation.
@@ -203,13 +203,7 @@ Backend job (`Backend Security & Cloud Functions`):
 - Vitest suite: **passed** (75/75 passed across 11 test files)
 - Firestore emulator tests (Java 21): **passed**
 
-Branch verification (Host local environment):
-- `dart format --output=none --set-exit-if-changed .`: **PASSED** (133 files formatted, 0 changed).
-- `flutter analyze`: **PASSED** (0 issues found).
-- `flutter test`: **PASSED** (268 / 268 tests passed, 100% pass rate).
-- Backend `npm run check` (`typecheck && lint && test`): **PASSED** (75 / 75 Vitest tests passed, TypeScript clean, ESLint clean).
-- Android build: **PASSED** (both debug `app-debug.apk` and release `app-release.apk` compiled and assembled successfully with ML Kit GenAI Prompt API integration).
-- Remote CI verification: **PASSED** (GitHub Actions run `37416018008` completed green).
+Branch verification: **PENDING**. This environment can inspect and edit repository files and can read GitHub Actions results, but it cannot independently claim a local Flutter/Android build. The last verified green remote run is main-branch run `37416018008` at commit `1311ac91...`.
 
 ## 12. Production readiness matrix
 
@@ -259,6 +253,8 @@ Branch verification (Host local environment):
 
 ## 15. Final ship decision
 
-# RELEASE-CANDIDATE READY (SHIP AFTER PRODUCTION CREDENTIALS & QA)
+## Current audit disposition
 
-The repository has eliminated all previous blockers: CI is 100% green (`run 37416018008`), formatting passes, 268 Flutter tests pass, 75 backend tests pass, Firestore emulator tests pass, and both debug and release APKs assemble cleanly. The code is ready for the Play Console Closed Testing track upon inserting the team's release signing keystore and production Firebase credentials.
+# SHIP AFTER FIXES
+
+The repository has materially improved, but it is not ready for a public release yet. The latest verified main CI run (`37416018008`) was green, while this audit branch has not completed its own CI verification at the time of writing. The codebase still needs the remaining UX/device/release gates listed above. No local test/build result is claimed by this audit.

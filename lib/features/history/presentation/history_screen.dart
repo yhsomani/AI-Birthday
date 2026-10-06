@@ -21,7 +21,15 @@ class HistoryScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('History & Activity')),
       body: draftsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error loading history: $err')),
+        error: (_, _) => const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'We could not load your activity right now. Your saved messages have not been deleted. Try again later.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
         data: (drafts) {
           if (drafts.isEmpty) {
             return const EmptyState(

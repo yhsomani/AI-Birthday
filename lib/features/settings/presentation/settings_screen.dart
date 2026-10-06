@@ -184,15 +184,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!launched && mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Could not open link: $url')));
+        ).showSnackBar(SnackBar(content: const Text('Could not open that link. Please try again.')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Could not open link: $url')));
+        ).showSnackBar(SnackBar(content: const Text('Could not open that link. Please try again.')));
       }
     }
+  }
+
+  Future<void> _manageExactAlarmAccess() async {
+    HapticFeedback.lightImpact();
+    final gateway = ref.read(notificationSchedulerGatewayProvider);
+    final granted = await gateway.hasExactAlarmPermission();
+    if (granted && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Precise reminder access is already enabled.')),
+      );
+      return;
+    }
+    final opened = await gateway.requestExactAlarmPermission();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          opened
+              ? 'Precise reminder access is enabled.'
+              : 'Allow precise reminders in Android settings, then return to AI-Birthday.',
+        ),
+      ),
+    );
+    await _checkReminderAccess();
+  }
+
+  Future<void> _checkReminderAccess() async {
+    // Refreshing this screen after the system-settings handoff prevents stale permission UI.
+    if (!mounted) return;
+    setState(() {});
   }
 
   Future<void> _testConnection() async {
@@ -767,7 +797,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                   child: Text(
-                    'AI Provider Priority (SSOT §5): When drafting messages, AI-Birthday first uses your Pro Subscription or Personal Gemini API key. If offline or no key is set, supported Android devices fall back to Gemini Nano on-device.',
+                    'AI provider: your active AI-Birthday Pro access is required. When available, AI-Birthday uses your saved Gemini key; otherwise supported Android devices can use Gemini Nano on-device.',
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ),
@@ -809,6 +839,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       }
                     }
                     ref.read(reminderSettingsProvider.notifier).setEnabled(on);
+                  },
+                ),
+                FutureBuilder<bool>(
+                  future: ref.read(notificationSchedulerGatewayProvider).hasExactAlarmPermission(),
+                  builder: (context, snapshot) {
+                    final exactReady = snapshot.data != false;
+                    return ListTile(
+                      leading: Icon(
+                        exactReady
+                            ? Icons.schedule_outlined
+                            : Icons.warning_amber_rounded,
+                        color: exactReady
+                            ? AppColors.accentForest
+                            : Theme.of(context).colorScheme.error,
+                      ),
+                      title: const Text('Precise reminder access'),
+                      subtitle: Text(
+                        exactReady
+                            ? 'Android can schedule reminders at their selected time.'
+                            : 'Android is blocking precise reminders. Enable access so scheduled birthdays are not left unscheduled.',
+                      ),
+                      trailing: exactReady
+                          ? const Icon(Icons.check_circle_outline)
+                          : TextButton(
+                              onPressed: _manageExactAlarmAccess,
+                              child: const Text('Fix'),
+                            ),
+                    );
                   },
                 ),
                 if (reminderSettings.enabled) ...[
