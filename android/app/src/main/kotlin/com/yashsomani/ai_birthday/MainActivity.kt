@@ -13,9 +13,10 @@ import android.provider.ContactsContract
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import android.util.Log
 import androidx.core.content.ContextCompat
-import com.google.mlkit.genai.prompt.DownloadStatus
-import com.google.mlkit.genai.prompt.FeatureStatus
+import com.google.mlkit.genai.common.DownloadStatus
+import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.prompt.Generation
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -144,6 +145,7 @@ class MainActivity : FlutterActivity() {
                                                 is DownloadStatus.DownloadProgress,
                                                 DownloadStatus.DownloadCompleted,
                                                 is DownloadStatus.DownloadFailed -> Unit
+                                                else -> Unit
                                             }
                                         }
                                         result.success(mapFeatureStatus(generativeModel.checkStatus()))
@@ -178,7 +180,7 @@ class MainActivity : FlutterActivity() {
                                     }
 
                                     val response = generativeModel.generateContent(prompt)
-                                    val generatedText = response.text?.trim()
+                                    val generatedText = response.candidates.firstOrNull()?.text?.trim()
                                     if (generatedText.isNullOrEmpty()) {
                                         result.error(
                                             "NANO_EMPTY_RESPONSE",

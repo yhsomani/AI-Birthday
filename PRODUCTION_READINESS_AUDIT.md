@@ -207,7 +207,7 @@ Branch verification (Host local environment):
 - `flutter analyze`: **PASSED** (0 issues found).
 - `flutter test`: **PASSED** (268 / 268 tests passed, 100% pass rate).
 - Backend `npm run check` (`typecheck && lint && test`): **PASSED** (75 / 75 Vitest tests passed, TypeScript clean, ESLint clean).
-- Android build (`flutter build apk --debug`): **PASSED** (`app-debug.apk` assembled).
+- Android build: **PASSED** (both debug `app-debug.apk` and release `app-release.apk` compiled and assembled successfully with ML Kit GenAI Prompt API integration).
 - Remote CI verification: Pending GitHub Actions workflow run on remote origin.
 
 ## 12. Production readiness matrix
