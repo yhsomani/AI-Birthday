@@ -96,6 +96,8 @@ class MethodChannelGeminiNanoPlatform implements GeminiNanoPlatform {
         'downloading' || 'downloading_model' => NanoState.downloading,
         'busy' => NanoState.busy,
         'quotaExceeded' => NanoState.quotaExceeded,
+        'not_ready' => NanoState.notReady,
+        'error' => NanoState.error,
         _ => NanoState.unavailable,
       };
     } catch (_) {
@@ -115,7 +117,12 @@ class MethodChannelGeminiNanoPlatform implements GeminiNanoPlatform {
       final res = await _channel.invokeMethod<String>('startDownload');
       final state = switch (res) {
         'ready' || 'available' => NanoState.available,
+        'downloadable' => NanoState.downloadable,
         'downloading' || 'downloading_model' => NanoState.downloading,
+        'busy' => NanoState.busy,
+        'quotaExceeded' => NanoState.quotaExceeded,
+        'not_ready' => NanoState.notReady,
+        'error' => NanoState.error,
         _ => NanoState.unavailable,
       };
       _stateController.add(state);

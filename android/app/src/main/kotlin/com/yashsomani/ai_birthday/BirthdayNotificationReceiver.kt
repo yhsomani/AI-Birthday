@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import org.json.JSONArray
 
 class BirthdayNotificationReceiver : BroadcastReceiver() {
     companion object {
@@ -21,15 +22,87 @@ class BirthdayNotificationReceiver : BroadcastReceiver() {
         const val EXTRA_TITLE = "title"
         const val EXTRA_BODY = "body"
         const val EXTRA_PERSON_ID = "person_id"
+        const val PREFS_NAME = "scheduled_reminders_prefs"
+        const val KEY_SCHEDULED_ALARM_IDS = "scheduled_alarm_ids"
+        const val KEY_SCHEDULED_TRIGGERS_JSON = "scheduled_triggers_json"
+
+        fun reschedulePersisted(context: Context) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
+                ?: return
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val raw = prefs.getString(KEY_SCHEDULED_TRIGGERS_JSON, null) ?: return
+            val triggers = try {
+                JSONArray(raw)
+            } catch (e: Exception) {
+                Log.e(TAG, "Persisted reminder payload is invalid; clearing it.", e)
+                prefs.edit().remove(KEY_SCHEDULED_TRIGGERS_JSON).remove(KEY_SCHEDULED_ALARM_IDS).apply()
+                return
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+                Log.w(TAG, "Exact alarm permission unavailable after reboot; reminders remain unscheduled.")
+                return
+            }
+
+            val now = System.currentTimeMillis()
+            val restoredIds = mutableSetOf<String>()
+
+            for (index in 0 until triggers.length()) {
+                val item = triggers.optJSONObject(index) ?: continue
+                val id = item.optInt(EXTRA_ID, -1)
+                val timestampMs = item.optLong("timestampMs", 0L)
+                if (id < 0 || timestampMs <= now) continue
+
+                val reminderIntent = Intent(context, BirthdayNotificationReceiver::class.java).apply {
+                    action = ACTION_BIRTHDAY_REMINDER
+                    putExtra(EXTRA_ID, id)
+                    putExtra(EXTRA_TITLE, item.optString(EXTRA_TITLE, "Birthday Reminder"))
+                    putExtra(EXTRA_BODY, item.optString(EXTRA_BODY, ""))
+                    if (item.has(EXTRA_PERSON_ID)) {
+                        putExtra(EXTRA_PERSON_ID, item.optString(EXTRA_PERSON_ID))
+                    }
+                }
+
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    id,
+                    reminderIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setExactAndAllowWhileIdle(
+                            android.app.AlarmManager.RTC_WAKEUP,
+                            timestampMs,
+                            pendingIntent
+                        )
+                    } else {
+                        alarmManager.set(
+                            android.app.AlarmManager.RTC_WAKEUP,
+                            timestampMs,
+                            pendingIntent
+                        )
+                    }
+                    restoredIds.add(id.toString())
+                } catch (e: SecurityException) {
+                    Log.e(TAG, "Failed to restore reminder id=$id after reboot.", e)
+                }
+            }
+
+            prefs.edit().putStringSet(KEY_SCHEDULED_ALARM_IDS, restoredIds).apply()
+            Log.i(TAG, "Restored ${restoredIds.size} scheduled reminders after system restart.")
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         Log.i(TAG, "onReceive: action=$action")
 
-        // Never post notifications for system lifecycle broadcasts (boot / package update).
+        // AlarmManager entries are cleared by Android across reboot/package replacement.
+        // Restore the persisted future reminder payloads before returning.
         if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-            Log.i(TAG, "Received system boot/update event. Ignoring direct notification delivery.")
+            reschedulePersisted(context)
             return
         }
 

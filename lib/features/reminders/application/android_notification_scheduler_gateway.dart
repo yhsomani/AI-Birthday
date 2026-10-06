@@ -60,7 +60,7 @@ class AndroidNotificationSchedulerGateway
           ReminderKind.approaching => 'Birthday is in 7 days.',
         };
         return {
-          'id': '${t.personId}_${t.kind.name}'.hashCode.abs() % 1000000,
+          'id': _stableNotificationId('${t.personId}_${t.kind.name}'),
           'personId': t.personId,
           'personName': t.personName,
           'kind': t.kind.name,
@@ -130,4 +130,15 @@ class AndroidNotificationSchedulerGateway
       }
     });
   }
+}
+
+
+/// Produces the same positive notification ID across app restarts and runtimes.
+int _stableNotificationId(String value) {
+  var hash = 0x811C9DC5;
+  for (final unit in value.codeUnits) {
+    hash ^= unit;
+    hash = (hash * 0x01000193) & 0x7FFFFFFF;
+  }
+  return hash == 0 ? 1 : hash;
 }
