@@ -8,6 +8,7 @@ import 'package:ai_birthday/core/security/credential_storage.dart';
 import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
 import 'package:ai_birthday/features/ai/domain/ai_router.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
+import 'package:ai_birthday/features/birthdays/application/birthday_lifecycle_service.dart';
 import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_repository.dart';
 import 'package:ai_birthday/features/delivery/data/whatsapp_handoff_builder.dart';
 import 'package:ai_birthday/features/delivery/data/native_share_service.dart';
@@ -164,9 +165,18 @@ final peopleStreamProvider = StreamProvider<List<Person>>((ref) {
 });
 
 /// Stream of all tracked birthdays.
-final birthdaysStreamProvider = StreamProvider<List<Birthday>>((ref) {
-  final repo = ref.watch(birthdaysRepositoryProvider);
-  return repo.watchBirthdays();
+final birthdaysStreamProvider = StreamProvider<List<Birthday>>((ref) async* {
+  final birthdayRepo = ref.watch(birthdaysRepositoryProvider);
+  final peopleRepo = ref.watch(peopleRepositoryProvider);
+
+  // Reconcile the active occurrence before any screen consumes birthday data.
+  final people = await peopleRepo.getPeople();
+  await const BirthdayLifecycleService().refresh(
+    people: people,
+    birthdaysRepository: birthdayRepo,
+  );
+
+  yield* birthdayRepo.watchBirthdays();
 });
 
 /// Stream of all message drafts.
