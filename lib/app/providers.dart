@@ -30,6 +30,7 @@ import 'package:ai_birthday/core/platform/gemini_nano_platform.dart';
 import 'package:ai_birthday/features/ai/domain/ai_provider.dart';
 import 'package:ai_birthday/features/ai/data/gemini_nano_provider.dart';
 import 'package:ai_birthday/features/subscription/application/subscription_service.dart';
+import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 
 /// App-wide logger provider. Keep one logger instance across app and core layers.
 final loggerProvider = core.loggerProvider;
@@ -46,10 +47,27 @@ final credentialStorageProvider = Provider<CredentialStorage>((ref) {
 final subscriptionNotifierProvider =
     StateNotifierProvider<SubscriptionNotifier, UserEntitlement>((ref) {
       final logger = ref.watch(loggerProvider);
+      final secureStore = FlutterSecureStorageDriver(
+        const FlutterSecureStorage(),
+        logger,
+      );
       return SubscriptionNotifier(
         initial: UserEntitlement.free,
-        store: FlutterSecureStorageDriver(const FlutterSecureStorage(), logger),
+        store: secureStore,
         logger: logger,
+        authTokenProvider: () async {
+          final auth = await ref.read(authControllerProvider.future);
+          return auth.identity?.idToken;
+        },
+        accountBindingProvider: () async {
+          final auth = await ref.read(authControllerProvider.future);
+          final subject = auth.identity?.googleSubject;
+          if (subject == null || subject.isEmpty) return null;
+          return SubscriptionNotifier.readBindingFromStore(
+            secureStore,
+            subject,
+          );
+        },
       );
     });
 
