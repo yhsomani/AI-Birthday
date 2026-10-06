@@ -21,7 +21,7 @@ const ACCOUNT_BINDING = 'acct-binding-test-123456';
 
 function mockDb(
   sink: (path: string, data: Record<string, unknown>) => void,
-  owners: Map<string, string> = new Map(),
+  owners: Map<string, string> = new Map<string, string>(),
 ): Firestore {
   const doc = (path: string) =>
     ({
@@ -38,12 +38,12 @@ function mockDb(
         owners.set(path, String(data.uid));
         return Promise.resolve();
       },
-      get: async (): Promise<DocumentSnapshot> => {
+      get: (): Promise<DocumentSnapshot> => {
         const uid = owners.get(path);
-        return {
+        return Promise.resolve({
           exists: uid !== undefined,
           data: () => (uid === undefined ? undefined : { uid }),
-        } as unknown as DocumentSnapshot;
+        } as unknown as DocumentSnapshot);
       },
     }) as unknown as DocumentReference;
 
@@ -54,7 +54,7 @@ function verifier(
   snapshot: GooglePlaySubscriptionSnapshot,
 ): GooglePlaySubscriptionVerifier {
   return {
-    getSubscription: async () => snapshot,
+    getSubscription: () => Promise.resolve(snapshot),
   };
 }
 
@@ -133,7 +133,7 @@ describe('Subscription Verification Service', () => {
     };
 
     const result = await new SubscriptionVerificationService(
-      mockDb(() => {}),
+      mockDb(() => undefined),
       verifier(snapshot),
     ).verifyPurchase('user-abc', {
       contractVersion: 1,
@@ -149,7 +149,7 @@ describe('Subscription Verification Service', () => {
 
   it('binds a verified purchase token to the first authenticated account', async () => {
     const owners = new Map<string, string>();
-    const db = mockDb(() => {}, owners);
+    const db = mockDb(() => undefined, owners);
 
     const firstUser = new SubscriptionVerificationService(
       db,
@@ -181,14 +181,15 @@ describe('Subscription Verification Service', () => {
 
   it('marks invalid Play tokens as unentitled', async () => {
     const result = await new SubscriptionVerificationService(
-      mockDb(() => {}),
+      mockDb(() => undefined),
       {
-        getSubscription: async () => {
-          throw new GooglePlayApiError(
-            'GOOGLE_PLAY_SUBSCRIPTION_LOOKUP_FAILED',
-            404,
-          );
-        },
+        getSubscription: () =>
+          Promise.reject(
+            new GooglePlayApiError(
+              'GOOGLE_PLAY_SUBSCRIPTION_LOOKUP_FAILED',
+              404,
+            ),
+          ),
       },
     ).verifyPurchase('user-abc', {
       contractVersion: 1,
@@ -204,11 +205,9 @@ describe('Subscription Verification Service', () => {
 
   it('throws PACKAGE_MISMATCH before contacting Google Play', async () => {
     const service = new SubscriptionVerificationService(
-      mockDb(() => {}),
+      mockDb(() => undefined),
       {
-        getSubscription: async () => {
-          throw new Error('should not be called');
-        },
+        getSubscription: () => Promise.reject(new Error('should not be called')),
       },
     );
 

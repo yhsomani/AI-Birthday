@@ -159,7 +159,8 @@ export class SubscriptionVerificationService {
     }
 
     const existing = await ownershipRef.get();
-    const ownerUid = existing.data()?.['uid'];
+    const ownerData = existing.data() as Record<string, unknown> | undefined;
+    const ownerUid = ownerData?.uid;
     if (ownerUid !== uid) {
       throw new HttpsError('permission-denied', 'PURCHASE_ACCOUNT_MISMATCH');
     }

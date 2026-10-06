@@ -61,20 +61,20 @@ export class GooglePlaySubscriptionClient {
 
     const body = (await response.json()) as Record<string, unknown>;
     const subscriptionState =
-      typeof body['subscriptionState'] === 'string'
-        ? body['subscriptionState']
+      typeof body.subscriptionState === 'string'
+        ? body.subscriptionState
         : 'SUBSCRIPTION_STATE_UNSPECIFIED';
 
-    const lineItemsRaw = body['lineItems'];
+    const lineItemsRaw = body.lineItems;
     const lineItems: GooglePlaySubscriptionLineItem[] = [];
 
     if (Array.isArray(lineItemsRaw)) {
       for (const rawItem of lineItemsRaw) {
         if (typeof rawItem !== 'object' || rawItem === null) continue;
         const item = rawItem as Record<string, unknown>;
-        const productId = item['productId'];
+        const productId = item.productId;
         if (typeof productId !== 'string' || productId.length === 0) continue;
-        const expiryTime = item['expiryTime'];
+        const expiryTime = item.expiryTime;
         lineItems.push({
           productId,
           expiryTime: typeof expiryTime === 'string' ? expiryTime : null,
@@ -83,23 +83,22 @@ export class GooglePlaySubscriptionClient {
     }
 
     let obfuscatedExternalAccountId: string | null = null;
-    const externalIdentifiers = body['externalAccountIdentifiers'];
+    const externalIdentifiers = body.externalAccountIdentifiers;
     if (
       typeof externalIdentifiers === 'object' &&
       externalIdentifiers !== null
     ) {
       const value =
-        (externalIdentifiers as Record<string, unknown>)[
-          'obfuscatedExternalAccountId'
-        ];
+        (externalIdentifiers as Record<string, unknown>)
+          .obfuscatedExternalAccountId;
       if (typeof value === 'string' && value.length > 0) {
         obfuscatedExternalAccountId = value;
       }
     }
 
     const acknowledgementState =
-      typeof body['acknowledgementState'] === 'string'
-        ? body['acknowledgementState']
+      typeof body.acknowledgementState === 'string'
+        ? body.acknowledgementState
         : null;
 
     return {
@@ -126,7 +125,7 @@ export class GooglePlaySubscriptionClient {
     }
 
     const body = (await response.json()) as Record<string, unknown>;
-    const accessToken = body['access_token'];
+    const accessToken = body.access_token;
     if (typeof accessToken !== 'string' || accessToken.length === 0) {
       throw new GooglePlayApiError(
         'GOOGLE_RUNTIME_CREDENTIAL_UNAVAILABLE',
