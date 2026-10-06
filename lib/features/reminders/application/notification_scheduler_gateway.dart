@@ -30,7 +30,8 @@ abstract class NotificationSchedulerGateway {
   Future<bool> sendTestNotification({
     required String title,
     required String body,
-  }) async {}
+  }) async =>
+      false;
 
   /// Retrieves recipient personId if the app was launched by tapping a birthday notification.
   Future<String?> getInitialNotificationPersonId() async => null;
