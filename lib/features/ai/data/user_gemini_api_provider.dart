@@ -217,7 +217,8 @@ class UserGeminiApiProvider implements AiMessageProvider {
           str.contains('clientexception')) {
         return const GeminiConnectionResult.networkUnavailable();
       }
-      return GeminiConnectionResult.error('Connection error: $e');
+      // 🛡️ SECURITY: Prevent internal exception strings from leaking into the UI.
+      return const GeminiConnectionResult.error('A connection error occurred.');
     }
   }
 
