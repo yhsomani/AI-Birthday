@@ -14,9 +14,17 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.google.mlkit.genai.prompt.DownloadStatus
+import com.google.mlkit.genai.prompt.FeatureStatus
+import com.google.mlkit.genai.prompt.Generation
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class MainActivity : FlutterActivity() {
     private val NOTIFICATIONS_CHANNEL = "com.yashsomani.ai_birthday/notifications"
@@ -28,6 +36,8 @@ class MainActivity : FlutterActivity() {
     private var pendingContactsResult: MethodChannel.Result? = null
     private var initialPersonId: String? = null
     private var notificationsChannel: MethodChannel? = null
+    private val nativeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val generativeModel by lazy { Generation.getClient() }
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
@@ -106,28 +116,84 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-        // Setup Gemini Nano MethodChannel (SSOT §5, §20)
+        // Setup Gemini Nano MethodChannel (real ML Kit GenAI Prompt API / Gemini Nano)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NANO_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "currentState" -> {
-                        result.success(getAiCoreStatus())
+                        nativeScope.launch {
+                            try {
+                                result.success(mapFeatureStatus(generativeModel.checkStatus()))
+                            } catch (_: Exception) {
+                                result.success("error")
+                            }
+                        }
                     }
                     "startDownload" -> {
-                        val status = getAiCoreStatus()
-                        result.success(status)
+                        nativeScope.launch {
+                            try {
+                                when (generativeModel.checkStatus()) {
+                                    FeatureStatus.AVAILABLE -> result.success("ready")
+                                    FeatureStatus.DOWNLOADING -> result.success("downloading")
+                                    FeatureStatus.DOWNLOADABLE -> {
+                                        generativeModel.download().collect { status ->
+                                            when (status) {
+                                                is DownloadStatus.DownloadStarted,
+                                                is DownloadStatus.DownloadProgress,
+                                                DownloadStatus.DownloadCompleted,
+                                                is DownloadStatus.DownloadFailed -> Unit
+                                            }
+                                        }
+                                        result.success(mapFeatureStatus(generativeModel.checkStatus()))
+                                    }
+                                    FeatureStatus.UNAVAILABLE -> result.success("unavailable")
+                                    else -> result.success("error")
+                                }
+                            } catch (_: Exception) {
+                                result.error(
+                                    "NANO_DOWNLOAD_ERROR",
+                                    "Gemini Nano model download failed.",
+                                    null
+                                )
+                            }
+                        }
                     }
                     "generate" -> {
-                        val status = getAiCoreStatus()
-                        if (status == "ready") {
-                            val prompt = call.argument<String>("prompt") ?: ""
-                            result.success(prompt)
+                        val prompt = call.argument<String>("prompt")?.trim().orEmpty()
+                        if (prompt.isEmpty()) {
+                            result.error("INVALID_PROMPT", "Prompt cannot be empty.", null)
                         } else {
-                            result.error(
-                                "NANO_UNAVAILABLE",
-                                "Gemini Nano (AICore) is not ready on this device hardware ($status).",
-                                null
-                            )
+                            nativeScope.launch {
+                                try {
+                                    val status = generativeModel.checkStatus()
+                                    if (status != FeatureStatus.AVAILABLE) {
+                                        result.error(
+                                            "NANO_NOT_READY",
+                                            "Gemini Nano is not ready on this device.",
+                                            mapFeatureStatus(status)
+                                        )
+                                        return@launch
+                                    }
+
+                                    val response = generativeModel.generateContent(prompt)
+                                    val generatedText = response.text?.trim()
+                                    if (generatedText.isNullOrEmpty()) {
+                                        result.error(
+                                            "NANO_EMPTY_RESPONSE",
+                                            "Gemini Nano returned no text.",
+                                            null
+                                        )
+                                    } else {
+                                        result.success(generatedText)
+                                    }
+                                } catch (_: Exception) {
+                                    result.error(
+                                        "NANO_GENERATION_ERROR",
+                                        "Gemini Nano generation failed.",
+                                        null
+                                    )
+                                }
+                            }
                         }
                     }
                     else -> result.notImplemented()
@@ -422,22 +488,18 @@ class MainActivity : FlutterActivity() {
         notificationManager.notify(9999, notification)
     }
 
-    private fun getAiCoreStatus(): String {
-        if (Build.VERSION.SDK_INT < 34) {
-            return "unsupported_device"
+    private fun mapFeatureStatus(status: Int): String {
+        return when (status) {
+            FeatureStatus.AVAILABLE -> "ready"
+            FeatureStatus.DOWNLOADABLE -> "downloadable"
+            FeatureStatus.DOWNLOADING -> "downloading"
+            FeatureStatus.UNAVAILABLE -> "unavailable"
+            else -> "error"
         }
-        return try {
-            val pm = packageManager
-            val info = pm.getPackageInfo("com.google.android.aicore", 0)
-            if (info.applicationInfo?.enabled == true) {
-                "downloading_model"
-            } else {
-                "service_unavailable"
-            }
-        } catch (e: PackageManager.NameNotFoundException) {
-            "unsupported_device"
-        } catch (e: Exception) {
-            "service_unavailable"
-        }
+    }
+
+    override fun onDestroy() {
+        nativeScope.cancel()
+        super.onDestroy()
     }
 }
