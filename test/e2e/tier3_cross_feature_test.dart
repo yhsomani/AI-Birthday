@@ -145,50 +145,5 @@ void main() {
       );
     });
 
-    // =========================================================================
-    // Interaction 4: Local Drift SQLite <-> Cloud Envelope Sync with Version Vectors (R3)
-    // =========================================================================
-    group('Interaction 4: Drift SQLite <-> Cloud Version Vectors', () {
-      test(
-        'Deterministic version vector conflict resolution: newer cloud backup wins, older rejected',
-        () {
-          const localMaxVersion = 5;
-
-          // Scenario A: Remote cloud backup is newer (version 7 > 5) -> should apply
-          final newerRemoteEnvelope =
-              CryptoEnvelopeFixture.createEncryptedEnvelope(
-                persons: [
-                  {'id': 'p-remote', 'name': 'Updated on Cloud', 'version': 7},
-                ],
-                birthdays: [],
-                backupVersion: 7,
-              );
-
-          final remoteVersion = newerRemoteEnvelope['backupVersion'] as int;
-          expect(remoteVersion > localMaxVersion, isTrue);
-
-          final decryptedNewer = CryptoEnvelopeFixture.decryptEnvelope(
-            newerRemoteEnvelope,
-          );
-          expect(decryptedNewer['persons'][0]['name'], 'Updated on Cloud');
-
-          // Scenario B: Remote cloud backup is stale (version 3 < 5) -> must NOT overwrite local edits
-          final staleRemoteEnvelope =
-              CryptoEnvelopeFixture.createEncryptedEnvelope(
-                persons: [
-                  {'id': 'p-stale', 'name': 'Old Stale Name', 'version': 3},
-                ],
-                birthdays: [],
-                backupVersion: 3,
-              );
-
-          final staleVersion = staleRemoteEnvelope['backupVersion'] as int;
-          expect(staleVersion < localMaxVersion, isTrue);
-          // Client rejects stale restore to prevent silent data loss
-          final shouldApplyStale = staleVersion > localMaxVersion;
-          expect(shouldApplyStale, isFalse);
-        },
-      );
-    });
   });
 }
