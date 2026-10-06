@@ -40,7 +40,11 @@ class UserEntitlement {
   final DateTime? expiryDate;
   final bool isAutoRenewing;
 
-  bool get canUseAi => status.isEntitled;
+  bool get canUseAi {
+    if (!status.isEntitled) return false;
+    final expiry = expiryDate;
+    return expiry == null || expiry.isAfter(DateTime.now());
+  }
 
   /// Default free tier entitlement without active AI subscription.
   static const free = UserEntitlement(status: EntitlementStatus.none);
