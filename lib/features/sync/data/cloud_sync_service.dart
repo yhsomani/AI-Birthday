@@ -560,6 +560,14 @@ class CloudSyncService {
         final key = _string(fields, 'key');
         if (key == null) continue;
 
+        // Reminder settings have no per-record sync timestamp. Preserve a
+        // device-local preference rather than overwriting it with an older or
+        // ambiguous cloud copy during a merge-style restore.
+        final existing = await (_db.select(
+          _db.reminderSettingsEntries,
+        )..where((row) => row.key.equals(key))).getSingleOrNull();
+        if (existing != null) continue;
+
         await _db
             .into(_db.reminderSettingsEntries)
             .insertOnConflictUpdate(
