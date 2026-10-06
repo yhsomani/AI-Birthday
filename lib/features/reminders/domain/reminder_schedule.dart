@@ -92,9 +92,6 @@ class ReminderScheduler {
           nextDate: next.nextDate,
           frameTimezone: frameTimezone,
         );
-        if (!trigger.at.isAfter(reference)) {
-          continue;
-        }
         if (quietHours.contains(trigger.at)) {
           suppressed.add(trigger);
         } else {
