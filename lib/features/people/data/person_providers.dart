@@ -26,12 +26,14 @@ final personServiceProvider = Provider<PersonService>(
         final people = await ref.read(peopleStoreProvider).getAll();
         await reminderService.sync(people: people, settings: settings);
       } catch (error, stackTrace) {
-        ref.read(loggerProvider).warning(
-          'people',
-          'Reminder schedule refresh failed after a contact change.',
-          error: error,
-          stackTrace: stackTrace,
-        );
+        ref
+            .read(loggerProvider)
+            .warning(
+              'people',
+              'Reminder schedule refresh failed after a contact change.',
+              error: error,
+              stackTrace: stackTrace,
+            );
       }
     },
   ),

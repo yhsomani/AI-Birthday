@@ -34,7 +34,9 @@ class BirthdayLifecycleService {
         reference: reference,
       );
 
-      final existing = await birthdaysRepository.getBirthdayForPerson(person.id);
+      final existing = await birthdaysRepository.getBirthdayForPerson(
+        person.id,
+      );
       final targetStatus = next.isToday
           ? BirthdayStatus.reminderDue
           : BirthdayStatus.upcoming;

@@ -23,12 +23,14 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
   }) : _store = store,
        _http = httpClient ?? http.Client(),
        _logger = logger,
-       _firebaseApiKey = firebaseApiKey ??
+       _firebaseApiKey =
+           firebaseApiKey ??
            (const String.fromEnvironment('FIREBASE_WEB_API_KEY').isNotEmpty
                ? const String.fromEnvironment('FIREBASE_WEB_API_KEY')
-               : (httpClient != null || !const bool.fromEnvironment('dart.vm.product')
-                   ? 'test_dev_firebase_api_key'
-                   : ''));
+               : (httpClient != null ||
+                         !const bool.fromEnvironment('dart.vm.product')
+                     ? 'test_dev_firebase_api_key'
+                     : ''));
 
   final SecureStoreDriver _store;
   final http.Client _http;

@@ -37,7 +37,8 @@ class CloudSyncService {
        _store = store,
        _http = httpClient ?? http.Client(),
        _logger = logger,
-       _apiKey = apiKey ??
+       _apiKey =
+           apiKey ??
            (const String.fromEnvironment('FIREBASE_WEB_API_KEY').isNotEmpty
                ? const String.fromEnvironment('FIREBASE_WEB_API_KEY')
                : (httpClient != null ? 'test-mock-api-key' : ''));
@@ -139,17 +140,13 @@ class CloudSyncService {
     return documents;
   }
 
-  Map<String, dynamic> _firestoreString(String value) => {
-    'stringValue': value,
-  };
+  Map<String, dynamic> _firestoreString(String value) => {'stringValue': value};
 
   Map<String, dynamic> _firestoreInt(int value) => {
     'integerValue': value.toString(),
   };
 
-  Map<String, dynamic> _firestoreBool(bool value) => {
-    'booleanValue': value,
-  };
+  Map<String, dynamic> _firestoreBool(bool value) => {'booleanValue': value};
 
   Map<String, dynamic> _firestoreDate(DateTime value) => {
     'stringValue': value.toIso8601String(),
@@ -239,8 +236,9 @@ class CloudSyncService {
           'preferredTone': _firestoreString(p.preferredTone),
           'importantFacts': _firestoreString(p.importantFacts),
           if (p.notes != null) 'notes': _firestoreString(p.notes!),
-          'preferredDeliveryChannel':
-              _firestoreString(p.preferredDeliveryChannel),
+          'preferredDeliveryChannel': _firestoreString(
+            p.preferredDeliveryChannel,
+          ),
           if (p.timezone != null) 'timezone': _firestoreString(p.timezone!),
           'autoPrepare': _firestoreBool(p.autoPrepare),
           'autoSendPolicy': _firestoreString(p.autoSendPolicy),
@@ -308,18 +306,13 @@ class CloudSyncService {
           'key': _firestoreString(setting.key),
           'enabled': _firestoreBool(setting.enabled),
           'kinds': _firestoreString(setting.kinds),
-          'quietHoursStartMinutes':
-              _firestoreInt(setting.quietHoursStartMinutes),
-          'quietHoursEndMinutes':
-              _firestoreInt(setting.quietHoursEndMinutes),
+          'quietHoursStartMinutes': _firestoreInt(
+            setting.quietHoursStartMinutes,
+          ),
+          'quietHoursEndMinutes': _firestoreInt(setting.quietHoursEndMinutes),
         };
 
-        if (await _patchDocument(
-          remindersUrl,
-          setting.key,
-          fields,
-          headers,
-        )) {
+        if (await _patchDocument(remindersUrl, setting.key, fields, headers)) {
           uploaded++;
         } else {
           failures++;
@@ -412,16 +405,18 @@ class CloudSyncService {
         if (id == null || name == null) continue;
 
         final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
-        final existing = await (_db.select(_db.persons)
-              ..where((row) => row.id.equals(id)))
-            .getSingleOrNull();
+        final existing = await (_db.select(
+          _db.persons,
+        )..where((row) => row.id.equals(id))).getSingleOrNull();
         if (existing != null && !remoteUpdatedAt.isAfter(existing.updatedAt)) {
           continue;
         }
 
         final createdAt = _date(fields, 'createdAt') ?? remoteUpdatedAt;
         final deletedAt = _date(fields, 'deletedAt');
-        await _db.into(_db.persons).insertOnConflictUpdate(
+        await _db
+            .into(_db.persons)
+            .insertOnConflictUpdate(
               PersonsCompanion(
                 id: drift.Value(id),
                 name: drift.Value(name),
@@ -477,14 +472,16 @@ class CloudSyncService {
         if (id == null || personId == null || date == null) continue;
 
         final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
-        final existing = await (_db.select(_db.birthdays)
-              ..where((row) => row.id.equals(id)))
-            .getSingleOrNull();
+        final existing = await (_db.select(
+          _db.birthdays,
+        )..where((row) => row.id.equals(id))).getSingleOrNull();
         if (existing != null && !remoteUpdatedAt.isAfter(existing.updatedAt)) {
           continue;
         }
 
-        await _db.into(_db.birthdays).insertOnConflictUpdate(
+        await _db
+            .into(_db.birthdays)
+            .insertOnConflictUpdate(
               BirthdaysCompanion(
                 id: drift.Value(id),
                 personId: drift.Value(personId),
@@ -492,9 +489,7 @@ class CloudSyncService {
                   _integer(fields, 'cycleYear') ?? date.year,
                 ),
                 date: drift.Value(date),
-                status: drift.Value(
-                  _string(fields, 'status') ?? 'upcoming',
-                ),
+                status: drift.Value(_string(fields, 'status') ?? 'upcoming'),
                 draftId: drift.Value(_string(fields, 'draftId')),
                 createdAt: drift.Value(
                   _date(fields, 'createdAt') ?? remoteUpdatedAt,
@@ -523,14 +518,16 @@ class CloudSyncService {
         }
 
         final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
-        final existing = await (_db.select(_db.messageDrafts)
-              ..where((row) => row.id.equals(id)))
-            .getSingleOrNull();
+        final existing = await (_db.select(
+          _db.messageDrafts,
+        )..where((row) => row.id.equals(id))).getSingleOrNull();
         if (existing != null && !remoteUpdatedAt.isAfter(existing.updatedAt)) {
           continue;
         }
 
-        await _db.into(_db.messageDrafts).insertOnConflictUpdate(
+        await _db
+            .into(_db.messageDrafts)
+            .insertOnConflictUpdate(
               MessageDraftsCompanion(
                 id: drift.Value(id),
                 birthdayId: drift.Value(birthdayId),
@@ -539,8 +536,9 @@ class CloudSyncService {
                 tone: drift.Value(_string(fields, 'tone') ?? 'warm'),
                 length: drift.Value(_string(fields, 'length') ?? 'medium'),
                 status: drift.Value(_string(fields, 'status') ?? 'draft'),
-                providerType:
-                    drift.Value(_string(fields, 'providerType') ?? 'manual'),
+                providerType: drift.Value(
+                  _string(fields, 'providerType') ?? 'manual',
+                ),
                 variationIndex: drift.Value(
                   _integer(fields, 'variationIndex') ?? 0,
                 ),
@@ -562,7 +560,9 @@ class CloudSyncService {
         final key = _string(fields, 'key');
         if (key == null) continue;
 
-        await _db.into(_db.reminderSettingsEntries).insertOnConflictUpdate(
+        await _db
+            .into(_db.reminderSettingsEntries)
+            .insertOnConflictUpdate(
               ReminderSettingsEntriesCompanion(
                 key: drift.Value(key),
                 enabled: drift.Value(_boolean(fields, 'enabled') ?? false),

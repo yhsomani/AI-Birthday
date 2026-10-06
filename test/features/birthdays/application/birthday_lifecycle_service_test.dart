@@ -7,9 +7,7 @@ import 'package:ai_birthday/features/people/domain/models/person.dart';
 
 void main() {
   group('BirthdayLifecycleService', () {
-    const service = BirthdayLifecycleService(
-      now: _fixedNow,
-    );
+    const service = BirthdayLifecycleService(now: _fixedNow);
 
     Person person({int month = 10, int day = 25}) {
       final timestamp = _fixedNow();
@@ -26,10 +24,7 @@ void main() {
     test('creates the current birthday cycle when missing', () async {
       final repo = InMemoryBirthdaysRepository();
 
-      await service.refresh(
-        people: [person()],
-        birthdaysRepository: repo,
-      );
+      await service.refresh(people: [person()], birthdaysRepository: repo);
 
       final birthday = await repo.getBirthdayForPerson('person-1');
       expect(birthday, isNotNull);
@@ -38,33 +33,33 @@ void main() {
       expect(birthday.status, BirthdayStatus.upcoming);
     });
 
-    test('rolls a stale cycle into the next year and clears its draft', () async {
-      final repo = InMemoryBirthdaysRepository(
-        initialBirthdays: [
-          Birthday(
-            id: 'birthday-person-1',
-            personId: 'person-1',
-            cycleYear: 2025,
-            date: DateTime(2025, 10, 25),
-            status: BirthdayStatus.completed,
-            draftId: 'draft-1',
-            createdAt: DateTime(2025, 1, 1),
-            updatedAt: DateTime(2025, 10, 25),
-          ),
-        ],
-      );
+    test(
+      'rolls a stale cycle into the next year and clears its draft',
+      () async {
+        final repo = InMemoryBirthdaysRepository(
+          initialBirthdays: [
+            Birthday(
+              id: 'birthday-person-1',
+              personId: 'person-1',
+              cycleYear: 2025,
+              date: DateTime(2025, 10, 25),
+              status: BirthdayStatus.completed,
+              draftId: 'draft-1',
+              createdAt: DateTime(2025, 1, 1),
+              updatedAt: DateTime(2025, 10, 25),
+            ),
+          ],
+        );
 
-      await service.refresh(
-        people: [person()],
-        birthdaysRepository: repo,
-      );
+        await service.refresh(people: [person()], birthdaysRepository: repo);
 
-      final birthday = await repo.getBirthdayForPerson('person-1');
-      expect(birthday!.cycleYear, 2026);
-      expect(birthday.date, DateTime(2026, 10, 25));
-      expect(birthday.status, BirthdayStatus.upcoming);
-      expect(birthday.draftId, isNull);
-    });
+        final birthday = await repo.getBirthdayForPerson('person-1');
+        expect(birthday!.cycleYear, 2026);
+        expect(birthday.date, DateTime(2026, 10, 25));
+        expect(birthday.status, BirthdayStatus.upcoming);
+        expect(birthday.draftId, isNull);
+      },
+    );
 
     test('preserves completed state for the same active cycle', () async {
       final repo = InMemoryBirthdaysRepository(
@@ -82,10 +77,7 @@ void main() {
         ],
       );
 
-      await service.refresh(
-        people: [person()],
-        birthdaysRepository: repo,
-      );
+      await service.refresh(people: [person()], birthdaysRepository: repo);
 
       final birthday = await repo.getBirthdayForPerson('person-1');
       expect(birthday!.status, BirthdayStatus.completed);

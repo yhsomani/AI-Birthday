@@ -86,8 +86,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final auth = ref.read(authControllerProvider).valueOrNull;
       final identity = auth?.identity;
-      final accountId =
-          identity?.firebaseUid ?? identity?.googleSubject;
+      final accountId = identity?.firebaseUid ?? identity?.googleSubject;
       if (accountId == null || accountId.isEmpty) return;
 
       final syncService = ref.read(cloudSyncServiceProvider);

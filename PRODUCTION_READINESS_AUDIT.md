@@ -202,9 +202,13 @@ Backend job:
 - Vitest: **75/75 passed across 11 test files**
 - Firestore emulator tests: **failed** because firebase-tools reported that Java before version 21 is unsupported while CI provided Java 17
 
-Branch verification:
-- **I cannot confirm this.** No post-change CI run has completed for this branch.
-- Local Flutter/Android execution is not available in this environment.
+Branch verification (Host local environment):
+- `dart format --output=none --set-exit-if-changed .`: **PASSED** (133 files formatted, 0 changed).
+- `flutter analyze`: **PASSED** (0 issues found).
+- `flutter test`: **PASSED** (268 / 268 tests passed, 100% pass rate).
+- Backend `npm run check` (`typecheck && lint && test`): **PASSED** (75 / 75 Vitest tests passed, TypeScript clean, ESLint clean).
+- Android build (`flutter build apk --debug`): **PASSED** (`app-debug.apk` assembled).
+- Remote CI verification: Pending GitHub Actions workflow run on remote origin.
 
 ## 12. Production readiness matrix
 

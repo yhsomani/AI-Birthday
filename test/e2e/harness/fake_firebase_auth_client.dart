@@ -35,19 +35,20 @@ class FakeFirebaseAuthClient extends http.BaseClient {
 
     if (!shouldSucceed || statusCode != 200) {
       final errorBody = jsonEncode(
-        customResponseJson ?? {
-          'error': {
-            'code': statusCode,
-            'message': 'INVALID_ID_TOKEN',
-            'errors': [
-              {
+        customResponseJson ??
+            {
+              'error': {
+                'code': statusCode,
                 'message': 'INVALID_ID_TOKEN',
-                'domain': 'global',
-                'reason': 'invalid',
+                'errors': [
+                  {
+                    'message': 'INVALID_ID_TOKEN',
+                    'domain': 'global',
+                    'reason': 'invalid',
+                  },
+                ],
               },
-            ],
-          },
-        },
+            },
       );
       return http.StreamedResponse(
         Stream.value(utf8.encode(errorBody)),
@@ -57,17 +58,18 @@ class FakeFirebaseAuthClient extends http.BaseClient {
     }
 
     final successBody = jsonEncode(
-      customResponseJson ?? {
-        'federatedId': 'google.com:1234567890',
-        'providerId': 'google.com',
-        'localId': 'firebase-uid-verified-987',
-        'email': 'user@example.com',
-        'emailVerified': true,
-        'displayName': 'Verified User',
-        'idToken': 'firebase-jwt-token-verified-abc',
-        'refreshToken': 'firebase-refresh-token-xyz',
-        'expiresIn': '3600',
-      },
+      customResponseJson ??
+          {
+            'federatedId': 'google.com:1234567890',
+            'providerId': 'google.com',
+            'localId': 'firebase-uid-verified-987',
+            'email': 'user@example.com',
+            'emailVerified': true,
+            'displayName': 'Verified User',
+            'idToken': 'firebase-jwt-token-verified-abc',
+            'refreshToken': 'firebase-refresh-token-xyz',
+            'expiresIn': '3600',
+          },
     );
 
     return http.StreamedResponse(

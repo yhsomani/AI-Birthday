@@ -27,10 +27,7 @@ class InMemoryStoreDriver implements SecureStoreDriver {
 }
 
 class TestGoogleSignInPlatform extends GoogleSignInPlatform {
-  TestGoogleSignInPlatform({
-    this.authResults,
-    this.authException,
-  });
+  TestGoogleSignInPlatform({this.authResults, this.authException});
 
   AuthenticationResults? authResults;
   Object? authException;
@@ -178,10 +175,7 @@ void main() {
         final mockClient = MockClient((request) async {
           expect(request.url.host, 'identitytoolkit.googleapis.com');
           expect(request.url.path, '/v1/accounts:signInWithIdp');
-          expect(
-            request.url.queryParameters['key'],
-            isNotEmpty,
-          );
+          expect(request.url.queryParameters['key'], isNotEmpty);
           final body = jsonDecode(request.body) as Map<String, dynamic>;
           expect(
             body['postBody'],
@@ -316,10 +310,7 @@ void main() {
         final mockClient = MockClient((request) async {
           return http.Response(
             jsonEncode({
-              'error': {
-                'code': 400,
-                'message': 'INVALID_ID_TOKEN',
-              },
+              'error': {'code': 400, 'message': 'INVALID_ID_TOKEN'},
             }),
             400,
           );
@@ -382,17 +373,20 @@ void main() {
       },
     );
 
-    test('signOut removes auth_session_refresh_token from secure store', () async {
-      store.data['auth_session_subject'] = 'sub-1';
-      store.data['auth_session_email'] = 'test@example.com';
-      store.data['auth_session_name'] = 'Test';
-      store.data['auth_session_refresh_token'] = 'refresh-token-xyz';
+    test(
+      'signOut removes auth_session_refresh_token from secure store',
+      () async {
+        store.data['auth_session_subject'] = 'sub-1';
+        store.data['auth_session_email'] = 'test@example.com';
+        store.data['auth_session_name'] = 'Test';
+        store.data['auth_session_refresh_token'] = 'refresh-token-xyz';
 
-      final gateway = LiveGoogleAuthGateway(store: store);
-      await gateway.signOut();
+        final gateway = LiveGoogleAuthGateway(store: store);
+        await gateway.signOut();
 
-      expect(store.data['auth_session_refresh_token'], isNull);
-      expect(store.data.isEmpty, isTrue);
-    });
+        expect(store.data['auth_session_refresh_token'], isNull);
+        expect(store.data.isEmpty, isTrue);
+      },
+    );
   });
 }

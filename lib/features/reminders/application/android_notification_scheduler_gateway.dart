@@ -132,7 +132,6 @@ class AndroidNotificationSchedulerGateway
   }
 }
 
-
 /// Produces the same positive notification ID across app restarts and runtimes.
 int _stableNotificationId(String value) {
   var hash = 0x811C9DC5;

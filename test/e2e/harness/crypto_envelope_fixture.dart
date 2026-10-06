@@ -27,7 +27,9 @@ class CryptoEnvelopeFixture {
     final keyBytes = List<int>.generate(32, (i) => (i * 7 + 13) % 256);
     final iv = List<int>.generate(12, (i) => (i * 3 + 17) % 256);
     final ciphertextBytes = List<int>.generate(payloadBytes.length, (i) {
-      return payloadBytes[i] ^ keyBytes[i % keyBytes.length] ^ iv[i % iv.length];
+      return payloadBytes[i] ^
+          keyBytes[i % keyBytes.length] ^
+          iv[i % iv.length];
     });
 
     // 16-byte (128-bit) simulated auth tag
@@ -68,10 +70,14 @@ class CryptoEnvelopeFixture {
     final authTagBytes = base64Decode(authTagBase64);
 
     if (iv.length != 12) {
-      throw const FormatException('Invalid IV length; must be 96-bit (12 bytes)');
+      throw const FormatException(
+        'Invalid IV length; must be 96-bit (12 bytes)',
+      );
     }
     if (authTagBytes.length != 16) {
-      throw const FormatException('Invalid auth tag length; must be 128-bit (16 bytes)');
+      throw const FormatException(
+        'Invalid auth tag length; must be 128-bit (16 bytes)',
+      );
     }
 
     // Verify tag
@@ -85,14 +91,18 @@ class CryptoEnvelopeFixture {
     );
     for (var i = 0; i < 16; i++) {
       if (authTagBytes[i] != expectedTag[i]) {
-        throw const FormatException('Authentication tag mismatch! Ciphertext was tampered or corrupted.');
+        throw const FormatException(
+          'Authentication tag mismatch! Ciphertext was tampered or corrupted.',
+        );
       }
     }
 
     // Decrypt
     final keyBytes = List<int>.generate(32, (i) => (i * 7 + 13) % 256);
     final decryptedBytes = List<int>.generate(ciphertextBytes.length, (i) {
-      return ciphertextBytes[i] ^ keyBytes[i % keyBytes.length] ^ iv[i % iv.length];
+      return ciphertextBytes[i] ^
+          keyBytes[i % keyBytes.length] ^
+          iv[i % iv.length];
     });
 
     final jsonStr = utf8.decode(decryptedBytes);

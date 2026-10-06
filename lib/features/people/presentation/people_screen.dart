@@ -714,37 +714,35 @@ class PeopleScreen extends ConsumerWidget {
                     ],
                   ),
                   trailing: PopupMenuButton<String>(
-                        tooltip: 'Person actions',
-                        onSelected: (action) async {
-                          if (action == 'message') {
-                            final bRepo = ref.read(birthdaysRepositoryProvider);
-                            final b = await bRepo.getBirthdayForPerson(
-                              person.id,
-                            );
-                            if (b != null && context.mounted) {
-                              context.push('/message-studio/${b.id}');
-                            }
-                          } else if (action == 'edit') {
-                            context.push('/people/edit/${person.id}');
-                          } else if (action == 'delete') {
-                            _confirmAndDelete(context, ref, person);
-                          }
-                        },
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(
-                            value: 'message',
-                            child: Row(
-                              children: [
-                                Icon(Icons.auto_awesome, size: 18),
-                                SizedBox(width: 8),
-                                Text('Message Studio'),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(value: 'edit', child: Text('Edit')),
-                          PopupMenuItem(value: 'delete', child: Text('Delete')),
-                        ],
+                    tooltip: 'Person actions',
+                    onSelected: (action) async {
+                      if (action == 'message') {
+                        final bRepo = ref.read(birthdaysRepositoryProvider);
+                        final b = await bRepo.getBirthdayForPerson(person.id);
+                        if (b != null && context.mounted) {
+                          context.push('/message-studio/${b.id}');
+                        }
+                      } else if (action == 'edit') {
+                        context.push('/people/edit/${person.id}');
+                      } else if (action == 'delete') {
+                        _confirmAndDelete(context, ref, person);
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: 'message',
+                        child: Row(
+                          children: [
+                            Icon(Icons.auto_awesome, size: 18),
+                            SizedBox(width: 8),
+                            Text('Message Studio'),
+                          ],
+                        ),
                       ),
+                      PopupMenuItem(value: 'edit', child: Text('Edit')),
+                      PopupMenuItem(value: 'delete', child: Text('Delete')),
+                    ],
+                  ),
                   onTap: () => _showPersonDetailsModal(context, ref, person),
                 ),
               );

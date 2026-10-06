@@ -58,7 +58,7 @@ void main() {
         find.text('Remember → Prepare → Personalize → Review → Send'),
         findsOneWidget,
       );
-      expect(find.text('Strictly Local-First Privacy'), findsOneWidget);
+      expect(find.text('Local by Default'), findsOneWidget);
       expect(find.text('Next'), findsOneWidget);
       expect(find.text('Skip'), findsOneWidget);
     });

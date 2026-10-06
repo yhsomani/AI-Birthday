@@ -22,7 +22,10 @@ class ResponsiveTester {
   }
 
   /// Simulates software keyboard (IME) display with the given height (default 300dp).
-  static void simulateKeyboardActive(WidgetTester tester, {double keyboardHeight = 300.0}) {
+  static void simulateKeyboardActive(
+    WidgetTester tester, {
+    double keyboardHeight = 300.0,
+  }) {
     tester.view.viewInsets = FakeViewPadding(
       bottom: keyboardHeight,
       left: 0,

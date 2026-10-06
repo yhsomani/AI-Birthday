@@ -100,9 +100,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     }
   }
 
-  Future<void> _onPurchasesUpdated(
-    List<iap.PurchaseDetails> purchases,
-  ) async {
+  Future<void> _onPurchasesUpdated(List<iap.PurchaseDetails> purchases) async {
     for (final purchase in purchases) {
       if (purchase.productID != _kProMonthlyId) {
         if (purchase.pendingCompletePurchase) {
@@ -219,7 +217,8 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
       }
 
       final expiry = expiryDateMs.toInt();
-      final isActive = status == 'active' && expiry > DateTime.now().millisecondsSinceEpoch;
+      final isActive =
+          status == 'active' && expiry > DateTime.now().millisecondsSinceEpoch;
       if (isActive) {
         return _VerifiedEntitlement(
           status: EntitlementStatus.active,

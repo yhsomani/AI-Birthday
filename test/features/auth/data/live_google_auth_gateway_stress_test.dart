@@ -28,10 +28,7 @@ class InMemoryStoreDriver implements SecureStoreDriver {
 }
 
 class TestGoogleSignInPlatform extends GoogleSignInPlatform {
-  TestGoogleSignInPlatform({
-    this.authResults,
-    this.authException,
-  });
+  TestGoogleSignInPlatform({this.authResults, this.authException});
 
   AuthenticationResults? authResults;
   Object? authException;
@@ -144,9 +141,9 @@ void main() {
                       'message': 'INVALID_ID_TOKEN',
                       'domain': 'global',
                       'reason': 'invalid',
-                    }
+                    },
                   ],
-                }
+                },
               }),
               400,
             );
@@ -188,7 +185,7 @@ void main() {
           final mockClient = MockClient((request) async {
             return http.Response(
               jsonEncode({
-                'error': {'code': 401, 'message': 'API_KEY_INVALID'}
+                'error': {'code': 401, 'message': 'API_KEY_INVALID'},
               }),
               401,
             );
@@ -228,7 +225,7 @@ void main() {
           final mockClient = MockClient((request) async {
             return http.Response(
               jsonEncode({
-                'error': {'code': 500, 'message': 'INTERNAL_SERVER_ERROR'}
+                'error': {'code': 500, 'message': 'INTERNAL_SERVER_ERROR'},
               }),
               500,
             );
@@ -278,114 +275,128 @@ void main() {
           final outcome = await gateway.signIn();
           expect(outcome, isA<SignInSuccess>());
           // Verify logger caught the warning
-          final warning = logMessages.any((m) => m.contains('Firebase IdP exchange warning'));
+          final warning = logMessages.any(
+            (m) => m.contains('Firebase IdP exchange warning'),
+          );
           expect(warning, isTrue);
         },
       );
     });
 
     group('STRESS-2: Session Persistence & Tampering', () {
-      test('Incomplete session fields in SecureStoreDriver return null safely', () async {
-        final gateway = LiveGoogleAuthGateway(store: store, logger: logger);
+      test(
+        'Incomplete session fields in SecureStoreDriver return null safely',
+        () async {
+          final gateway = LiveGoogleAuthGateway(store: store, logger: logger);
 
-        // Only email and name, missing subject
-        store.data['auth_session_email'] = 'test@example.com';
-        store.data['auth_session_name'] = 'Test';
-        expect(await gateway.getStoredIdentity(), isNull);
+          // Only email and name, missing subject
+          store.data['auth_session_email'] = 'test@example.com';
+          store.data['auth_session_name'] = 'Test';
+          expect(await gateway.getStoredIdentity(), isNull);
 
-        // Subject present, but missing email
-        store.data.clear();
-        store.data['auth_session_subject'] = 'sub-1';
-        store.data['auth_session_name'] = 'Test';
-        expect(await gateway.getStoredIdentity(), isNull);
+          // Subject present, but missing email
+          store.data.clear();
+          store.data['auth_session_subject'] = 'sub-1';
+          store.data['auth_session_name'] = 'Test';
+          expect(await gateway.getStoredIdentity(), isNull);
 
-        // Subject and email present, missing name
-        store.data.clear();
-        store.data['auth_session_subject'] = 'sub-1';
-        store.data['auth_session_email'] = 'test@example.com';
-        expect(await gateway.getStoredIdentity(), isNull);
-      });
+          // Subject and email present, missing name
+          store.data.clear();
+          store.data['auth_session_subject'] = 'sub-1';
+          store.data['auth_session_email'] = 'test@example.com';
+          expect(await gateway.getStoredIdentity(), isNull);
+        },
+      );
 
-      test('Empty string values for photo, uid, and idToken fall back gracefully', () async {
-        store.data['auth_session_subject'] = 'sub-empty-test';
-        store.data['auth_session_email'] = 'empty@example.com';
-        store.data['auth_session_name'] = 'Empty Field User';
-        store.data['auth_session_photo'] = '';
-        store.data['auth_session_uid'] = '';
-        store.data['auth_session_id_token'] = '';
+      test(
+        'Empty string values for photo, uid, and idToken fall back gracefully',
+        () async {
+          store.data['auth_session_subject'] = 'sub-empty-test';
+          store.data['auth_session_email'] = 'empty@example.com';
+          store.data['auth_session_name'] = 'Empty Field User';
+          store.data['auth_session_photo'] = '';
+          store.data['auth_session_uid'] = '';
+          store.data['auth_session_id_token'] = '';
 
-        final gateway = LiveGoogleAuthGateway(store: store, logger: logger);
-        final identity = await gateway.getStoredIdentity();
+          final gateway = LiveGoogleAuthGateway(store: store, logger: logger);
+          final identity = await gateway.getStoredIdentity();
 
-        expect(identity, isNotNull);
-        expect(identity!.photoUrl, isNull);
-        // Falls back to googleSubject when uid is empty
-        expect(identity.firebaseUid, 'sub-empty-test');
-        expect(identity.idToken, isNull);
-      });
+          expect(identity, isNotNull);
+          expect(identity!.photoUrl, isNull);
+          // Falls back to googleSubject when uid is empty
+          expect(identity.firebaseUid, 'sub-empty-test');
+          expect(identity.idToken, isNull);
+        },
+      );
 
-      test('SignOut cleans up store even if GoogleSignInPlatform throws exception', () async {
-        final testPlatform = TestGoogleSignInPlatform(
-          authException: StateError('Google Play Services disconnected'),
-        );
-        GoogleSignInPlatform.instance = testPlatform;
+      test(
+        'SignOut cleans up store even if GoogleSignInPlatform throws exception',
+        () async {
+          final testPlatform = TestGoogleSignInPlatform(
+            authException: StateError('Google Play Services disconnected'),
+          );
+          GoogleSignInPlatform.instance = testPlatform;
 
-        store.data['auth_session_subject'] = 'sub-err';
-        store.data['auth_session_email'] = 'err@example.com';
-        store.data['auth_session_name'] = 'Error User';
+          store.data['auth_session_subject'] = 'sub-err';
+          store.data['auth_session_email'] = 'err@example.com';
+          store.data['auth_session_name'] = 'Error User';
 
-        final gateway = LiveGoogleAuthGateway(store: store, logger: logger);
-        await gateway.signOut();
+          final gateway = LiveGoogleAuthGateway(store: store, logger: logger);
+          await gateway.signOut();
 
-        expect(store.data.isEmpty, isTrue);
-      });
+          expect(store.data.isEmpty, isTrue);
+        },
+      );
     });
 
     group('STRESS-3: PII and Credential Leakage in Logging', () {
-      test('Verify no raw tokens, API keys, or raw email addresses appear in info logs', () async {
-        const secretIdToken = 'very-secret-id-token-abc-123';
-        const userEmail = 'private.user@confidential.org';
+      test(
+        'Verify no raw tokens, API keys, or raw email addresses appear in info logs',
+        () async {
+          const secretIdToken = 'very-secret-id-token-abc-123';
+          const userEmail = 'private.user@confidential.org';
 
-        final testPlatform = TestGoogleSignInPlatform(
-          authResults: const AuthenticationResults(
-            user: GoogleSignInUserData(
-              id: 'google-sub-secret',
-              email: userEmail,
-              displayName: 'Confidential Person',
+          final testPlatform = TestGoogleSignInPlatform(
+            authResults: const AuthenticationResults(
+              user: GoogleSignInUserData(
+                id: 'google-sub-secret',
+                email: userEmail,
+                displayName: 'Confidential Person',
+              ),
+              authenticationTokens: AuthenticationTokenData(
+                idToken: secretIdToken,
+              ),
             ),
-            authenticationTokens: AuthenticationTokenData(
-              idToken: secretIdToken,
-            ),
-          ),
-        );
-        GoogleSignInPlatform.instance = testPlatform;
-
-        final mockClient = MockClient((request) async {
-          return http.Response(
-            jsonEncode({
-              'localId': 'firebase-uid-secret',
-              'idToken': 'firebase-token-secret-xyz',
-            }),
-            200,
           );
-        });
+          GoogleSignInPlatform.instance = testPlatform;
 
-        final gateway = LiveGoogleAuthGateway(
-          store: store,
-          httpClient: mockClient,
-          logger: logger,
-        );
+          final mockClient = MockClient((request) async {
+            return http.Response(
+              jsonEncode({
+                'localId': 'firebase-uid-secret',
+                'idToken': 'firebase-token-secret-xyz',
+              }),
+              200,
+            );
+          });
 
-        final outcome = await gateway.signIn();
-        expect(outcome, isA<SignInSuccess>());
+          final gateway = LiveGoogleAuthGateway(
+            store: store,
+            httpClient: mockClient,
+            logger: logger,
+          );
 
-        // Check all log messages
-        for (final msg in logMessages) {
-          expect(msg, isNot(contains(secretIdToken)));
-          expect(msg, isNot(contains('firebase-token-secret-xyz')));
-          expect(msg, isNot(contains(userEmail)));
-        }
-      });
+          final outcome = await gateway.signIn();
+          expect(outcome, isA<SignInSuccess>());
+
+          // Check all log messages
+          for (final msg in logMessages) {
+            expect(msg, isNot(contains(secretIdToken)));
+            expect(msg, isNot(contains('firebase-token-secret-xyz')));
+            expect(msg, isNot(contains(userEmail)));
+          }
+        },
+      );
     });
   });
 }

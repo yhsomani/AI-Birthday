@@ -58,9 +58,14 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
       case SignInSuccess():
         _onSuccess('Successfully signed in with Google!');
       case SignInFailed(message: final msg):
-        setState(() => _errorMessage = msg ?? 'Sign-in was cancelled or failed.');
+        setState(
+          () => _errorMessage = msg ?? 'Sign-in was cancelled or failed.',
+        );
       case SignInUnavailable(reason: final r):
-        setState(() => _errorMessage = r ?? 'Google Sign-In is unavailable on this device.');
+        setState(
+          () => _errorMessage =
+              r ?? 'Google Sign-In is unavailable on this device.',
+        );
     }
   }
 
@@ -202,7 +207,9 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
               child: FilledButton(
                 onPressed: _isLoading ? null : _handleGoogleSignIn,
                 style: FilledButton.styleFrom(
-                  backgroundColor: isDark ? Colors.white : const Color(0xFF1F1F1F),
+                  backgroundColor: isDark
+                      ? Colors.white
+                      : const Color(0xFF1F1F1F),
                   foregroundColor: isDark ? Colors.black87 : Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -214,7 +221,9 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
                         width: 22,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.grey,
+                          ),
                         ),
                       )
                     : Row(
@@ -240,9 +249,7 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
               onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
               child: Text(
                 'Not Now',
-                style: TextStyle(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
               ),
             ),
           ],

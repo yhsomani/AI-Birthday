@@ -272,7 +272,8 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
             nextDate.year == now.year &&
             nextDate.month == now.month &&
             nextDate.day == now.day;
-         final birthdayChanged = existingBirthday != null &&
+        final birthdayChanged =
+            existingBirthday != null &&
             (existingBirthday.date.month != nextDate.month ||
                 existingBirthday.date.day != nextDate.day);
 
