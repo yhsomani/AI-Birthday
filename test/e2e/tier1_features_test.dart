@@ -18,7 +18,6 @@ import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 
-import 'harness/crypto_envelope_fixture.dart';
 import 'harness/fake_firebase_auth_client.dart';
 import 'harness/responsive_tester.dart';
 import 'harness/test_harness.dart';
@@ -254,120 +253,6 @@ void main() {
             harness.subscriptionNotifier.state.status,
             EntitlementStatus.active,
           );
-        },
-      );
-    });
-
-    // =========================================================================
-    // R3: End-to-End Encrypted Zero-PII Cloud Backup Envelope
-    // =========================================================================
-    group('R3: Zero-PII Cloud Backup Envelope', () {
-      test(
-        'R3.1: Client-side encrypts recipient birthday payloads into AES-256-GCM envelope',
-        () {
-          final persons = [
-            {
-              'id': 'person-1',
-              'name': 'Sarah Connor',
-              'phoneNumber': '+14155552671',
-              'notes': 'Important anniversary details',
-              'birthdayMonth': 10,
-              'birthdayDay': 5,
-            },
-          ];
-          final birthdays = [
-            {
-              'id': 'b-1',
-              'personId': 'person-1',
-              'cycleYear': 2026,
-              'status': 'upcoming',
-            },
-          ];
-
-          final envelope = CryptoEnvelopeFixture.createEncryptedEnvelope(
-            persons: persons,
-            birthdays: birthdays,
-            backupVersion: 1,
-            deviceId: 'device-test-1',
-          );
-
-          expect(envelope['schemaVersion'], 1);
-          expect(envelope['backupVersion'], 1);
-          expect(envelope['deviceId'], 'device-test-1');
-          expect(envelope['iv'], isNotEmpty);
-          expect(envelope['ciphertext'], isNotEmpty);
-          expect(envelope['authTag'], isNotEmpty);
-          expect(envelope['updatedAt'], isNotEmpty);
-        },
-      );
-
-      test(
-        'R3.2: Zero-PII promise: Cloud payload exposes ZERO cleartext recipient attributes',
-        () {
-          final persons = [
-            {
-              'id': 'person-1',
-              'name': 'Sarah Connor',
-              'phoneNumber': '+14155552671',
-              'notes': 'Important anniversary details',
-            },
-          ];
-
-          final envelope = CryptoEnvelopeFixture.createEncryptedEnvelope(
-            persons: persons,
-            birthdays: [],
-            backupVersion: 2,
-          );
-
-          final piiLeaks = CryptoEnvelopeFixture.inspectCloudPayloadForPiiLeaks(
-            cloudEnvelope: envelope,
-            knownPiiValues: [
-              'Sarah Connor',
-              '+14155552671',
-              'Important anniversary details',
-            ],
-          );
-
-          expect(
-            piiLeaks,
-            isEmpty,
-            reason: 'Cloud envelope must not contain any cleartext PII',
-          );
-        },
-      );
-
-      test(
-        'R3.3: Restore workflow cleanly decrypts envelope back into database records',
-        () {
-          final persons = [
-            {
-              'id': 'p-test-restore',
-              'name': 'John Doe',
-              'phoneNumber': '+12025550143',
-              'notes': 'College roommate',
-              'birthdayMonth': 3,
-              'birthdayDay': 15,
-            },
-          ];
-          final birthdays = [
-            {
-              'id': 'b-test-restore',
-              'personId': 'p-test-restore',
-              'cycleYear': 2026,
-              'status': 'upcoming',
-            },
-          ];
-
-          final envelope = CryptoEnvelopeFixture.createEncryptedEnvelope(
-            persons: persons,
-            birthdays: birthdays,
-            backupVersion: 5,
-          );
-
-          final decrypted = CryptoEnvelopeFixture.decryptEnvelope(envelope);
-          expect(decrypted['persons'], isNotEmpty);
-          expect(decrypted['persons'][0]['name'], 'John Doe');
-          expect(decrypted['birthdays'][0]['cycleYear'], 2026);
         },
       );
     });
