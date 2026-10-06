@@ -73,7 +73,7 @@ class UserGeminiApiProvider implements AiMessageProvider {
     AppLogger? logger,
     AiPromptBuilder? promptBuilder,
     HttpPostSender? httpSender,
-    this.model = 'gemini-2.5-flash-lite',
+    this.model = 'gemini-3.5-flash-lite',
   }) : _credentialStorage = credentialStorage,
        _logger = logger ?? ConsoleAppLogger(),
        _promptBuilder = promptBuilder ?? const AiPromptBuilder(),
