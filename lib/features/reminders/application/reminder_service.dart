@@ -18,14 +18,20 @@ class ReminderService {
   final AppLogger _logger;
 
   /// Recomputes and reapplies reminders for [people] under [settings].
-  Future<void> sync({
+  Future<bool> sync({
     required List<Person> people,
     required ReminderSettings settings,
     DateTime? reference,
   }) async {
     if (!settings.enabled) {
-      await _gateway.cancelAll();
-      return;
+      final cancelled = await _gateway.cancelAll();
+      if (!cancelled) {
+        _logger.warning(
+          'reminders',
+          'Reminder cancellation could not be confirmed.',
+        );
+      }
+      return cancelled;
     }
 
     final plan = _scheduler.plan(
@@ -34,7 +40,18 @@ class ReminderService {
       enabled: settings.kinds,
       quietHours: settings.quietHours,
     );
-    await _gateway.apply(plan);
+    final applied = await _gateway.apply(plan);
+    if (!applied) {
+      _logger.warning(
+        'reminders',
+        'Reminder scheduling could not be confirmed.',
+        params: {
+          'active': '${plan.active.length}',
+          'suppressed': '${plan.suppressed.length}',
+        },
+      );
+      return false;
+    }
     _logger.info(
       'reminders',
       'Reminder sync',
@@ -43,5 +60,6 @@ class ReminderService {
         'suppressed': '${plan.suppressed.length}',
       },
     );
+    return true;
   }
 }
