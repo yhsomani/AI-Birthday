@@ -27,3 +27,8 @@
 
 **Learning:** When checking strings against a fixed set of patterns or fragments in a hot code path (like a logger), iterating over an array and performing string manipulation (`toLowerCase()`, `replaceAll()`) on every iteration incurs heavy string allocation and matching overhead.
 **Action:** Use a single, pre-compiled, case-insensitive `RegExp` instead of looping through a collection of fragments. This reduces O(N) operations with multiple intermediate string allocations to a single highly-optimized regex match.
+
+## 2024-10-24 - Single Pass Predicate Counting
+
+**Learning:** Calling `.where().length` multiple times on the same collection for mutually exclusive conditions (like `isPotentialDuplicate` and `!isPotentialDuplicate`) iterates over the collection redundantly.
+**Action:** Iterate once to count one condition, and use arithmetic (e.g., `total - condition`) for the complement to halve the iterations and CPU cycles during widget builds.

@@ -195,6 +195,10 @@ class PeopleScreen extends ConsumerWidget {
         if (!parsedCandidates[i].isPotentialDuplicate) i,
     };
 
+    // Calculate once to avoid multiple O(N) evaluations in the builder.
+    final int duplicateCount = parsedCandidates.length - selectedIndices.length;
+    final int newCount = selectedIndices.length;
+
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -238,7 +242,7 @@ class PeopleScreen extends ConsumerWidget {
                   ],
                 ),
                 Text(
-                  '${parsedCandidates.length} birthdays found: ${parsedCandidates.where((c) => !c.isPotentialDuplicate).length} new, ${parsedCandidates.where((c) => c.isPotentialDuplicate).length} already added.',
+                  '${parsedCandidates.length} birthdays found: $newCount new, $duplicateCount already added.',
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.accentForest,
