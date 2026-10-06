@@ -83,7 +83,8 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
       }
     } catch (_) {
       state = state.copyWith(
-        syncError: 'Could not load saved reminder settings. Your existing reminders were not changed.',
+        syncError:
+            'Could not load saved reminder settings. Your existing reminders were not changed.',
       );
     }
   }
