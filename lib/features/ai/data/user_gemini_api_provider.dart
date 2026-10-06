@@ -113,7 +113,7 @@ class UserGeminiApiProvider implements AiMessageProvider {
     );
 
     final uri = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
+      'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent',
     );
 
     final requestBody = jsonEncode({
@@ -131,6 +131,7 @@ class UserGeminiApiProvider implements AiMessageProvider {
     try {
       response = await _httpSender(uri, {
         'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
       }, requestBody);
     } on SocketException {
       throw const AppFailure.networkUnavailable();
@@ -170,7 +171,7 @@ class UserGeminiApiProvider implements AiMessageProvider {
     }
 
     final uri = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$trimmed',
+      'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent',
     );
 
     final requestBody = jsonEncode({
@@ -187,6 +188,7 @@ class UserGeminiApiProvider implements AiMessageProvider {
     try {
       final response = await _httpSender(uri, {
         'Content-Type': 'application/json',
+        'x-goog-api-key': trimmed,
       }, requestBody);
 
       if (response.statusCode == 200) {
