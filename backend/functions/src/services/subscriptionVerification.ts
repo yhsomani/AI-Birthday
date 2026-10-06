@@ -6,12 +6,34 @@ import type {
   VerifyPurchaseRequest,
   VerifyPurchaseResponse,
 } from '../transport/schemas.js';
+import {
+  GooglePlayApiError,
+  GooglePlaySubscriptionClient,
+  type GooglePlaySubscriptionSnapshot,
+} from './googlePlaySubscriptionClient.js';
 
 export const PRO_PRODUCT_ID = 'ai_birthday_pro_monthly';
-export const EXPECTED_PACKAGE_NAME = 'com.yashsomani.ai_birthday';
+export const EXPECTED_PACKAGE_NAME = 'com.yashomani.ai_birthday';
+
+const ENTITLED_STATES = new Set([
+  'SUBSCRIPTION_STATE_ACTIVE',
+  'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+  'SUBSCRIPTION_STATE_CANCELED',
+]);
+
+export interface GooglePlaySubscriptionVerifier {
+  getSubscription(
+    packageName: string,
+    purchaseToken: string,
+  ): Promise<GooglePlaySubscriptionSnapshot>;
+}
 
 export class SubscriptionVerificationService {
-  constructor(private readonly db: Firestore) {}
+  constructor(
+    private readonly db: Firestore,
+    private readonly verifier: GooglePlaySubscriptionVerifier =
+      new GooglePlaySubscriptionClient(),
+  ) {}
 
   async verifyPurchase(
     uid: string,
@@ -25,56 +47,106 @@ export class SubscriptionVerificationService {
       throw new HttpsError('invalid-argument', 'INVALID_PRODUCT');
     }
 
-    const isValidToken =
-      request.purchaseToken.length > 0 &&
-      !request.purchaseToken.startsWith('invalid') &&
-      !request.purchaseToken.startsWith('fake_invalid');
+    let purchase: GooglePlaySubscriptionSnapshot;
+    try {
+      purchase = await this.verifier.getSubscription(
+        request.packageName,
+        request.purchaseToken,
+      );
+    } catch (error) {
+      if (
+        error instanceof GooglePlayApiError &&
+        (error.statusCode === 400 ||
+          error.statusCode === 404 ||
+          error.statusCode === 410)
+      ) {
+        return this.writeNone(uid, request.productId);
+      }
 
-    const now = Timestamp.now();
-    const nowMs = now.toMillis();
-
-    if (!isValidToken) {
-      const noneRecord = {
-        status: 'none' as const,
-        productId: request.productId,
-        expiryDateMs: 0,
-        isAutoRenewing: false,
-        canUseAi: false,
-        verifiedAtMs: nowMs,
-        updatedAt: now,
-      };
-      await this.db
-        .doc(`users/${uid}/entitlement/status`)
-        .set(noneRecord, { merge: true });
-
-      return {
-        status: 'none',
-        productId: request.productId,
-        expiryDateMs: 0,
-        canUseAi: false,
-      };
+      throw new HttpsError(
+        'unavailable',
+        'GOOGLE_PLAY_VERIFICATION_UNAVAILABLE',
+      );
     }
 
-    const expiryDateMs = nowMs + 30 * 24 * 60 * 60 * 1000;
-    const activeRecord = {
-      status: 'active' as const,
-      productId: request.productId,
-      expiryDateMs,
-      isAutoRenewing: true,
-      canUseAi: true,
-      verifiedAtMs: nowMs,
-      updatedAt: now,
-    };
+    if (
+      purchase.obfuscatedExternalAccountId == null ||
+      purchase.obfuscatedExternalAccountId !== request.accountBinding
+    ) {
+      throw new HttpsError('permission-denied', 'PURCHASE_ACCOUNT_MISMATCH');
+    }
 
-    await this.db
-      .doc(`users/${uid}/entitlement/status`)
-      .set(activeRecord, { merge: true });
+    const matchingItem = purchase.lineItems
+      .filter(item => item.productId === request.productId)
+      .sort((a, b) => {
+        const aMs = a.expiryTime ? Date.parse(a.expiryTime) : 0;
+        const bMs = b.expiryTime ? Date.parse(b.expiryTime) : 0;
+        return bMs - aMs;
+      })[0];
+
+    const nowMs = Date.now();
+    const expiryDateMs = matchingItem?.expiryTime
+      ? Date.parse(matchingItem.expiryTime)
+      : 0;
+
+    const canUseAi =
+      matchingItem !== undefined &&
+      Number.isFinite(expiryDateMs) &&
+      expiryDateMs > nowMs &&
+      ENTITLED_STATES.has(purchase.subscriptionState);
+
+    const status: VerifyPurchaseResponse['status'] = canUseAi
+      ? 'active'
+      : expiryDateMs > 0 && expiryDateMs <= nowMs
+        ? 'expired'
+        : 'none';
+
+    await this.db.doc(`users/${uid}/entitlement/status`).set(
+      {
+        status,
+        productId: request.productId,
+        expiryDateMs,
+        canUseAi,
+        isAutoRenewing: purchase.subscriptionState === 'SUBSCRIPTION_STATE_ACTIVE',
+        acknowledgementState: purchase.acknowledgementState,
+        accountBinding: request.accountBinding,
+        verifiedAtMs: nowMs,
+        updatedAt: Timestamp.now(),
+      },
+      { merge: true },
+    );
 
     return {
-      status: 'active',
+      status,
       productId: request.productId,
       expiryDateMs,
-      canUseAi: true,
+      canUseAi,
+    };
+  }
+
+  private async writeNone(
+    uid: string,
+    productId: string,
+  ): Promise<VerifyPurchaseResponse> {
+    const nowMs = Date.now();
+    await this.db.doc(`users/${uid}/entitlement/status`).set(
+      {
+        status: 'none',
+        productId,
+        expiryDateMs: 0,
+        canUseAi: false,
+        isAutoRenewing: false,
+        verifiedAtMs: nowMs,
+        updatedAt: Timestamp.now(),
+      },
+      { merge: true },
+    );
+
+    return {
+      status: 'none',
+      productId,
+      expiryDateMs: 0,
+      canUseAi: false,
     };
   }
 }
