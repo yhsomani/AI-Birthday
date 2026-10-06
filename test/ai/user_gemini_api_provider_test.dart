@@ -61,7 +61,9 @@ void main() {
       final provider = UserGeminiApiProvider(
         credentialStorage: storage,
         httpSender: (uri, headers, body) async {
-          expect(uri.queryParameters['key'], 'AIzaSyValidKey');
+          expect(uri.queryParameters, isEmpty);
+          expect(headers['x-goog-api-key'], 'AIzaSyValidKey');
+          expect(headers['Content-Type'], 'application/json');
           return const HttpResponsePayload(
             statusCode: 200,
             body: '{"candidates":[{"content":{"parts":[{"text":"Hi"}]}}]}',
