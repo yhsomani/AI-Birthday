@@ -184,13 +184,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!launched && mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: const Text('Could not open that link. Please try again.')));
+        ).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open that link. Please try again.'),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: const Text('Could not open that link. Please try again.')));
+        ).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open that link. Please try again.'),
+          ),
+        );
       }
     }
   }
@@ -201,7 +209,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final granted = await gateway.hasExactAlarmPermission();
     if (granted && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Precise reminder access is already enabled.')),
+        const SnackBar(
+          content: Text('Precise reminder access is already enabled.'),
+        ),
       );
       return;
     }
@@ -842,7 +852,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   },
                 ),
                 FutureBuilder<bool>(
-                  future: ref.read(notificationSchedulerGatewayProvider).hasExactAlarmPermission(),
+                  future: ref
+              .read(notificationSchedulerGatewayProvider)
+              .hasExactAlarmPermission(),
                   builder: (context, snapshot) {
                     final exactReady = snapshot.data != false;
                     return ListTile(
