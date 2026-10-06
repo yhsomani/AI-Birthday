@@ -942,7 +942,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     onTap: () async {
                       HapticFeedback.lightImpact();
-                      await ref
+                      final sent = await ref
                           .read(notificationSchedulerGatewayProvider)
                           .sendTestNotification(
                             title: '🎉 Birthday Reminder Test',
@@ -951,9 +951,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           );
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Test notification dispatched!'),
-                            duration: Duration(seconds: 2),
+                          SnackBar(
+                            content: Text(
+                              sent
+                                  ? 'Test notification sent to this device.'
+                                  : 'The test notification could not be delivered. Check notification access and try again.',
+                            ),
+                            duration: const Duration(seconds: 3),
                           ),
                         );
                       }
