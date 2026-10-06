@@ -1,321 +1,197 @@
 # ARCHITECTURE
 
-## 1. Document Purpose
+## 1. Purpose
 
-This document serves as the architectural Single Source of Truth for the `ai_birthday` application. It governs implementation decisions that cannot be safely inferred from reading individual files alone. It explicitly documents boundaries, ownership, critical paths, and strict rules that AI coding agents and human developers must respect to prevent architectural drift.
+This document describes the architecture that is actually wired in the repository. It is not a plan. Runtime behavior and source code are authoritative over older documentation.
 
-This document does _not_ outline planned features or hypothetical components; it describes the architecture that actually exists in this repository today.
-
-## 2. Architecture At A Glance
-
-The application follows a clean-architecture-inspired Flutter structure, utilizing Riverpod for dependency injection and state management, and a local SQLite database for offline-first persistence.
+## 2. Runtime architecture
 
 ```mermaid
 flowchart TD
-    Client[Flutter UI Widgets] --> State[Riverpod Providers]
-    State --> Application[App / Domain Services]
-    Application --> Repositories[Data Repositories]
-    Repositories --> DB[Drift SQLite Database]
-    Repositories --> SecureStore[Flutter Secure Storage]
-    Application --> AIRouter[AI Router]
-    AIRouter --> UserGemini[User Gemini API Provider]
-    Application --> WhatsApp[WhatsApp Handoff Builder]
+  UI[Flutter Screens / Widgets]
+  STATE[Riverpod State + Controllers]
+  DOMAIN[Application + Domain Services]
+  REPO[Repository Abstractions]
+  DB[Drift / SQLite]
+  SEC[Flutter Secure Storage]
+  AI[AiRouter]
+  GEM[Gemini API / Gemini Nano]
+  AUTH[Google Sign-In + Firebase Identity]
+  CLOUD[Firestore REST Backup]
+  BILL[Cloud Function + Google Play Developer API]
+  WA[WhatsApp Click-to-Chat]
+  NATIVE[Android Method Channels]
+  ALARM[AlarmManager + Notifications]
+
+  UI --> STATE
+  STATE --> DOMAIN
+  DOMAIN --> REPO
+  REPO --> DB
+  DOMAIN --> SEC
+  DOMAIN --> AI
+  AI --> GEM
+  DOMAIN --> AUTH
+  DOMAIN --> CLOUD
+  DOMAIN --> WA
+  DOMAIN --> NATIVE
+  NATIVE --> ALARM
+  BILL --> CLOUD
 ```
 
-**Major Components:**
-
-- **Presentation Layer:** Flutter UI components (e.g., `DashboardScreen`, `MessageStudioScreen`) and Riverpod state controllers.
-- **Domain Layer:** Business logic, models (e.g., `Birthday`, `Person`), routing policies (`AiRouter`), and prompt building (`AiPromptBuilder`).
-- **Data/Infrastructure Layer:** Repositories (`InMemoryPeopleRepository`, `AppDatabase` via Drift), HTTP API clients (`UserGeminiApiProvider`), and native integrations (`FlutterSecureStorageDriver`).
-
-## 3. System Boundary
-
-| Area                | Responsibility                          | Inside System? | Notes                                                                                     |
-| ------------------- | --------------------------------------- | -------------- | ----------------------------------------------------------------------------------------- |
-| Flutter Application | Presentation, Routing, App State        | Yes            | `lib/` directory                                                                          |
-| Local Database      | Persistence (People, Birthdays, Drafts) | Yes            | Drift/SQLite (`app_database.dart`)                                                        |
-| Secrets Storage     | Storing User API Keys securely          | Yes            | `flutter_secure_storage`                                                                  |
-| Native Layer        | Android-specific wrappers / bridges     | Yes            | `android/app/src/main/kotlin/`                                                            |
-| Authentication      | User Login / Firebase Auth              | No             | **ARCHITECTURAL RISK**: Defined in SSOT but no Firebase implementation found in codebase. |
-| AI Inference        | Gemini Cloud API                        | No             | Accessed via user-provided API keys.                                                      |
-| Message Delivery    | WhatsApp                                | No             | Uses official Click-to-Chat deep links (`WhatsAppHandoffBuilder`); no automation.         |
-| Subscription State  | Google Play Billing / Backend           | No             | Handled externally, simulated locally via `entitlementProvider`.                          |
-
-## 4. QUESTION 01 — WHAT'S IN THE SYSTEM?
-
-### Core Application Layers
-
-- **`app/`**: Application bootstrap, global routing (`appRouter` via `go_router`), and global service injection (`providers.dart`).
-- **`core/`**: Shared infrastructure.
-  - `AppDatabase`: Owns SQLite schema and persistence.
-  - `CredentialStorage`: Owns secure persistence of sensitive keys.
-  - `AppLogger`: Standardized, safe logging.
-  - `AppFailure`: Typed application errors.
-- **`features/`**: Bounded contexts for domain functionality.
-  - `ai`: Owns prompt generation, AI routing rules (`AiRouter`), and API integrations (`UserGeminiApiProvider`).
-  - `birthdays`: Owns birthday lifecycle management and status tracking.
-  - `dashboard`: Owns the home view and aggregated birthday lists.
-  - `delivery`: Owns external handoff construction (WhatsApp).
-  - `message_studio`: Owns the drafting, reviewing, and editing UI for messages.
-  - `people`: Owns recipient profiles and relationship management.
-  - `settings`: Owns user configuration UI.
-  - `subscription`: Owns entitlement state models.
-
-## 5. QUESTION 02 — WHO'S RESPONSIBLE FOR WHAT?
-
-| Responsibility           | Single Owner              | Location                                                               | Notes                                        |
-| ------------------------ | ------------------------- | ---------------------------------------------------------------------- | -------------------------------------------- |
-| AI Provider Routing      | `AiRouter`                | `lib/features/ai/domain/ai_router.dart`                                | The only class allowed to decide if AI runs. |
-| Gemini API Communication | `UserGeminiApiProvider`   | `lib/features/ai/data/user_gemini_api_provider.dart`                   |                                              |
-| Secure Data Storage      | `SecureCredentialStorage` | `lib/core/security/credential_storage.dart`                            | Wraps `flutter_secure_storage`.              |
-| Prompt Construction      | `AiPromptBuilder`         | `lib/features/ai/domain/ai_prompt_builder.dart`                        |                                              |
-| People Persistence       | `PeopleRepository`        | `lib/features/people/domain/repositories/people_repository.dart`       | (Currently `InMemory` provider fallback)     |
-| Birthday Persistence     | `BirthdaysRepository`     | `lib/features/birthdays/domain/repositories/birthdays_repository.dart` | (Currently `InMemory` provider fallback)     |
-| Global Navigation        | `appRouter`               | `lib/app/router.dart`                                                  | GoRouter implementation.                     |
-| Global State Injection   | `providers.dart`          | `lib/app/providers.dart`                                               | Riverpod root providers.                     |
-| Logging                  | `AppLogger`               | `lib/core/logging/app_logger.dart`                                     | Centralized structured logging.              |
-
-**ARCHITECTURAL RISK:** Repositories (`peopleRepositoryProvider`, `birthdaysRepositoryProvider`) are currently wired to `InMemory` implementations in `providers.dart`, despite a robust `AppDatabase` (Drift) schema existing in `core/database/`. This requires human confirmation to complete the migration to SQLite.
-
-## 6. QUESTION 03 — WHY IS IT BUILT THIS WAY?
-
-- **Decision: Riverpod for State Management**
-  - **Status:** KNOWN DECISION
-  - **Reason:** Provides robust dependency injection, reactive state, and easy mocking for tests.
-- **Decision: Drift (SQLite) for Data**
-  - **Status:** KNOWN DECISION
-  - **Reason:** Offline-first architecture constraint (SSOT §13). Requires robust schema migration and type-safe queries.
-- **Decision: User-provided Gemini Credentials**
-  - **Status:** KNOWN DECISION
-  - **Reason:** The app intentionally avoids spending application-owned Gemini quota.
-- **Decision: WhatsApp Click-to-Chat over Automation**
-  - **Status:** KNOWN DECISION
-  - **Reason:** Banned unofficial automation (SSOT §9). Uses deep links requiring the user to physically press "Send".
-- **Decision: No Firebase Implementation**
-  - **Status:** UNKNOWN — HUMAN DECISION REQUIRED
-  - **Reason:** SSOT mandates Firebase for Sync and Auth, but the codebase entirely lacks Firebase dependencies. It currently operates completely locally/offline.
-
-## 7. QUESTION 04 — WHAT'S ALLOWED TO TOUCH WHAT?
-
-**Allowed Direction:**
-UI Widget → Riverpod Provider → Application Service / Repository → Database / External API
-
-**Forbidden Dependencies:**
-| Source | Must Not Depend On | Reason |
-|---|---|---|
-| UI Widgets | `AppDatabase` (Drift) | Abstraction boundary; must use Repositories. |
-| UI Widgets | HTTP Clients (`dart:io`, `http`) | Logic leakage; must use Providers/Services. |
-| `AiRouter` | Specific UI contexts | UI agnosticism. |
-| `UserGeminiApiProvider`| Local Database | Separation of concerns; receives data, does not query it. |
-
-## 8. QUESTION 05 — HOW DOES DATA ACTUALLY MOVE?
-
-### Critical Flow: AI Message Generation
-
-**Trigger:** User taps "Generate with AI" in `MessageStudioScreen`
-→ UI calls `_generateWithAi()`
-→ `AiRouter.generate()` checks `entitlementProvider`
-→ If entitled, `AiRouter` checks `CredentialStorage` for API key.
-→ `AiRouter` routes to `UserGeminiApiProvider.generateMessage()`
-→ `UserGeminiApiProvider` calls `AiPromptBuilder`
-→ Network request to Gemini API (`generativelanguage.googleapis.com`)
-→ Result mapped to `AiGenerationResult`
-→ UI state updates with new message text.
-
-### Critical Flow: WhatsApp Handoff
+## 3. Source-of-truth ownership
 
-**Trigger:** User taps "Send on WhatsApp" in `MessageStudioScreen`
-→ UI validates draft body is not empty.
-→ UI calls `WhatsAppHandoffBuilder.buildHandoffUrl()`
-→ `WhatsAppHandoffBuilder` constructs `https://wa.me/...` URL.
-→ UI launches URL via `url_launcher`.
-→ User confirms send in dialog.
-→ UI calls `BirthdaysRepository.updateBirthdayStatus(completed)`.
-→ UI updates and navigates back.
+| Concern | Runtime owner |
+|---|---|
+| Application routing | `lib/app/router.dart` |
+| Dependency injection | `lib/app/providers.dart` + `lib/core/core_providers.dart` |
+| Local persistence | `AppDatabase` / Drift SQLite |
+| People persistence | `DriftPeopleRepository` |
+| Birthday persistence | `DriftBirthdaysRepository` |
+| Draft persistence | `DriftDraftsRepository` |
+| Birthday cycle rollover | `BirthdayLifecycleService` |
+| Reminder scheduling | Reminder application services + Android bridge |
+| AI routing | `AiRouter` |
+| Gemini BYOK | `UserGeminiApiProvider` + `SecureCredentialStorage` |
+| Gemini Nano | `GeminiNanoProvider` + `MethodChannelGeminiNanoPlatform` |
+| Authentication | `LiveGoogleAuthGateway` |
+| Cloud backup/restore | `CloudSyncService` + Firestore security rules |
+| Subscription entitlement | `SubscriptionNotifier` + `verifyPurchase` Cloud Function |
+| Play verification | `GooglePlaySubscriptionClient` |
+| WhatsApp handoff | `WhatsAppHandoffBuilder` |
+| Logging | `core/loggerProvider` and `AppLogger` |
 
-## 9. QUESTION 06 — WHAT CAN NEVER BREAK?
+The `InMemory*Repository` implementations are test doubles. Production Riverpod providers are wired to Drift repositories.
 
-- **INVARIANT:** Entitlement _must_ be validated by `AiRouter` before any AI request is processed.
-- **INVARIANT:** The Gemini API key must _never_ be logged, hardcoded, or stored in plaintext databases. It must only live in `CredentialStorage`.
-- **INVARIANT:** WhatsApp integration must remain a strict "handoff" (deep link). No automated sending is permitted.
-- **INVARIANT:** Exceptions from external APIs must not leak raw error strings to the user; they must be wrapped in `AppFailure`.
+## 4. Critical user flows
 
-## 10. QUESTION 07 — WHERE DOES NEW CODE BELONG?
+### Add and remember a birthday
 
-| New Requirement     | Correct Location                      | Existing Pattern              | Must Not Do                                       |
-| ------------------- | ------------------------------------- | ----------------------------- | ------------------------------------------------- |
-| New screen/page     | `lib/features/<name>/presentation/`   | Hook into `appRouter`         | Do not create multiple top-level routers.         |
-| New local table     | `lib/core/database/app_database.dart` | Drift `Table` classes         | Do not use raw SQLite strings outside Drift.      |
-| New AI Provider     | `lib/features/ai/domain/`             | Implement `AiMessageProvider` | Do not bypass `AiRouter`.                         |
-| New Delivery Method | `lib/features/delivery/data/`         | Implement handoff builder     | Do not automate the delivery without user review. |
+`PeopleScreen`
+→ `PersonFormScreen`
+→ `PersonService` / `DriftPeopleRepository`
+→ SQLite
+→ `BirthdayLifecycleService`
+→ birthday stream
+→ dashboard/calendar/reminder scheduling.
 
-## 11. QUESTION 08 — WHEN DOES THE AGENT STOP AND ASK?
+When the birthday month/day changes, the current cycle status and draft are invalidated so a draft from a different date cannot remain attached to the new occurrence.
 
-**AI AGENTS MUST DEFAULT TO THE FOLLOWING:**
-If completing a task means breaking one of the architectural rules above:
+### AI message generation
 
-1. STOP before writing code.
-2. Name the conflict directly in the prompt.
-3. Identify the affected files/modules.
-4. Identify the affected architectural boundary.
-5. Identify the affected responsibility owner.
-6. Explain the smallest change required to resolve the conflict.
-7. Do not silently bypass the rule.
-8. Do not introduce an alternative architecture without human approval.
+`MessageStudioScreen`
+→ `AiRouter`
+→ entitlement check
+→ user Gemini API key check
+→ Gemini Nano when available without a user key
+→ otherwise user Gemini API
+→ `AiGenerationResult`
+→ draft persistence.
 
-**Also STOP and ask when:**
+AI entitlement is mandatory before either provider is used. AI failure does not invalidate non-AI birthday management.
 
-- Modifying `pubspec.yaml` to add Firebase, since it involves a major architectural shift currently missing from the codebase.
-- Implementing Gemini Nano natively, as Kotlin/Android structure is present but the bridge is not yet established.
-- Connecting Repositories to `AppDatabase` instead of InMemory mocks, as it fundamentally changes state lifecycle.
+### WhatsApp delivery
 
-## 12. AUTHENTICATION & AUTHORIZATION ARCHITECTURE
+Draft
+→ open WhatsApp / WhatsApp Business
+→ user reviews and sends
+→ user returns to AI-Birthday
+→ explicit confirmation
+→ birthday/draft status becomes completed.
 
-- **Status:** NOT IMPLEMENTED (Stubbed)
-- The codebase relies entirely on local unauthenticated state. SSOT references Firebase Auth, but it is entirely absent from implementation.
+Opening WhatsApp is not treated as delivery confirmation.
 
-## 13. DATA ARCHITECTURE
+### Birthday cycle rollover
 
-- **Primary Database:** Drift / SQLite (`AppDatabase`).
-- **Data Access:** Repositories (e.g., `BirthdaysRepository`).
-- **NOTE:** The implementation currently injects `InMemory` repositories via Riverpod (`providers.dart`), bypassing Drift at runtime. Drift schema exists but is disconnected from the UI.
+`birthdaysStreamProvider`
+→ load current active people
+→ `BirthdayLifecycleService.refresh`
+→ create missing occurrences or roll stale occurrences into the next calendar year
+→ preserve same-cycle completed drafts/status
+→ expose the live birthday stream.
 
-## 14. API ARCHITECTURE
+## 5. Authentication
 
-- **External Client:** `UserGeminiApiProvider`.
-- **Error Handling:** Centralized via `AppFailure.providerError` and `AppFailure.credentialInvalid`.
-- **Rate Limiting/Auth:** Handled explicitly by catching 429/401 HTTP codes.
+Google Sign-In is implemented through `LiveGoogleAuthGateway`. A successful Google identity is exchanged with Firebase Identity Platform when Firebase configuration is present, then the resulting Firebase UID and ID token are stored in secure storage.
 
-## 15. FRONTEND ARCHITECTURE
+The current client persists an ID token but does not implement an explicit refresh-token lifecycle. Cloud and subscription calls therefore require a currently usable Firebase ID token.
 
-- **Framework:** Flutter.
-- **Routing:** `go_router` utilizing `StatefulShellRoute` for bottom navigation (Dashboard, People, Settings).
-- **State Management:** Riverpod (`ConsumerWidget`, `StreamProvider`).
-- **Global Theme:** `AppTheme`.
+## 6. Cloud backup
 
-## 16. BACKEND ARCHITECTURE
+Cloud backup is opt-in and account-scoped.
 
-- **Status:** NOT APPLICABLE
-- Entirely local client application.
+The mobile client writes:
 
-## 17. EXTERNAL SYSTEMS & INTEGRATIONS
+- `users/{uid}/people`
+- `users/{uid}/birthdays`
+- `users/{uid}/drafts`
+- `users/{uid}/reminderSettings`
 
-**System: Google Gemini API**
+Firestore rules permit an authenticated owner to access only these backup collections under their own UID. Entitlement data and coordination state remain server-only.
 
-- **Purpose:** AI Draft Generation.
-- **Owner:** `UserGeminiApiProvider`.
-- **Authentication:** User-supplied API key via URL param.
-- **Failure Behavior:** Maps specific HTTP codes to `AppFailure`.
+The backup includes version/timestamp fields and compares `updatedAt` during restore to avoid replacing newer local data with older remote data.
 
-**System: WhatsApp**
+**Important privacy boundary:** this implementation currently stores backup records as Firestore fields. It is not an encrypted zero-PII envelope implementation. The README and UI must not claim otherwise.
 
-- **Purpose:** Message Delivery.
-- **Owner:** `WhatsAppHandoffBuilder`.
-- **Integration:** Deep links (`wa.me`).
+## 7. Subscription verification
 
-## 18. ASYNCHRONOUS ARCHITECTURE
+The client never grants Pro merely because a purchase token is non-empty.
 
-- Heavily relies on Dart Futures/Streams and Riverpod `AsyncValue` for UI state updates. No complex background workers or queues are currently implemented.
+Flow:
 
-## 19. ERROR & FAILURE ARCHITECTURE
+Google Play purchase
+→ purchase stream
+→ authenticated server request
+→ Cloud Function
+→ Google Play Developer API `subscriptionsv2`
+→ verify product/package/account binding/state/expiry
+→ write entitlement
+→ client unlocks AI.
 
-- **Canonical Model:** `AppFailure` (Exception subclass).
-- **Rule:** Catch generic exceptions at the boundaries (e.g., in `UserGeminiApiProvider`), log them via `AppLogger`, and throw a sanitized `AppFailure` for the UI to display.
+The verification endpoint currently requires Firebase authentication. Firebase App Check is not yet enabled on this endpoint because the client does not initialize App Check.
 
-## 20. SECURITY ARCHITECTURE
+## 8. AI provider routing
 
-- **Secrets:** Handled via `CredentialStorage` backed by `flutter_secure_storage`.
-- **Logging Restrictions:** High-frequency/sensitive params must not be logged. Raw exception strings from HTTP requests are logged internally but sanitized before throwing to the UI.
+`AiRouter` is the only component allowed to select the AI provider.
 
-## 21. OBSERVABILITY & OPERATIONS
+Rules:
 
-- **Logging:** `AppLogger` (`ConsoleAppLogger`).
+1. No active entitlement → AI locked.
+2. User Gemini API key exists → route to user Gemini.
+3. No user key + Gemini Nano is usable → route to Nano.
+4. Otherwise → truthful provider-unavailable error.
 
-## 22. TESTING ARCHITECTURE
+The user's Gemini key is never stored in the SQLite database or sent to Firestore backup.
 
-- Testing is handled via standard Flutter `test` (unit) and `flutter_test` (widget).
+## 9. Delivery boundaries
 
-## 23. DEPLOYMENT & RUNTIME ARCHITECTURE
+WhatsApp uses a user-controlled deep-link handoff. No unofficial automation or background message sending is implemented.
 
-- Standard Flutter Android deployment. No complex CI/CD found in the tree natively.
+Android alarms and notifications are handled through platform services. The Flutter UI does not directly own alarm scheduling internals.
 
-## 24. ARCHITECTURAL RISKS & DRIFT
+## 10. Security invariants
 
-**CRITICAL**
+- API keys and session credentials stay in secure storage.
+- Application logs redact credential and PII-like parameter keys.
+- User backup collections are scoped by Firebase UID.
+- Entitlement documents are readable by the owner but writable only by server code.
+- Purchase entitlement is denied until the Play token is verified.
+- The app never reports WhatsApp delivery without explicit user confirmation.
+- Release builds no longer fall back to the debug signing key.
 
-- **Issue:** Missing Gemini Nano Kotlin Bridge.
-- **Evidence:** `android/app/src/main/kotlin/` only contains `MainActivity.kt`.
-- **Current State:** SSOT dictates Nano is a fallback, but no platform channels or native Kotlin code exist to support it.
+## 11. Known production risks
 
-**HIGH**
+These are real unresolved items, not hypothetical tasks:
 
-- **Issue:** Repositories use `InMemory` instead of `Drift`.
-- **Evidence:** `providers.dart` injects `InMemoryPeopleRepository` instead of utilizing `AppDatabase`.
-- **Current State:** Data does not persist across application restarts.
+1. Firebase App Check is disabled for the purchase verification callable.
+2. Authentication currently relies on a stored Firebase ID token and has no explicit client refresh lifecycle.
+3. Android release signing requires `android/key.properties` or equivalent CI signing configuration; CI must provide it for a Play-ready artifact.
+4. Gemini Nano availability depends on the native Android AICore bridge and device/model support.
+5. Full Flutter/backend runtime verification must be executed in CI or a development environment; repository inspection alone is not evidence that every integration test passes.
 
-**HIGH**
+## 12. Architectural rule
 
-- **Issue:** Missing Firebase Sync/Auth.
-- **Evidence:** Missing from `pubspec.yaml` and code.
-- **Current State:** Code is fully offline.
+Prefer the smallest coherent implementation that preserves the core loop:
 
-## 25. ARCHITECTURAL INVARIANTS
+`REMEMBER → PREPARE → PERSONALIZE → REVIEW → SEND → CONFIRM → COMPLETE → RETURN`
 
-- **INVARIANT-001:** `AiRouter` is the absolute gatekeeper for AI requests. UI must never talk to `UserGeminiApiProvider` directly.
-- **INVARIANT-002:** API Keys must only be read from `CredentialStorage` at the exact moment of request and immediately discarded from memory.
-- **INVARIANT-003:** WhatsApp must always use Click-to-Chat; no scraping or accessibility-service automation is allowed.
-
-## 26. DECISION REGISTER
-
-| ID      | Decision               | Reason                                 | Trade-off                 | Revisit When                           |
-| ------- | ---------------------- | -------------------------------------- | ------------------------- | -------------------------------------- |
-| ADR-001 | Use Riverpod for State | Best fit for declarative Flutter apps. | Slight learning curve.    | N/A                                    |
-| ADR-002 | Use Drift (SQLite)     | Robust local persistence per SSOT.     | Requires code generation. | N/A                                    |
-| ADR-003 | User Gemini API Key    | Avoids app spending its own quota.     | Friction for users.       | If Nano becomes universally available. |
-
-## 27. QUICK REFERENCE FOR AI CODING AGENTS
-
-**Before changing code:**
-
-1. Identify the responsibility involved.
-2. Identify its owner.
-3. Identify the architectural layer.
-4. Identify the existing extension point.
-5. Check dependency direction.
-6. Check relevant invariants.
-7. Check critical data flow.
-8. Check whether the requested change conflicts with a rule.
-
-**Before adding new code - Ask:**
-
-- Does this capability already exist?
-- Who owns it?
-- Where does similar code already live?
-- What is the existing extension point?
-- Am I creating a second implementation?
-- Am I crossing a forbidden boundary?
-- Am I introducing a new architectural pattern?
-
-**STOP CONDITIONS**
-Explicitly stop and request human input when:
-
-- Ownership is ambiguous (e.g., adding Firebase Auth vs keeping it local).
-- Architecture conflicts with the request (e.g., automating WhatsApp).
-- Implementation and documentation disagree materially (e.g., Native Kotlin Nano code is requested but the bridge doesn't exist).
-- A security invariant would be violated (e.g., logging a user API key).
-- A new infrastructure dependency is required.
-
-**DO NOT:**
-
-- Do not automate WhatsApp.
-- Do not bypass `AiRouter` for AI requests.
-- Do not hardcode API keys.
-- Do not query Drift directly from UI Widgets.
-
-## 28. EVIDENCE & CONFIDENCE
-
-- **CONFIRMED:** Riverpod State Management (`lib/app/providers.dart`).
-- **CONFIRMED:** Drift Database Schema (`lib/core/database/app_database.dart`).
-- **CONFIRMED:** `AiRouter` policy (`lib/features/ai/domain/ai_router.dart`).
-- **CONFIRMED:** WhatsApp Handoff via `url_launcher` (`lib/features/message_studio/presentation/message_studio_screen.dart`).
-- **INFERRED:** Missing Firebase / Native Nano. (Checked `pubspec.yaml` and `android/` directory; confirmed absent).
+Do not introduce a new service, state layer, cache, or abstraction unless it removes a real product or reliability problem.

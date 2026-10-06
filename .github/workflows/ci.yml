@@ -2,7 +2,7 @@ name: CI / Release Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, "feat/**" ]
   pull_request:
     branches: [ main ]
 
@@ -38,15 +38,15 @@ jobs:
       - name: Run Flutter Test Suite
         run: flutter test --coverage
 
-      - name: Build Android Release APK
+      - name: Build Android Release APK (unsigned CI artifact)
         env:
           FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
         run: flutter build apk --release --dart-define=FIREBASE_WEB_API_KEY="$FIREBASE_WEB_API_KEY"
 
-      - name: Upload APK Artifact
+      - name: Upload unsigned APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
+          name: app-release-unsigned-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: ignore
 
@@ -63,12 +63,18 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: backend/functions/package-lock.json
 
       - name: Install Dependencies
         run: npm ci
+
+      - name: Install Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
       - name: Lint Check
         run: npm run lint
@@ -78,3 +84,6 @@ jobs:
 
       - name: Run Vitest Suite
         run: npm test
+
+      - name: Run Firestore Emulator Tests
+        run: npm run test:emulator

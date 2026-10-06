@@ -179,6 +179,7 @@ void main() {
             email: 'user@example.com',
             displayName: 'User',
             firebaseUid: 'uid-test',
+          idToken: 'test-id-token',
           ),
         );
 
