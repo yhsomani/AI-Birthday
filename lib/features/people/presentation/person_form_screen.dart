@@ -272,17 +272,24 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
             nextDate.year == now.year &&
             nextDate.month == now.month &&
             nextDate.day == now.day;
+         final birthdayChanged = existingBirthday != null &&
+            (existingBirthday.date.month != nextDate.month ||
+                existingBirthday.date.day != nextDate.day);
+
         final birthdayModel = b_models.Birthday(
           id: existingBirthday?.id ?? 'birthday-${saved.id}',
           personId: saved.id,
           cycleYear: nextDate.year,
           date: nextDate,
-          status:
-              existingBirthday?.status ??
-              (isToday
-                  ? b_models.BirthdayStatus.reminderDue
-                  : b_models.BirthdayStatus.upcoming),
-          draftId: existingBirthday?.draftId,
+          status: birthdayChanged
+              ? (isToday
+                    ? b_models.BirthdayStatus.reminderDue
+                    : b_models.BirthdayStatus.upcoming)
+              : existingBirthday?.status ??
+                    (isToday
+                        ? b_models.BirthdayStatus.reminderDue
+                        : b_models.BirthdayStatus.upcoming),
+          draftId: birthdayChanged ? null : existingBirthday?.draftId,
           createdAt: existingBirthday?.createdAt ?? now,
           updatedAt: now,
         );
