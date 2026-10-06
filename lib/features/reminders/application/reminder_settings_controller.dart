@@ -23,21 +23,25 @@ class ReminderSettings {
       ReminderKind.birthday,
     },
     this.quietHours = const QuietHours.night(),
+    this.syncError,
   });
 
   final bool enabled;
   final Set<ReminderKind> kinds;
   final QuietHours quietHours;
+  final String? syncError;
 
   ReminderSettings copyWith({
     bool? enabled,
     Set<ReminderKind>? kinds,
     QuietHours? quietHours,
+    String? syncError,
   }) {
     return ReminderSettings(
       enabled: enabled ?? this.enabled,
       kinds: kinds ?? this.kinds,
       quietHours: quietHours ?? this.quietHours,
+      syncError: syncError,
     );
   }
 }
@@ -73,15 +77,18 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
             start: Duration(minutes: row.quietHoursStartMinutes),
             end: Duration(minutes: row.quietHoursEndMinutes),
           ),
+          syncError: null,
         );
-        _syncService();
+        await _syncService();
       }
     } catch (_) {
-      // In-memory / test environment fallback
+      state = state.copyWith(
+        syncError: 'Could not load saved reminder settings. Your existing reminders were not changed.',
+      );
     }
   }
 
-  Future<void> _saveToDatabase(ReminderSettings s) async {
+  Future<bool> _saveToDatabase(ReminderSettings s) async {
     try {
       final database = ref.read(databaseProvider);
       await database
@@ -95,9 +102,12 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
               quietHoursEndMinutes: Value(s.quietHours.end.inMinutes),
             ),
           );
-      _syncService();
+      return true;
     } catch (_) {
-      // In-memory / test environment fallback
+      state = state.copyWith(
+        syncError: 'Could not save your reminder settings. Please try again.',
+      );
+      return false;
     }
   }
 
@@ -106,15 +116,35 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
     try {
       final reminderService = ref.read(reminderServiceProvider);
       final people = await ref.read(peopleStoreProvider).getAll();
-      await reminderService.sync(people: people, settings: state);
+      final success = await reminderService.sync(
+        people: people,
+        settings: state,
+      );
+      if (success) {
+        state = state.copyWith(syncError: null);
+      } else {
+        state = state.copyWith(
+          syncError:
+              'Reminders are enabled, but Android could not confirm the schedule. Check notification and precise reminder access.',
+        );
+      }
     } catch (_) {
-      // In-memory / test environment fallback
+      state = state.copyWith(
+        syncError:
+            'Reminders could not be updated on this device. Check notification access and try again.',
+      );
     }
   }
 
+  Future<void> _persistAndSync() async {
+    final snapshot = state;
+    final saved = await _saveToDatabase(snapshot);
+    if (saved) await _syncService();
+  }
+
   void setEnabled(bool enabled) {
-    state = state.copyWith(enabled: enabled);
-    _saveToDatabase(state);
+    state = state.copyWith(enabled: enabled, syncError: null);
+    unawaited(_persistAndSync());
   }
 
   void setKind(ReminderKind kind, bool on) {
@@ -124,13 +154,13 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
     } else {
       kinds.remove(kind);
     }
-    state = state.copyWith(kinds: kinds);
-    _saveToDatabase(state);
+    state = state.copyWith(kinds: kinds, syncError: null);
+    unawaited(_persistAndSync());
   }
 
   void setQuietHours(QuietHours quietHours) {
-    state = state.copyWith(quietHours: quietHours);
-    _saveToDatabase(state);
+    state = state.copyWith(quietHours: quietHours, syncError: null);
+    unawaited(_persistAndSync());
   }
 }
 
