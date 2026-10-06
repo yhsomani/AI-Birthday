@@ -841,6 +841,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ref.read(reminderSettingsProvider.notifier).setEnabled(on);
                   },
                 ),
+                FutureBuilder<bool>(
+                  future: ref.read(notificationSchedulerGatewayProvider).hasExactAlarmPermission(),
+                  builder: (context, snapshot) {
+                    final exactReady = snapshot.data != false;
+                    return ListTile(
+                      leading: Icon(
+                        exactReady
+                            ? Icons.schedule_outlined
+                            : Icons.warning_amber_rounded,
+                        color: exactReady
+                            ? AppColors.accentForest
+                            : Theme.of(context).colorScheme.error,
+                      ),
+                      title: const Text('Precise reminder access'),
+                      subtitle: Text(
+                        exactReady
+                            ? 'Android can schedule reminders at their selected time.'
+                            : 'Android is blocking precise reminders. Enable access so scheduled birthdays are not left unscheduled.',
+                      ),
+                      trailing: exactReady
+                          ? const Icon(Icons.check_circle_outline)
+                          : TextButton(
+                              onPressed: _manageExactAlarmAccess,
+                              child: const Text('Fix'),
+                            ),
+                    );
+                  },
+                ),
                 if (reminderSettings.enabled) ...[
                   const Divider(height: 1),
                   for (final kind in ReminderKind.values)
