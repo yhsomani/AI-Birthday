@@ -266,5 +266,5 @@ void main() {
       expect(local.quietHoursStartMinutes, 120);
       expect(local.quietHoursEndMinutes, 360);
     });
-
+  });
 }
