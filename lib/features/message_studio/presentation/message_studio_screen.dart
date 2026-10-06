@@ -209,7 +209,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Message drafted with AI ✨')),
+          const SnackBar(content: Text('Draft created with AI.')),
         );
       }
     } on AppFailure catch (e) {
@@ -447,12 +447,12 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
 
       if (mounted) {
         final label = languageName != null
-            ? 'Translated to $languageName ✨'
+            ? 'Translated to $languageName.'
             : (length == MessageLength.short
-                  ? 'Message shortened ✂️'
+                  ? 'Message shortened.'
                   : length == MessageLength.expanded
-                  ? 'Message expanded 📝'
-                  : 'Message refined ✨');
+                  ? 'Message expanded.'
+                  : 'Message refined.');
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(label)));
@@ -585,7 +585,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Variation applied! ✨')));
+          ).showSnackBar(const SnackBar(content: Text('Variation applied.')));
         }
       }
     } catch (e) {
@@ -708,7 +708,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                   context.pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Celebration confirmed as sent! 🎉'),
+                      content: Text('Sent status confirmed.'),
                     ),
                   );
                 }
@@ -727,7 +727,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       Clipboard.setData(ClipboardData(text: text));
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Copied to clipboard 📋')));
+      ).showSnackBar(const SnackBar(content: Text('Copied to clipboard.')));
     }
   }
 
