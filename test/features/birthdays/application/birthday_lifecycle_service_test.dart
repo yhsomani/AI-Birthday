@@ -61,7 +61,9 @@ void main() {
       },
     );
 
-    test('promotes an existing upcoming birthday to reminder due today', () async {
+    test(
+      'promotes an existing upcoming birthday to reminder due today',
+      () async {
       final repo = InMemoryBirthdaysRepository(
         initialBirthdays: [
           Birthday(
@@ -82,8 +84,9 @@ void main() {
       );
 
       final birthday = await repo.getBirthdayForPerson('person-1');
-      expect(birthday!.status, BirthdayStatus.reminderDue);
-    });
+        expect(birthday!.status, BirthdayStatus.reminderDue);
+      },
+    );
 
     test('preserves completed state for the same active cycle', () async {
       final repo = InMemoryBirthdaysRepository(
