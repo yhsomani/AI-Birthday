@@ -124,6 +124,8 @@ export class SubscriptionVerificationService {
       productId: request.productId,
       expiryDateMs,
       canUseAi,
+      isAutoRenewing:
+        purchase.subscriptionState === 'SUBSCRIPTION_STATE_ACTIVE',
     };
   }
 
@@ -189,6 +191,7 @@ export class SubscriptionVerificationService {
       productId,
       expiryDateMs: 0,
       canUseAi: false,
+      isAutoRenewing: false,
     };
   }
 }
