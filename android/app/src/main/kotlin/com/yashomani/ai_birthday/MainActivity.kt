@@ -141,7 +141,8 @@ class MainActivity : FlutterActivity() {
                         val title = call.argument<String>("title") ?: "Birthday Reminder"
                         val body = call.argument<String>("body") ?: "Testing notification delivery"
                         val personId = call.argument<String>("personId")
-                        result.success(showImmediateNotification(title, body, personId))
+                        showImmediateNotification(title, body, personId)
+                        result.success(null)
                     }
                     else -> result.notImplemented()
                 }
@@ -402,27 +403,29 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun scheduleTriggers(triggers: List<Map<String, Any>>): Boolean {
-        val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return false
         val now = System.currentTimeMillis()
         val prefs = getSharedPreferences(BirthdayNotificationReceiver.PREFS_NAME, Context.MODE_PRIVATE)
 
         // Cancel previous alarms first to avoid duplicate pending intents.
-        cancelAllReminders()
+        var allScheduled = cancelAllReminders()
 
         val scheduledIds = mutableSetOf<String>()
         val scheduledTriggers = JSONArray()
-        var allScheduled = true
-
         for (trigger in triggers) {
-            val id = (trigger["id"] as? Number)?.toInt() ?: run {
+            val id = (trigger["id"] as? Number)?.toInt()
+            if (id == null) {
                 allScheduled = false
                 continue
             }
-            val timestampMs = (trigger["timestampMs"] as? Number)?.toLong() ?: run {
+            val timestampMs = (trigger["timestampMs"] as? Number)?.toLong()
+            if (timestampMs == null) {
                 allScheduled = false
                 continue
             }
-            if (timestampMs <= now) continue
+            if (timestampMs <= now) {
+                continue
+            }
 
             val title = trigger["title"] as? String ?: "Birthday Reminder"
             val body = trigger["body"] as? String ?: ""
@@ -533,8 +536,8 @@ class MainActivity : FlutterActivity() {
         return allCancelled
     }
 
-    private fun showImmediateNotification(title: String, body: String, personId: String? = null): Boolean {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return false
+    private fun showImmediateNotification(title: String, body: String, personId: String? = null) {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 BirthdayNotificationReceiver.CHANNEL_ID,
@@ -545,10 +548,6 @@ class MainActivity : FlutterActivity() {
                 enableVibration(true)
             }
             notificationManager.createNotificationChannel(channel)
-        }
-
-        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
-            return false
         }
 
         val launchIntent = Intent(this, MainActivity::class.java).apply {
@@ -575,7 +574,6 @@ class MainActivity : FlutterActivity() {
             .build()
 
         notificationManager.notify(9999, notification)
-        return true
     }
 
     private fun mapFeatureStatus(status: Int): String {
