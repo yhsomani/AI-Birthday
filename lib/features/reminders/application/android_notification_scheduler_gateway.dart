@@ -117,18 +117,19 @@ class AndroidNotificationSchedulerGateway
   }
 
   @override
-  Future<void> sendTestNotification({
+  Future<bool> sendTestNotification({
     required String title,
     required String body,
   }) async {
-    if (!_isLiveAndroid) return;
+    if (!_isLiveAndroid) return true;
     try {
-      await _channel.invokeMethod('testNotification', {
+      final result = await _channel.invokeMethod<bool>('testNotification', {
         'title': title,
         'body': body,
       });
+      return result ?? false;
     } catch (_) {
-      // Ignored
+      return false;
     }
   }
 
