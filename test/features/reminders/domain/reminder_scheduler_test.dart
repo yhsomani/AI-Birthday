@@ -54,7 +54,7 @@ void main() {
     const scheduler = ReminderScheduler();
     final plan = scheduler.plan(
       people: [person(month: 3, day: 20)],
-      reference: DateTime.utc(2026, 3, 18, 8),
+      reference: DateTime.utc(2026, 3, 18, 10),
       enabled: ReminderKind.values.toSet(),
     );
 
