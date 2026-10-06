@@ -847,6 +847,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ref.read(reminderSettingsProvider.notifier).setEnabled(on);
                   },
                 ),
+                if (reminderSettings.syncError != null) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .errorContainer
+                          .withValues(alpha: 0.55),
+                      borderRadius: AppSpacing.roundedMd,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            reminderSettings.syncError!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onErrorContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 FutureBuilder<bool>(
                   future: ref
                       .read(notificationSchedulerGatewayProvider)
@@ -898,7 +929,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     subtitle: Text(
                       'No delivery between '
                       '${_formatTime(reminderSettings.quietHours.start)} and '
-                      '${_formatTime(reminderSettings.quietHours.end)} (shifted to 8:00 AM)',
+                      '${_formatTime(reminderSettings.quietHours.end)}',
                     ),
                     onTap: () => _editQuietHours(reminderSettings.quietHours),
                   ),
