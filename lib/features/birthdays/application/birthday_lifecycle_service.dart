@@ -63,7 +63,22 @@ class BirthdayLifecycleService {
           existing.date.month == next.nextDate.month &&
           existing.date.day == next.nextDate.day;
 
-      if (cycleMatches) continue;
+      if (cycleMatches) {
+        final needsTodayStatus =
+            targetStatus == BirthdayStatus.reminderDue &&
+            (existing.status == BirthdayStatus.created ||
+                existing.status == BirthdayStatus.upcoming);
+        if (needsTodayStatus) {
+          final now = _now();
+          await birthdaysRepository.saveBirthday(
+            existing.copyWith(
+              status: targetStatus,
+              updatedAt: now,
+            ),
+          );
+        }
+        continue;
+      }
 
       final now = _now();
       await birthdaysRepository.saveBirthday(
