@@ -233,4 +233,5 @@ export interface VerifyPurchaseResponse {
   productId: string;
   expiryDateMs: number;
   canUseAi: boolean;
+  isAutoRenewing: boolean;
 }
