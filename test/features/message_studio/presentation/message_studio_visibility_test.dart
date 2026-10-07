@@ -191,5 +191,29 @@ void main() {
         );
       },
     );
+
+    testWidgets(
+      'handed-off birthday confirms without re-launching (audit 03 AC3)',
+      (tester) async {
+        await pumpStudio(
+          tester,
+          phone: '+14155552671',
+          status: BirthdayStatus.handedOff,
+        );
+
+        // Primary becomes Confirm Sent; the WhatsApp re-send affordance
+        // disappears (SMS/Share remain as alternate channels, per Q).
+        expect(find.text('Confirm Sent'), findsOneWidget);
+        expect(find.text('Send on WhatsApp'), findsNothing);
+
+        await tester.tap(find.text('Confirm Sent'));
+        await tester.pumpAndSettle();
+
+        // The dialog asks the user, it never re-opens the external app.
+        expect(find.text('Did you send the message?'), findsOneWidget);
+        expect(find.text('Yes, Message Sent!'), findsOneWidget);
+        expect(find.text('Not Sent Yet'), findsOneWidget);
+      },
+    );
   });
 }

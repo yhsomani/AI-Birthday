@@ -36,14 +36,15 @@ void main() {
       version: 1,
     );
 
-    // Birthday pins to "today" so it lands in the today/action sections.
-    Birthday buildBirthday(BirthdayStatus status) {
+    // Birthday pins to "today" so it lands in the today/action sections, unless
+    // [date] overrides it (e.g. +3 days for window tests).
+    Birthday buildBirthday(BirthdayStatus status, {DateTime? date}) {
       final now = DateTime.now();
       return Birthday(
         id: 'b-asha',
         personId: 'p-asha',
         cycleYear: now.year,
-        date: DateTime(now.year, now.month, now.day),
+        date: date ?? DateTime(now.year, now.month, now.day),
         status: status,
         createdAt: now,
         updatedAt: now,
@@ -109,6 +110,25 @@ void main() {
         expect(find.text('Handed Off'), findsOneWidget);
         expect(find.text('Confirm Sent'), findsOneWidget);
         expect(find.text('Completed'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'handed-off birthday 3 days out stays in Action Needed (1-7d window)',
+      (tester) async {
+        final inThreeDays = DateTime.now().add(const Duration(days: 3));
+        await pumpDashboard(
+          tester,
+          people: [buildPerson()],
+          birthdays: [
+            buildBirthday(BirthdayStatus.handedOff, date: inThreeDays),
+          ],
+        );
+
+        // An unconfirmed hand-off must not vanish after the birthday day
+        // passes: it remains actionable inside the 1-7d window (audit 03 AC2).
+        expect(find.text('ACTION NEEDED'), findsOneWidget);
+        expect(find.text('Confirm Sent'), findsOneWidget);
       },
     );
 

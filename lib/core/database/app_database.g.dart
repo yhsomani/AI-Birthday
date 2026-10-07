@@ -2777,6 +2777,323 @@ class ReminderSettingsEntriesCompanion
   }
 }
 
+class $DeliveryEventsTable extends DeliveryEvents
+    with TableInfo<$DeliveryEventsTable, DeliveryEvent> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DeliveryEventsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _birthdayIdMeta = const VerificationMeta(
+    'birthdayId',
+  );
+  @override
+  late final GeneratedColumn<String> birthdayId = GeneratedColumn<String>(
+    'birthday_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _channelMeta = const VerificationMeta(
+    'channel',
+  );
+  @override
+  late final GeneratedColumn<String> channel = GeneratedColumn<String>(
+    'channel',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _handedOffAtMeta = const VerificationMeta(
+    'handedOffAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> handedOffAt = GeneratedColumn<DateTime>(
+    'handed_off_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, birthdayId, channel, handedOffAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'delivery_events';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DeliveryEvent> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('birthday_id')) {
+      context.handle(
+        _birthdayIdMeta,
+        birthdayId.isAcceptableOrUnknown(data['birthday_id']!, _birthdayIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_birthdayIdMeta);
+    }
+    if (data.containsKey('channel')) {
+      context.handle(
+        _channelMeta,
+        channel.isAcceptableOrUnknown(data['channel']!, _channelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_channelMeta);
+    }
+    if (data.containsKey('handed_off_at')) {
+      context.handle(
+        _handedOffAtMeta,
+        handedOffAt.isAcceptableOrUnknown(
+          data['handed_off_at']!,
+          _handedOffAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_handedOffAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DeliveryEvent map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DeliveryEvent(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      birthdayId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}birthday_id'],
+      )!,
+      channel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}channel'],
+      )!,
+      handedOffAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}handed_off_at'],
+      )!,
+    );
+  }
+
+  @override
+  $DeliveryEventsTable createAlias(String alias) {
+    return $DeliveryEventsTable(attachedDatabase, alias);
+  }
+}
+
+class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
+  final String id;
+  final String birthdayId;
+  final String channel;
+  final DateTime handedOffAt;
+  const DeliveryEvent({
+    required this.id,
+    required this.birthdayId,
+    required this.channel,
+    required this.handedOffAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['birthday_id'] = Variable<String>(birthdayId);
+    map['channel'] = Variable<String>(channel);
+    map['handed_off_at'] = Variable<DateTime>(handedOffAt);
+    return map;
+  }
+
+  DeliveryEventsCompanion toCompanion(bool nullToAbsent) {
+    return DeliveryEventsCompanion(
+      id: Value(id),
+      birthdayId: Value(birthdayId),
+      channel: Value(channel),
+      handedOffAt: Value(handedOffAt),
+    );
+  }
+
+  factory DeliveryEvent.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DeliveryEvent(
+      id: serializer.fromJson<String>(json['id']),
+      birthdayId: serializer.fromJson<String>(json['birthdayId']),
+      channel: serializer.fromJson<String>(json['channel']),
+      handedOffAt: serializer.fromJson<DateTime>(json['handedOffAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'birthdayId': serializer.toJson<String>(birthdayId),
+      'channel': serializer.toJson<String>(channel),
+      'handedOffAt': serializer.toJson<DateTime>(handedOffAt),
+    };
+  }
+
+  DeliveryEvent copyWith({
+    String? id,
+    String? birthdayId,
+    String? channel,
+    DateTime? handedOffAt,
+  }) => DeliveryEvent(
+    id: id ?? this.id,
+    birthdayId: birthdayId ?? this.birthdayId,
+    channel: channel ?? this.channel,
+    handedOffAt: handedOffAt ?? this.handedOffAt,
+  );
+  DeliveryEvent copyWithCompanion(DeliveryEventsCompanion data) {
+    return DeliveryEvent(
+      id: data.id.present ? data.id.value : this.id,
+      birthdayId: data.birthdayId.present
+          ? data.birthdayId.value
+          : this.birthdayId,
+      channel: data.channel.present ? data.channel.value : this.channel,
+      handedOffAt: data.handedOffAt.present
+          ? data.handedOffAt.value
+          : this.handedOffAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeliveryEvent(')
+          ..write('id: $id, ')
+          ..write('birthdayId: $birthdayId, ')
+          ..write('channel: $channel, ')
+          ..write('handedOffAt: $handedOffAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, birthdayId, channel, handedOffAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DeliveryEvent &&
+          other.id == this.id &&
+          other.birthdayId == this.birthdayId &&
+          other.channel == this.channel &&
+          other.handedOffAt == this.handedOffAt);
+}
+
+class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
+  final Value<String> id;
+  final Value<String> birthdayId;
+  final Value<String> channel;
+  final Value<DateTime> handedOffAt;
+  final Value<int> rowid;
+  const DeliveryEventsCompanion({
+    this.id = const Value.absent(),
+    this.birthdayId = const Value.absent(),
+    this.channel = const Value.absent(),
+    this.handedOffAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DeliveryEventsCompanion.insert({
+    required String id,
+    required String birthdayId,
+    required String channel,
+    required DateTime handedOffAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       birthdayId = Value(birthdayId),
+       channel = Value(channel),
+       handedOffAt = Value(handedOffAt);
+  static Insertable<DeliveryEvent> custom({
+    Expression<String>? id,
+    Expression<String>? birthdayId,
+    Expression<String>? channel,
+    Expression<DateTime>? handedOffAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (birthdayId != null) 'birthday_id': birthdayId,
+      if (channel != null) 'channel': channel,
+      if (handedOffAt != null) 'handed_off_at': handedOffAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DeliveryEventsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? birthdayId,
+    Value<String>? channel,
+    Value<DateTime>? handedOffAt,
+    Value<int>? rowid,
+  }) {
+    return DeliveryEventsCompanion(
+      id: id ?? this.id,
+      birthdayId: birthdayId ?? this.birthdayId,
+      channel: channel ?? this.channel,
+      handedOffAt: handedOffAt ?? this.handedOffAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (birthdayId.present) {
+      map['birthday_id'] = Variable<String>(birthdayId.value);
+    }
+    if (channel.present) {
+      map['channel'] = Variable<String>(channel.value);
+    }
+    if (handedOffAt.present) {
+      map['handed_off_at'] = Variable<DateTime>(handedOffAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeliveryEventsCompanion(')
+          ..write('id: $id, ')
+          ..write('birthdayId: $birthdayId, ')
+          ..write('channel: $channel, ')
+          ..write('handedOffAt: $handedOffAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2785,6 +3102,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MessageDraftsTable messageDrafts = $MessageDraftsTable(this);
   late final $ReminderSettingsEntriesTable reminderSettingsEntries =
       $ReminderSettingsEntriesTable(this);
+  late final $DeliveryEventsTable deliveryEvents = $DeliveryEventsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2794,6 +3112,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     birthdays,
     messageDrafts,
     reminderSettingsEntries,
+    deliveryEvents,
   ];
 }
 
@@ -4111,6 +4430,193 @@ typedef $$ReminderSettingsEntriesTableProcessedTableManager =
       ReminderSettingsEntry,
       PrefetchHooks Function()
     >;
+typedef $$DeliveryEventsTableCreateCompanionBuilder =
+    DeliveryEventsCompanion Function({
+      required String id,
+      required String birthdayId,
+      required String channel,
+      required DateTime handedOffAt,
+      Value<int> rowid,
+    });
+typedef $$DeliveryEventsTableUpdateCompanionBuilder =
+    DeliveryEventsCompanion Function({
+      Value<String> id,
+      Value<String> birthdayId,
+      Value<String> channel,
+      Value<DateTime> handedOffAt,
+      Value<int> rowid,
+    });
+
+class $$DeliveryEventsTableFilterComposer
+    extends Composer<_$AppDatabase, $DeliveryEventsTable> {
+  $$DeliveryEventsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get birthdayId => $composableBuilder(
+    column: $table.birthdayId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get channel => $composableBuilder(
+    column: $table.channel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get handedOffAt => $composableBuilder(
+    column: $table.handedOffAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DeliveryEventsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DeliveryEventsTable> {
+  $$DeliveryEventsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get birthdayId => $composableBuilder(
+    column: $table.birthdayId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get channel => $composableBuilder(
+    column: $table.channel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get handedOffAt => $composableBuilder(
+    column: $table.handedOffAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DeliveryEventsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DeliveryEventsTable> {
+  $$DeliveryEventsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get birthdayId => $composableBuilder(
+    column: $table.birthdayId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get channel =>
+      $composableBuilder(column: $table.channel, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get handedOffAt => $composableBuilder(
+    column: $table.handedOffAt,
+    builder: (column) => column,
+  );
+}
+
+class $$DeliveryEventsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DeliveryEventsTable,
+          DeliveryEvent,
+          $$DeliveryEventsTableFilterComposer,
+          $$DeliveryEventsTableOrderingComposer,
+          $$DeliveryEventsTableAnnotationComposer,
+          $$DeliveryEventsTableCreateCompanionBuilder,
+          $$DeliveryEventsTableUpdateCompanionBuilder,
+          (
+            DeliveryEvent,
+            BaseReferences<_$AppDatabase, $DeliveryEventsTable, DeliveryEvent>,
+          ),
+          DeliveryEvent,
+          PrefetchHooks Function()
+        > {
+  $$DeliveryEventsTableTableManager(
+    _$AppDatabase db,
+    $DeliveryEventsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DeliveryEventsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DeliveryEventsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DeliveryEventsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> birthdayId = const Value.absent(),
+                Value<String> channel = const Value.absent(),
+                Value<DateTime> handedOffAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DeliveryEventsCompanion(
+                id: id,
+                birthdayId: birthdayId,
+                channel: channel,
+                handedOffAt: handedOffAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String birthdayId,
+                required String channel,
+                required DateTime handedOffAt,
+                Value<int> rowid = const Value.absent(),
+              }) => DeliveryEventsCompanion.insert(
+                id: id,
+                birthdayId: birthdayId,
+                channel: channel,
+                handedOffAt: handedOffAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DeliveryEventsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DeliveryEventsTable,
+      DeliveryEvent,
+      $$DeliveryEventsTableFilterComposer,
+      $$DeliveryEventsTableOrderingComposer,
+      $$DeliveryEventsTableAnnotationComposer,
+      $$DeliveryEventsTableCreateCompanionBuilder,
+      $$DeliveryEventsTableUpdateCompanionBuilder,
+      (
+        DeliveryEvent,
+        BaseReferences<_$AppDatabase, $DeliveryEventsTable, DeliveryEvent>,
+      ),
+      DeliveryEvent,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4126,4 +4632,6 @@ class $AppDatabaseManager {
         _db,
         _db.reminderSettingsEntries,
       );
+  $$DeliveryEventsTableTableManager get deliveryEvents =>
+      $$DeliveryEventsTableTableManager(_db, _db.deliveryEvents);
 }

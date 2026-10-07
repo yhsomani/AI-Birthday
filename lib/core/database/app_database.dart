@@ -93,8 +93,24 @@ class ReminderSettingsEntries extends Table {
   Set<Column> get primaryKey => {key};
 }
 
+/// Persisted evidence of a successful external-app launch (audit 03 P1-1).
+///
+/// This is the ONLY durable record that a message was handed off; the app
+/// must never infer "opened" from birthday/draft status alone. `channel`
+/// stores a [DeliveryChannel] name so History can label the exact app
+/// (WhatsApp vs SMS vs Share Sheet) rather than guessing.
+class DeliveryEvents extends Table {
+  TextColumn get id => text()();
+  TextColumn get birthdayId => text()();
+  TextColumn get channel => text()();
+  DateTimeColumn get handedOffAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(
-  tables: [Persons, Birthdays, MessageDrafts, ReminderSettingsEntries],
+  tables: [Persons, Birthdays, MessageDrafts, ReminderSettingsEntries, DeliveryEvents],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
@@ -109,7 +125,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -127,6 +143,9 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           "DELETE FROM birthdays WHERE person_id IN (SELECT id FROM persons WHERE birthday_month IS NULL);",
         );
+      }
+      if (from < 4) {
+        await m.createTable(deliveryEvents);
       }
     },
     beforeOpen: (details) async {

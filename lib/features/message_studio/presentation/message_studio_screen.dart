@@ -13,6 +13,7 @@ import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/delivery/data/whatsapp_handoff_builder.dart';
+import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
@@ -328,6 +329,13 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         await ref
             .read(birthdaysRepositoryProvider)
             .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
+        // Persist the launch as evidence (audit 03 P1-1): History renders
+        // "Opened in WhatsApp" from this record, never from status alone.
+        await ref.read(deliveryEventsRepositoryProvider).recordHandoff(
+              birthdayId: _activeBirthdayId,
+              channel: DeliveryChannel.whatsapp,
+              at: DateTime.now(),
+            );
       } else {
         await ref
             .read(birthdaysRepositoryProvider)
@@ -373,6 +381,17 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       await ref
           .read(birthdaysRepositoryProvider)
           .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
+      await ref.read(deliveryEventsRepositoryProvider).recordHandoff(
+            birthdayId: _activeBirthdayId,
+            channel: DeliveryChannel.sms,
+            at: DateTime.now(),
+          );
+    } else {
+      // Any channel that fails to open must surface as action-required, same
+      // as WhatsApp (audit 03 AC4/P2-2).
+      await ref
+          .read(birthdaysRepositoryProvider)
+          .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
     }
 
     if (mounted) {
@@ -406,6 +425,15 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       await ref
           .read(birthdaysRepositoryProvider)
           .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
+      await ref.read(deliveryEventsRepositoryProvider).recordHandoff(
+            birthdayId: _activeBirthdayId,
+            channel: DeliveryChannel.share,
+            at: DateTime.now(),
+          );
+    } else {
+      await ref
+          .read(birthdaysRepositoryProvider)
+          .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
     }
 
     if (mounted) {
@@ -706,6 +734,16 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             ],
           ),
           actions: [
+            if (!wasLaunched)
+              TextButton(
+                onPressed: () {
+                  Clipboard.setData(
+                    ClipboardData(text: _messageController.text.trim()),
+                  );
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Copy message'),
+              ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Not Sent Yet'),
@@ -735,6 +773,21 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           ],
         );
       },
+    );
+  }
+
+  /// Confirm-only entry (audit 03 AC3/P1-3): a handed-off birthday's primary
+  /// action asks "Did you send it?" WITHOUT re-launching the external app.
+  Future<void> _confirmFromHandedOff() async {
+    HapticFeedback.lightImpact();
+    final repo = ref.read(deliveryEventsRepositoryProvider);
+    final handoff = await repo.latestHandoffForBirthday(_activeBirthdayId);
+    final channel = handoff?.channel.displayName ?? 'delivery app';
+    if (!mounted) return;
+    _showHandoffConfirmationDialog(
+      'Opened via $channel — ${_messageController.text.trim()}',
+      wasLaunched: true,
+      channelName: channel,
     );
   }
 
@@ -802,6 +855,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     // never generate: pre-warn instead of failing on tap (audit H/G).
     final aiLocked = !entitlement.canUseAi;
     final isCompleted = birthday.status == BirthdayStatus.completed;
+    final isHandedOff = birthday.status == BirthdayStatus.handedOff;
     final rawPhone = person.phoneNumber?.trim() ?? '';
     final hasUsablePhone =
         WhatsAppHandoffBuilder.sanitizePhoneNumber(rawPhone) != null;
@@ -945,6 +999,14 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                     },
                     icon: const Icon(Icons.history),
                     label: const Text('View in History'),
+                  )
+                : isHandedOff
+                ? // Already handed off: ask to confirm, never re-launch
+                  // (audit 03 AC3/C2 — works for any channel, not just WhatsApp).
+                  FilledButton.icon(
+                    onPressed: _confirmFromHandedOff,
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Confirm Sent'),
                   )
                 : !hasUsablePhone
                 ? FilledButton.icon(

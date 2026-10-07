@@ -1,5 +1,6 @@
 import 'package:ai_birthday/core/database/app_database.dart';
 import 'package:ai_birthday/core/database/drift_repositories.dart';
+import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart'
     as domain;
 import 'package:drift/native.dart';
@@ -58,6 +59,53 @@ void main() {
             ..where((r) => r.id.equals('p')))
           .getSingle();
       expect(row.deletedAt, isNotNull);
+    });
+  });
+
+  group('DriftDeliveryEventsRepository (audit 03 P1-1)', () {
+    late AppDatabase db;
+    late DriftDeliveryEventsRepository repo;
+
+    setUp(() {
+      db = AppDatabase(NativeDatabase.memory());
+      repo = DriftDeliveryEventsRepository(db);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    test('records persist and latestHandoffForBirthday returns newest', () async {
+      final early = DateTime.utc(2026, 1, 1, 9);
+      final late = DateTime.utc(2026, 1, 2, 9);
+
+      expect(await repo.latestHandoffForBirthday('b1'), isNull);
+
+      await repo.recordHandoff(
+        birthdayId: 'b1',
+        channel: DeliveryChannel.whatsapp,
+        at: early,
+      );
+      await repo.recordHandoff(
+        birthdayId: 'b1',
+        channel: DeliveryChannel.sms,
+        at: late,
+      );
+      await repo.recordHandoff(
+        birthdayId: 'b2',
+        channel: DeliveryChannel.share,
+        at: early,
+      );
+
+      // Newest wins, and the channel is preserved exactly as launched.
+      final latest = await repo.latestHandoffForBirthday('b1');
+      expect(latest?.channel, DeliveryChannel.sms);
+      expect(latest?.at, late);
+
+      final all = await repo.watchHandoffs().first;
+      expect(all, hasLength(3));
+      final b2 = all.singleWhere((h) => h.birthdayId == 'b2');
+      expect(b2.channel, DeliveryChannel.share);
     });
   });
 }

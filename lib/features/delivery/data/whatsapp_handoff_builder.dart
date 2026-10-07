@@ -4,12 +4,12 @@
 /// - Uses official WhatsApp Click-to-Chat URLs (`https://wa.me/<number>?text=<encoded_text>`).
 /// - Never attempts background automation, tap simulation, or unofficial APIs.
 /// - Requires explicit user review before generating the handoff.
-/// - The app tracks handoff as [DeliveryState.handedOff], NEVER claiming sent
-///   until the user returns and confirms.
+/// - Every successful launch is recorded as a persisted delivery event
+///   (channel + timestamp); the app NEVER claims sent until the user returns
+///   and confirms (audit 03 P1-1).
 library;
 
 import 'package:ai_birthday/core/errors/app_failure.dart';
-import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 
 /// Structured result of a WhatsApp handoff preparation.
 class WhatsAppHandoffResult {

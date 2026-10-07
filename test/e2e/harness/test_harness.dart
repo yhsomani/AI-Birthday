@@ -65,6 +65,7 @@ class E2ETestHarness {
   late DriftPeopleRepository peopleRepo;
   late DriftBirthdaysRepository birthdaysRepo;
   late DriftDraftsRepository draftsRepo;
+  late DriftDeliveryEventsRepository deliveryEventsRepo;
   late FakeAICorePlatform fakeAiCore;
   late FakeFirebaseAuthClient fakeAuthClient;
   late FakeSubscriptionServer fakeSubscriptionServer;
@@ -78,6 +79,7 @@ class E2ETestHarness {
     peopleRepo = DriftPeopleRepository(db);
     birthdaysRepo = DriftBirthdaysRepository(db);
     draftsRepo = DriftDraftsRepository(db);
+    deliveryEventsRepo = DriftDeliveryEventsRepository(db);
     fakeAiCore = FakeAICorePlatform();
     fakeAuthClient = FakeFirebaseAuthClient();
     fakeSubscriptionServer = FakeSubscriptionServer();
@@ -108,6 +110,7 @@ class E2ETestHarness {
     peopleRepositoryProvider.overrideWithValue(peopleRepo),
     birthdaysRepositoryProvider.overrideWithValue(birthdaysRepo),
     draftsRepositoryProvider.overrideWithValue(draftsRepo),
+    deliveryEventsRepositoryProvider.overrideWithValue(deliveryEventsRepo),
     geminiNanoPlatformProvider.overrideWithValue(fakeAiCore),
     subscriptionNotifierProvider.overrideWith((ref) => subscriptionNotifier),
     loggerProvider.overrideWithValue(const NoopLogger()),

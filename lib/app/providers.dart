@@ -12,6 +12,8 @@ import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_rep
 import 'package:ai_birthday/features/delivery/data/whatsapp_handoff_builder.dart';
 import 'package:ai_birthday/features/delivery/data/native_share_service.dart';
 import 'package:ai_birthday/features/delivery/data/sms_delivery_service.dart';
+import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dart';
+import 'package:ai_birthday/features/delivery/domain/repositories/delivery_events_repository.dart';
 import 'package:ai_birthday/features/people/data/contact_csv_service.dart';
 import 'package:ai_birthday/features/people/data/device_contacts_service.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
@@ -177,6 +179,19 @@ final birthdaysRepositoryProvider = Provider<BirthdaysRepository>((ref) {
 final draftsRepositoryProvider = Provider<DraftsRepository>((ref) {
   final db = ref.watch(core.databaseProvider);
   return DriftDraftsRepository(db);
+});
+
+/// Delivery-event Repository: persisted evidence of external-app launches
+/// (audit 03 P1-1). History and the handed-off confirm flow read this.
+final deliveryEventsRepositoryProvider = Provider<DeliveryEventsRepository>((ref) {
+  final db = ref.watch(core.databaseProvider);
+  return DriftDeliveryEventsRepository(db);
+});
+
+/// Live stream of every persisted external-app handoff event.
+final deliveryEventsStreamProvider = StreamProvider<List<DeliveryHandoff>>((ref) {
+  final repo = ref.watch(deliveryEventsRepositoryProvider);
+  return repo.watchHandoffs();
 });
 
 /// Stream of all tracked people.

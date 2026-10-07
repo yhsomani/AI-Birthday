@@ -4,18 +4,17 @@ library;
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
 
 /// Editorial status of a birthday message draft.
+///
+/// `handedOff`/`reviewed` were removed (audit 03 C1/AC5): "opened" is now
+/// evidenced by a persisted [DeliveryHandoff] event, never by draft status.
 enum DraftStatus {
   draft,
-  reviewed,
   ready,
-  handedOff,
   confirmedSent;
 
   String get displayName => switch (this) {
     DraftStatus.draft => 'Draft',
-    DraftStatus.reviewed => 'Reviewed',
     DraftStatus.ready => 'Ready to Send',
-    DraftStatus.handedOff => 'Handed Off',
     DraftStatus.confirmedSent => 'Sent & Confirmed',
   };
 
@@ -68,9 +67,6 @@ class MessageDraft {
 
   final DateTime createdAt;
   final DateTime updatedAt;
-
-  bool get isReviewed =>
-      status == DraftStatus.reviewed || status == DraftStatus.ready;
 
   MessageDraft copyWith({
     String? id,

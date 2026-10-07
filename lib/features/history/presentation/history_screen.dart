@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../app/providers.dart';
 import '../../../shared/design_system/design_system.dart';
+import '../../delivery/domain/models/delivery_handoff.dart';
 import '../../message_studio/domain/models/message_draft.dart';
 
 /// History — message and delivery activity timeline (SSOT §3, §16, §28).
@@ -16,6 +17,7 @@ class HistoryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final draftsAsync = ref.watch(draftsStreamProvider);
     final peopleAsync = ref.watch(peopleStreamProvider);
+    final handoffsAsync = ref.watch(deliveryEventsStreamProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('History & Activity')),
@@ -42,6 +44,18 @@ class HistoryScreen extends ConsumerWidget {
           final people = peopleAsync.asData?.value ?? [];
           final peopleMap = {for (final p in people) p.id: p};
 
+          // Resolve the latest persisted handoff per birthday (audit 03 P1-1):
+          // "Opened in <channel>" is evidence-driven, never inferred from
+          // draft status.
+          final handoffs = handoffsAsync.asData?.value ?? const <DeliveryHandoff>[];
+          final latestHandoffByBirthday = <String, DeliveryHandoff>{};
+          for (final h in handoffs) {
+            final existing = latestHandoffByBirthday[h.birthdayId];
+            if (existing == null || h.at.isAfter(existing.at)) {
+              latestHandoffByBirthday[h.birthdayId] = h;
+            }
+          }
+
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(
               16,
@@ -57,30 +71,34 @@ class HistoryScreen extends ConsumerWidget {
               // The contact may have been deleted; say so instead of showing
               // a placeholder name that reads like a real recipient.
               final recipientName = person?.name ?? 'Removed contact';
-              final statusColor = switch (draft.status) {
-                DraftStatus.confirmedSent => Colors.green[800] ?? Colors.green,
-                DraftStatus.handedOff => Colors.orange[800] ?? Colors.orange,
-                DraftStatus.ready => Theme.of(context).colorScheme.primary,
-                DraftStatus.reviewed => Colors.teal[800] ?? Colors.teal,
-                DraftStatus.draft => Colors.grey[700] ?? Colors.grey,
-              };
+              final handoff = latestHandoffByBirthday[draft.birthdayId];
+              final sent = draft.status == DraftStatus.confirmedSent;
+              final statusColor = sent
+                  ? Colors.green[800] ?? Colors.green
+                  : handoff != null
+                  ? Colors.orange[800] ?? Colors.orange
+                  : switch (draft.status) {
+                      DraftStatus.ready => Theme.of(context).colorScheme.primary,
+                      DraftStatus.draft => Colors.grey[700] ?? Colors.grey,
+                      // confirmedSent is handled above via [sent].
+                      _ => Colors.grey[700] ?? Colors.grey,
+                    };
 
-              final (statusIcon, statusLabel) = switch (draft.status) {
-                DraftStatus.confirmedSent => (
-                  Icons.check_circle_outline,
-                  'Sent',
-                ),
-                DraftStatus.handedOff => (
-                  Icons.open_in_new,
-                  'Opened in WhatsApp',
-                ),
-                DraftStatus.ready => (Icons.send_outlined, 'Ready to Send'),
-                DraftStatus.reviewed => (
-                  Icons.rate_review_outlined,
-                  'Reviewed',
-                ),
-                DraftStatus.draft => (Icons.edit_note_outlined, 'Draft'),
-              };
+              final (statusIcon, statusLabel) = sent
+                  ? (Icons.check_circle_outline, 'Sent')
+                  : handoff != null
+                  ? (
+                      Icons.open_in_new,
+                      'Opened in ${handoff.channel.displayName}',
+                    )
+                  : switch (draft.status) {
+                      DraftStatus.ready => (Icons.send_outlined, 'Ready to Send'),
+                      DraftStatus.draft => (
+                        Icons.edit_note_outlined,
+                        'Draft',
+                      ),
+                      _ => (Icons.edit_note_outlined, 'Draft'),
+                    };
 
               return Card(
                 elevation: 0,

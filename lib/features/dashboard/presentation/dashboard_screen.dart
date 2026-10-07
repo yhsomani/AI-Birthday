@@ -84,6 +84,9 @@ class DashboardScreen extends ConsumerWidget {
                   if (b.status == BirthdayStatus.reminderDue ||
                       b.status == BirthdayStatus.messageNotPrepared ||
                       b.status == BirthdayStatus.messageDrafted ||
+                      // A handed-off birthday awaiting the user's confirmation
+                      // stays actionable inside the 1-7d window (audit 03 AC2).
+                      b.status == BirthdayStatus.handedOff ||
                       b.status == BirthdayStatus.failed) {
                     actionNeededBirthdays.add(b);
                   }

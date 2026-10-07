@@ -8,6 +8,8 @@ import 'package:ai_birthday/core/database/app_database.dart' as db;
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_repository.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
+import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dart';
+import 'package:ai_birthday/features/delivery/domain/repositories/delivery_events_repository.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
@@ -317,6 +319,56 @@ class DriftDraftsRepository implements DraftsRepository {
       variationIndex: row.variationIndex,
       createdAt: row.createdAt.toUtc(),
       updatedAt: row.updatedAt.toUtc(),
+    );
+  }
+}
+
+/// Drift/SQLite-backed implementation of [DeliveryEventsRepository].
+class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
+  DriftDeliveryEventsRepository(this._database);
+
+  final db.AppDatabase _database;
+
+  @override
+  Future<void> recordHandoff({
+    required String birthdayId,
+    required DeliveryChannel channel,
+    required DateTime at,
+  }) async {
+    final utc = at.toUtc();
+    await _database.into(_database.deliveryEvents).insert(
+          db.DeliveryEventsCompanion.insert(
+            id: '$birthdayId-${utc.millisecondsSinceEpoch}',
+            birthdayId: birthdayId,
+            channel: channel.name,
+            handedOffAt: utc,
+          ),
+        );
+  }
+
+  @override
+  Future<DeliveryHandoff?> latestHandoffForBirthday(String birthdayId) async {
+    final row = await (_database.select(_database.deliveryEvents)
+          ..where((r) => r.birthdayId.equals(birthdayId))
+          ..orderBy([(r) => OrderingTerm.desc(r.handedOffAt)])
+          ..limit(1))
+        .getSingleOrNull();
+    return row == null ? null : _handoffFromRow(row);
+  }
+
+  @override
+  Stream<List<DeliveryHandoff>> watchHandoffs() {
+    return _database
+        .select(_database.deliveryEvents)
+        .watch()
+        .map((rows) => rows.map(_handoffFromRow).toList());
+  }
+
+  static DeliveryHandoff _handoffFromRow(db.DeliveryEvent row) {
+    return DeliveryHandoff(
+      birthdayId: row.birthdayId,
+      channel: DeliveryChannel.fromString(row.channel),
+      at: row.handedOffAt.toUtc(),
     );
   }
 }
