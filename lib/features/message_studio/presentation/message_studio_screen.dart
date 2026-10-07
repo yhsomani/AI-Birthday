@@ -47,6 +47,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   bool _isLoading = true;
   bool _isGenerating = false;
   String? _errorMessage;
+  AppFailureCode? _lastFailureCode;
 
   // Captured at load: dispose() runs after ref becomes unusable, but the
   // final draft save still needs the repository.
@@ -154,12 +155,13 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     }
   }
 
-  Future<void> _generateWithAi() async {
+  Future<void> _generateWithAi({bool forceNano = false}) async {
     if (_person == null) return;
 
     setState(() {
       _isGenerating = true;
       _errorMessage = null;
+      _lastFailureCode = null;
     });
 
     try {
@@ -181,6 +183,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       final result = await aiRouter.generate(
         request: request,
         entitlement: entitlement,
+        forceNano: forceNano,
       );
 
       _messageController.text = result.message;
@@ -223,6 +226,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     } on AppFailure catch (e) {
       setState(() {
         _errorMessage = '${e.message}: ${e.detail ?? ''} ${e.action ?? ''}';
+        _lastFailureCode = e.code;
         _isGenerating = false;
       });
     } catch (e, st) {
@@ -238,6 +242,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       setState(() {
         _errorMessage =
             'An unexpected error occurred while drafting the message.';
+        _lastFailureCode = null;
         _isGenerating = false;
       });
     }
@@ -470,6 +475,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     } on AppFailure catch (e) {
       setState(() {
         _errorMessage = '${e.message}: ${e.detail ?? ''} ${e.action ?? ''}';
+        _lastFailureCode = e.code;
       });
     } catch (e, st) {
       ref
@@ -604,6 +610,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           _errorMessage = e is AppFailure
               ? '${e.message}: ${e.detail ?? ''} ${e.action ?? ''}'.trim()
               : 'Could not generate variations. You can compose your message manually or retry.';
+          _lastFailureCode = e is AppFailure ? e.code : null;
           _isGenerating = false;
         });
       }
@@ -882,11 +889,22 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                       TextButton.icon(
                         icon: const Icon(Icons.refresh, size: 16),
                         label: const Text('Retry'),
-                        onPressed: _generateWithAi,
+                        onPressed: () => _generateWithAi(),
                         style: TextButton.styleFrom(
                           visualDensity: VisualDensity.compact,
                         ),
                       ),
+                      // On a credential failure, offer the on-device fallback
+                      // (audit 02 AC P1-1): retry with Gemini Nano forced.
+                      if (_lastFailureCode == AppFailureCode.aiCredentialInvalid)
+                        TextButton.icon(
+                          icon: const Icon(Icons.phone_android, size: 16),
+                          label: const Text('Use on-device AI (Gemini Nano)'),
+                          onPressed: () => _generateWithAi(forceNano: true),
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
                       TextButton.icon(
                         icon: const Icon(Icons.edit_note, size: 16),
                         label: const Text('Write manually'),

@@ -8,10 +8,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 class InMemoryCredentialStorage implements CredentialStorage {
   String? key;
+  DateTime? verifiedAt;
 
   @override
   Future<void> deleteGeminiApiKey() async {
     key = null;
+    verifiedAt = null;
   }
 
   @override
@@ -30,10 +32,24 @@ class InMemoryCredentialStorage implements CredentialStorage {
   }
 
   @override
+  Future<DateTime?> geminiKeyVerifiedAt() async => verifiedAt;
+
+  @override
+  Future<void> recordGeminiKeyVerifiedAt(DateTime at) async {
+    verifiedAt = at;
+  }
+
+  @override
+  Future<void> clearGeminiKeyVerifiedAt() async {
+    verifiedAt = null;
+  }
+
+  @override
   Future<bool> hasCompletedOnboarding() async => false;
 
   @override
-  Future<void> setCompletedOnboarding(bool completed) async {}
+  Future<void> setCompletedOnboarding(bool completed)
+      async {}
 }
 
 void main() {
@@ -243,13 +259,33 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(storage.key, 'AIzaSySavedManually');
-    expect(find.text('Configured'), findsOneWidget);
+    // Raw save is UNVERIFIED: the badge must not claim readiness (audit 02
+    // P2-1), and the unvalidated save must not inherit older verifications.
+    expect(find.text('Unverified'), findsOneWidget);
+    expect(storage.verifiedAt, isNull);
     expect(find.text('Remove Key'), findsOneWidget);
 
     await tester.tap(find.text('Remove Key'));
     await tester.pumpAndSettle();
 
     expect(storage.key, isNull);
+    expect(storage.verifiedAt, isNull);
     expect(find.text('Not Configured'), findsOneWidget);
   });
+
+  testWidgets(
+    'previously verified key shows durable "Verified <date>" badge on reopen',
+    (tester) async {
+      storage.key = 'AIzaSyVerifiedBefore';
+      storage.verifiedAt = DateTime.now().subtract(const Duration(days: 3));
+
+      await pumpSettings(tester);
+
+      // Never a bare green "Connected" without a live test this session
+      // (audit 02 P1-2); the durable badge carries the last-verified date.
+      expect(find.textContaining('Verified ·'), findsOneWidget);
+      expect(find.text('Connected'), findsNothing);
+      expect(find.text('Unverified'), findsNothing);
+    },
+  );
 }

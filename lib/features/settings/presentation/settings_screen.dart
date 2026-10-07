@@ -33,11 +33,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       'https://aistudio.google.com/app/apikey';
   static const String _geminiBillingUrl = 'https://ai.google.dev/pricing';
 
+  /// Dark amber that passes WCAG AA on the light amber "Verified" badge
+  /// container (the palette's accentAmber alone is ~2.8:1 in small text).
+  static const Color _kVerifiedAmber = Color(0xFF9A5B17);
+
   final TextEditingController _apiKeyController = TextEditingController();
   bool _hasKey = false;
   bool _obscureKey = true;
   bool _isTestingKey = false;
   GeminiConnectionResult? _connectionResult;
+  DateTime? _lastVerifiedAt;
   bool _isPurchasing = false;
   bool _isSyncing = false;
   DateTime? _lastSyncTime;
@@ -67,9 +72,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final key = await storage.getGeminiApiKey();
       if (!mounted) return;
       if (key != null && key.isNotEmpty) {
+        // Durable validation (audit 02 P1-2): never claim readiness from key
+        // presence alone; badge derives from the last recorded verification.
+        final verifiedAt = await storage.geminiKeyVerifiedAt();
+        if (!mounted) return;
         setState(() {
           _hasKey = true;
           _apiKeyController.text = key;
+          _lastVerifiedAt = verifiedAt;
         });
       }
     } catch (_) {
@@ -286,9 +296,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       if (result.status == GeminiConnectionStatus.connected) {
         await ref.read(credentialStorageProvider).saveGeminiApiKey(text);
+        // Persist the successful verification so the badge stays honest
+        // across restarts (audit 02 P1-2).
+        await ref
+            .read(credentialStorageProvider)
+            .recordGeminiKeyVerifiedAt(DateTime.now());
         setState(() {
           _hasKey = true;
           _connectionResult = result;
+          _lastVerifiedAt = DateTime.now();
           _isTestingKey = false;
         });
       } else {
@@ -331,9 +347,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       if (text.isEmpty) {
         await storage.deleteGeminiApiKey();
+        await storage.clearGeminiKeyVerifiedAt();
         setState(() {
           _hasKey = false;
           _connectionResult = null;
+          _lastVerifiedAt = null;
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -342,7 +360,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         }
       } else {
         await storage.saveGeminiApiKey(text);
-        setState(() => _hasKey = true);
+        // Raw save is UNVERIFIED: drop any prior verification so the badge
+        // can never claim readiness for a key that was not tested
+        // (audit 02 P2-1).
+        await storage.clearGeminiKeyVerifiedAt();
+        setState(() {
+          _hasKey = true;
+          _lastVerifiedAt = null;
+        });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -1174,17 +1199,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ),
       );
-    } else if (_hasKey) {
+    } else if (_hasKey && _lastVerifiedAt != null) {
+      // Durable state: key was verified by a live ping at some point, but not
+      // this session. Label the timestamp rather than claiming live
+      // "Connected" (audit 02 P1-2).
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.accentForest.withValues(alpha: 0.12),
+          color: AppColors.accentAmber.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Text(
-          'Configured',
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.verified_outlined,
+              size: 12,
+              color: _kVerifiedAmber,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Verified · '
+              '${MaterialLocalizations.of(context).formatMediumDate(_lastVerifiedAt!.toLocal())}',
+              style: const TextStyle(
+                color: _kVerifiedAmber,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (_hasKey) {
+      // A stored key that was never verified must not look ready (audit 02
+      // P2-1).
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.grey.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          'Unverified',
           style: TextStyle(
-            color: AppColors.accentForest,
+            color: Colors.grey[700],
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),
@@ -1502,7 +1560,7 @@ class _GeminiSetupGuideSheet extends StatelessWidget {
                 stepNumber: '4',
                 title: 'Paste and Test in Settings',
                 description:
-                    'Return to AI-Birthday, paste the key into the Gemini API Key field, and tap "Test Connection". We will verify access before saving it.',
+                    'Return to AI-Birthday, paste the key into the Gemini API Key field, then tap "Test Connection" to verify access before saving. "Save Key" also works, but the key is stored unverified until you test it.',
               ),
               const SizedBox(height: 24),
 

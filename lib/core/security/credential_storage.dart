@@ -20,6 +20,15 @@ abstract interface class CredentialStorage {
   Future<void> saveGeminiApiKey(String apiKey);
   Future<void> deleteGeminiApiKey();
   Future<bool> hasGeminiApiKey();
+
+  /// When the stored key was last confirmed working by a live server ping
+  /// (null = never validated). Persisted so the UI never claims a
+  /// "Connected"/"Configured" state purely from key presence (audit 02
+  /// P1-2/P2-1).
+  Future<DateTime?> geminiKeyVerifiedAt();
+  Future<void> recordGeminiKeyVerifiedAt(DateTime at);
+  Future<void> clearGeminiKeyVerifiedAt();
+
   Future<bool> hasCompletedOnboarding();
   Future<void> setCompletedOnboarding(bool completed);
 }
@@ -31,6 +40,8 @@ class SecureCredentialStorage implements CredentialStorage {
   final SecureStoreDriver _driver;
 
   static const String _geminiApiKeyKey = 'ai_birthday_user_gemini_api_key';
+  static const String _geminiKeyVerifiedAtKey =
+      'ai_birthday_gemini_key_verified_at';
   static const String _onboardingKey = 'ai_birthday_onboarding_completed';
 
   @override
@@ -52,6 +63,31 @@ class SecureCredentialStorage implements CredentialStorage {
   @override
   Future<void> deleteGeminiApiKey() async {
     await _driver.delete(_geminiApiKeyKey);
+    // A deleted key can never carry a stale "verified" claim.
+    await clearGeminiKeyVerifiedAt();
+  }
+
+  @override
+  Future<DateTime?> geminiKeyVerifiedAt() async {
+    final raw = await _driver.read(_geminiKeyVerifiedAtKey);
+    if (raw == null) return null;
+    final ms = int.tryParse(raw.trim());
+    // Guard corrupted values: never throw, treat as unverified.
+    if (ms == null || ms <= 0) return null;
+    return DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true);
+  }
+
+  @override
+  Future<void> recordGeminiKeyVerifiedAt(DateTime at) async {
+    await _driver.write(
+      _geminiKeyVerifiedAtKey,
+      at.millisecondsSinceEpoch.toString(),
+    );
+  }
+
+  @override
+  Future<void> clearGeminiKeyVerifiedAt() async {
+    await _driver.delete(_geminiKeyVerifiedAtKey);
   }
 
   @override
@@ -86,6 +122,7 @@ class InMemoryCredentialStorage implements CredentialStorage {
 
   String? _key;
   bool _onboardingCompleted;
+  DateTime? _verifiedAt;
 
   @override
   Future<String?> getGeminiApiKey() async => _key;
@@ -93,11 +130,26 @@ class InMemoryCredentialStorage implements CredentialStorage {
   @override
   Future<void> saveGeminiApiKey(String apiKey) async {
     _key = apiKey.trim().isEmpty ? null : apiKey.trim();
+    if (_key == null) _verifiedAt = null;
   }
 
   @override
   Future<void> deleteGeminiApiKey() async {
     _key = null;
+    _verifiedAt = null;
+  }
+
+  @override
+  Future<DateTime?> geminiKeyVerifiedAt() async => _verifiedAt;
+
+  @override
+  Future<void> recordGeminiKeyVerifiedAt(DateTime at) async {
+    _verifiedAt = at;
+  }
+
+  @override
+  Future<void> clearGeminiKeyVerifiedAt() async {
+    _verifiedAt = null;
   }
 
   @override

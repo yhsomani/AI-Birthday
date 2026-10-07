@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ai_birthday/app/providers.dart';
+import 'package:ai_birthday/core/platform/gemini_nano_platform.dart';
+import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/message_studio/presentation/message_studio_screen.dart';
@@ -24,6 +27,7 @@ void main() {
       required String? phone,
       BirthdayStatus status = BirthdayStatus.messageNotPrepared,
       bool pro = true,
+      List<Override> extraOverrides = const [],
     }) async {
       final now = DateTime.now();
       final person = Person(
@@ -66,7 +70,7 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: harness.providerOverrides,
+          overrides: [...harness.providerOverrides, ...extraOverrides],
           child: const MaterialApp(
             home: MessageStudioScreen(birthdayId: 'b-test'),
           ),
@@ -144,6 +148,47 @@ void main() {
         // Resending stays intentionally reachable via the alternate channels.
         expect(find.text('Send via SMS'), findsOneWidget);
         expect(find.text('Share Sheet'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'invalid stored key offers on-device fallback that unlocks draft (P1-1)',
+      (tester) async {
+        harness.fakeAiCore.setState(NanoState.available);
+        await harness.credentialStorage.saveGeminiApiKey('AIzaSyDeadKey');
+        final failingProvider = UserGeminiApiProvider(
+          credentialStorage: harness.credentialStorage,
+          httpSender: (uri, headers, body) async {
+            return const HttpResponsePayload(
+              statusCode: 401,
+              body: '{"error":{"message":"API key not valid"}}',
+            );
+          },
+        );
+
+        await pumpStudio(
+          tester,
+          phone: '+14155552671',
+          extraOverrides: [
+            userGeminiApiProvider.overrideWithValue(failingProvider),
+          ],
+        );
+
+        await tester.tap(find.text('Generate with AI'));
+        await tester.pumpAndSettle();
+
+        // Credential failure surfaces the error AND the on-device action.
+        expect(find.textContaining('Gemini API key could not be used'), findsOneWidget);
+        expect(find.text('Use on-device AI (Gemini Nano)'), findsOneWidget);
+
+        await tester.tap(find.text('Use on-device AI (Gemini Nano)'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Message drafted with AI ✨'), findsOneWidget);
+        expect(
+          find.text('Happy Birthday! Wishing you a fantastic day!'),
+          findsOneWidget,
+        );
       },
     );
   });

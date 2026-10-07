@@ -6,10 +6,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 class FakeCredentialStorage implements CredentialStorage {
   String? key;
+  DateTime? verifiedAt;
 
   @override
   Future<void> deleteGeminiApiKey() async {
     key = null;
+    verifiedAt = null;
   }
 
   @override
@@ -25,6 +27,19 @@ class FakeCredentialStorage implements CredentialStorage {
   @override
   Future<void> saveGeminiApiKey(String apiKey) async {
     key = apiKey;
+  }
+
+  @override
+  Future<DateTime?> geminiKeyVerifiedAt() async => verifiedAt;
+
+  @override
+  Future<void> recordGeminiKeyVerifiedAt(DateTime at) async {
+    verifiedAt = at;
+  }
+
+  @override
+  Future<void> clearGeminiKeyVerifiedAt() async {
+    verifiedAt = null;
   }
 
   @override
