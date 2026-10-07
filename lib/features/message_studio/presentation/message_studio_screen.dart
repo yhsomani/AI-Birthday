@@ -12,6 +12,7 @@ import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
+import 'package:ai_birthday/features/delivery/data/whatsapp_handoff_builder.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
@@ -740,6 +741,40 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     }
   }
 
+  /// Opens the contact editor so the recipient can get a usable phone number.
+  void _openPhoneSetup() {
+    HapticFeedback.lightImpact();
+    context.push('/people/edit/${_person!.id}');
+  }
+
+  /// Replaces the AI controls when the account is not entitled (audit H).
+  Widget _buildAiLockedNotice() {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.star_outline, color: theme.colorScheme.tertiary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'AI drafting (tones, lengths, rewrite and translate) is a Pro feature. '
+                'Compose your message below — writing and delivery stay free.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -752,6 +787,19 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         body: Center(child: Text(_errorMessage ?? 'Birthday not found')),
       );
     }
+
+    final person = _person!;
+    final birthday = _birthday!;
+    final entitlement = ref.watch(entitlementProvider);
+    // The AI router gates on entitlement first, so a non-entitled user can
+    // never generate: pre-warn instead of failing on tap (audit H/G).
+    final aiLocked = !entitlement.canUseAi;
+    final isCompleted = birthday.status == BirthdayStatus.completed;
+    final rawPhone = person.phoneNumber?.trim() ?? '';
+    final hasUsablePhone =
+        WhatsAppHandoffBuilder.sanitizePhoneNumber(rawPhone) != null;
+    final phoneMissing = rawPhone.isEmpty;
+    final phoneInvalid = !phoneMissing && !hasUsablePhone;
 
     return Scaffold(
       appBar: AppBar(
@@ -773,12 +821,21 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         ),
         children: [
           // Recipient Context Card
-          _buildRecipientCard(),
+          _buildRecipientCard(
+            phoneMissing: phoneMissing,
+            phoneInvalid: phoneInvalid,
+            isCompleted: isCompleted,
+          ),
           const SizedBox(height: AppSpacing.md),
 
-          // Tone & Length Controls
-          _buildControlsCard(),
-          const SizedBox(height: AppSpacing.md),
+          // Tone & Length Controls (AI personalization; hidden when AI is locked)
+          if (!aiLocked) ...[
+            _buildControlsCard(),
+            const SizedBox(height: AppSpacing.md),
+          ] else ...[
+            _buildAiLockedNotice(),
+            const SizedBox(height: AppSpacing.md),
+          ],
 
           // Error banner with recovery action buttons
           if (_errorMessage != null) ...[
@@ -857,31 +914,56 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           ],
 
           // Message Editor Box
-          _buildMessageEditor(),
+          _buildMessageEditor(showAiTools: !aiLocked),
           const SizedBox(height: AppSpacing.lg),
 
           // Action Buttons
           ResponsiveActionBar(
-            primary: FilledButton.icon(
-              onPressed: _handleWhatsAppSend,
-              icon: const Icon(Icons.chat),
-              label: const Text('Send on WhatsApp'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.whatsappGreen,
-                foregroundColor: Colors.white,
-              ),
-            ),
-            secondary: FilledButton.tonalIcon(
-              onPressed: _isGenerating ? null : _generateWithAi,
-              icon: _isGenerating
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.auto_awesome),
-              label: Text(_isGenerating ? 'Drafting...' : 'Generate with AI'),
-            ),
+            primary: isCompleted
+                ? FilledButton.icon(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      context.go('/history');
+                    },
+                    icon: const Icon(Icons.history),
+                    label: const Text('View in History'),
+                  )
+                : !hasUsablePhone
+                ? FilledButton.icon(
+                    onPressed: _openPhoneSetup,
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: Text(
+                      phoneMissing ? 'Add Phone Number' : 'Fix Phone Number',
+                    ),
+                  )
+                : FilledButton.icon(
+                    onPressed: _handleWhatsAppSend,
+                    icon: const Icon(Icons.chat),
+                    label: const Text('Send on WhatsApp'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.whatsappGreen,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+            secondary: aiLocked
+                ? FilledButton.tonalIcon(
+                    onPressed: () => context.push('/settings'),
+                    icon: const Icon(Icons.star_outline),
+                    label: const Text('Unlock with Pro'),
+                  )
+                : FilledButton.tonalIcon(
+                    onPressed: _isGenerating ? null : _generateWithAi,
+                    icon: _isGenerating
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.auto_awesome),
+                    label: Text(
+                      _isGenerating ? 'Drafting...' : 'Generate with AI',
+                    ),
+                  ),
           ),
           const SizedBox(height: AppSpacing.sm),
           // Alternate delivery channels (SSOT §10)
@@ -890,11 +972,12 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
-              OutlinedButton.icon(
-                onPressed: _handleSmsSend,
-                icon: const Icon(Icons.sms_outlined, size: 18),
-                label: const Text('Send via SMS'),
-              ),
+              if (hasUsablePhone)
+                OutlinedButton.icon(
+                  onPressed: _handleSmsSend,
+                  icon: const Icon(Icons.sms_outlined, size: 18),
+                  label: const Text('Send via SMS'),
+                ),
               OutlinedButton.icon(
                 onPressed: _handleShareSend,
                 icon: const Icon(Icons.share_outlined, size: 18),
@@ -912,7 +995,13 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     );
   }
 
-  Widget _buildRecipientCard() {
+  Widget _buildRecipientCard({
+    required bool phoneMissing,
+    required bool phoneInvalid,
+    required bool isCompleted,
+  }) {
+    final theme = Theme.of(context);
+    final person = _person!;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -921,29 +1010,56 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           children: [
             Row(
               children: [
-                CircleAvatar(child: Text(_person!.name[0])),
+                CircleAvatar(child: Text(person.name[0])),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _person!.name,
+                        person.name,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        '${_person!.relationship.displayName} • ${_person!.phoneNumber ?? 'No phone'}',
+                        '${person.relationship.displayName} • ${person.phoneNumber ?? 'No phone'}',
                         style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                       ),
+                      if (phoneMissing)
+                        Text(
+                          'No phone number yet — add one for WhatsApp delivery.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.tertiary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                      else if (phoneInvalid)
+                        Text(
+                          'This number needs a country code (e.g. +1 555 123 4567) for WhatsApp.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.tertiary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                      else if (isCompleted)
+                        Text(
+                          '✓ Celebration marked as sent. Resend anytime below.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.green[800],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                     ],
                   ),
                 ),
               ],
             ),
-            if (_person!.importantFacts.isNotEmpty) ...[
+            if (person.importantFacts.isNotEmpty) ...[
               const Divider(height: 24),
               const Text(
                 'Known Facts (User-verified):',
@@ -951,7 +1067,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               ),
               const SizedBox(height: 4),
               Text(
-                _person!.importantFacts.join(' • '),
+                person.importantFacts.join(' • '),
                 style: TextStyle(fontSize: 12, color: Colors.grey[700]),
               ),
             ],
@@ -1020,7 +1136,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     );
   }
 
-  Widget _buildMessageEditor() {
+  Widget _buildMessageEditor({required bool showAiTools}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1072,37 +1188,39 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             hintText: 'Write a birthday greeting or tap Create message...',
           ),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          children: [
-            ActionChip(
-              avatar: const Icon(Icons.compress, size: 16),
-              label: const Text('Shorten'),
-              onPressed: _isGenerating
-                  ? null
-                  : () => _rewriteMessage(length: MessageLength.short),
-            ),
-            ActionChip(
-              avatar: const Icon(Icons.expand, size: 16),
-              label: const Text('Expand'),
-              onPressed: _isGenerating
-                  ? null
-                  : () => _rewriteMessage(length: MessageLength.expanded),
-            ),
-            ActionChip(
-              avatar: const Icon(Icons.translate, size: 16),
-              label: const Text('Translate'),
-              onPressed: _isGenerating ? null : _showTranslateDialog,
-            ),
-            ActionChip(
-              avatar: const Icon(Icons.casino_outlined, size: 16),
-              label: const Text('Variations'),
-              onPressed: _isGenerating ? null : _generateVariations,
-            ),
-          ],
-        ),
+        if (showAiTools) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              ActionChip(
+                avatar: const Icon(Icons.compress, size: 16),
+                label: const Text('Shorten'),
+                onPressed: _isGenerating
+                    ? null
+                    : () => _rewriteMessage(length: MessageLength.short),
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.expand, size: 16),
+                label: const Text('Expand'),
+                onPressed: _isGenerating
+                    ? null
+                    : () => _rewriteMessage(length: MessageLength.expanded),
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.translate, size: 16),
+                label: const Text('Translate'),
+                onPressed: _isGenerating ? null : _showTranslateDialog,
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.casino_outlined, size: 16),
+                label: const Text('Variations'),
+                onPressed: _isGenerating ? null : _generateVariations,
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

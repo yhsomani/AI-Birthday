@@ -737,19 +737,23 @@ class PeopleScreen extends ConsumerWidget {
                         _confirmAndDelete(context, ref, person);
                       }
                     },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: 'message',
-                        child: Row(
-                          children: [
-                            Icon(Icons.auto_awesome, size: 18),
-                            SizedBox(width: 8),
-                            Text('Message Studio'),
-                          ],
+                    itemBuilder: (context) => [
+                      if (person.hasBirthday)
+                        const PopupMenuItem(
+                          value: 'message',
+                          child: Row(
+                            children: [
+                              Icon(Icons.auto_awesome, size: 18),
+                              SizedBox(width: 8),
+                              Text('Message Studio'),
+                            ],
+                          ),
                         ),
+                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Delete'),
                       ),
-                      PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      PopupMenuItem(value: 'delete', child: Text('Delete')),
                     ],
                   ),
                   onTap: () => _showPersonDetailsModal(context, ref, person),
@@ -873,22 +877,24 @@ class PeopleScreen extends ConsumerWidget {
             ),
           ),
         const SizedBox(height: AppSpacing.lg),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              final bRepo = ref.read(birthdaysRepositoryProvider);
-              final b = await bRepo.getBirthdayForPerson(person.id);
-              if (b != null && context.mounted) {
-                context.push('/message-studio/${b.id}');
-              }
-            },
-            icon: const Icon(Icons.auto_awesome),
-            label: const Text('Draft Message with AI'),
+        if (person.hasBirthday) ...[
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                final bRepo = ref.read(birthdaysRepositoryProvider);
+                final b = await bRepo.getBirthdayForPerson(person.id);
+                if (b != null && context.mounted) {
+                  context.push('/message-studio/${b.id}');
+                }
+              },
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Draft Message with AI'),
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.xs),
+        ],
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(

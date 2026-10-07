@@ -43,6 +43,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   DateTime? _lastSyncTime;
   NanoState _nanoState = NanoState.unavailable;
 
+  // Bumped after a notification re-enable attempt so the revoked-state
+  // FutureBuilder below re-queries OS permission (audit Scenario T).
+  int _notificationPermissionRevision = 0;
+
   @override
   void initState() {
     super.initState();
@@ -229,6 +233,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // Refreshing this screen after the system-settings handoff prevents stale permission UI.
     if (!mounted) return;
     setState(() {});
+  }
+
+  /// Recovery for reminders that were enabled but are now blocked at the OS
+  /// level (audit Scenario T): re-request access and reschedule.
+  Future<void> _reenableNotifications() async {
+    HapticFeedback.lightImpact();
+    final gateway = ref.read(notificationSchedulerGatewayProvider);
+    final granted = await gateway.requestPermission();
+    if (!mounted) return;
+    setState(() => _notificationPermissionRevision++);
+    if (granted) {
+      // Re-run the schedule now that delivery can work again.
+      ref.read(reminderSettingsProvider.notifier).setEnabled(true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Notifications re-enabled. Reminders are being rescheduled.',
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Notifications are still blocked in system settings.'),
+        ),
+      );
+    }
   }
 
   Future<void> _testConnection() async {
@@ -882,6 +913,67 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                 ],
+                if (reminderSettings.enabled)
+                  FutureBuilder<bool>(
+                    key: ValueKey(
+                      'notification-permission-$_notificationPermissionRevision',
+                    ),
+                    future: ref
+                        .read(notificationSchedulerGatewayProvider)
+                        .hasPermission(),
+                    builder: (context, snapshot) {
+                      if (snapshot.data != false) {
+                        return const SizedBox.shrink();
+                      }
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.errorContainer.withValues(alpha: 0.55),
+                          borderRadius: AppSpacing.roundedMd,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.notifications_off_outlined,
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Notifications are blocked in system settings, so birthday reminders cannot be delivered right now.',
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onErrorContainer,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: _reenableNotifications,
+                                icon: const Icon(
+                                  Icons.notifications_active_outlined,
+                                  size: 16,
+                                ),
+                                label: const Text('Re-enable notifications'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 FutureBuilder<bool>(
                   future: ref
                       .read(notificationSchedulerGatewayProvider)

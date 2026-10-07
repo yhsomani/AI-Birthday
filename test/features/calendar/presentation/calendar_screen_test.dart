@@ -53,6 +53,9 @@ void main() {
   ) async {
     final store = FakePeopleStore();
     addTearDown(store.close);
+    await store.save(
+      person(id: 'a', name: 'Ana', month: 2, day: 5, birthYear: 2025),
+    );
     await pumpHarness(tester, store);
 
     expect(find.text('February 2026'), findsOneWidget);

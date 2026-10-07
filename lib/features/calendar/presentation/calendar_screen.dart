@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -114,7 +115,25 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) =>
             const Center(child: Text('Could not load birthdays.')),
-        data: (people) => _monthGrid(context, people),
+        data: (people) {
+          if (people.isEmpty) {
+            return EmptyState(
+              icon: Icons.calendar_month_outlined,
+              title: 'No birthdays yet',
+              message:
+                  'Add a birthday contact and their special day will appear on the calendar.',
+              action: FilledButton.icon(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  context.push('/people/add');
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Add Birthday Contact'),
+              ),
+            );
+          }
+          return _monthGrid(context, people);
+        },
       ),
     );
   }

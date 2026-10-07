@@ -90,7 +90,13 @@ class E2ETestHarness {
   }
 
   Future<void> tearDown() async {
-    subscriptionNotifier.dispose();
+    // Riverpod disposes the notifier when a widget tree that watches it
+    // unmounts (end of test), so a second dispose here would throw in debug.
+    try {
+      subscriptionNotifier.dispose();
+    } on StateError {
+      // Already disposed by Riverpod; nothing to release.
+    }
     await fakeAiCore.dispose();
     await db.close();
   }
