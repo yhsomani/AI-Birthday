@@ -4,9 +4,12 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/app/router.dart';
 import 'package:ai_birthday/app/theme/app_theme.dart';
 import 'package:ai_birthday/app/theme/theme_mode_provider.dart';
+import 'package:ai_birthday/features/auth/application/auth_controller.dart';
+import 'package:ai_birthday/features/auth/domain/auth_state.dart';
 import 'package:ai_birthday/l10n/app_localizations.dart';
 
 class AiBirthdayApp extends ConsumerWidget {
@@ -15,6 +18,22 @@ class AiBirthdayApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+
+    // Eagerly start the subscription pipeline at launch so a returning
+    // subscriber is restored/verified without opening a specific screen
+    // (audit P1-2). Harmless when IAP/auth are unavailable.
+    ref.watch(entitlementProvider);
+
+    // A session that first materializes after sign-in must still be checked:
+    // trigger restore the moment authentication completes.
+    ref.listen<AsyncValue<AuthState>>(authControllerProvider, (previous, next) {
+      final wasSignedIn = previous?.value?.isSignedIn ?? false;
+      final isSignedIn = next.value?.isSignedIn ?? false;
+      if (isSignedIn && !wasSignedIn) {
+        ref.read(subscriptionNotifierProvider.notifier).restorePurchases();
+      }
+    });
+    ref.watch(authControllerProvider);
 
     return MaterialApp.router(
       title: 'AI-Birthday',

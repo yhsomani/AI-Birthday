@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:clock/clock.dart' as clock;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:in_app_purchase/in_app_purchase.dart' as iap;
@@ -41,6 +42,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     AppLogger? logger,
     Future<String?> Function()? authTokenProvider,
     Future<String?> Function()? accountBindingProvider,
+    DateTime Function()? now,
     String verificationEndpoint =
         'https://asia-south1-relateai-birthday-ysomani.cloudfunctions.net/verifyPurchase',
   }) : _store = store,
@@ -49,6 +51,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
        _logger = logger ?? ConsoleAppLogger(),
        _authTokenProvider = authTokenProvider,
        _accountBindingProvider = accountBindingProvider,
+       _now = now ?? clock.clock.now,
        _verificationEndpoint = verificationEndpoint,
        super(initial) {
     _initIapAndRestore();
@@ -60,6 +63,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   final AppLogger _logger;
   final Future<String?> Function()? _authTokenProvider;
   final Future<String?> Function()? _accountBindingProvider;
+  final DateTime Function() _now;
   final String _verificationEndpoint;
 
   StreamSubscription<List<iap.PurchaseDetails>>? _iapSubscription;
@@ -70,6 +74,18 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   static const String _kProMonthlyId = 'ai_birthday_pro_monthly';
   static const String _kPackageName = 'com.yashomani.ai_birthday';
   static const String _kBindingPrefix = 'purchase_binding_';
+
+  /// How long an in-session grant survives failed re-verification before the
+  /// app stops claiming Pro (audit P1-3). A successful verification resets it.
+  static const Duration _kPreserveTtl = Duration(hours: 24);
+  static const Duration _kVerifyTimeout = Duration(seconds: 15);
+
+  DateTime? _lastVerifiedAt;
+
+  /// True after a purchase event whose verification failed, while the
+  /// purchase is left unacknowledged (so Play re-emits it for retry).
+  bool _hasPendingVerification = false;
+  bool get hasPendingVerification => _hasPendingVerification;
 
   Future<void> _initIapAndRestore() async {
     try {
@@ -111,12 +127,15 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
         continue;
       }
 
+      _VerifiedEntitlement? verified;
       if (purchase.status == iap.PurchaseStatus.purchased ||
           purchase.status == iap.PurchaseStatus.restored) {
         _purchaseStatus = PurchaseStatus.verifying;
-        final verified = await _verifyPurchase(purchase);
+        verified = await _verifyPurchase(purchase);
 
         if (verified != null) {
+          _lastVerifiedAt = _now();
+          _hasPendingVerification = false;
           state = UserEntitlement(
             status: verified.status,
             productId: verified.productId,
@@ -128,12 +147,15 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
           );
           _purchaseStatus = PurchaseStatus.success;
         } else {
-          // Do not manufacture or preserve a Pro entitlement after an
-          // unverified restore/purchase while the app is starting from Free.
-          if (state.status != EntitlementStatus.active &&
-              state.status != EntitlementStatus.grace) {
-            state = UserEntitlement.free;
-          }
+          // Verification could not be completed (network/server). A
+          // previously verified grant is preserved only for a bounded
+          // window; past that, stop claiming Pro (audit P1-3).
+          final preserved = state.status.isEntitled &&
+              state.canUseAi &&
+              _lastVerifiedAt != null &&
+              _now().difference(_lastVerifiedAt!) < _kPreserveTtl;
+          if (!preserved) state = UserEntitlement.free;
+          _hasPendingVerification = true;
           _purchaseStatus = PurchaseStatus.error;
         }
       } else if (purchase.status == iap.PurchaseStatus.error) {
@@ -142,15 +164,19 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
         _purchaseStatus = PurchaseStatus.cancelled;
       }
 
-      // completePurchase acknowledges the platform transaction. It is called
-      // after verification so the entitlement decision itself is server-backed.
-      if (purchase.pendingCompletePurchase) {
+      // Acknowledge the platform transaction only after a verified success.
+      // An unacknowledged purchase stays pending in Google Play and is
+      // re-emitted on the next launch/restore, which is the automatic retry
+      // path for a transient verification failure (audit P1-1).
+      if (purchase.pendingCompletePurchase && verified != null) {
         await _iap.completePurchase(purchase);
       }
 
       final completer = _restoreCompleter;
       if (completer != null && !completer.isCompleted) {
-        completer.complete(state.canUseAi);
+        // Only a fresh, successful verification counts as "restored";
+        // a preserved or timeout state never reports success (audit P3-1).
+        completer.complete(verified != null && state.canUseAi);
       }
     }
 
@@ -185,14 +211,16 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     };
 
     try {
-      final response = await _http.post(
-        Uri.parse(_verificationEndpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $authToken',
-        },
-        body: jsonEncode(payload),
-      );
+      final response = await _http
+          .post(
+            Uri.parse(_verificationEndpoint),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $authToken',
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(_kVerifyTimeout);
 
       if (response.statusCode != 200) {
         _logger.warning(
@@ -205,7 +233,10 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
 
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic>) return null;
-      final data = decoded['data'];
+      // The deployed backend is a Firebase callable, which wraps success in
+      // {"result": {...}} (and failure in {"error": {...}}). Accept the
+      // legacy {"data": ...} envelope for emulator/proxy variants (P0-1).
+      final data = decoded['result'] ?? decoded['data'];
       if (data is! Map<String, dynamic>) return null;
 
       final status = data['status'];
@@ -313,7 +344,25 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     return _restorePurchases();
   }
 
-  Future<bool> _restorePurchases() async {
+  /// Single shared restore pipeline. The claim is fully synchronous so two
+  /// overlapping restore attempts (cold-start init + a manual Restore) can
+  /// never race two completers: the second caller awaits the first run
+  /// (audit P1-2).
+  Future<bool>? _restoreRun;
+
+  Future<bool> _restorePurchases() {
+    final inFlight = _restoreRun;
+    if (inFlight != null) return inFlight;
+
+    final run = _doRestorePurchases();
+    _restoreRun = run;
+    unawaited(run.whenComplete(() {
+      if (identical(_restoreRun, run)) _restoreRun = null;
+    }));
+    return run;
+  }
+
+  Future<bool> _doRestorePurchases() async {
     _logger.info('Subscription', 'Checking for restorable purchases');
 
     try {
@@ -335,7 +384,9 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
 
       return await completer.future.timeout(
         const Duration(seconds: 10),
-        onTimeout: () => state.canUseAi,
+        // A timeout means nothing was re-verified this run: never report
+        // success from stale state (audit P3-1/C6).
+        onTimeout: () => false,
       );
     } catch (error, stackTrace) {
       _logger.warning(

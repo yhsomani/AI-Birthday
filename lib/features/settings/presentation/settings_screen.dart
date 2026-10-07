@@ -617,6 +617,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     const SizedBox(height: 8),
                   ],
+                  if (!entitlement.canUseAi &&
+                      ref
+                          .read(subscriptionNotifierProvider.notifier)
+                          .hasPendingVerification) ...[
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          size: 16,
+                          color: AppColors.error,
+                        ),
+                        const SizedBox(width: 6),
+                        const Expanded(
+                          child: Text(
+                            'Purchase verification failed. Tap “Restore Purchases” to try again.',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
