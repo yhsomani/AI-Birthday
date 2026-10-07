@@ -337,16 +337,11 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'ESSENTIAL INFORMATION',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
-                        color: AppColors.primaryTerracotta,
-                      ),
+                    const AppSectionHeader(
+                      title: 'Essential Information',
+                      isAccent: true,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: _name,
                       textCapitalization: TextCapitalization.words,

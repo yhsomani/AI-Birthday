@@ -468,12 +468,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
         children: [
           // Section 1: Account
-          _SectionHeader(title: 'Account'),
+          AppSectionHeader(title: 'Account', isAccent: true),
           Card(child: const _AuthTile()),
           const SizedBox(height: 20),
 
           // Section 1.5: Cloud Backup (SSOT §13)
-          _SectionHeader(title: 'Cloud Backup'),
+          AppSectionHeader(title: 'Cloud Backup', isAccent: true),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -571,7 +571,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 20),
 
           // Section 2: Subscription & Entitlement (SSOT §11)
-          _SectionHeader(title: 'Subscription & Entitlement'),
+          AppSectionHeader(title: 'Subscription & Entitlement', isAccent: true),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -687,7 +687,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 20),
 
           // Section 3: AI Provider & Personal Gemini API Key (SSOT §5, §20)
-          _SectionHeader(title: 'AI provider'),
+          AppSectionHeader(title: 'AI provider', isAccent: true),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -855,7 +855,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 20),
 
           // Section 4: On-Device AI / Gemini Nano (SSOT §5, §25)
-          _SectionHeader(title: 'On-Device Intelligence'),
+          AppSectionHeader(title: 'On-Device Intelligence', isAccent: true),
           Card(
             child: Column(
               children: [
@@ -903,7 +903,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 20),
 
           // Section 5: Reminders & Quiet Hours (SSOT §17)
-          _SectionHeader(title: 'Reminders'),
+          AppSectionHeader(title: 'Reminders', isAccent: true),
           Card(
             child: Column(
               children: [
@@ -1122,7 +1122,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 20),
 
           // Section 6: Help & Guide
-          _SectionHeader(title: 'Help & Guide'),
+          AppSectionHeader(title: 'Help & Guide', isAccent: true),
           Card(
             child: ListTile(
               leading: const Icon(Icons.explore_outlined),
@@ -1339,28 +1339,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-          letterSpacing: 0.5,
-          color: Theme.of(context).colorScheme.primary,
-        ),
       ),
     );
   }

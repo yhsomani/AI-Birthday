@@ -29,8 +29,10 @@ class AppSectionHeader extends StatelessWidget {
               : AppColors.primaryTerracotta)
         : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+    return Semantics(
+      header: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -85,6 +87,7 @@ class AppSectionHeader extends StatelessWidget {
             ),
           ?trailing,
         ],
+      ),
       ),
     );
   }

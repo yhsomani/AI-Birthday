@@ -1267,12 +1267,15 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: _messageController,
-          maxLines: 5,
-          onChanged: _onMessageChanged,
-          decoration: const InputDecoration(
-            hintText: 'Write a birthday greeting or tap Create message...',
+        Semantics(
+          label: 'Your message',
+          child: TextField(
+            controller: _messageController,
+            maxLines: 5,
+            onChanged: _onMessageChanged,
+            decoration: const InputDecoration(
+              hintText: 'Write a birthday greeting or tap Create message...',
+            ),
           ),
         ),
         if (showAiTools) ...[

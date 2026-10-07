@@ -22,8 +22,8 @@ void main() {
   ) async {
     await pumpSettings(tester);
 
-    expect(find.text('Reminders'), findsOneWidget);
-    expect(find.text('AI provider'), findsOneWidget);
+    expect(find.text('REMINDERS'), findsOneWidget);
+    expect(find.text('AI PROVIDER'), findsOneWidget);
     expect(find.text('7 days before'), findsNothing);
   });
 
@@ -109,7 +109,7 @@ void main() {
 
       expect(find.text('Dark Mode'), findsNothing);
       expect(find.byIcon(Icons.dark_mode_outlined), findsNothing);
-      expect(find.text('Help & Guide'), findsOneWidget);
+      expect(find.text('HELP & GUIDE'), findsOneWidget);
       expect(find.text('Replay App Onboarding'), findsOneWidget);
     },
   );

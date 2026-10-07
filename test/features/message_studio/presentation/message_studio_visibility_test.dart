@@ -128,6 +128,24 @@ void main() {
       },
     );
 
+    testWidgets(
+      'editor field announces its purpose to screen readers (audit 05 W6)',
+      (tester) async {
+        await pumpStudio(tester, phone: '+14155552671');
+
+        final editor = find.byWidgetPredicate(
+          (w) => w is TextField && w.maxLines == 5,
+        );
+        await tester.scrollUntilVisible(
+          editor,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        final semantics = tester.getSemantics(editor);
+        expect(semantics.label, contains('Your message'));
+      },
+    );
+
     testWidgets('missing phone leads with Add Phone Number, SMS hidden (L)', (
       tester,
     ) async {
