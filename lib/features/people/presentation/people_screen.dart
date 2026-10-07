@@ -756,7 +756,10 @@ class PeopleScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  onTap: () => _showPersonDetailsModal(context, ref, person),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _showPersonDetailsModal(context, ref, person);
+                  },
                 ),
               );
             },
