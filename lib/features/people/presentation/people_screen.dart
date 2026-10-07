@@ -517,13 +517,16 @@ class PeopleScreen extends ConsumerWidget {
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () async {
-            await peopleRepo.savePerson(person);
-            if (associatedBirthday != null) {
-              await birthdaysRepo.saveBirthday(associatedBirthday);
-            }
+            // Restore through the single tombstone owner (legacy service
+            // clears `deletedAt` and bumps the version); do NOT write the row
+            // through the new repository, which would resurrect the tombstone
+            // and rewrite enum values through a second model stack.
             try {
               await ref.read(personServiceProvider).restore(person.id);
             } catch (_) {}
+            if (associatedBirthday != null) {
+              await birthdaysRepo.saveBirthday(associatedBirthday);
+            }
           },
         ),
       ),

@@ -1,10 +1,11 @@
 /// Drift/SQLite database foundation.
 ///
 /// Local data is operationally primary (SSOT §13, §19). Firestore is a
-/// synchronization target, never the operational store. Tables carry the
-/// shared sync envelope fields (`id`, `createdAt`, `updatedAt`, `version`,
-/// `deletedAt`) so synchronization, conflict handling and tombstones stay
-/// deterministic.
+/// synchronization target, never the operational store. The sync envelope
+/// fields (`id`, `createdAt`, `updatedAt`, `version`, `deletedAt`) are carried
+/// per table — only `Persons` currently has the full envelope
+/// (`version` + `deletedAt` tombstones); `Birthdays`, `MessageDrafts` and
+/// `ReminderSettingsEntries` carry only timestamps.
 library;
 
 import 'dart:io' show Platform;

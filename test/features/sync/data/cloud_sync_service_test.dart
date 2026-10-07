@@ -265,5 +265,101 @@ void main() {
       expect(local.quietHoursStartMinutes, 120);
       expect(local.quietHoursEndMinutes, 360);
     });
+
+    test(
+      'restore does not resurrect a locally-tombstoned contact when the '
+      'cloud copy has no tombstone',
+      () async {
+        final now = DateTime.now().toUtc();
+        await db
+            .into(db.persons)
+            .insert(
+              PersonsCompanion.insert(
+                id: 'p-del',
+                name: 'Deleted Locally',
+                relationship: 'Friend',
+                relationshipCloseness: 'close',
+                preferredLanguage: 'en',
+                preferredTone: 'warm',
+                importantFacts: '',
+                preferredDeliveryChannel: 'whatsapp',
+                autoSendPolicy: 'manualOnly',
+                createdAt: now.subtract(const Duration(days: 30)),
+                updatedAt: now,
+                version: 2,
+                deletedAt: Value(now),
+              ),
+            );
+
+        final mockClient = MockClient((request) async {
+          expect(request.method, 'GET');
+          if (request.url.path.endsWith('/people')) {
+            // Cloud copy is NEWER than the local tombstone but still live:
+            // it predates the on-device deletion (no deletedAt field).
+            return http.Response(
+              jsonEncode({
+                'documents': [
+                  {
+                    'name':
+                        'projects/t/databases/(default)/documents/users/uid-test/people/p-del',
+                    'fields': {
+                      'id': {'stringValue': 'p-del'},
+                      'name': {'stringValue': 'Deleted Locally'},
+                      'relationship': {'stringValue': 'Friend'},
+                      'relationshipCloseness': {'stringValue': 'close'},
+                      'preferredLanguage': {'stringValue': 'en'},
+                      'preferredTone': {'stringValue': 'warm'},
+                      'importantFacts': {'stringValue': ''},
+                      'preferredDeliveryChannel': {
+                        'stringValue': 'whatsapp',
+                      },
+                      'autoSendPolicy': {'stringValue': 'manualOnly'},
+                      'createdAt': {
+                        'stringValue': now
+                            .subtract(const Duration(days: 30))
+                            .toIso8601String(),
+                      },
+                      'updatedAt': {
+                        'stringValue': now
+                            .add(const Duration(days: 1))
+                            .toIso8601String(),
+                      },
+                      'version': {'integerValue': '2'},
+                    },
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          return http.Response(jsonEncode({'documents': []}), 200);
+        });
+
+        final service = CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: mockClient,
+        );
+
+        final auth = const AuthState(
+          status: AuthStatus.signedIn,
+          identity: GoogleIdentity(
+            googleSubject: 'sub-test',
+            email: 'user@example.com',
+            displayName: 'User',
+            firebaseUid: 'uid-test',
+            idToken: 'test-id-token',
+          ),
+        );
+
+        final result = await service.restore(auth);
+        expect(result.success, isTrue);
+
+        final row = await (db.select(db.persons)
+              ..where((r) => r.id.equals('p-del')))
+            .getSingle();
+        expect(row.deletedAt, isNotNull, reason: 'local tombstone must win');
+      },
+    );
   });
 }

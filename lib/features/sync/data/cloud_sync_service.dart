@@ -419,8 +419,13 @@ class CloudSyncService {
           continue;
         }
 
-        final createdAt = _date(fields, 'createdAt') ?? remoteUpdatedAt;
         final deletedAt = _date(fields, 'deletedAt');
+        // A local tombstone outranks a live cloud copy that has no tombstone:
+        // restore must never resurrect a contact the user deleted on-device
+        // (audit F-2). Tombstones in the cloud still apply below.
+        if (existing?.deletedAt != null && deletedAt == null) continue;
+
+        final createdAt = _date(fields, 'createdAt') ?? remoteUpdatedAt;
         await _db
             .into(_db.persons)
             .insertOnConflictUpdate(

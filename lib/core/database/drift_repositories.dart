@@ -52,6 +52,9 @@ class DriftPeopleRepository implements PeopleRepository {
 
   @override
   Future<void> savePerson(Person person) async {
+    // Never resurrect a tombstoned row: save preserves an existing
+    // `deletedAt` instead of forcing it null (audit F-1).
+    final existing = await _selectPersonRow(person.id);
     await _database
         .into(_database.persons)
         .insertOnConflictUpdate(
@@ -78,21 +81,34 @@ class DriftPeopleRepository implements PeopleRepository {
             createdAt: Value(person.createdAt),
             updatedAt: Value(person.updatedAt),
             version: Value(person.version),
-            deletedAt: const Value(null),
+            deletedAt: existing?.deletedAt == null
+                ? const Value(null)
+                : Value(existing!.deletedAt),
           ),
         );
   }
 
   @override
   Future<void> deletePerson(String id) async {
+    // Tombstone with a version bump, matching the legacy store so the sync
+    // envelope stays consistent regardless of which writer deletes (audit F-4).
+    final existing = await _selectPersonRow(id);
+    final now = DateTime.now().toUtc();
     await (_database.update(
       _database.persons,
     )..where((r) => r.id.equals(id))).write(
       db.PersonsCompanion(
-        deletedAt: Value(DateTime.now().toUtc()),
-        updatedAt: Value(DateTime.now().toUtc()),
+        deletedAt: Value(now),
+        updatedAt: Value(now),
+        version: Value((existing?.version ?? 0) + 1),
       ),
     );
+  }
+
+  Future<db.Person?> _selectPersonRow(String id) async {
+    return (_database.select(
+      _database.persons,
+    )..where((r) => r.id.equals(id))).getSingleOrNull();
   }
 
   static Person _personFromRow(db.Person row) {
