@@ -28,6 +28,8 @@ void main() {
       BirthdayStatus status = BirthdayStatus.messageNotPrepared,
       bool pro = true,
       List<Override> extraOverrides = const [],
+      Size size = const Size(800, 2000),
+      double textScale = 1.0,
     }) async {
       final now = DateTime.now();
       final person = Person(
@@ -63,8 +65,10 @@ void main() {
         );
       }
 
-      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1.0;
+      tester.platformDispatcher.textScaleFactorTestValue = textScale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
@@ -89,6 +93,40 @@ void main() {
       expect(find.text('Generate with AI'), findsOneWidget);
       expect(find.text('Tone:'), findsOneWidget);
     });
+
+    testWidgets(
+      'editor header and status cluster never overflow at 200% on 360dp '
+      '(audit 05 P2-1)',
+      (tester) async {
+        await pumpStudio(
+          tester,
+          phone: '+14155552671',
+          size: const Size(360, 640),
+          textScale: 2.0,
+        );
+
+        // The 'Your message' header sits below the fold on a small screen
+        // (lazy list — scroll until it builds), then confirm zero
+        // overflow/exceptions.
+        await tester.scrollUntilVisible(
+          find.text('Your message'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Your message'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        // Typing grows the 'N chars' readout next to the header — still no
+        // overflow once the Wrap lets the status cluster fall to its own line.
+        await tester.enterText(
+          find.byType(TextField).last,
+          'Happy birthday to a wonderful friend — hope you have an amazing day!',
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('missing phone leads with Add Phone Number, SMS hidden (L)', (
       tester,
@@ -178,7 +216,10 @@ void main() {
         await tester.pumpAndSettle();
 
         // Credential failure surfaces the error AND the on-device action.
-        expect(find.textContaining('Gemini API key could not be used'), findsOneWidget);
+        expect(
+          find.textContaining('Gemini API key could not be used'),
+          findsOneWidget,
+        );
         expect(find.text('Use on-device AI (Gemini Nano)'), findsOneWidget);
 
         await tester.tap(find.text('Use on-device AI (Gemini Nano)'));

@@ -21,13 +21,25 @@ class CountdownChip extends StatelessWidget {
   final bool isToday;
   final String? customLabel;
 
-  String get _label {
-    if (customLabel != null) return customLabel!;
+  /// Single source of truth for countdown labels, shared with the People
+  /// list tiles (audit 05 P2-6).
+  static String labelFor({
+    required int daysUntil,
+    bool isToday = false,
+    String? customLabel,
+  }) {
+    if (customLabel != null) return customLabel;
     if (isToday || daysUntil == 0) return 'Today';
     if (daysUntil == 1) return 'Tomorrow';
     if (daysUntil <= 90) return 'In $daysUntil days';
     return 'In ${(daysUntil / 30).ceil()} months';
   }
+
+  String get _label => labelFor(
+    daysUntil: daysUntil,
+    isToday: isToday,
+    customLabel: customLabel,
+  );
 
   @override
   Widget build(BuildContext context) {

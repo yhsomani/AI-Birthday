@@ -331,7 +331,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
         // Persist the launch as evidence (audit 03 P1-1): History renders
         // "Opened in WhatsApp" from this record, never from status alone.
-        await ref.read(deliveryEventsRepositoryProvider).recordHandoff(
+        await ref
+            .read(deliveryEventsRepositoryProvider)
+            .recordHandoff(
               birthdayId: _activeBirthdayId,
               channel: DeliveryChannel.whatsapp,
               at: DateTime.now(),
@@ -381,7 +383,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       await ref
           .read(birthdaysRepositoryProvider)
           .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
-      await ref.read(deliveryEventsRepositoryProvider).recordHandoff(
+      await ref
+          .read(deliveryEventsRepositoryProvider)
+          .recordHandoff(
             birthdayId: _activeBirthdayId,
             channel: DeliveryChannel.sms,
             at: DateTime.now(),
@@ -425,7 +429,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       await ref
           .read(birthdaysRepositoryProvider)
           .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
-      await ref.read(deliveryEventsRepositoryProvider).recordHandoff(
+      await ref
+          .read(deliveryEventsRepositoryProvider)
+          .recordHandoff(
             birthdayId: _activeBirthdayId,
             channel: DeliveryChannel.share,
             at: DateTime.now(),
@@ -573,10 +579,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                 SizedBox(width: 8),
                 Text(
                   'Select a Variation',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 ),
               ],
             ),
@@ -608,10 +611,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                           ],
                         ),
                         const SizedBox(height: 6),
-                        Text(
-                          v.value,
-                          style: const TextStyle(fontSize: 14),
-                        ),
+                        Text(v.value, style: const TextStyle(fontSize: 14)),
                       ],
                     ),
                   ),
@@ -953,7 +953,8 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                       ),
                       // On a credential failure, offer the on-device fallback
                       // (audit 02 AC P1-1): retry with Gemini Nano forced.
-                      if (_lastFailureCode == AppFailureCode.aiCredentialInvalid)
+                      if (_lastFailureCode ==
+                          AppFailureCode.aiCredentialInvalid)
                         TextButton.icon(
                           icon: const Icon(Icons.phone_android, size: 16),
                           label: const Text('Use on-device AI (Gemini Nano)'),
@@ -1223,8 +1224,11 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 4,
           children: [
             const Text(
               'Your message',

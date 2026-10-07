@@ -41,5 +41,9 @@ class AppColors {
   static const Color errorContainer = Color(0xFFFFDAD6);
   static const Color success = Color(0xFF2D5A46);
   static const Color successContainer = Color(0xFFE8F2EC);
-  static const Color whatsappGreen = Color(0xFF25D366);
+
+  /// WhatsApp CTA fill. The brand green `#25D366` fails AA with white
+  /// (≈1.99:1); WhatsApp's dark teal keeps the brand look at 7.7:1
+  /// (audit 05 P2-4).
+  static const Color whatsappGreen = Color(0xFF075E54);
 }

@@ -487,15 +487,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         color: context.colors.success,
                       ),
                       const SizedBox(width: 8),
-                      const Text(
-                        'Cloud Backup (Firestore)',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      // Expanded so the title wraps instead of overflowing at
+                      // large text scales (audit 05 P2-3 sibling).
+                      const Expanded(
+                        child: Text(
+                          'Cloud Backup (Firestore)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
-                      const Spacer(),
-                      if (_lastSyncTime != null)
+                      if (_lastSyncTime != null) ...[
+                        const SizedBox(width: 8),
                         Chip(
                           label: Text(
                             'LAST SUCCESSFUL',
@@ -510,6 +514,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                           visualDensity: VisualDensity.compact,
                         ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -691,7 +696,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.key, color: Theme.of(context).colorScheme.primary),
+                      Icon(
+                        Icons.key,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                       const SizedBox(width: 8),
                       const Text(
                         'Personal Gemini API Key',
@@ -852,10 +860,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: Icon(
-                    Icons.memory,
-                    color: context.colors.success,
-                  ),
+                  leading: Icon(Icons.memory, color: context.colors.success),
                   title: const Text('Gemini Nano (AICore)'),
                   subtitle: Text(switch (_nanoState) {
                     NanoState.available =>
@@ -1157,11 +1162,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.check_circle,
-              size: 12,
-              color: context.colors.success,
-            ),
+            Icon(Icons.check_circle, size: 12, color: context.colors.success),
             const SizedBox(width: 4),
             Text(
               'Connected',
@@ -1496,9 +1497,9 @@ class _GeminiSetupGuideSheet extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(
-                        alpha: 0.12,
-                      ),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(

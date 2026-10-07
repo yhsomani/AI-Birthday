@@ -78,141 +78,147 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
         color: theme.colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      padding: EdgeInsets.fromLTRB(
-        24,
-        16,
-        24,
-        MediaQuery.of(context).viewInsets.bottom + 28,
-      ),
+      // Scroll-safe at large text scales (audit 05 P2-3): the whole sheet
+      // scrolls instead of overflowing on short screens.
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : Colors.black12,
-                  borderRadius: BorderRadius.circular(2),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            16,
+            24,
+            MediaQuery.of(context).viewInsets.bottom + 28,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : Colors.black12,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Header Icon & Title
-            Row(
-              children: [
+              // Header Icon & Title
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryTerracotta.withValues(
+                        alpha: 0.12,
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.account_circle_outlined,
+                      color: AppColors.primaryTerracotta,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sign in to AI-Birthday',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Connect your account securely',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Value proposition items
+              _buildFeatureTile(
+                context,
+                icon: Icons.cloud_done_outlined,
+                title: 'Cloud Backup',
+                description:
+                    'Back up people, birthdays and drafts to your account over '
+                    'HTTPS, and restore them on a new device.',
+              ),
+              const SizedBox(height: 12),
+              _buildFeatureTile(
+                context,
+                icon: Icons.star_outline_rounded,
+                title: 'Pro subscription',
+                description:
+                    'Pro is tied to your Play Store account — restore purchases '
+                    'after reinstalling.',
+              ),
+              const SizedBox(height: 12),
+              _buildFeatureTile(
+                context,
+                icon: Icons.lock_outline_rounded,
+                title: 'What sign-in is used for',
+                description:
+                    'Your Google account is used for sign-in and cloud backup '
+                    'only. Your data is never sold or used for ads.',
+              ),
+              const SizedBox(height: 20),
+
+              // Error Message Banner
+              if (_errorMessage != null) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryTerracotta.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
+                    color: theme.colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.account_circle_outlined,
-                    color: AppColors.primaryTerracotta,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        'Sign in to AI-Birthday',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Icon(
+                        Icons.error_outline,
+                        color: theme.colorScheme.onErrorContainer,
+                        size: 20,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Connect your account securely',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onErrorContainer,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
               ],
-            ),
-            const SizedBox(height: 20),
 
-            // Value proposition items
-            _buildFeatureTile(
-              context,
-              icon: Icons.cloud_done_outlined,
-              title: 'Cloud Backup',
-              description:
-                  'Back up people, birthdays and drafts to your account over '
-                  'HTTPS, and restore them on a new device.',
-            ),
-            const SizedBox(height: 12),
-            _buildFeatureTile(
-              context,
-              icon: Icons.star_outline_rounded,
-              title: 'Pro subscription',
-              description:
-                  'Pro is tied to your Play Store account — restore purchases '
-                  'after reinstalling.',
-            ),
-            const SizedBox(height: 12),
-            _buildFeatureTile(
-              context,
-              icon: Icons.lock_outline_rounded,
-              title: 'What sign-in is used for',
-              description:
-                  'Your Google account is used for sign-in and cloud backup '
-                  'only. Your data is never sold or used for ads.',
-            ),
-            const SizedBox(height: 20),
-
-            // Error Message Banner
-            if (_errorMessage != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      color: theme.colorScheme.onErrorContainer,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _errorMessage!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onErrorContainer,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Google Sign-In Action Button
-            SizedBox(
-              height: 52,
-              child: FilledButton(
+              // Google Sign-In Action Button. minimumSize (not a fixed-height
+              // SizedBox) so the label can wrap and the button grow at large
+              // text scales (audit 05 P2-3).
+              FilledButton(
                 onPressed: _isLoading ? null : _handleGoogleSignIn,
                 style: FilledButton.styleFrom(
                   backgroundColor: isDark
                       ? Colors.white
                       : const Color(0xFF1F1F1F),
                   foregroundColor: isDark ? Colors.black87 : Colors.white,
+                  minimumSize: Size.fromHeight(52),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -228,8 +234,9 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
                           ),
                         ),
                       )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                    : Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           const Icon(Icons.g_mobiledata_rounded, size: 28),
                           const SizedBox(width: 8),
@@ -243,18 +250,20 @@ class _AuthBottomSheetState extends ConsumerState<AuthBottomSheet> {
                         ],
                       ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
 
-            // Cancel / Dismiss
-            TextButton(
-              onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-              child: Text(
-                'Not Now',
-                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              // Cancel / Dismiss
+              TextButton(
+                onPressed: _isLoading
+                    ? null
+                    : () => Navigator.of(context).pop(),
+                child: Text(
+                  'Not Now',
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

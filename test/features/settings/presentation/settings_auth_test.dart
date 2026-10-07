@@ -11,9 +11,13 @@ void main() {
   Future<void> pumpSettings(
     WidgetTester tester, {
     List<Override> overrides = const [],
+    Size size = const Size(800, 1600),
+    double textScale = 1.0,
   }) async {
-    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
+    tester.platformDispatcher.textScaleFactorTestValue = textScale;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
@@ -87,5 +91,26 @@ void main() {
     expect(find.text('Sign in with Google'), findsOneWidget);
     expect(find.text('cancelled'), findsOneWidget); // error stays in the sheet
     expect(find.text('Ana'), findsNothing);
+  });
+
+  testWidgets('sign-in sheet never overflows at 200% on a 360dp screen', (
+    tester,
+  ) async {
+    // audit 05 P2-3: the Google button used a fixed 52px height and a
+    // non-flexible label row; the sheet itself was unscrollable. At 200% on a
+    // small phone the sheet must scroll and the action stay reachable.
+    final gateway = FakeAuthGateway();
+    await pumpSettings(
+      tester,
+      overrides: [googleAuthGatewayProvider.overrideWithValue(gateway)],
+      size: const Size(360, 640),
+      textScale: 2.0,
+    );
+
+    await tester.tap(find.text('Sign in with Google'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

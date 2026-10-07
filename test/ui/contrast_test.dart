@@ -9,6 +9,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ai_birthday/shared/design_system/app_colors.dart';
 import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
 double _luminance(Color c) {
@@ -70,6 +71,17 @@ void main() {
         expectPass('primary on surface', p.primary, p.surface, 3.0);
         expectPass('accent on surface', p.accent, p.surface, 3.0);
         expectPass('info on surface', p.info, p.surface, 3.0);
+      });
+
+      test('WhatsApp CTA label on fill ≥ 4.5:1', () {
+        // audit 05 P2-4: brand green #25D366 fails at 1.99:1; WhatsApp dark
+        // teal #075E54 keeps the look and passes AA with white text.
+        expectPass(
+          'white on whatsappGreen',
+          Colors.white,
+          AppColors.whatsappGreen,
+          4.5,
+        );
       });
 
       test('tone accents on surfaceAlt ≥ 3:1', () {

@@ -31,10 +31,11 @@ class PeopleScreen extends ConsumerWidget {
 
   String _countdownLabel(NextBirthday? next) {
     if (next == null) return '';
-    if (next.isToday) return 'Today';
-    if (next.daysUntil == 1) return 'Tomorrow';
-    if (next.daysUntil <= 90) return 'In ${next.daysUntil} days';
-    return 'In ${(next.daysUntil / 30).ceil()} months';
+    // Single-sourced with CountdownChip (audit 05 P2-6).
+    return CountdownChip.labelFor(
+      daysUntil: next.daysUntil,
+      isToday: next.isToday,
+    );
   }
 
   Future<void> _exportCsv(
@@ -89,10 +90,7 @@ class PeopleScreen extends ConsumerWidget {
               const Expanded(
                 child: Text(
                   'Import Contacts (CSV)',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 ),
               ),
               IconButton(
@@ -211,8 +209,7 @@ class PeopleScreen extends ConsumerWidget {
                 TextButton(
                   onPressed: () {
                     setReviewState(() {
-                      if (selectedIndices.length ==
-                          parsedCandidates.length) {
+                      if (selectedIndices.length == parsedCandidates.length) {
                         selectedIndices.clear();
                       } else {
                         selectedIndices.addAll(
@@ -576,7 +573,10 @@ class PeopleScreen extends ConsumerWidget {
                     Icon(Icons.file_download_outlined, size: 20),
                     SizedBox(width: 8),
                     Flexible(
-                      child: Text('Import CSV', overflow: TextOverflow.ellipsis),
+                      child: Text(
+                        'Import CSV',
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
@@ -588,7 +588,10 @@ class PeopleScreen extends ConsumerWidget {
                     Icon(Icons.file_upload_outlined, size: 20),
                     SizedBox(width: 8),
                     Flexible(
-                      child: Text('Export CSV', overflow: TextOverflow.ellipsis),
+                      child: Text(
+                        'Export CSV',
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
