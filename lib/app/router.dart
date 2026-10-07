@@ -35,11 +35,6 @@ GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
       return null;
     },
     routes: [
-      // Redirect aliases to canonical destinations
-      GoRoute(path: '/', redirect: (_, _) => '/dashboard'),
-      GoRoute(path: '/home', redirect: (_, _) => '/dashboard'),
-      GoRoute(path: '/birthdays', redirect: (_, _) => '/people'),
-
       // First-run / Onboarding walkthrough
       GoRoute(
         path: '/onboarding',

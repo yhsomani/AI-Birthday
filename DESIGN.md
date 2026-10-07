@@ -33,14 +33,14 @@ Never use purple or blue neon, decorative glow, pure black, or oversaturated gra
 
 ## 3. Typography Architecture
 
-Use Outfit throughout the product UI.
+Two bundled fonts, no network fetching: **Bricolage Grotesque** for display and headline moments, **Outfit** for body copy.
 
-- Display: 32px, weight 700, tight tracking.
-- Headline: 24px, weight 700.
-- Title: 18px and 16px, weight 600–700.
-- Body: 16px and 14px with relaxed leading.
-- Label: 12px, weight 600.
-- Caption: 11–12px.
+- Display: 32px, weight 700, tight tracking (Bricolage Grotesque).
+- Headline: 24px, weight 700 (Bricolage Grotesque).
+- Title: 18px and 16px, weight 600–700 (Bricolage Grotesque).
+- Body: 16px and 14px with relaxed leading (Outfit).
+- Label: 12px, weight 600 (Outfit).
+- Caption: 11–12px (Outfit).
 - Technical metadata: system monospace only when needed.
 
 Dashboard and utility screens use sans-serif hierarchy. Do not use Inter or generic serif typography for software UI.

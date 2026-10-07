@@ -603,7 +603,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                 ),
                 subtitle: Text(
-                  'User-provided facts to personalize drafts (SSOT §21)',
+                  'User-provided facts to personalize drafts',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
                 children: [

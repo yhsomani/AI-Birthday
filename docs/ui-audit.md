@@ -199,8 +199,6 @@ Also observed (working as designed, documented here so the redesign doesn't regr
 | 19-history-populated | Draft entry with Copy/Studio actions |
 | 20-add-form-validation | "Name is required" + "Pick a birthday (month and day)" |
 
-Test data on device: 2 contacts (Asha, born 1996-10-07, friend; Rohan, 1998-10-15, family) + 1 draft — inserted directly into the local Drift DB for repeatable before/after comparison; to be removed in Phase 8 cleanup.
-
 ---
 
 ## 10. Definition-of-done checklist for the audit (Phase 0 gate)

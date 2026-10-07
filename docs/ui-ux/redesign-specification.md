@@ -12,8 +12,8 @@ This specification outlines the architectural refactoring and visual redesign fo
 
 ```
 [AppScaffold (Bottom Navigation Shell)]
-  ├── /dashboard  ──> DashboardScreen (Unifies Dashboard & HomeScreen)
-  ├── /people     ──> PeopleScreen (Unifies People & PersonListScreen)
+  ├── /dashboard  ──> DashboardScreen
+  ├── /people     ──> PeopleScreen
   │     ├── /people/add       ──> PersonFormScreen (Add mode)
   │     └── /people/edit/:id  ──> PersonFormScreen (Edit mode)
   ├── /calendar   ──> CalendarScreen
@@ -89,7 +89,7 @@ This specification outlines the architectural refactoring and visual redesign fo
 - **Visual Structure**:
   1. **Timeline Feed**: Chronological cards of drafts and sent greetings.
   2. **Status Badges**: Distinct "Sent" (green check) vs "Draft" (amber pencil) badges.
-  3. **Body Preview**: Clean monospace/editorial bubble with copy button (instant SnackBar feedback) and studio deep link.
+  3. **Body Preview**: Clean editorial bubble with copy button (instant SnackBar feedback) and studio deep link.
 - **Defects Fixed**:
   - Replaces static empty placeholder with live reactive stream.
   - Aligns trailing timestamp and status chips cleanly.
@@ -97,7 +97,7 @@ This specification outlines the architectural refactoring and visual redesign fo
 ### 2.7 Settings Screen (`SettingsScreen`)
 - **Visual Structure**:
   1. **Account Tile**: Google Sign-In status with clean state reporting.
-  2. **Subscription Card**: Free vs Pro status, feature availability, upgrade button, restore purchases button, and developer sandbox switch.
+  2. **Subscription Card**: Free vs Pro status, feature availability, upgrade button, and restore purchases button.
   3. **AI Credentials Card**: Hardware-backed Gemini API Key with secure mask/unmask toggle and remove action.
   4. **On-Device Intelligence**: Gemini Nano (AICore) readiness chip.
   5. **Reminders & Quiet Hours**: Toggle switch, lead time switches (1d, 3d, 7d), and interactive time pickers for quiet hours.

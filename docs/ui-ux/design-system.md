@@ -52,19 +52,19 @@ Error:             #BA1A1A (Crimson Red)                     #FFB4AB (Soft Red)
 
 ## 3. Typography Scale
 
-The type system blends an **Editorial Serif** for display and headline moments with a highly legible, humanistic sans-serif (**Inter** / **Nunito**) for body copy and dense metadata.
+The type system pairs a display grotesque (**Bricolage Grotesque**) for headline moments with a highly legible, humanistic sans-serif (**Outfit**) for body copy and dense metadata. Both fonts are bundled — no runtime fetching.
 
 | Role | Font Family | Size | Weight | Line Height | Tracking |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Headline XL** | Playfair Display / Serif | 32sp | Bold (700) | 40sp | -0.5px |
-| **Headline LG** | Playfair Display / Serif | 24sp | Bold (700) | 32sp | -0.3px |
-| **Headline MD** | Playfair Display / Serif | 20sp | SemiBold (600)| 28sp | -0.2px |
-| **Title LG** | Inter / Nunito | 18sp | Bold (700) | 24sp | 0.0px |
-| **Title MD** | Inter / Nunito | 16sp | SemiBold (600)| 22sp | 0.1px |
-| **Body LG** | Inter / Nunito | 16sp | Regular (400) | 24sp | 0.0px |
-| **Body MD** | Inter / Nunito | 14sp | Regular (400) | 20sp | 0.0px |
-| **Label MD** | Inter / Nunito | 12sp | SemiBold (600)| 16sp | 0.5px (Uppercase) |
-| **Label SM** | Inter / Nunito | 11sp | Medium (500) | 14sp | 0.4px |
+| **Headline XL** | Bricolage Grotesque | 32sp | Bold (700) | 40sp | -0.5px |
+| **Headline LG** | Bricolage Grotesque | 24sp | Bold (700) | 32sp | -0.3px |
+| **Headline MD** | Bricolage Grotesque | 20sp | SemiBold (600)| 28sp | -0.2px |
+| **Title LG** | Bricolage Grotesque | 18sp | Bold (700) | 24sp | 0.0px |
+| **Title MD** | Bricolage Grotesque | 16sp | SemiBold (600)| 22sp | 0.1px |
+| **Body LG** | Outfit | 16sp | Regular (400) | 24sp | 0.0px |
+| **Body MD** | Outfit | 14sp | Regular (400) | 20sp | 0.0px |
+| **Label MD** | Outfit | 12sp | SemiBold (600)| 16sp | 0.5px (Uppercase) |
+| **Label SM** | Outfit | 11sp | Medium (500) | 14sp | 0.4px |
 
 ---
 

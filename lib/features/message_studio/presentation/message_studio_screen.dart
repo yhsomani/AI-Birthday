@@ -726,7 +726,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                 ),
                 child: SelectableText(
                   detailInfo,
-                  style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
               const SizedBox(height: 16),

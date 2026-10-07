@@ -161,3 +161,21 @@ From `docs/ui-ux/*`, `docs/ui-audit.md`, `DESIGN.md`, and component test headers
 ---
 
 *Scope note: state-health, touch targets (theme-enforced 48dp via `minimumSize`/`IconButtonTheme` — `app_theme.dart:101-145`), and text-scaling behavior verified from source; on-device rendering at 200% was NOT re-run for this audit (Phase 0 device session covered baseline).*
+
+---
+
+## 7. Fix status (post-audit, committed on `main`)
+
+| Item | Status | Evidence |
+| :--- | :--- | :--- |
+| P1 token reconciliation / single palette / old `lib/ui/design_system` deleted | ✅ | `a93e4f7`; `app_tokens.dart` brand roles derive from `AppColors`; zero screen importers of `lib/ui/design_system` |
+| P2-1 editor header flex · P2-3 auth sheet 200% · P2-4 WhatsApp AA · P2-6 countdown SSOT | ✅ | `f66be7f`; tests: `countdown_chip_test.dart`, 200% editor/sheet tests, `contrast_test.dart` WhatsApp pair |
+| P2-7 l10n unused | ⏸ **Explicitly deferred** | `app_en.arb` still 5 keys, nav labels only. Extraction is a cross-cutting change with no functional value until a second locale is actually required — revisit when localization lands. |
+| P2-8 `'monospace'` literal + `'(SSOT §21)'` leak | ✅ | `message_studio_screen.dart` handoff detail → `Theme…bodySmall`; `person_form_screen.dart:606` → plain user-facing copy |
+| P2-9 dead router aliases (`/`, `/home`, `/birthdays`) | ✅ | removed from `router.dart` (initialLocation is `/dashboard`); no navigation targets them |
+| P3-2 `docs/ui-ux/current-ui-audit.md` | ✅ | archived-banner added as superseded baseline |
+| P3-3 `DESIGN.md` / `DESIGN-SUMMARY.md` / `design-system.md` | ✅ | typography rewritten to shipped Bricolage Grotesque + Outfit (bundled) |
+| P3-4 sandbox-switch claim | ✅ | removed from `redesign-specification.md` §2.7; only the service test hook remains |
+| W8 device test-data note (`docs/ui-audit.md:202`) | ✅ | removed |
+
+Remaining work-program items (W2 headers-as-semantics, W5 status-chip wiring, W6 editor field label) are documented in §5 but were **not** part of the approved P2/P3 batch.

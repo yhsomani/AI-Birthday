@@ -4,6 +4,8 @@
 **Auditor:** Principal Product Designer, Senior UI/UX Engineer & Flutter Architect  
 **Scope:** Full application inspection across `lib/`, `android/`, `test/`, theme, components, and responsive behaviors.
 
+> **ARCHIVED — superseded baseline.** This is the pre-redesign audit record (October 4, 2026). The defects it lists were tracked through the redesign and its fixes are recorded in `docs/audit/05-uiux-redesign.md` (committed on `main`). Screen references such as `HomeScreen`/`PersonListScreen` describe the app **as it was at audit time** and no longer exist. Treat this document as history, not as a description of the current app.
+
 ---
 
 ## 1. Executive Summary
