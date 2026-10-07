@@ -229,20 +229,15 @@ void main() {
         );
         await tester.pump();
 
-        final error = tester.takeException();
-        if (error != null) {
-          expect(error.toString(), contains('RenderFlex overflowed'));
-        } else {
-          expect(find.byType(DashboardScreen), findsOneWidget);
-        }
+        // Strict zero-overflow gate (audit 05 P0-2): the empty dashboard must
+        // lay out at 360dp/1.5× without any RenderFlex overflow.
+        expect(tester.takeException(), isNull);
+        expect(find.byType(DashboardScreen), findsOneWidget);
 
         // Simulate keyboard open
         ResponsiveTester.simulateKeyboardActive(tester, keyboardHeight: 300.0);
         await tester.pump();
-        final keyboardError = tester.takeException();
-        if (keyboardError != null) {
-          expect(keyboardError.toString(), contains('RenderFlex overflowed'));
-        }
+        expect(tester.takeException(), isNull);
 
         // Dismiss keyboard
         ResponsiveTester.simulateKeyboardDismissed(tester);

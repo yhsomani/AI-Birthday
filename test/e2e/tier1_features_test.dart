@@ -371,15 +371,10 @@ void main() {
           );
           await tester.pump();
 
-          // Progressive testability check:
-          // Prior to M5 implementation, DashboardScreen contains known horizontal Row
-          // overflow defects on 360dp/1.5x scale. When M5 lands, overflow is eliminated.
-          final error = tester.takeException();
-          if (error != null) {
-            expect(error.toString(), contains('RenderFlex overflowed'));
-          } else {
-            expect(find.text('AI-Birthday'), findsOneWidget);
-          }
+          // Strict zero-overflow gate (audit 05 P0-2): the empty dashboard
+          // must lay out at 360dp/1.5× without any RenderFlex overflow.
+          expect(tester.takeException(), isNull);
+          expect(find.text('AI-Birthday'), findsOneWidget);
         },
       );
 

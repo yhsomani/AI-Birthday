@@ -20,6 +20,7 @@ import 'package:ai_birthday/features/reminders/application/reminder_settings_con
 import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
 import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
+import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -32,10 +33,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   static const String _geminiApiKeyUrl =
       'https://aistudio.google.com/app/apikey';
   static const String _geminiBillingUrl = 'https://ai.google.dev/pricing';
-
-  /// Dark amber that passes WCAG AA on the light amber "Verified" badge
-  /// container (the palette's accentAmber alone is ~2.8:1 in small text).
-  static const Color _kVerifiedAmber = Color(0xFF9A5B17);
 
   final TextEditingController _apiKeyController = TextEditingController();
   bool _hasKey = false;
@@ -485,9 +482,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.cloud_upload_outlined,
-                        color: AppColors.accentForest,
+                        color: context.colors.success,
                       ),
                       const SizedBox(width: 8),
                       const Text(
@@ -500,15 +497,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const Spacer(),
                       if (_lastSyncTime != null)
                         Chip(
-                          label: const Text(
+                          label: Text(
                             'LAST SUCCESSFUL',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.accentForest,
+                              color: context.colors.success,
                             ),
                           ),
-                          backgroundColor: AppColors.accentForestContainer,
+                          backgroundColor: context.colors.success.withValues(
+                            alpha: 0.12,
+                          ),
                           visualDensity: VisualDensity.compact,
                         ),
                     ],
@@ -581,8 +580,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ? Icons.verified
                             : Icons.lock_outline,
                         color: entitlement.canUseAi
-                            ? AppColors.accentAmber
-                            : Colors.grey,
+                            ? context.colors.warning
+                            : context.colors.textSecondary,
                       ),
                       const SizedBox(width: 10),
                       Text(
@@ -600,12 +599,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: entitlement.canUseAi
-                                ? AppColors.accentForest
-                                : Colors.grey[700],
+                                ? context.colors.success
+                                : context.colors.textSecondary,
                           ),
                         ),
                         backgroundColor: entitlement.canUseAi
-                            ? AppColors.accentForestContainer
+                            ? context.colors.success.withValues(alpha: 0.12)
                             : Colors.grey.withValues(alpha: 0.12),
                         visualDensity: VisualDensity.compact,
                       ),
@@ -648,16 +647,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           .hasPendingVerification) ...[
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.error_outline,
                           size: 16,
-                          color: AppColors.error,
+                          color: Theme.of(context).colorScheme.error,
                         ),
                         const SizedBox(width: 6),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Purchase verification failed. Tap “Restore Purchases” to try again.',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.colors.textSecondary,
+                            ),
                           ),
                         ),
                       ],
@@ -689,7 +691,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.key, color: AppColors.primaryTerracotta),
+                      Icon(Icons.key, color: Theme.of(context).colorScheme.primary),
                       const SizedBox(width: 8),
                       const Text(
                         'Personal Gemini API Key',
@@ -766,9 +768,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             _apiKeyController.clear();
                             _saveKey();
                           },
-                          child: const Text(
+                          child: Text(
                             'Remove Key',
-                            style: TextStyle(color: Colors.red),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
                           ),
                         ),
                       OutlinedButton(
@@ -848,9 +852,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.memory,
-                    color: AppColors.accentForest,
+                    color: context.colors.success,
                   ),
                   title: const Text('Gemini Nano (AICore)'),
                   subtitle: Text(switch (_nanoState) {
@@ -871,12 +875,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         color: _nanoState == NanoState.available
-                            ? AppColors.accentForest
-                            : Colors.grey[700],
+                            ? context.colors.success
+                            : context.colors.textSecondary,
                       ),
                     ),
                     backgroundColor: _nanoState == NanoState.available
-                        ? AppColors.accentForest.withValues(alpha: 0.12)
+                        ? context.colors.success.withValues(alpha: 0.12)
                         : Colors.grey.withValues(alpha: 0.12),
                     visualDensity: VisualDensity.compact,
                   ),
@@ -1033,7 +1037,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ? Icons.schedule_outlined
                             : Icons.warning_amber_rounded,
                         color: exactReady
-                            ? AppColors.accentForest
+                            ? context.colors.success
                             : Theme.of(context).colorScheme.error,
                       ),
                       title: const Text('Precise reminder access'),
@@ -1147,18 +1151,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.accentForest.withValues(alpha: 0.12),
+          color: context.colors.success.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle, size: 12, color: AppColors.accentForest),
-            SizedBox(width: 4),
+            Icon(
+              Icons.check_circle,
+              size: 12,
+              color: context.colors.success,
+            ),
+            const SizedBox(width: 4),
             Text(
               'Connected',
               style: TextStyle(
-                color: AppColors.accentForest,
+                color: context.colors.success,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
@@ -1170,13 +1178,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: 0.12),
+          color: context.colors.danger.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Text(
+        child: Text(
           'Invalid Key',
           style: TextStyle(
-            color: Colors.red,
+            color: context.colors.danger,
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),
@@ -1187,13 +1195,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.amber.withValues(alpha: 0.15),
+          color: context.colors.warning.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           'Quota Exceeded',
           style: TextStyle(
-            color: Colors.amber[900],
+            color: context.colors.warning,
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),
@@ -1206,23 +1214,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.accentAmber.withValues(alpha: 0.12),
+          color: context.colors.warning.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.verified_outlined,
               size: 12,
-              color: _kVerifiedAmber,
+              color: context.colors.warning,
             ),
             const SizedBox(width: 4),
             Text(
               'Verified · '
               '${MaterialLocalizations.of(context).formatMediumDate(_lastVerifiedAt!.toLocal())}',
-              style: const TextStyle(
-                color: _kVerifiedAmber,
+              style: TextStyle(
+                color: context.colors.warning,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
@@ -1236,13 +1244,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.grey.withValues(alpha: 0.12),
+          color: context.colors.textSecondary.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           'Unverified',
           style: TextStyle(
-            color: Colors.grey[700],
+            color: context.colors.textSecondary,
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),
@@ -1252,13 +1260,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.grey.withValues(alpha: 0.12),
+          color: context.colors.textSecondary.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           'Not Configured',
           style: TextStyle(
-            color: Colors.grey[700],
+            color: context.colors.textSecondary,
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),
@@ -1275,33 +1283,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       IconData icon,
     ) = switch (result.status) {
       GeminiConnectionStatus.connected => (
-        AppColors.accentForest.withValues(alpha: 0.12),
-        AppColors.accentForest,
-        AppColors.accentForest,
+        context.colors.success.withValues(alpha: 0.12),
+        context.colors.success,
+        context.colors.success,
         Icons.check_circle_outline,
       ),
       GeminiConnectionStatus.invalidKey => (
-        Colors.red.withValues(alpha: 0.10),
-        Colors.red,
-        Colors.red[800] ?? Colors.red,
+        context.colors.danger.withValues(alpha: 0.10),
+        context.colors.danger,
+        context.colors.danger,
         Icons.error_outline,
       ),
       GeminiConnectionStatus.quotaExceeded => (
-        Colors.amber.withValues(alpha: 0.15),
-        Colors.amber[800] ?? Colors.amber,
-        Colors.amber[900] ?? Colors.black,
+        context.colors.warning.withValues(alpha: 0.15),
+        context.colors.warning,
+        context.colors.warning,
         Icons.warning_amber_rounded,
       ),
       GeminiConnectionStatus.networkUnavailable => (
-        Colors.blueGrey.withValues(alpha: 0.12),
-        Colors.blueGrey,
-        Colors.blueGrey[800] ?? Colors.blueGrey,
+        context.colors.info.withValues(alpha: 0.12),
+        context.colors.info,
+        context.colors.info,
         Icons.wifi_off_outlined,
       ),
       GeminiConnectionStatus.error => (
-        Colors.red.withValues(alpha: 0.10),
-        Colors.red,
-        Colors.red[800] ?? Colors.red,
+        context.colors.danger.withValues(alpha: 0.10),
+        context.colors.danger,
+        context.colors.danger,
         Icons.error_outline,
       ),
     };
@@ -1346,11 +1354,11 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 13,
           letterSpacing: 0.5,
-          color: AppColors.primaryTerracotta,
+          color: Theme.of(context).colorScheme.primary,
         ),
       ),
     );
@@ -1382,7 +1390,10 @@ class _AuthTile extends ConsumerWidget {
           title: Text('Sign in with Google'),
         ),
         AuthStatus.signedOut => ListTile(
-          leading: const Icon(Icons.login, color: AppColors.primaryTerracotta),
+          leading: Icon(
+            Icons.login,
+            color: Theme.of(context).colorScheme.primary,
+          ),
           title: const Text('Sign in with Google'),
           subtitle: const Text('Sync, backups and delivery'),
           trailing: FilledButton.tonal(
@@ -1401,8 +1412,8 @@ class _AuthTile extends ConsumerWidget {
         ),
         AuthStatus.signedIn => ListTile(
           leading: CircleAvatar(
-            backgroundColor: AppColors.accentForest.withValues(alpha: 0.15),
-            foregroundColor: AppColors.accentForest,
+            backgroundColor: context.colors.success.withValues(alpha: 0.15),
+            foregroundColor: context.colors.success,
             backgroundImage: state.identity?.photoUrl != null
                 ? NetworkImage(state.identity!.photoUrl!)
                 : null,
@@ -1485,14 +1496,14 @@ class _GeminiSetupGuideSheet extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryTerracotta.withValues(
+                      color: Theme.of(context).colorScheme.primary.withValues(
                         alpha: 0.12,
                       ),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.auto_awesome,
-                      color: AppColors.primaryTerracotta,
+                      color: Theme.of(context).colorScheme.primary,
                       size: 24,
                     ),
                   ),
@@ -1662,8 +1673,8 @@ class _GuideStepTile extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 14,
-          backgroundColor: AppColors.primaryTerracotta,
-          foregroundColor: Colors.white,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
           child: Text(
             stepNumber,
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),

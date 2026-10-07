@@ -294,12 +294,9 @@ void main() {
           );
           await tester.pump();
 
-          final error = tester.takeException();
-          if (error != null) {
-            expect(error.toString(), contains('RenderFlex overflowed'));
-          } else {
-            expect(find.byType(DashboardScreen), findsOneWidget);
-          }
+          // Strict zero-overflow gate (audit 05 P0-2), 360dp narrow viewport.
+          expect(tester.takeException(), isNull);
+          expect(find.byType(DashboardScreen), findsOneWidget);
         },
       );
 
@@ -328,12 +325,9 @@ void main() {
           );
           await tester.pump();
 
-          final error = tester.takeException();
-          if (error != null) {
-            expect(error.toString(), contains('RenderFlex overflowed'));
-          } else {
-            expect(find.byType(DashboardScreen), findsOneWidget);
-          }
+          // Strict zero-overflow gate (audit 05 P0-2), 360dp narrow viewport.
+          expect(tester.takeException(), isNull);
+          expect(find.byType(DashboardScreen), findsOneWidget);
 
           ResponsiveTester.simulateKeyboardDismissed(tester);
           await tester.pump();

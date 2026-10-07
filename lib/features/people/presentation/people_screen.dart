@@ -13,6 +13,7 @@ import 'package:ai_birthday/features/people/data/person_providers.dart'
     show personServiceProvider;
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
+import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
 class PeopleScreen extends ConsumerWidget {
   const PeopleScreen({super.key});
@@ -80,72 +81,60 @@ class PeopleScreen extends ConsumerWidget {
     final parsedCandidates = await showModalBottomSheet<CsvParseResult>(
       context: context,
       isScrollControlled: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (ctx, setModalState) => SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 16,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Import Contacts (CSV)',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      tooltip: 'Close',
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.of(sheetContext).pop();
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Paste CSV with columns: Name, Month, Day, Year, Phone, Relationship.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: textController,
-                  maxLines: 5,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: 'Sarah,10,7,1992,+14155552671,Friend\n...',
+      builder: (sheetContext) => AppBottomSheet(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Expanded(
+                child: Text(
+                  'Import Contacts (CSV)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
                   ),
                 ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () {
-                      final csvService = ref.read(contactCsvServiceProvider);
-                      final parseResult = csvService.parseCsvWithResult(
-                        textController.text,
-                        existingPeople: currentPeople,
-                      );
-                      Navigator.of(sheetContext).pop(parseResult);
-                    },
-                    child: const Text('Parse & Review Candidates'),
-                  ),
-                ),
-              ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: 'Close',
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.of(sheetContext).pop();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Paste CSV with columns: Name, Month, Day, Year, Phone, Relationship.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: textController,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'Sarah,10,7,1992,+14155552671,Friend\n...',
             ),
           ),
-        ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                final csvService = ref.read(contactCsvServiceProvider);
+                final parseResult = csvService.parseCsvWithResult(
+                  textController.text,
+                  existingPeople: currentPeople,
+                );
+                Navigator.of(sheetContext).pop(parseResult);
+              },
+              child: const Text('Parse & Review Candidates'),
+            ),
+          ),
+        ],
       ),
     );
 
@@ -203,132 +192,133 @@ class PeopleScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       builder: (reviewContext) => StatefulBuilder(
-        builder: (ctx, setReviewState) => SafeArea(
-          child: Container(
-            height: MediaQuery.of(ctx).size.height * 0.7,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        builder: (ctx, setReviewState) => AppBottomSheet(
+          children: [
+            // Wrap (not Row): at large text scales the action wraps onto its
+            // own line instead of starving the title (audit 05 P0-1).
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '$title (${parsedCandidates.length})',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setReviewState(() {
-                          if (selectedIndices.length ==
-                              parsedCandidates.length) {
-                            selectedIndices.clear();
-                          } else {
-                            selectedIndices.addAll(
-                              List.generate(parsedCandidates.length, (i) => i),
-                            );
-                          }
-                        });
-                      },
-                      child: Text(
-                        selectedIndices.length == parsedCandidates.length
-                            ? 'Deselect All'
-                            : 'Select All',
-                      ),
-                    ),
-                  ],
-                ),
                 Text(
-                  '${parsedCandidates.length} birthdays found: $newCount new, $duplicateCount already added.',
+                  '$title (${parsedCandidates.length})',
                   style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.accentForest,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
                   ),
                 ),
-                const SizedBox(height: 2),
-                const Text(
-                  'Potential duplicates are unselected by default for safety.',
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-                const Divider(),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: parsedCandidates.length,
-                    itemBuilder: (ctx, i) {
-                      final c = parsedCandidates[i];
-                      final isSelected = selectedIndices.contains(i);
-                      return CheckboxListTile(
-                        value: isSelected,
-                        onChanged: (val) {
-                          setReviewState(() {
-                            if (val == true) {
-                              selectedIndices.add(i);
-                            } else {
-                              selectedIndices.remove(i);
-                            }
-                          });
-                        },
-                        title: Text(
-                          c.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              c.hasBirthday
-                                  ? 'Birthday: ${c.birthdayMonth}/${c.birthdayDay}'
-                                        '${c.birthYear != null ? ' (${c.birthYear})' : ''}'
-                                        ' • ${c.relationship.displayName}'
-                                        '${c.phoneNumber != null ? ' • ${c.phoneNumber}' : ''}'
-                                  : 'No birthday • ${c.relationship.displayName}'
-                                        '${c.phoneNumber != null ? ' • ${c.phoneNumber}' : ''}',
-                            ),
-                            if (c.isPotentialDuplicate) ...[
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: Colors.amber),
-                                ),
-                                child: Text(
-                                  c.duplicateWarning ?? 'Potential duplicate',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.brown,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: selectedIndices.isEmpty
-                        ? null
-                        : () => Navigator.of(reviewContext).pop(true),
-                    child: Text('Import Selected (${selectedIndices.length})'),
+                TextButton(
+                  onPressed: () {
+                    setReviewState(() {
+                      if (selectedIndices.length ==
+                          parsedCandidates.length) {
+                        selectedIndices.clear();
+                      } else {
+                        selectedIndices.addAll(
+                          List.generate(parsedCandidates.length, (i) => i),
+                        );
+                      }
+                    });
+                  },
+                  child: Text(
+                    selectedIndices.length == parsedCandidates.length
+                        ? 'Deselect All'
+                        : 'Select All',
                   ),
                 ),
               ],
             ),
-          ),
+            Text(
+              '${parsedCandidates.length} birthdays found: $newCount new, $duplicateCount already added.',
+              style: TextStyle(
+                fontSize: 12,
+                color: ctx.colors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'Potential duplicates are unselected by default for safety.',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+            const Divider(),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.5,
+              ),
+              child: ListView.builder(
+                itemCount: parsedCandidates.length,
+                itemBuilder: (idxCtx, i) {
+                  final c = parsedCandidates[i];
+                  final isSelected = selectedIndices.contains(i);
+                  return CheckboxListTile(
+                    value: isSelected,
+                    onChanged: (val) {
+                      setReviewState(() {
+                        if (val == true) {
+                          selectedIndices.add(i);
+                        } else {
+                          selectedIndices.remove(i);
+                        }
+                      });
+                    },
+                    title: Text(
+                      c.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          c.hasBirthday
+                              ? 'Birthday: ${c.birthdayMonth}/${c.birthdayDay}'
+                                    '${c.birthYear != null ? ' (${c.birthYear})' : ''}'
+                                    ' • ${c.relationship.displayName}'
+                                    '${c.phoneNumber != null ? ' • ${c.phoneNumber}' : ''}'
+                              : 'No birthday • ${c.relationship.displayName}'
+                                    '${c.phoneNumber != null ? ' • ${c.phoneNumber}' : ''}',
+                        ),
+                        if (c.isPotentialDuplicate) ...[
+                          const SizedBox(height: 4),
+                          // Contrast-tested warning tone, light + dark
+                          // (audit 05 P1-3).
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTone.warning.fill(ctx.colors),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              c.duplicateWarning ?? 'Potential duplicate',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppTone.warning.label(ctx.colors),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: selectedIndices.isEmpty
+                    ? null
+                    : () => Navigator.of(reviewContext).pop(true),
+                child: Text('Import Selected (${selectedIndices.length})'),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -568,7 +558,14 @@ class PeopleScreen extends ConsumerWidget {
                   children: [
                     Icon(Icons.contact_phone_outlined, size: 20),
                     SizedBox(width: 8),
-                    Text('Import from Phone'),
+                    // Flexible keeps the label from overflowing the fixed
+                    // popup width at large text scales (audit 05 P0-1).
+                    Flexible(
+                      child: Text(
+                        'Import from Phone',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -578,7 +575,9 @@ class PeopleScreen extends ConsumerWidget {
                   children: [
                     Icon(Icons.file_download_outlined, size: 20),
                     SizedBox(width: 8),
-                    Text('Import CSV'),
+                    Flexible(
+                      child: Text('Import CSV', overflow: TextOverflow.ellipsis),
+                    ),
                   ],
                 ),
               ),
@@ -588,7 +587,9 @@ class PeopleScreen extends ConsumerWidget {
                   children: [
                     Icon(Icons.file_upload_outlined, size: 20),
                     SizedBox(width: 8),
-                    Text('Export CSV'),
+                    Flexible(
+                      child: Text('Export CSV', overflow: TextOverflow.ellipsis),
+                    ),
                   ],
                 ),
               ),

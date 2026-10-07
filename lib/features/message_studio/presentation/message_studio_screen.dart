@@ -561,65 +561,65 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       final selected = await showModalBottomSheet<String>(
         context: context,
         isScrollControlled: true,
-        builder: (ctx) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (ctx) => AppBottomSheet(
+          children: [
+            const Row(
               children: [
-                const Row(
-                  children: [
-                    Icon(Icons.auto_awesome, color: AppColors.accentAmber),
-                    SizedBox(width: 8),
-                    Text(
-                      'Select a Variation',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                for (final v in variations) ...[
-                  Card(
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => Navigator.of(ctx).pop(v.value),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Chip(
-                                  label: Text(v.key.displayName),
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                                const Spacer(),
-                                const Text(
-                                  'Tap to choose',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(v.value, style: const TextStyle(fontSize: 14)),
-                          ],
-                        ),
-                      ),
-                    ),
+                Icon(Icons.auto_awesome, color: AppColors.accentAmber),
+                SizedBox(width: 8),
+                Text(
+                  'Select a Variation',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
                   ),
-                  const SizedBox(height: 8),
-                ],
+                ),
               ],
             ),
-          ),
+            const SizedBox(height: 12),
+            for (final v in variations) ...[
+              Card(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => Navigator.of(ctx).pop(v.value),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Chip(
+                              label: Text(v.key.displayName),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            const Spacer(),
+                            const Text(
+                              'Tap to choose',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          v.value,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ],
         ),
       );
 
@@ -655,32 +655,35 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       {'code': 'ja', 'name': 'Japanese (日本語)'},
     ];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                'Translate Greeting To',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => AppBottomSheet(
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Translate Greeting To',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            for (final lang in languages)
-              ListTile(
-                title: Text(lang['name']!),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  _rewriteMessage(
-                    targetLanguage: lang['code'],
-                    languageName: lang['name'],
-                  );
-                },
-              ),
-          ],
-        ),
+          ),
+          for (final lang in languages)
+            ListTile(
+              title: Text(lang['name']!),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _rewriteMessage(
+                  targetLanguage: lang['code'],
+                  languageName: lang['name'],
+                );
+              },
+            ),
+        ],
       ),
     );
   }

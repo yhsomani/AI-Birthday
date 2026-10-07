@@ -8,6 +8,7 @@ import '../../../app/providers.dart';
 import '../../../shared/design_system/design_system.dart';
 import '../../delivery/domain/models/delivery_handoff.dart';
 import '../../message_studio/domain/models/message_draft.dart';
+import '../../../ui/design_system/app_tokens.dart';
 
 /// History — message and delivery activity timeline (SSOT §3, §16, §28).
 class HistoryScreen extends ConsumerWidget {
@@ -73,15 +74,18 @@ class HistoryScreen extends ConsumerWidget {
               final recipientName = person?.name ?? 'Removed contact';
               final handoff = latestHandoffByBirthday[draft.birthdayId];
               final sent = draft.status == DraftStatus.confirmedSent;
-              final statusColor = sent
-                  ? Colors.green[800] ?? Colors.green
+              // Status chips use the palette's contrast-tested tone pairs so
+              // they stay legible in dark mode (audit 05 P1-3).
+              final colors = context.colors;
+              final statusTone = sent
+                  ? AppTone.success
                   : handoff != null
-                  ? Colors.orange[800] ?? Colors.orange
+                  ? AppTone.warning
                   : switch (draft.status) {
-                      DraftStatus.ready => Theme.of(context).colorScheme.primary,
-                      DraftStatus.draft => Colors.grey[700] ?? Colors.grey,
+                      DraftStatus.ready => AppTone.primary,
+                      DraftStatus.draft => AppTone.neutral,
                       // confirmedSent is handled above via [sent].
-                      _ => Colors.grey[700] ?? Colors.grey,
+                      _ => AppTone.neutral,
                     };
 
               final (statusIcon, statusLabel) = sent
@@ -106,7 +110,7 @@ class HistoryScreen extends ConsumerWidget {
                   side: BorderSide(
                     color: Theme.of(context).colorScheme.outlineVariant,
                   ),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -153,20 +157,24 @@ class HistoryScreen extends ConsumerWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.12),
+                              color: statusTone.fill(colors),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(statusIcon, size: 14, color: statusColor),
+                                Icon(
+                                  statusIcon,
+                                  size: 14,
+                                  color: statusTone.label(colors),
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   statusLabel,
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: statusColor,
+                                    color: statusTone.label(colors),
                                   ),
                                 ),
                               ],

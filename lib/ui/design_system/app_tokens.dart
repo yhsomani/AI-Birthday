@@ -8,6 +8,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import 'package:ai_birthday/shared/design_system/app_colors.dart';
+
 /// Semantic color roles, light + dark.
 class AppPalette extends ThemeExtension<AppPalette> {
   const AppPalette({
@@ -65,11 +67,14 @@ class AppPalette extends ThemeExtension<AppPalette> {
     border: Color(0xFFE9DED5),
     textPrimary: Color(0xFF1E1A17),
     textSecondary: Color(0xFF6E645C),
-    // Deviation from spec #D93F0B (4.4996:1 on surfaceAlt — rounds below AA);
-    // #C63806 is ≈4.71 on surfaceAlt, ≈5.29 on white. See docs/ui-audit.md.
-    primary: Color(0xFFC63806),
+    // Unified on the spec'd terracotta brand (audit 05 P1-1): screens and
+    // shared components already paint AppColors.primaryTerracotta everywhere,
+    // so the theme derives its brand roles from those constants instead of a
+    // second coral palette. AA re-verified: white on #A64B2A ≈5.7:1, #6B2000
+    // on #FBECE6 ≈10.5:1, #A64B2A on surfaceAlt ≈5.1:1 (contrast_test enforces).
+    primary: AppColors.primaryTerracotta,
     onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFFFFE0D3),
+    primaryContainer: AppColors.primaryTerracottaContainer,
     onPrimaryContainer: Color(0xFF6B2000),
     accent: Color(0xFFC77700),
     success: Color(0xFF0F7B54),
@@ -89,7 +94,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     border: Color(0xFF3A342F),
     textPrimary: Color(0xFFF4EFEA),
     textSecondary: Color(0xFFADA49B),
-    primary: Color(0xFFFF8A5C),
+    // Bright terracotta variant: ≥4.5:1 on every dark surface (audit 05 P1-1).
+    primary: AppColors.primaryTerracottaLight,
     onPrimary: Color(0xFF17110D),
     primaryContainer: Color(0xFF5C2410),
     onPrimaryContainer: Color(0xFFFFDBCE),
@@ -175,10 +181,16 @@ class AppPalette extends ThemeExtension<AppPalette> {
 
 /// Ergonomic access to the active palette: `context.colors.primary`.
 ///
-/// Throws if the ambient theme has no [AppPalette] — a theme wiring bug,
-/// not something to silently paper over with the light palette.
+/// Resolves the [AppPalette] registered by [AppTheme]; when no extension is
+/// present (bare test harnesses, small standalone widgets) it falls back to
+/// the brightness-correct built-in palette so screens never crash on color
+/// lookup. The app itself always registers the extension via [AppTheme].
 extension AppPaletteAccess on BuildContext {
-  AppPalette get colors => Theme.of(this).extension<AppPalette>()!;
+  AppPalette get colors {
+    final brightness = Theme.of(this).brightness;
+    return Theme.of(this).extension<AppPalette>() ??
+        (brightness == Brightness.dark ? AppPalette.dark : AppPalette.light);
+  }
 }
 
 /// Spacing scale, 4dp base. Use instead of raw SizedBox/EdgeInsets values.
