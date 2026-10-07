@@ -177,5 +177,8 @@ From `docs/ui-ux/*`, `docs/ui-audit.md`, `DESIGN.md`, and component test headers
 | P3-3 `DESIGN.md` / `DESIGN-SUMMARY.md` / `design-system.md` | ✅ | typography rewritten to shipped Bricolage Grotesque + Outfit (bundled) |
 | P3-4 sandbox-switch claim | ✅ | removed from `redesign-specification.md` §2.7; only the service test hook remains |
 | W8 device test-data note (`docs/ui-audit.md:202`) | ✅ | removed |
+| W2 section headers announced (one header, TalkBack heading) | ✅ | `7f58663`; `AppSectionHeader` emits `Semantics(header: true)`; settings `_SectionHeader` (7 sites) + person-form raw `ESSENTIAL INFORMATION` replaced with `AppSectionHeader`; `test/ui/section_header_test.dart` |
+| W5 status chips + card radius | ✅ verified already satisfied, no change | History chips already on `AppTone` fill/label (`history_screen.dart:77-180`) with every tone pair asserted ≥4.5:1 in `contrast_test.dart`; Settings badges already AA palette tokens; History card radius 12 = theme `AppRadius.md` |
+| W6 Studio editor field label | ✅ | `7f58663`; editor `TextField` wrapped in `Semantics(label: 'Your message')`; asserted in `message_studio_visibility_test.dart` |
 
-Remaining work-program items (W2 headers-as-semantics, W5 status-chip wiring, W6 editor field label) are documented in §5 but were **not** part of the approved P2/P3 batch.
+All audit 05 work-program items are now closed — W2/W5/W6 landed in `7f58663`; the only remaining deferral is P2-7 l10n (above).
