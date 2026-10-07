@@ -32,3 +32,6 @@
 
 **Learning:** Calling `.where().length` multiple times on the same collection for mutually exclusive conditions (like `isPotentialDuplicate` and `!isPotentialDuplicate`) iterates over the collection redundantly.
 **Action:** Iterate once to count one condition, and use arithmetic (e.g., `total - condition`) for the complement to halve the iterations and CPU cycles during widget builds.
+## 2024-05-18 - Remove replaceAll string manipulations in hot paths
+**Learning:** Using `replaceAll` on strings inside frequently called functions like a logger adds significant hidden overhead (e.g., O(N) allocation x2 per log parameter). Pre-compiling a slightly more complex regular expression to account for punctuation is much faster (~2x) in high-volume logging pathways.
+**Action:** When performing string sanitization or checks in hot code paths, use robust RegExp patterns instead of chaining string manipulation functions.

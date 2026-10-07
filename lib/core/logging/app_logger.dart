@@ -41,14 +41,13 @@ class LogRecord {
 // 🛡️ SECURITY: Explicitly include sensitive keys (email, phone, credentials, note, text, body, facts, user identifiers) to prevent PII leakage.
 // ⚡ PERFORMANCE: Pre-compiled RegExp avoids looping and repeated string operations.
 final RegExp _sensitiveKeyRegExp = RegExp(
-  r'(^sub$|subject|uid|userid|user_id|credential|secret|token|apikey|api_key|api-key|password|key|phone|phonenumber|phone_number|address|email|note|message|content|body|text|fact|quote)',
+  r'(^sub$|subject|uid|user[-_]?id|credential|secret|token|api[-_]?key|password|key|phone([-._]?number)?|address|email|note|message|content|body|text|fact|quote)',
   caseSensitive: false,
 );
 
 /// Redacts values whose key suggests sensitive content.
 Object? _redactValue(String key, Object? value) {
-  final normalized = key.replaceAll('_', '').replaceAll('-', '');
-  if (_sensitiveKeyRegExp.hasMatch(normalized)) {
+  if (_sensitiveKeyRegExp.hasMatch(key)) {
     return '[REDACTED]';
   }
   return value;
