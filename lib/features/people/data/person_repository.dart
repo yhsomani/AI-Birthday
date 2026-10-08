@@ -32,23 +32,23 @@ class DriftPeopleStore implements PeopleStore {
 
   @override
   Future<List<Person>> getAll({bool includeDeleted = false}) async {
-    final query = _database.select(_database.persons);
+    final query = _database.select(_database.persons)
+      ..orderBy([(row) => drift.OrderingTerm(expression: row.name.lower())]);
     if (!includeDeleted) {
       query.where((row) => row.deletedAt.isNull());
     }
     final rows = await query.get();
-    rows.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return rows.map(_toDomain).toList();
   }
 
   @override
   Stream<List<Person>> watchAll({bool includeDeleted = false}) {
-    final query = _database.select(_database.persons);
+    final query = _database.select(_database.persons)
+      ..orderBy([(row) => drift.OrderingTerm(expression: row.name.lower())]);
     if (!includeDeleted) {
       query.where((row) => row.deletedAt.isNull());
     }
     return query.watch().map((rows) {
-      rows.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       return rows.map(_toDomain).toList();
     });
   }
