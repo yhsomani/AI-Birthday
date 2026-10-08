@@ -69,11 +69,40 @@ void main() {
     expect(find.text('ana@example.com'), findsOneWidget);
     expect(find.text('Sign out'), findsOneWidget);
 
+    // Sign out now asks for confirmation first.
     await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign out?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign out'));
     await tester.pumpAndSettle();
 
     expect(gateway.signOutCalls, 1);
     expect(find.text('Sign in with Google'), findsOneWidget);
+  });
+
+  testWidgets('canceling the sign-out dialog keeps the session', (
+    tester,
+  ) async {
+    final gateway = FakeAuthGateway();
+    await pumpSettings(
+      tester,
+      overrides: [googleAuthGatewayProvider.overrideWithValue(gateway)],
+    );
+
+    await tester.tap(find.text('Sign in with Google'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign out'), findsOneWidget);
+
+    await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(gateway.signOutCalls, 0); // no sign-out ever reached the gateway
+    expect(find.text('Sign out'), findsOneWidget); // still signed in
+    expect(find.text('ana@example.com'), findsOneWidget);
   });
 
   testWidgets('a failed sign-in keeps the signed-out tile', (tester) async {

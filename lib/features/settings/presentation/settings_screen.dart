@@ -1516,6 +1516,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 class _AuthTile extends ConsumerWidget {
   const _AuthTile();
 
+  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
+    HapticFeedback.lightImpact();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text(
+          'Your birthdays and drafts stay on this device. Signing out only '
+          'disconnects your Google account and cloud backup.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    ref.read(authControllerProvider.notifier).signOut();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
@@ -1588,10 +1614,7 @@ class _AuthTile extends ConsumerWidget {
           ),
           subtitle: Text(state.identity?.email ?? ''),
           trailing: OutlinedButton(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              ref.read(authControllerProvider.notifier).signOut();
-            },
+            onPressed: () => _confirmSignOut(context, ref),
             child: const Text('Sign out'),
           ),
         ),

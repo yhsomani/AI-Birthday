@@ -25,6 +25,9 @@ GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/dashboard',
+    // Unmatched locations get a real screen (not a blank/error page) with a
+    // way back into the shell.
+    errorBuilder: (context, state) => _NotFoundScreen(state),
     redirect: (context, state) async {
       if (credentialStorage == null) return null;
       final completed = await credentialStorage.hasCompletedOnboarding();
@@ -127,3 +130,41 @@ final routerProvider = Provider<GoRouter>((ref) {
   final storage = ref.watch(credentialStorageProvider);
   return createAppRouter(storage);
 });
+
+/// Fallback for any location that matches no route: show what was asked and
+/// hand the user back to the dashboard shell (they can return to their tab).
+class _NotFoundScreen extends StatelessWidget {
+  const _NotFoundScreen(this.state);
+
+  final GoRouterState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final location = state.uri.path == '/' ? '' : state.uri.path;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Screen not found')),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                location.isEmpty
+                    ? 'That screen does not exist.'
+                    : 'No screen matches "$location".',
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () => context.go('/dashboard'),
+              icon: const Icon(Icons.home_outlined),
+              label: const Text('Back to dashboard'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

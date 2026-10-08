@@ -979,7 +979,28 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     if (_person == null || _birthday == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Message Studio')),
-        body: Center(child: Text(_errorMessage ?? 'Birthday not found')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: Text(
+                  _errorMessage ?? 'Birthday not found',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              // Recovery action: the birthday was deleted (or the deep link
+              // went stale), so hand the user back to where birthdays live.
+              FilledButton.icon(
+                onPressed: () => context.go('/people'),
+                icon: const Icon(Icons.people_outline),
+                label: const Text('Go to People'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
