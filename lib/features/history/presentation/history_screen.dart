@@ -28,7 +28,9 @@ class HistoryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final draftsAsync = ref.watch(draftsStreamProvider);
     final peopleAsync = ref.watch(peopleStreamProvider);
-    final handoffsAsync = ref.watch(deliveryEventsStreamProvider);
+    // Batched: only the latest handoff per drafted birthday is loaded, never
+    // the full (unbounded) event log (query audit).
+    final handoffsAsync = ref.watch(latestHandoffsForDraftsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('History & Activity')),

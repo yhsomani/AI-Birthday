@@ -29,7 +29,7 @@ class DriftPeopleRepository implements PeopleRepository {
       _database.persons,
     )..where((r) => r.deletedAt.isNull())).watch().map((rows) {
       final list = rows.map(_personFromRow).toList();
-      list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      list.sort(_byNameThenId);
       return list;
     });
   }
@@ -40,7 +40,7 @@ class DriftPeopleRepository implements PeopleRepository {
       _database.persons,
     )..where((r) => r.deletedAt.isNull())).get();
     final list = rows.map(_personFromRow).toList();
-    list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    list.sort(_byNameThenId);
     return list;
   }
 
@@ -113,6 +113,13 @@ class DriftPeopleRepository implements PeopleRepository {
     )..where((r) => r.id.equals(id))).getSingleOrNull();
   }
 
+  /// Deterministic total order (query audit Phase 4): name asc with the
+  /// unique id as tie-breaker — Dart's sort is unstable under equal keys.
+  static int _byNameThenId(Person a, Person b) {
+    final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    return byName != 0 ? byName : a.id.compareTo(b.id);
+  }
+
   static Person _personFromRow(db.Person row) {
     return Person(
       id: row.id,
@@ -158,7 +165,7 @@ class DriftBirthdaysRepository implements BirthdaysRepository {
   Stream<List<Birthday>> watchBirthdays() {
     return _database.select(_database.birthdays).watch().map((rows) {
       final list = rows.map(_birthdayFromRow).toList();
-      list.sort((a, b) => a.date.compareTo(b.date));
+      list.sort(_byDateThenId);
       return list;
     });
   }
@@ -167,7 +174,7 @@ class DriftBirthdaysRepository implements BirthdaysRepository {
   Future<List<Birthday>> getBirthdays() async {
     final rows = await _database.select(_database.birthdays).get();
     final list = rows.map(_birthdayFromRow).toList();
-    list.sort((a, b) => a.date.compareTo(b.date));
+    list.sort(_byDateThenId);
     return list;
   }
 
@@ -244,6 +251,13 @@ class DriftBirthdaysRepository implements BirthdaysRepository {
       updatedAt: row.updatedAt.toUtc(),
     );
   }
+
+  /// Deterministic total order (query audit Phase 4): date asc with the
+  /// unique id as tie-breaker.
+  static int _byDateThenId(Birthday a, Birthday b) {
+    final byDate = a.date.compareTo(b.date);
+    return byDate != 0 ? byDate : a.id.compareTo(b.id);
+  }
 }
 
 /// Drift/SQLite-backed implementation of [DraftsRepository].
@@ -256,7 +270,7 @@ class DriftDraftsRepository implements DraftsRepository {
   Stream<List<MessageDraft>> watchDrafts() {
     return _database.select(_database.messageDrafts).watch().map((rows) {
       final list = rows.map(_draftFromRow).toList();
-      list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      list.sort(_byUpdatedAtDescThenIdDesc);
       return list;
     });
   }
@@ -265,7 +279,7 @@ class DriftDraftsRepository implements DraftsRepository {
   Future<List<MessageDraft>> getAllDrafts() async {
     final rows = await _database.select(_database.messageDrafts).get();
     final list = rows.map(_draftFromRow).toList();
-    list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    list.sort(_byUpdatedAtDescThenIdDesc);
     return list;
   }
 
@@ -321,6 +335,14 @@ class DriftDraftsRepository implements DraftsRepository {
       updatedAt: row.updatedAt.toUtc(),
     );
   }
+
+  /// Deterministic total order (query audit Phase 4): newest-first with the
+  /// unique id as tie-breaker — equal timestamps must not reorder between
+  /// watch emissions.
+  static int _byUpdatedAtDescThenIdDesc(MessageDraft a, MessageDraft b) {
+    final byUpdatedAt = b.updatedAt.compareTo(a.updatedAt);
+    return byUpdatedAt != 0 ? byUpdatedAt : b.id.compareTo(a.id);
+  }
 }
 
 /// Drift/SQLite-backed implementation of [DeliveryEventsRepository].
@@ -336,7 +358,9 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
     required DateTime at,
   }) async {
     final utc = at.toUtc();
-    await _database.into(_database.deliveryEvents).insert(
+    await _database
+        .into(_database.deliveryEvents)
+        .insert(
           db.DeliveryEventsCompanion.insert(
             id: '$birthdayId-${utc.millisecondsSinceEpoch}',
             birthdayId: birthdayId,
@@ -348,11 +372,12 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
 
   @override
   Future<DeliveryHandoff?> latestHandoffForBirthday(String birthdayId) async {
-    final row = await (_database.select(_database.deliveryEvents)
-          ..where((r) => r.birthdayId.equals(birthdayId))
-          ..orderBy([(r) => OrderingTerm.desc(r.handedOffAt)])
-          ..limit(1))
-        .getSingleOrNull();
+    final row =
+        await (_database.select(_database.deliveryEvents)
+              ..where((r) => r.birthdayId.equals(birthdayId))
+              ..orderBy([(r) => OrderingTerm.desc(r.handedOffAt)])
+              ..limit(1))
+            .getSingleOrNull();
     return row == null ? null : _handoffFromRow(row);
   }
 
@@ -362,6 +387,29 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
         .select(_database.deliveryEvents)
         .watch()
         .map((rows) => rows.map(_handoffFromRow).toList());
+  }
+
+  @override
+  Stream<List<DeliveryHandoff>> watchLatestHandoffs(Set<String> birthdayIds) {
+    if (birthdayIds.isEmpty) return Stream.value(const []);
+    // Query audit: "batched related data". Only events for the requested
+    // birthdays are loaded — newest first — then reduced to the latest per
+    // birthday. The full, unbounded event log is never materialized.
+    return (_database.select(_database.deliveryEvents)
+          ..where((r) => r.birthdayId.isIn(birthdayIds))
+          ..orderBy([(r) => OrderingTerm.desc(r.handedOffAt)]))
+        .watch()
+        .map((rows) {
+          final latest = <String, DeliveryHandoff>{};
+          for (final row in rows) {
+            final handoff = _handoffFromRow(row);
+            final existing = latest[handoff.birthdayId];
+            if (existing == null || handoff.at.isAfter(existing.at)) {
+              latest[handoff.birthdayId] = handoff;
+            }
+          }
+          return latest.values.toList();
+        });
   }
 
   static DeliveryHandoff _handoffFromRow(db.DeliveryEvent row) {

@@ -183,15 +183,36 @@ final draftsRepositoryProvider = Provider<DraftsRepository>((ref) {
 
 /// Delivery-event Repository: persisted evidence of external-app launches
 /// (audit 03 P1-1). History and the handed-off confirm flow read this.
-final deliveryEventsRepositoryProvider = Provider<DeliveryEventsRepository>((ref) {
+final deliveryEventsRepositoryProvider = Provider<DeliveryEventsRepository>((
+  ref,
+) {
   final db = ref.watch(core.databaseProvider);
   return DriftDeliveryEventsRepository(db);
 });
 
 /// Live stream of every persisted external-app handoff event.
-final deliveryEventsStreamProvider = StreamProvider<List<DeliveryHandoff>>((ref) {
+final deliveryEventsStreamProvider = StreamProvider<List<DeliveryHandoff>>((
+  ref,
+) {
   final repo = ref.watch(deliveryEventsRepositoryProvider);
   return repo.watchHandoffs();
+});
+
+/// Latest persisted handoff per birthday, batched to only the birthdays that
+/// currently have drafts (query audit: History consumes this instead of the
+/// full, unbounded event log).
+final latestHandoffsForDraftsProvider = StreamProvider<List<DeliveryHandoff>>((
+  ref,
+) {
+  final repo = ref.watch(deliveryEventsRepositoryProvider);
+  // Depends on the drafts stream via `.future` (the non-deprecated watch);
+  // when the draft set changes this create re-runs and re-batches. The
+  // Stream.fromFuture singleton emits once per draft set, so the previous
+  // (stale-ids) handoff subscription is replaced — no duplicate labels.
+  final ids = ref
+      .watch(draftsStreamProvider.future)
+      .then((drafts) => {for (final d in drafts) d.birthdayId});
+  return Stream.fromFuture(ids).asyncExpand(repo.watchLatestHandoffs);
 });
 
 /// Stream of all tracked people.

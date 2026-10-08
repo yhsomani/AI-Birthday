@@ -18,4 +18,10 @@ abstract interface class DeliveryEventsRepository {
   /// Live stream of every persisted handoff, newest first order agnostic
   /// (consumers resolve "latest per birthday" themselves).
   Stream<List<DeliveryHandoff>> watchHandoffs();
+
+  /// Live stream of the most recent handoff per birthday, restricted to
+  /// [birthdayIds] (query audit: "batched related data"). Consumers with a
+  /// bounded set of birthdays — e.g. History's draft list — use this instead
+  /// of materializing the full, unbounded event log.
+  Stream<List<DeliveryHandoff>> watchLatestHandoffs(Set<String> birthdayIds);
 }

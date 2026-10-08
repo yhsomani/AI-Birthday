@@ -110,7 +110,13 @@ class DeliveryEvents extends Table {
 }
 
 @DriftDatabase(
-  tables: [Persons, Birthdays, MessageDrafts, ReminderSettingsEntries, DeliveryEvents],
+  tables: [
+    Persons,
+    Birthdays,
+    MessageDrafts,
+    ReminderSettingsEntries,
+    DeliveryEvents,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
@@ -154,6 +160,12 @@ class AppDatabase extends _$AppDatabase {
       );
       await customStatement(
         "DELETE FROM birthdays WHERE person_id IN (SELECT id FROM persons WHERE birthday_month IS NULL);",
+      );
+      // Query audit: delivery_events is the only unbounded table and
+      // birthday_id is its hot filter column (per-birthday handoff lookups).
+      // IF NOT EXISTS keeps this idempotent for both fresh and existing DBs.
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_delivery_events_birthday_id ON delivery_events (birthday_id)',
       );
     },
   );

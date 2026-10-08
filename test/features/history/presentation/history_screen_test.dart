@@ -4,8 +4,42 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dart';
+import 'package:ai_birthday/features/delivery/domain/repositories/delivery_events_repository.dart';
 import 'package:ai_birthday/features/history/presentation/history_screen.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
+
+/// Records [handoffs] for `watchHandoffs`, but only forwards the requested
+/// subset to [watchLatestHandoffs] — mirroring the drift repository's
+/// batching contract under test.
+class _FakeDeliveryEventsRepository implements DeliveryEventsRepository {
+  _FakeDeliveryEventsRepository(this.handoffs);
+
+  final List<DeliveryHandoff> handoffs;
+
+  @override
+  Future<void> recordHandoff({
+    required String birthdayId,
+    required DeliveryChannel channel,
+    required DateTime at,
+  }) async {}
+
+  @override
+  Future<DeliveryHandoff?> latestHandoffForBirthday(String birthdayId) async {
+    for (final h in handoffs.reversed) {
+      if (h.birthdayId == birthdayId) return h;
+    }
+    return null;
+  }
+
+  @override
+  Stream<List<DeliveryHandoff>> watchHandoffs() => Stream.value(handoffs);
+
+  @override
+  Stream<List<DeliveryHandoff>> watchLatestHandoffs(Set<String> birthdayIds) =>
+      Stream.value(
+        handoffs.where((h) => birthdayIds.contains(h.birthdayId)).toList(),
+      );
+}
 
 void main() {
   group('HistoryScreen Status Truthfulness (P0)', () {
@@ -57,7 +91,7 @@ void main() {
                 ]),
               ),
               peopleStreamProvider.overrideWith((_) => Stream.value([])),
-              deliveryEventsStreamProvider.overrideWith(
+              latestHandoffsForDraftsProvider.overrideWith(
                 (_) => Stream.value([
                   DeliveryHandoff(
                     birthdayId: 'b1',
@@ -76,6 +110,54 @@ void main() {
         expect(find.text('Sent'), findsOneWidget);
         // No evidence → honest neutral label, never an "Opened" claim.
         expect(find.text('Ready to Send'), findsOneWidget);
+      },
+    );
+  });
+
+  group('latestHandoffsForDraftsProvider (batched related data)', () {
+    test(
+      'only the latest handoff for DRAFTED birthdays is delivered',
+      () async {
+        final container = ProviderContainer(
+          overrides: [
+            draftsStreamProvider.overrideWith(
+              (_) => Stream.value([
+                MessageDraft(
+                  id: 'd1',
+                  birthdayId: 'b1',
+                  personId: 'p1',
+                  body: 'Happy birthday!',
+                  status: DraftStatus.ready,
+                  createdAt: DateTime(2026, 1, 1),
+                  updatedAt: DateTime(2026, 1, 1),
+                ),
+              ]),
+            ),
+            deliveryEventsRepositoryProvider.overrideWithValue(
+              _FakeDeliveryEventsRepository([
+                DeliveryHandoff(
+                  birthdayId: 'b1',
+                  channel: DeliveryChannel.whatsapp,
+                  at: DateTime(2026, 1, 1, 9),
+                ),
+                // b2 has no draft — its events must not be loaded at all.
+                DeliveryHandoff(
+                  birthdayId: 'b2',
+                  channel: DeliveryChannel.sms,
+                  at: DateTime(2026, 1, 2, 9),
+                ),
+              ]),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final result = await container.read(
+          latestHandoffsForDraftsProvider.future,
+        );
+        expect(result, hasLength(1));
+        expect(result.single.birthdayId, 'b1');
+        expect(result.single.channel, DeliveryChannel.whatsapp);
       },
     );
   });
