@@ -172,9 +172,13 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('Import Contacts (CSV)'), findsOneWidget);
 
-      // Paste a 3-row CSV; Sarah already exists (duplicate candidate).
+      // Paste a 3-row CSV; Sarah already exists (duplicate candidate). Scope
+      // to the sheet: the People screen now also has a search TextField.
       await tester.enterText(
-        find.byType(TextField),
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.byType(TextField),
+        ),
         'Sarah,10,7,1992,+14155552671,Friend\n'
         'Alex,3,15,1988,+14155551234,Family\n'
         'Jamie,8,22,1995,+14155559876,Coworker',

@@ -15,10 +15,24 @@ import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
-class PeopleScreen extends ConsumerWidget {
+class PeopleScreen extends ConsumerStatefulWidget {
   const PeopleScreen({super.key});
 
+  @override
+  ConsumerState<PeopleScreen> createState() => _PeopleScreenState();
+}
+
+class _PeopleScreenState extends ConsumerState<PeopleScreen> {
   static const BirthdayEngine _engine = BirthdayEngine();
+
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   NextBirthday? _next(Person person) => person.hasBirthday
       ? _engine.computeNext(
@@ -524,7 +538,7 @@ class PeopleScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final peopleAsync = ref.watch(peopleStreamProvider);
     final currentPeople = peopleAsync.valueOrNull ?? [];
 
@@ -650,17 +664,58 @@ class PeopleScreen extends ConsumerWidget {
             );
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              AppSpacing.bottomClearance,
-            ),
-            itemCount: people.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final person = people[index];
+          final trimmed = _query.trim();
+            final filtered = trimmed.isEmpty
+                ? people
+                : people
+                      .where(
+                        (p) => p.name.toLowerCase().contains(
+                          trimmed.toLowerCase(),
+                        ),
+                      )
+                      .toList();
+
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() => _query = value),
+                    decoration: InputDecoration(
+                      hintText: 'Search contacts',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.close),
+                              tooltip: 'Clear search',
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _query = '');
+                              },
+                            ),
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? _noSearchResults(trimmed)
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(
+                            16,
+                            8,
+                            16,
+                            AppSpacing.bottomClearance,
+                          ),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final person = filtered[index];
               final next = _next(person);
               final dateStr = person.hasBirthday
                   ? DateFormat.MMMMd().format(
@@ -775,7 +830,10 @@ class PeopleScreen extends ConsumerWidget {
                 ),
               );
             },
-          );
+          ),
+                ),
+              ],
+            );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => const Center(
@@ -795,6 +853,34 @@ class PeopleScreen extends ConsumerWidget {
         },
         tooltip: 'Add Person',
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _noSearchResults(String query) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.search_off, size: 48, color: Colors.grey),
+            const SizedBox(height: 12),
+            const Text(
+              'No contacts found',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Nothing matches "$query". Try a different name.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: context.colors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
