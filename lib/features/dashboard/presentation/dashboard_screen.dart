@@ -296,7 +296,9 @@ class DashboardScreen extends ConsumerWidget {
                 OutlinedButton.icon(
                   onPressed: () {
                     HapticFeedback.lightImpact();
-                    context.push('/people');
+                    // Tab-switch to People (like Quick Actions) — pushing a
+                    // shell branch would stack a second shell instance.
+                    context.go('/people');
                   },
                   icon: const Icon(Icons.contacts_outlined, size: 16),
                   label: const Text('Import Contacts'),

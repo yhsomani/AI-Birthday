@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../app/providers.dart';
 import '../../../shared/design_system/design_system.dart';
+import '../../delivery/domain/models/delivery_channel.dart';
 import '../../delivery/domain/models/delivery_handoff.dart';
 import '../../message_studio/domain/models/message_draft.dart';
 import '../../../ui/design_system/app_tokens.dart';
@@ -13,6 +14,15 @@ import '../../../ui/design_system/app_tokens.dart';
 /// History — message and delivery activity timeline (SSOT §3, §16, §28).
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
+
+  /// "Opened in" is only honest for channels that actually opened (WhatsApp /
+  /// SMS); clipboard and share sheet handoffs are labelled by what they did.
+  String _handoffLabel(DeliveryHandoff handoff) => switch (handoff.channel) {
+    DeliveryChannel.whatsapp ||
+    DeliveryChannel.sms => 'Opened in ${handoff.channel.displayName}',
+    DeliveryChannel.clipboard => 'Copied to Clipboard',
+    DeliveryChannel.share => 'Shared',
+  };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -24,21 +34,40 @@ class HistoryScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('History & Activity')),
       body: draftsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => const Center(
+        error: (_, _) => Center(
           child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'We could not load your activity right now. Your saved messages have not been deleted. Try again later.',
-              textAlign: TextAlign.center,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'We could not load your activity right now. Your saved messages have not been deleted.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () => ref.invalidate(draftsStreamProvider),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Try again'),
+                ),
+              ],
             ),
           ),
         ),
         data: (drafts) {
           if (drafts.isEmpty) {
-            return const EmptyState(
+            return EmptyState(
               icon: Icons.history_outlined,
               title: 'No activity yet',
               message: 'Prepared and sent messages will appear here.',
+              action: FilledButton.icon(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  context.push('/people/add');
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Add Birthday Contact'),
+              ),
             );
           }
 
@@ -48,7 +77,8 @@ class HistoryScreen extends ConsumerWidget {
           // Resolve the latest persisted handoff per birthday (audit 03 P1-1):
           // "Opened in <channel>" is evidence-driven, never inferred from
           // draft status.
-          final handoffs = handoffsAsync.asData?.value ?? const <DeliveryHandoff>[];
+          final handoffs =
+              handoffsAsync.asData?.value ?? const <DeliveryHandoff>[];
           final latestHandoffByBirthday = <String, DeliveryHandoff>{};
           for (final h in handoffs) {
             final existing = latestHandoffByBirthday[h.birthdayId];
@@ -91,16 +121,13 @@ class HistoryScreen extends ConsumerWidget {
               final (statusIcon, statusLabel) = sent
                   ? (Icons.check_circle_outline, 'Sent')
                   : handoff != null
-                  ? (
-                      Icons.open_in_new,
-                      'Opened in ${handoff.channel.displayName}',
-                    )
+                  ? (Icons.open_in_new, _handoffLabel(handoff))
                   : switch (draft.status) {
-                      DraftStatus.ready => (Icons.send_outlined, 'Ready to Send'),
-                      DraftStatus.draft => (
-                        Icons.edit_note_outlined,
-                        'Draft',
+                      DraftStatus.ready => (
+                        Icons.send_outlined,
+                        'Ready to Send',
                       ),
+                      DraftStatus.draft => (Icons.edit_note_outlined, 'Draft'),
                       _ => (Icons.edit_note_outlined, 'Draft'),
                     };
 

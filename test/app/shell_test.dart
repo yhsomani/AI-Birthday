@@ -12,6 +12,7 @@ import 'package:ai_birthday/features/calendar/presentation/calendar_screen.dart'
 import 'package:ai_birthday/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:ai_birthday/features/history/presentation/history_screen.dart';
 import 'package:ai_birthday/features/people/presentation/people_screen.dart';
+import 'package:ai_birthday/features/people/presentation/person_form_screen.dart';
 import 'package:ai_birthday/features/settings/presentation/settings_screen.dart';
 
 import 'pump_app.dart';
@@ -70,6 +71,43 @@ void main() {
 
     expect(selectedIndex(tester), 0);
     expect(find.byType(DashboardScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await drainApp(tester);
+  });
+
+  // Regression: the empty-state Import CTA used context.push('/people'),
+  // stacking a second shell instance instead of switching tabs.
+  testWidgets('empty-state Import Contacts tab-switches to People', (
+    tester,
+  ) async {
+    await pumpCompletedApp(tester);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Import Contacts'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PeopleScreen), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(selectedIndex(tester), 1);
+    expect(tester.takeException(), isNull);
+
+    await drainApp(tester);
+  });
+
+  testWidgets('History empty state offers an add-person CTA', (tester) async {
+    await pumpCompletedApp(tester);
+    await tester.pumpAndSettle();
+
+    await tester.tap(navLabel('History'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No activity yet'), findsOneWidget);
+
+    await tester.tap(find.text('Add Birthday Contact'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PersonFormScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await drainApp(tester);

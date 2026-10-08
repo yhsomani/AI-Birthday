@@ -42,6 +42,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
+  /// Completes onboarding for a specific on-ramp (audit: onboarding the
+  /// destination tiles must not race _finishOnboarding's pop against their
+  /// push — pop() would dismiss the just-pushed route). Marks onboarding done,
+  /// lands on the People shell branch, then pushes the modal destination above
+  /// it so back always returns to a real home.
+  Future<void> _finishTo(String destination) async {
+    HapticFeedback.lightImpact();
+    await ref.read(credentialStorageProvider).setCompletedOnboarding(true);
+    if (!mounted) return;
+    context.go('/people');
+    if (destination != '/people') {
+      context.push(destination);
+    }
+  }
+
   void _nextPage() {
     HapticFeedback.lightImpact();
     if (_currentPage < _totalPages - 1) {
@@ -203,10 +218,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               ),
               subtitle: const Text('Enter name, date, relationship, and tone.'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                _finishOnboarding();
-                context.push('/people/add');
-              },
+              onTap: () => _finishTo('/people/add'),
             ),
           ),
           const SizedBox(height: 12),
@@ -224,10 +236,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 'Quickly scan phone contacts to import existing birthdays.',
               ),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                _finishOnboarding();
-                context.push('/people');
-              },
+              onTap: () => _finishTo('/people'),
             ),
           ),
         ],

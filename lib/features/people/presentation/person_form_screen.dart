@@ -76,7 +76,38 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
   PersonValidation? _validation;
   bool _saving = false;
 
+  /// True once the user edits any field; gates the discard-confirmation on
+  /// back (the only other way to abandon the form).
+  bool _dirty = false;
+
   bool get _isEditing => _loaded != null;
+
+  void _markDirty() {
+    if (!_dirty) setState(() => _dirty = true);
+  }
+
+  Future<bool?> _confirmDiscard(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Discard changes?'),
+        content: const Text('Your unsaved changes will be lost.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Keep Editing'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -186,6 +217,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
 
   void _onMonthChanged(int? month) {
     setState(() {
+      _dirty = true;
       _month = month;
       if (month != null) {
         final maxDay = month == 2
@@ -202,12 +234,18 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
 
   void _addFact() {
     HapticFeedback.lightImpact();
-    setState(() => _facts.add(TextEditingController()));
+    setState(() {
+      _dirty = true;
+      _facts.add(TextEditingController());
+    });
   }
 
   void _removeFact(int index) {
     HapticFeedback.lightImpact();
-    setState(() => _facts.removeAt(index).dispose());
+    setState(() {
+      _dirty = true;
+      _facts.removeAt(index).dispose();
+    });
   }
 
   PersonDraft _draft() {
@@ -325,378 +363,431 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
     final title = _isEditing ? 'Edit birthday' : 'Add birthday';
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 48),
-          children: [
-            // STEP 1: Core Essentials (Name & Birthday Date)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const AppSectionHeader(
-                      title: 'Essential Information',
-                      isAccent: true,
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _name,
-                      textCapitalization: TextCapitalization.words,
-                      maxLength: 120,
-                      decoration: InputDecoration(
-                        labelText: 'Name',
-                        hintText: 'e.g. Priya',
-                        errorText: _errorFor(PersonField.name),
+    return PopScope<void>(
+      canPop: !_dirty && !_saving,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop || !_dirty) return;
+        final discard = await _confirmDiscard(context);
+        if (discard != true) return;
+        if (!context.mounted) return;
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(title),
+          leading: TextButton(
+            // Explicit labeled cancel: the default back affordance would hide
+            // the abandon action and silently drop edits. maybePop routes
+            // through the PopScope discard confirmation above.
+            onPressed: _saving ? null : () => Navigator.of(context).maybePop(),
+            child: const Text('Cancel'),
+          ),
+        ),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 48),
+            children: [
+              // STEP 1: Core Essentials (Name & Birthday Date)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const AppSectionHeader(
+                        title: 'Essential Information',
+                        isAccent: true,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<int>(
-                            initialValue: _month,
-                            items: [
-                              for (var m = 1; m <= 12; m++)
-                                DropdownMenuItem(
-                                  value: m,
-                                  child: Text(_monthNames[m - 1]),
-                                ),
-                            ],
-                            onChanged: _onMonthChanged,
-                            decoration: InputDecoration(
-                              labelText: 'Month',
-                              errorText: _errorFor(PersonField.birthday),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _name,
+                        textCapitalization: TextCapitalization.words,
+                        maxLength: 120,
+                        onChanged: (_) => _markDirty(),
+                        decoration: InputDecoration(
+                          labelText: 'Name',
+                          hintText: 'e.g. Priya',
+                          errorText: _errorFor(PersonField.name),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              initialValue: _month,
+                              items: [
+                                for (var m = 1; m <= 12; m++)
+                                  DropdownMenuItem(
+                                    value: m,
+                                    child: Text(_monthNames[m - 1]),
+                                  ),
+                              ],
+                              onChanged: _onMonthChanged,
+                              decoration: InputDecoration(
+                                labelText: 'Month',
+                                errorText: _errorFor(PersonField.birthday),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: DropdownButtonFormField<int>(
-                            initialValue: _day,
-                            items: [
-                              for (final d in _dayOptions)
-                                DropdownMenuItem(value: d, child: Text('$d')),
-                            ],
-                            onChanged: (value) => setState(() => _day = value),
-                            decoration: const InputDecoration(labelText: 'Day'),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              initialValue: _day,
+                              items: [
+                                for (final d in _dayOptions)
+                                  DropdownMenuItem(value: d, child: Text('$d')),
+                              ],
+                              onChanged: (value) => setState(() {
+                                _dirty = true;
+                                _day = value;
+                              }),
+                              decoration: const InputDecoration(
+                                labelText: 'Day',
+                              ),
+                            ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _birthYear,
+                        keyboardType: TextInputType.number,
+                        maxLength: 4,
+                        onChanged: (_) => _markDirty(),
+                        decoration: InputDecoration(
+                          labelText: 'Birth year (optional)',
+                          hintText: 'e.g. 1991',
+                          errorText: _errorFor(PersonField.birthYear),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // STEP 2: Progressive Disclosure - Relationship & Tone
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: ExpansionTile(
+                  initiallyExpanded: _relationship.text.isNotEmpty,
+                  title: const Text(
+                    'Relationship & Tone',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  ),
+                  subtitle: Text(
+                    'Customize message dynamics and tone',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.colors.textSecondary,
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _birthYear,
-                      keyboardType: TextInputType.number,
-                      maxLength: 4,
-                      decoration: InputDecoration(
-                        labelText: 'Birth year (optional)',
-                        hintText: 'e.g. 1991',
-                        errorText: _errorFor(PersonField.birthYear),
+                  ),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: _relationship,
+                            maxLength: 60,
+                            onChanged: (_) => _markDirty(),
+                            decoration: InputDecoration(
+                              labelText: 'Relationship (optional)',
+                              hintText: 'e.g. Best friend, Cousin, Colleague',
+                              errorText: _errorFor(PersonField.relationship),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<PreferredTone>(
+                            initialValue: _tone,
+                            items: [
+                              for (final tone in PreferredTone.values)
+                                DropdownMenuItem(
+                                  value: tone,
+                                  child: Text(_toneLabel(tone)),
+                                ),
+                            ],
+                            onChanged: (value) => setState(() {
+                              _dirty = true;
+                              _tone = value ?? PreferredTone.warm;
+                            }),
+                            decoration: const InputDecoration(
+                              labelText: 'Preferred tone',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<p_rel.RelationshipCloseness>(
+                            initialValue: _closeness,
+                            items: [
+                              for (final c
+                                  in p_rel.RelationshipCloseness.values)
+                                DropdownMenuItem(
+                                  value: c,
+                                  child: Text(c.displayName),
+                                ),
+                            ],
+                            onChanged: (value) => setState(() {
+                              _dirty = true;
+                              _closeness =
+                                  value ?? p_rel.RelationshipCloseness.casual;
+                            }),
+                            decoration: const InputDecoration(
+                              labelText: 'Closeness',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            initialValue: _preferredLanguage,
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'en',
+                                child: Text('English'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'hi',
+                                child: Text('Hindi'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'es',
+                                child: Text('Spanish'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'fr',
+                                child: Text('French'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'de',
+                                child: Text('German'),
+                              ),
+                            ],
+                            onChanged: (value) => setState(() {
+                              _dirty = true;
+                              _preferredLanguage = value ?? 'en';
+                            }),
+                            decoration: const InputDecoration(
+                              labelText: 'Preferred language',
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // STEP 2: Progressive Disclosure - Relationship & Tone
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: ExpansionTile(
-                initiallyExpanded: _relationship.text.isNotEmpty,
-                title: const Text(
-                  'Relationship & Tone',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                ),
-                subtitle: Text(
-                  'Customize message dynamics and tone',
-                  style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
-                ),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: _relationship,
-                          maxLength: 60,
-                          decoration: InputDecoration(
-                            labelText: 'Relationship (optional)',
-                            hintText: 'e.g. Best friend, Cousin, Colleague',
-                            errorText: _errorFor(PersonField.relationship),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<PreferredTone>(
-                          initialValue: _tone,
-                          items: [
-                            for (final tone in PreferredTone.values)
-                              DropdownMenuItem(
-                                value: tone,
-                                child: Text(_toneLabel(tone)),
-                              ),
-                          ],
-                          onChanged: (value) => setState(
-                            () => _tone = value ?? PreferredTone.warm,
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Preferred tone',
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<p_rel.RelationshipCloseness>(
-                          initialValue: _closeness,
-                          items: [
-                            for (final c in p_rel.RelationshipCloseness.values)
-                              DropdownMenuItem(
-                                value: c,
-                                child: Text(c.displayName),
-                              ),
-                          ],
-                          onChanged: (value) => setState(
-                            () => _closeness =
-                                value ?? p_rel.RelationshipCloseness.casual,
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Closeness',
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
-                          initialValue: _preferredLanguage,
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'en',
-                              child: Text('English'),
-                            ),
-                            DropdownMenuItem(value: 'hi', child: Text('Hindi')),
-                            DropdownMenuItem(
-                              value: 'es',
-                              child: Text('Spanish'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'fr',
-                              child: Text('French'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'de',
-                              child: Text('German'),
-                            ),
-                          ],
-                          onChanged: (value) => setState(
-                            () => _preferredLanguage = value ?? 'en',
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Preferred language',
-                          ),
-                        ),
-                      ],
+              // STEP 3: Progressive Disclosure - Contact & Delivery Details
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: ExpansionTile(
+                  initiallyExpanded:
+                      _phone.text.isNotEmpty || _email.text.isNotEmpty,
+                  title: const Text(
+                    'Contact & Delivery',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  ),
+                  subtitle: Text(
+                    'Phone for WhatsApp handoff and timezone',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.colors.textSecondary,
                     ),
                   ),
-                ],
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: _phone,
+                            keyboardType: TextInputType.phone,
+                            onChanged: (_) => _markDirty(),
+                            decoration: InputDecoration(
+                              labelText: 'Phone number (optional)',
+                              hintText: 'e.g. +91 98765 43210',
+                              errorText: _errorFor(PersonField.phoneNumber),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _email,
+                            keyboardType: TextInputType.emailAddress,
+                            onChanged: (_) => _markDirty(),
+                            decoration: InputDecoration(
+                              labelText: 'Email (optional)',
+                              hintText: 'e.g. priya@example.com',
+                              errorText: _errorFor(PersonField.email),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<d_chan.DeliveryChannel>(
+                            initialValue: _deliveryChannel,
+                            items: [
+                              for (final ch in d_chan.DeliveryChannel.values)
+                                DropdownMenuItem(
+                                  value: ch,
+                                  child: Text(ch.displayName),
+                                ),
+                            ],
+                            onChanged: (value) => setState(() {
+                              _dirty = true;
+                              _deliveryChannel =
+                                  value ?? d_chan.DeliveryChannel.whatsapp;
+                            }),
+                            decoration: const InputDecoration(
+                              labelText: 'Preferred delivery channel',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Prepare drafts automatically'),
+                            subtitle: const Text(
+                              'Drafts will be generated ahead of birthday for your review',
+                            ),
+                            value: _autoPrepare,
+                            onChanged: (v) => setState(() {
+                              _dirty = true;
+                              _autoPrepare = v;
+                            }),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _timezone,
+                            textCapitalization: TextCapitalization.none,
+                            onChanged: (_) => _markDirty(),
+                            decoration: InputDecoration(
+                              labelText: 'Timezone (optional, IANA)',
+                              hintText: 'e.g. Asia/Kolkata',
+                              helperText:
+                                  'Used to compute birthdays in their location.',
+                              errorText: _errorFor(PersonField.timezone),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // STEP 3: Progressive Disclosure - Contact & Delivery Details
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: ExpansionTile(
-                initiallyExpanded:
-                    _phone.text.isNotEmpty || _email.text.isNotEmpty,
-                title: const Text(
-                  'Contact & Delivery',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                ),
-                subtitle: Text(
-                  'Phone for WhatsApp handoff and timezone',
-                  style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
-                ),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: _phone,
-                          keyboardType: TextInputType.phone,
-                          decoration: InputDecoration(
-                            labelText: 'Phone number (optional)',
-                            hintText: 'e.g. +91 98765 43210',
-                            errorText: _errorFor(PersonField.phoneNumber),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _email,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            labelText: 'Email (optional)',
-                            hintText: 'e.g. priya@example.com',
-                            errorText: _errorFor(PersonField.email),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<d_chan.DeliveryChannel>(
-                          initialValue: _deliveryChannel,
-                          items: [
-                            for (final ch in d_chan.DeliveryChannel.values)
-                              DropdownMenuItem(
-                                value: ch,
-                                child: Text(ch.displayName),
-                              ),
-                          ],
-                          onChanged: (value) => setState(
-                            () => _deliveryChannel =
-                                value ?? d_chan.DeliveryChannel.whatsapp,
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Preferred delivery channel',
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SwitchListTile.adaptive(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Prepare drafts automatically'),
-                          subtitle: const Text(
-                            'Drafts will be generated ahead of birthday for your review',
-                          ),
-                          value: _autoPrepare,
-                          onChanged: (v) => setState(() => _autoPrepare = v),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _timezone,
-                          textCapitalization: TextCapitalization.none,
-                          decoration: InputDecoration(
-                            labelText: 'Timezone (optional, IANA)',
-                            hintText: 'e.g. Asia/Kolkata',
-                            helperText:
-                                'Used to compute birthdays in their location.',
-                            errorText: _errorFor(PersonField.timezone),
-                          ),
-                        ),
-                      ],
+              // STEP 4: Progressive Disclosure - AI Personalization Facts & Notes
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: ExpansionTile(
+                  initiallyExpanded:
+                      _facts.isNotEmpty || _notes.text.isNotEmpty,
+                  title: const Text(
+                    'Facts & Context for AI',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  ),
+                  subtitle: Text(
+                    'User-provided facts to personalize drafts',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.colors.textSecondary,
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // STEP 4: Progressive Disclosure - AI Personalization Facts & Notes
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: ExpansionTile(
-                initiallyExpanded: _facts.isNotEmpty || _notes.text.isNotEmpty,
-                title: const Text(
-                  'Facts & Context for AI',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                ),
-                subtitle: Text(
-                  'User-provided facts to personalize drafts',
-                  style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
-                ),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Verified Facts:',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            TextButton.icon(
-                              onPressed: _addFact,
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text('Add Fact'),
-                            ),
-                          ],
-                        ),
-                        if (_errorFor(PersonField.importantFacts) != null)
-                          Text(
-                            _errorFor(PersonField.importantFacts)!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.error,
-                            ),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Verified Facts:',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextButton.icon(
+                                onPressed: _addFact,
+                                icon: const Icon(Icons.add, size: 18),
+                                label: const Text('Add Fact'),
+                              ),
+                            ],
                           ),
-                        for (final (index, controller) in _facts.indexed)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: TextField(
-                              controller: controller,
-                              maxLength: 200,
-                              decoration: InputDecoration(
-                                labelText: 'Fact ${index + 1}',
-                                hintText: 'e.g. Loves marathon running',
-                                suffixIcon: IconButton(
-                                  icon: const Icon(Icons.close),
-                                  tooltip: 'Remove fact',
-                                  onPressed: () => _removeFact(index),
+                          if (_errorFor(PersonField.importantFacts) != null)
+                            Text(
+                              _errorFor(PersonField.importantFacts)!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.error,
+                              ),
+                            ),
+                          for (final (index, controller) in _facts.indexed)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: TextField(
+                                controller: controller,
+                                maxLength: 200,
+                                onChanged: (_) => _markDirty(),
+                                decoration: InputDecoration(
+                                  labelText: 'Fact ${index + 1}',
+                                  hintText: 'e.g. Loves marathon running',
+                                  suffixIcon: IconButton(
+                                    icon: const Icon(Icons.close),
+                                    tooltip: 'Remove fact',
+                                    onPressed: () => _removeFact(index),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        if (_facts.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              'No facts added yet. AI will never invent facts.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontStyle: FontStyle.italic,
-                                color: Colors.grey[600],
+                          if (_facts.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                'No facts added yet. AI will never invent facts.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.grey[600],
+                                ),
                               ),
                             ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _notes,
+                            maxLines: 3,
+                            maxLength: 2000,
+                            onChanged: (_) => _markDirty(),
+                            decoration: InputDecoration(
+                              labelText: 'Notes (optional)',
+                              alignLabelWithHint: true,
+                              errorText: _errorFor(PersonField.notes),
+                            ),
                           ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _notes,
-                          maxLines: 3,
-                          maxLength: 2000,
-                          decoration: InputDecoration(
-                            labelText: 'Notes (optional)',
-                            alignLabelWithHint: true,
-                            errorText: _errorFor(PersonField.notes),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // PRIMARY SAVE ACTION
-            FilledButton(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
+              // PRIMARY SAVE ACTION
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+                onPressed: _saving ? null : _save,
+                child: Text(
+                  _saving ? 'Saving…' : 'Save',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
-              onPressed: _saving ? null : _save,
-              child: Text(
-                _saving ? 'Saving…' : 'Save',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
-          ],
+              const SizedBox(height: 32),
+            ],
+          ),
         ),
       ),
     );

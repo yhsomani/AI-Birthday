@@ -107,5 +107,44 @@ void main() {
       expect(await fakeStorage.hasCompletedOnboarding(), isTrue);
       expect(find.text('Dashboard Screen'), findsOneWidget);
     });
+
+    testWidgets(
+      'Add Birthday Manually completes onboarding and keeps the form open',
+      (tester) async {
+        // Regression for the push-then-pop race: _finishOnboarding's pop()
+        // used to land after the push and dismiss the just-opened form.
+        await tester.pumpWidget(buildTestApp());
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Add Birthday Manually'));
+        await tester.pumpAndSettle();
+
+        expect(await fakeStorage.hasCompletedOnboarding(), isTrue);
+        expect(find.text('Add Person Screen'), findsOneWidget);
+        expect(find.text('Bring in your birthdays'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'Import from Phone Contacts completes onboarding and lands on People',
+      (tester) async {
+        await tester.pumpWidget(buildTestApp());
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Import from Phone Contacts'));
+        await tester.pumpAndSettle();
+
+        expect(await fakeStorage.hasCompletedOnboarding(), isTrue);
+        expect(find.text('People Screen'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

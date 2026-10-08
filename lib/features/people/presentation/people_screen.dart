@@ -237,7 +237,10 @@ class PeopleScreen extends ConsumerWidget {
             const SizedBox(height: 2),
             Text(
               'Potential duplicates are unselected by default for safety.',
-              style: TextStyle(fontSize: 11, color: context.colors.textSecondary),
+              style: TextStyle(
+                fontSize: 11,
+                color: context.colors.textSecondary,
+              ),
             ),
             const Divider(),
             ConstrainedBox(
@@ -736,11 +739,10 @@ class PeopleScreen extends ConsumerWidget {
                     tooltip: 'Person actions',
                     onSelected: (action) async {
                       if (action == 'message') {
-                        final bRepo = ref.read(birthdaysRepositoryProvider);
-                        final b = await bRepo.getBirthdayForPerson(person.id);
-                        if (b != null && context.mounted) {
-                          context.push('/message-studio/${b.id}');
-                        }
+                        // Person-scoped Studio route: no birthday lookup, so
+                        // the action can never silently no-op on a missing row
+                        // (same route notifications/calendar use).
+                        context.push('/message-studio/person/${person.id}');
                       } else if (action == 'edit') {
                         context.push('/people/edit/${person.id}');
                       } else if (action == 'delete') {
@@ -902,11 +904,7 @@ class PeopleScreen extends ConsumerWidget {
             child: FilledButton.icon(
               onPressed: () async {
                 Navigator.of(context).pop();
-                final bRepo = ref.read(birthdaysRepositoryProvider);
-                final b = await bRepo.getBirthdayForPerson(person.id);
-                if (b != null && context.mounted) {
-                  context.push('/message-studio/${b.id}');
-                }
+                context.push('/message-studio/person/${person.id}');
               },
               icon: const Icon(Icons.auto_awesome),
               label: const Text('Draft Message with AI'),

@@ -1110,7 +1110,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                       ),
                       Text(
                         '${person.relationship.displayName} • ${person.phoneNumber ?? 'No phone'}',
-                        style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: context.colors.textSecondary,
+                        ),
                       ),
                       if (phoneMissing)
                         Text(
@@ -1132,7 +1135,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                         )
                       else if (isCompleted)
                         Text(
-                          '✓ Celebration marked as sent. Resend anytime below.',
+                          // WhatsApp is replaced by 'View in History' once the
+                          // celebration is marked sent, so don't promise a
+                          // resend path that no longer exists on this screen.
+                          '✓ Celebration marked as sent.',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.green[800],
@@ -1153,7 +1159,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               const SizedBox(height: 4),
               Text(
                 person.importantFacts.join(' • '),
-                style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: context.colors.textSecondary,
+                ),
               ),
             ],
           ],
@@ -1259,7 +1268,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                   ),
                 Text(
                   '${_messageController.text.length} chars',
-                  style: TextStyle(fontSize: 11, color: context.colors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: context.colors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -1278,7 +1290,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             maxLines: 5,
             onChanged: _onMessageChanged,
             decoration: const InputDecoration(
-              hintText: 'Write a birthday greeting or tap Create message...',
+              hintText: 'Write a birthday greeting or tap Generate with AI...',
             ),
           ),
         ),

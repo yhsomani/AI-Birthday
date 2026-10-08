@@ -340,38 +340,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _saveKey() async {
     HapticFeedback.lightImpact();
     final text = _apiKeyController.text.trim();
+    if (text.isEmpty) {
+      // The empty-field Save Key button previously wiped the stored key
+      // silently — a redundant, unlabeled destructive path next to the
+      // explicit 'Remove Key' button. Save now refuses to delete; removal is
+      // the labelled 'Remove Key' action only.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _hasKey
+                  ? 'Enter a key to save, or use Remove Key to delete the stored key.'
+                  : 'Enter a key to save first.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
     final storage = ref.read(credentialStorageProvider);
     try {
-      if (text.isEmpty) {
-        await storage.deleteGeminiApiKey();
-        await storage.clearGeminiKeyVerifiedAt();
-        setState(() {
-          _hasKey = false;
-          _connectionResult = null;
-          _lastVerifiedAt = null;
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Gemini API key removed.')),
-          );
-        }
-      } else {
-        await storage.saveGeminiApiKey(text);
-        // Raw save is UNVERIFIED: drop any prior verification so the badge
-        // can never claim readiness for a key that was not tested
-        // (audit 02 P2-1).
-        await storage.clearGeminiKeyVerifiedAt();
-        setState(() {
-          _hasKey = true;
-          _lastVerifiedAt = null;
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Gemini API key saved in secure device storage.'),
-            ),
-          );
-        }
+      await storage.saveGeminiApiKey(text);
+      // Raw save is UNVERIFIED: drop any prior verification so the badge
+      // can never claim readiness for a key that was not tested
+      // (audit 02 P2-1).
+      await storage.clearGeminiKeyVerifiedAt();
+      setState(() {
+        _hasKey = true;
+        _lastVerifiedAt = null;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gemini API key saved in secure device storage.'),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -379,6 +382,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SnackBar(
             content: Text(
               'Unable to save API key to secure storage. Please try again.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeKey() async {
+    HapticFeedback.lightImpact();
+    final storage = ref.read(credentialStorageProvider);
+    try {
+      await storage.deleteGeminiApiKey();
+      await storage.clearGeminiKeyVerifiedAt();
+      setState(() {
+        _hasKey = false;
+        _connectionResult = null;
+        _lastVerifiedAt = null;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gemini API key removed.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to remove API key from secure storage. Please try again.',
             ),
           ),
         );
@@ -522,7 +554,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _lastSyncTime != null
                         ? 'Last backed up: ${DateFormat.yMMMd().add_jm().format(_lastSyncTime!)}'
                         : 'Save a recoverable copy of your birthdays and contacts to your signed-in cloud account.',
-                    style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.colors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -620,7 +655,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     entitlement.canUseAi
                         ? 'Full AI draft generation, rewrite variations, and personalized message studio are active.'
                         : 'Application AI features require an active subscription entitlement. Birthday tracking and manual drafting remain free forever.',
-                    style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.colors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   if (!entitlement.canUseAi) ...[
@@ -715,7 +753,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     'Don\'t have an API key? Get one from Google AI Studio to unlock personalized AI message drafting.',
-                    style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.colors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -774,7 +815,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         TextButton(
                           onPressed: () {
                             _apiKeyController.clear();
-                            _saveKey();
+                            _removeKey();
                           },
                           child: Text(
                             'Remove Key',
@@ -894,7 +935,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                   child: Text(
                     'AI provider: your active AI-Birthday Pro access is required. When available, AI-Birthday uses your saved Gemini key; otherwise supported Android devices can use Gemini Nano on-device.',
-                    style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.colors.textSecondary,
+                    ),
                   ),
                 ),
               ],
@@ -1354,7 +1398,10 @@ class _AuthTile extends ConsumerWidget {
       ),
       data: (state) => switch (state.status) {
         AuthStatus.unknown => const ListTile(
+          leading: Icon(Icons.login),
           title: Text('Sign in with Google'),
+          subtitle: Text('Account status unavailable'),
+          enabled: false,
         ),
         AuthStatus.signedOut => ListTile(
           leading: Icon(
@@ -1662,7 +1709,10 @@ class _GuideStepTile extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 description,
-                style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: context.colors.textSecondary,
+                ),
               ),
               ?action,
             ],
