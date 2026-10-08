@@ -3094,6 +3094,824 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
   }
 }
 
+class $JobsTable extends Jobs with TableInfo<$JobsTable, Job> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $JobsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _subjectIdMeta = const VerificationMeta(
+    'subjectId',
+  );
+  @override
+  late final GeneratedColumn<String> subjectId = GeneratedColumn<String>(
+    'subject_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _attemptsMeta = const VerificationMeta(
+    'attempts',
+  );
+  @override
+  late final GeneratedColumn<int> attempts = GeneratedColumn<int>(
+    'attempts',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _maxAttemptsMeta = const VerificationMeta(
+    'maxAttempts',
+  );
+  @override
+  late final GeneratedColumn<int> maxAttempts = GeneratedColumn<int>(
+    'max_attempts',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _errorCodeMeta = const VerificationMeta(
+    'errorCode',
+  );
+  @override
+  late final GeneratedColumn<String> errorCode = GeneratedColumn<String>(
+    'error_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _errorMessageMeta = const VerificationMeta(
+    'errorMessage',
+  );
+  @override
+  late final GeneratedColumn<String> errorMessage = GeneratedColumn<String>(
+    'error_message',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _resultRefMeta = const VerificationMeta(
+    'resultRef',
+  );
+  @override
+  late final GeneratedColumn<String> resultRef = GeneratedColumn<String>(
+    'result_ref',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _startedAtMeta = const VerificationMeta(
+    'startedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> startedAt = GeneratedColumn<DateTime>(
+    'started_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _finishedAtMeta = const VerificationMeta(
+    'finishedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> finishedAt = GeneratedColumn<DateTime>(
+    'finished_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _nextRetryAtMeta = const VerificationMeta(
+    'nextRetryAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> nextRetryAt = GeneratedColumn<DateTime>(
+    'next_retry_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    type,
+    status,
+    subjectId,
+    payload,
+    attempts,
+    maxAttempts,
+    errorCode,
+    errorMessage,
+    resultRef,
+    createdAt,
+    startedAt,
+    finishedAt,
+    nextRetryAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'jobs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Job> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('subject_id')) {
+      context.handle(
+        _subjectIdMeta,
+        subjectId.isAcceptableOrUnknown(data['subject_id']!, _subjectIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_subjectIdMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    }
+    if (data.containsKey('attempts')) {
+      context.handle(
+        _attemptsMeta,
+        attempts.isAcceptableOrUnknown(data['attempts']!, _attemptsMeta),
+      );
+    }
+    if (data.containsKey('max_attempts')) {
+      context.handle(
+        _maxAttemptsMeta,
+        maxAttempts.isAcceptableOrUnknown(
+          data['max_attempts']!,
+          _maxAttemptsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('error_code')) {
+      context.handle(
+        _errorCodeMeta,
+        errorCode.isAcceptableOrUnknown(data['error_code']!, _errorCodeMeta),
+      );
+    }
+    if (data.containsKey('error_message')) {
+      context.handle(
+        _errorMessageMeta,
+        errorMessage.isAcceptableOrUnknown(
+          data['error_message']!,
+          _errorMessageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('result_ref')) {
+      context.handle(
+        _resultRefMeta,
+        resultRef.isAcceptableOrUnknown(data['result_ref']!, _resultRefMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('started_at')) {
+      context.handle(
+        _startedAtMeta,
+        startedAt.isAcceptableOrUnknown(data['started_at']!, _startedAtMeta),
+      );
+    }
+    if (data.containsKey('finished_at')) {
+      context.handle(
+        _finishedAtMeta,
+        finishedAt.isAcceptableOrUnknown(data['finished_at']!, _finishedAtMeta),
+      );
+    }
+    if (data.containsKey('next_retry_at')) {
+      context.handle(
+        _nextRetryAtMeta,
+        nextRetryAt.isAcceptableOrUnknown(
+          data['next_retry_at']!,
+          _nextRetryAtMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Job map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Job(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      subjectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subject_id'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      ),
+      attempts: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempts'],
+      )!,
+      maxAttempts: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}max_attempts'],
+      )!,
+      errorCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}error_code'],
+      ),
+      errorMessage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}error_message'],
+      ),
+      resultRef: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}result_ref'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      startedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}started_at'],
+      ),
+      finishedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}finished_at'],
+      ),
+      nextRetryAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}next_retry_at'],
+      ),
+    );
+  }
+
+  @override
+  $JobsTable createAlias(String alias) {
+    return $JobsTable(attachedDatabase, alias);
+  }
+}
+
+class Job extends DataClass implements Insertable<Job> {
+  final String id;
+  final String type;
+  final String status;
+
+  /// Owner-free, single-user app: `subjectId` scopes the job — a birthday id
+  /// for `ai_generate`, the signed-in account uid for `cloud_sync`.
+  final String subjectId;
+  final String? payload;
+  final int attempts;
+  final int maxAttempts;
+  final String? errorCode;
+  final String? errorMessage;
+  final String? resultRef;
+  final DateTime createdAt;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
+  final DateTime? nextRetryAt;
+  const Job({
+    required this.id,
+    required this.type,
+    required this.status,
+    required this.subjectId,
+    this.payload,
+    required this.attempts,
+    required this.maxAttempts,
+    this.errorCode,
+    this.errorMessage,
+    this.resultRef,
+    required this.createdAt,
+    this.startedAt,
+    this.finishedAt,
+    this.nextRetryAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['type'] = Variable<String>(type);
+    map['status'] = Variable<String>(status);
+    map['subject_id'] = Variable<String>(subjectId);
+    if (!nullToAbsent || payload != null) {
+      map['payload'] = Variable<String>(payload);
+    }
+    map['attempts'] = Variable<int>(attempts);
+    map['max_attempts'] = Variable<int>(maxAttempts);
+    if (!nullToAbsent || errorCode != null) {
+      map['error_code'] = Variable<String>(errorCode);
+    }
+    if (!nullToAbsent || errorMessage != null) {
+      map['error_message'] = Variable<String>(errorMessage);
+    }
+    if (!nullToAbsent || resultRef != null) {
+      map['result_ref'] = Variable<String>(resultRef);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || startedAt != null) {
+      map['started_at'] = Variable<DateTime>(startedAt);
+    }
+    if (!nullToAbsent || finishedAt != null) {
+      map['finished_at'] = Variable<DateTime>(finishedAt);
+    }
+    if (!nullToAbsent || nextRetryAt != null) {
+      map['next_retry_at'] = Variable<DateTime>(nextRetryAt);
+    }
+    return map;
+  }
+
+  JobsCompanion toCompanion(bool nullToAbsent) {
+    return JobsCompanion(
+      id: Value(id),
+      type: Value(type),
+      status: Value(status),
+      subjectId: Value(subjectId),
+      payload: payload == null && nullToAbsent
+          ? const Value.absent()
+          : Value(payload),
+      attempts: Value(attempts),
+      maxAttempts: Value(maxAttempts),
+      errorCode: errorCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(errorCode),
+      errorMessage: errorMessage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(errorMessage),
+      resultRef: resultRef == null && nullToAbsent
+          ? const Value.absent()
+          : Value(resultRef),
+      createdAt: Value(createdAt),
+      startedAt: startedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startedAt),
+      finishedAt: finishedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(finishedAt),
+      nextRetryAt: nextRetryAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextRetryAt),
+    );
+  }
+
+  factory Job.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Job(
+      id: serializer.fromJson<String>(json['id']),
+      type: serializer.fromJson<String>(json['type']),
+      status: serializer.fromJson<String>(json['status']),
+      subjectId: serializer.fromJson<String>(json['subjectId']),
+      payload: serializer.fromJson<String?>(json['payload']),
+      attempts: serializer.fromJson<int>(json['attempts']),
+      maxAttempts: serializer.fromJson<int>(json['maxAttempts']),
+      errorCode: serializer.fromJson<String?>(json['errorCode']),
+      errorMessage: serializer.fromJson<String?>(json['errorMessage']),
+      resultRef: serializer.fromJson<String?>(json['resultRef']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      startedAt: serializer.fromJson<DateTime?>(json['startedAt']),
+      finishedAt: serializer.fromJson<DateTime?>(json['finishedAt']),
+      nextRetryAt: serializer.fromJson<DateTime?>(json['nextRetryAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'type': serializer.toJson<String>(type),
+      'status': serializer.toJson<String>(status),
+      'subjectId': serializer.toJson<String>(subjectId),
+      'payload': serializer.toJson<String?>(payload),
+      'attempts': serializer.toJson<int>(attempts),
+      'maxAttempts': serializer.toJson<int>(maxAttempts),
+      'errorCode': serializer.toJson<String?>(errorCode),
+      'errorMessage': serializer.toJson<String?>(errorMessage),
+      'resultRef': serializer.toJson<String?>(resultRef),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'startedAt': serializer.toJson<DateTime?>(startedAt),
+      'finishedAt': serializer.toJson<DateTime?>(finishedAt),
+      'nextRetryAt': serializer.toJson<DateTime?>(nextRetryAt),
+    };
+  }
+
+  Job copyWith({
+    String? id,
+    String? type,
+    String? status,
+    String? subjectId,
+    Value<String?> payload = const Value.absent(),
+    int? attempts,
+    int? maxAttempts,
+    Value<String?> errorCode = const Value.absent(),
+    Value<String?> errorMessage = const Value.absent(),
+    Value<String?> resultRef = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> startedAt = const Value.absent(),
+    Value<DateTime?> finishedAt = const Value.absent(),
+    Value<DateTime?> nextRetryAt = const Value.absent(),
+  }) => Job(
+    id: id ?? this.id,
+    type: type ?? this.type,
+    status: status ?? this.status,
+    subjectId: subjectId ?? this.subjectId,
+    payload: payload.present ? payload.value : this.payload,
+    attempts: attempts ?? this.attempts,
+    maxAttempts: maxAttempts ?? this.maxAttempts,
+    errorCode: errorCode.present ? errorCode.value : this.errorCode,
+    errorMessage: errorMessage.present ? errorMessage.value : this.errorMessage,
+    resultRef: resultRef.present ? resultRef.value : this.resultRef,
+    createdAt: createdAt ?? this.createdAt,
+    startedAt: startedAt.present ? startedAt.value : this.startedAt,
+    finishedAt: finishedAt.present ? finishedAt.value : this.finishedAt,
+    nextRetryAt: nextRetryAt.present ? nextRetryAt.value : this.nextRetryAt,
+  );
+  Job copyWithCompanion(JobsCompanion data) {
+    return Job(
+      id: data.id.present ? data.id.value : this.id,
+      type: data.type.present ? data.type.value : this.type,
+      status: data.status.present ? data.status.value : this.status,
+      subjectId: data.subjectId.present ? data.subjectId.value : this.subjectId,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      attempts: data.attempts.present ? data.attempts.value : this.attempts,
+      maxAttempts: data.maxAttempts.present
+          ? data.maxAttempts.value
+          : this.maxAttempts,
+      errorCode: data.errorCode.present ? data.errorCode.value : this.errorCode,
+      errorMessage: data.errorMessage.present
+          ? data.errorMessage.value
+          : this.errorMessage,
+      resultRef: data.resultRef.present ? data.resultRef.value : this.resultRef,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      finishedAt: data.finishedAt.present
+          ? data.finishedAt.value
+          : this.finishedAt,
+      nextRetryAt: data.nextRetryAt.present
+          ? data.nextRetryAt.value
+          : this.nextRetryAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Job(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('status: $status, ')
+          ..write('subjectId: $subjectId, ')
+          ..write('payload: $payload, ')
+          ..write('attempts: $attempts, ')
+          ..write('maxAttempts: $maxAttempts, ')
+          ..write('errorCode: $errorCode, ')
+          ..write('errorMessage: $errorMessage, ')
+          ..write('resultRef: $resultRef, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('nextRetryAt: $nextRetryAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    type,
+    status,
+    subjectId,
+    payload,
+    attempts,
+    maxAttempts,
+    errorCode,
+    errorMessage,
+    resultRef,
+    createdAt,
+    startedAt,
+    finishedAt,
+    nextRetryAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Job &&
+          other.id == this.id &&
+          other.type == this.type &&
+          other.status == this.status &&
+          other.subjectId == this.subjectId &&
+          other.payload == this.payload &&
+          other.attempts == this.attempts &&
+          other.maxAttempts == this.maxAttempts &&
+          other.errorCode == this.errorCode &&
+          other.errorMessage == this.errorMessage &&
+          other.resultRef == this.resultRef &&
+          other.createdAt == this.createdAt &&
+          other.startedAt == this.startedAt &&
+          other.finishedAt == this.finishedAt &&
+          other.nextRetryAt == this.nextRetryAt);
+}
+
+class JobsCompanion extends UpdateCompanion<Job> {
+  final Value<String> id;
+  final Value<String> type;
+  final Value<String> status;
+  final Value<String> subjectId;
+  final Value<String?> payload;
+  final Value<int> attempts;
+  final Value<int> maxAttempts;
+  final Value<String?> errorCode;
+  final Value<String?> errorMessage;
+  final Value<String?> resultRef;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> startedAt;
+  final Value<DateTime?> finishedAt;
+  final Value<DateTime?> nextRetryAt;
+  final Value<int> rowid;
+  const JobsCompanion({
+    this.id = const Value.absent(),
+    this.type = const Value.absent(),
+    this.status = const Value.absent(),
+    this.subjectId = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.maxAttempts = const Value.absent(),
+    this.errorCode = const Value.absent(),
+    this.errorMessage = const Value.absent(),
+    this.resultRef = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.nextRetryAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  JobsCompanion.insert({
+    required String id,
+    required String type,
+    required String status,
+    required String subjectId,
+    this.payload = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.maxAttempts = const Value.absent(),
+    this.errorCode = const Value.absent(),
+    this.errorMessage = const Value.absent(),
+    this.resultRef = const Value.absent(),
+    required DateTime createdAt,
+    this.startedAt = const Value.absent(),
+    this.finishedAt = const Value.absent(),
+    this.nextRetryAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       type = Value(type),
+       status = Value(status),
+       subjectId = Value(subjectId),
+       createdAt = Value(createdAt);
+  static Insertable<Job> custom({
+    Expression<String>? id,
+    Expression<String>? type,
+    Expression<String>? status,
+    Expression<String>? subjectId,
+    Expression<String>? payload,
+    Expression<int>? attempts,
+    Expression<int>? maxAttempts,
+    Expression<String>? errorCode,
+    Expression<String>? errorMessage,
+    Expression<String>? resultRef,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? startedAt,
+    Expression<DateTime>? finishedAt,
+    Expression<DateTime>? nextRetryAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (type != null) 'type': type,
+      if (status != null) 'status': status,
+      if (subjectId != null) 'subject_id': subjectId,
+      if (payload != null) 'payload': payload,
+      if (attempts != null) 'attempts': attempts,
+      if (maxAttempts != null) 'max_attempts': maxAttempts,
+      if (errorCode != null) 'error_code': errorCode,
+      if (errorMessage != null) 'error_message': errorMessage,
+      if (resultRef != null) 'result_ref': resultRef,
+      if (createdAt != null) 'created_at': createdAt,
+      if (startedAt != null) 'started_at': startedAt,
+      if (finishedAt != null) 'finished_at': finishedAt,
+      if (nextRetryAt != null) 'next_retry_at': nextRetryAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  JobsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? type,
+    Value<String>? status,
+    Value<String>? subjectId,
+    Value<String?>? payload,
+    Value<int>? attempts,
+    Value<int>? maxAttempts,
+    Value<String?>? errorCode,
+    Value<String?>? errorMessage,
+    Value<String?>? resultRef,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? startedAt,
+    Value<DateTime?>? finishedAt,
+    Value<DateTime?>? nextRetryAt,
+    Value<int>? rowid,
+  }) {
+    return JobsCompanion(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      status: status ?? this.status,
+      subjectId: subjectId ?? this.subjectId,
+      payload: payload ?? this.payload,
+      attempts: attempts ?? this.attempts,
+      maxAttempts: maxAttempts ?? this.maxAttempts,
+      errorCode: errorCode ?? this.errorCode,
+      errorMessage: errorMessage ?? this.errorMessage,
+      resultRef: resultRef ?? this.resultRef,
+      createdAt: createdAt ?? this.createdAt,
+      startedAt: startedAt ?? this.startedAt,
+      finishedAt: finishedAt ?? this.finishedAt,
+      nextRetryAt: nextRetryAt ?? this.nextRetryAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (subjectId.present) {
+      map['subject_id'] = Variable<String>(subjectId.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (attempts.present) {
+      map['attempts'] = Variable<int>(attempts.value);
+    }
+    if (maxAttempts.present) {
+      map['max_attempts'] = Variable<int>(maxAttempts.value);
+    }
+    if (errorCode.present) {
+      map['error_code'] = Variable<String>(errorCode.value);
+    }
+    if (errorMessage.present) {
+      map['error_message'] = Variable<String>(errorMessage.value);
+    }
+    if (resultRef.present) {
+      map['result_ref'] = Variable<String>(resultRef.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<DateTime>(startedAt.value);
+    }
+    if (finishedAt.present) {
+      map['finished_at'] = Variable<DateTime>(finishedAt.value);
+    }
+    if (nextRetryAt.present) {
+      map['next_retry_at'] = Variable<DateTime>(nextRetryAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('JobsCompanion(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('status: $status, ')
+          ..write('subjectId: $subjectId, ')
+          ..write('payload: $payload, ')
+          ..write('attempts: $attempts, ')
+          ..write('maxAttempts: $maxAttempts, ')
+          ..write('errorCode: $errorCode, ')
+          ..write('errorMessage: $errorMessage, ')
+          ..write('resultRef: $resultRef, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('finishedAt: $finishedAt, ')
+          ..write('nextRetryAt: $nextRetryAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3103,6 +3921,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ReminderSettingsEntriesTable reminderSettingsEntries =
       $ReminderSettingsEntriesTable(this);
   late final $DeliveryEventsTable deliveryEvents = $DeliveryEventsTable(this);
+  late final $JobsTable jobs = $JobsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3113,6 +3932,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     messageDrafts,
     reminderSettingsEntries,
     deliveryEvents,
+    jobs,
   ];
 }
 
@@ -4617,6 +5437,377 @@ typedef $$DeliveryEventsTableProcessedTableManager =
       DeliveryEvent,
       PrefetchHooks Function()
     >;
+typedef $$JobsTableCreateCompanionBuilder =
+    JobsCompanion Function({
+      required String id,
+      required String type,
+      required String status,
+      required String subjectId,
+      Value<String?> payload,
+      Value<int> attempts,
+      Value<int> maxAttempts,
+      Value<String?> errorCode,
+      Value<String?> errorMessage,
+      Value<String?> resultRef,
+      required DateTime createdAt,
+      Value<DateTime?> startedAt,
+      Value<DateTime?> finishedAt,
+      Value<DateTime?> nextRetryAt,
+      Value<int> rowid,
+    });
+typedef $$JobsTableUpdateCompanionBuilder =
+    JobsCompanion Function({
+      Value<String> id,
+      Value<String> type,
+      Value<String> status,
+      Value<String> subjectId,
+      Value<String?> payload,
+      Value<int> attempts,
+      Value<int> maxAttempts,
+      Value<String?> errorCode,
+      Value<String?> errorMessage,
+      Value<String?> resultRef,
+      Value<DateTime> createdAt,
+      Value<DateTime?> startedAt,
+      Value<DateTime?> finishedAt,
+      Value<DateTime?> nextRetryAt,
+      Value<int> rowid,
+    });
+
+class $$JobsTableFilterComposer extends Composer<_$AppDatabase, $JobsTable> {
+  $$JobsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subjectId => $composableBuilder(
+    column: $table.subjectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get maxAttempts => $composableBuilder(
+    column: $table.maxAttempts,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get errorCode => $composableBuilder(
+    column: $table.errorCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get errorMessage => $composableBuilder(
+    column: $table.errorMessage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get resultRef => $composableBuilder(
+    column: $table.resultRef,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$JobsTableOrderingComposer extends Composer<_$AppDatabase, $JobsTable> {
+  $$JobsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get subjectId => $composableBuilder(
+    column: $table.subjectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get maxAttempts => $composableBuilder(
+    column: $table.maxAttempts,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get errorCode => $composableBuilder(
+    column: $table.errorCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get errorMessage => $composableBuilder(
+    column: $table.errorMessage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get resultRef => $composableBuilder(
+    column: $table.resultRef,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$JobsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $JobsTable> {
+  $$JobsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get subjectId =>
+      $composableBuilder(column: $table.subjectId, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<int> get attempts =>
+      $composableBuilder(column: $table.attempts, builder: (column) => column);
+
+  GeneratedColumn<int> get maxAttempts => $composableBuilder(
+    column: $table.maxAttempts,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get errorCode =>
+      $composableBuilder(column: $table.errorCode, builder: (column) => column);
+
+  GeneratedColumn<String> get errorMessage => $composableBuilder(
+    column: $table.errorMessage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get resultRef =>
+      $composableBuilder(column: $table.resultRef, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get startedAt =>
+      $composableBuilder(column: $table.startedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get finishedAt => $composableBuilder(
+    column: $table.finishedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => column,
+  );
+}
+
+class $$JobsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $JobsTable,
+          Job,
+          $$JobsTableFilterComposer,
+          $$JobsTableOrderingComposer,
+          $$JobsTableAnnotationComposer,
+          $$JobsTableCreateCompanionBuilder,
+          $$JobsTableUpdateCompanionBuilder,
+          (Job, BaseReferences<_$AppDatabase, $JobsTable, Job>),
+          Job,
+          PrefetchHooks Function()
+        > {
+  $$JobsTableTableManager(_$AppDatabase db, $JobsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$JobsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$JobsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$JobsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> subjectId = const Value.absent(),
+                Value<String?> payload = const Value.absent(),
+                Value<int> attempts = const Value.absent(),
+                Value<int> maxAttempts = const Value.absent(),
+                Value<String?> errorCode = const Value.absent(),
+                Value<String?> errorMessage = const Value.absent(),
+                Value<String?> resultRef = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> startedAt = const Value.absent(),
+                Value<DateTime?> finishedAt = const Value.absent(),
+                Value<DateTime?> nextRetryAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => JobsCompanion(
+                id: id,
+                type: type,
+                status: status,
+                subjectId: subjectId,
+                payload: payload,
+                attempts: attempts,
+                maxAttempts: maxAttempts,
+                errorCode: errorCode,
+                errorMessage: errorMessage,
+                resultRef: resultRef,
+                createdAt: createdAt,
+                startedAt: startedAt,
+                finishedAt: finishedAt,
+                nextRetryAt: nextRetryAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String type,
+                required String status,
+                required String subjectId,
+                Value<String?> payload = const Value.absent(),
+                Value<int> attempts = const Value.absent(),
+                Value<int> maxAttempts = const Value.absent(),
+                Value<String?> errorCode = const Value.absent(),
+                Value<String?> errorMessage = const Value.absent(),
+                Value<String?> resultRef = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> startedAt = const Value.absent(),
+                Value<DateTime?> finishedAt = const Value.absent(),
+                Value<DateTime?> nextRetryAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => JobsCompanion.insert(
+                id: id,
+                type: type,
+                status: status,
+                subjectId: subjectId,
+                payload: payload,
+                attempts: attempts,
+                maxAttempts: maxAttempts,
+                errorCode: errorCode,
+                errorMessage: errorMessage,
+                resultRef: resultRef,
+                createdAt: createdAt,
+                startedAt: startedAt,
+                finishedAt: finishedAt,
+                nextRetryAt: nextRetryAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$JobsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $JobsTable,
+      Job,
+      $$JobsTableFilterComposer,
+      $$JobsTableOrderingComposer,
+      $$JobsTableAnnotationComposer,
+      $$JobsTableCreateCompanionBuilder,
+      $$JobsTableUpdateCompanionBuilder,
+      (Job, BaseReferences<_$AppDatabase, $JobsTable, Job>),
+      Job,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4634,4 +5825,5 @@ class $AppDatabaseManager {
       );
   $$DeliveryEventsTableTableManager get deliveryEvents =>
       $$DeliveryEventsTableTableManager(_db, _db.deliveryEvents);
+  $$JobsTableTableManager get jobs => $$JobsTableTableManager(_db, _db.jobs);
 }

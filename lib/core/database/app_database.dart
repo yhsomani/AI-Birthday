@@ -109,6 +109,41 @@ class DeliveryEvents extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Durable background-job queue (background-jobs audit).
+///
+/// One row per durable operation (`ai_generate`, `cloud_sync`). The worker
+/// that owns processing lives in the app process — a job survives process
+/// death in [JobStatus.running]/[JobStatus.retrying] and is reset to queued
+/// by the worker's crash recovery on next launch, so no job is ever lost or
+/// reported "succeeded" unless its handler actually completed.
+///
+/// `payload` stores only NON-secret, JSON-encoded inputs (no API keys, no
+/// ID tokens — the worker reads credentials fresh at run time). `attempts` /
+/// `maxAttempts` drive the bounded retry policy; `nextRetryAt` defers retries
+/// after backoff. `resultRef` points at the durable effect (draft id,
+/// last-sync timestamp).
+class Jobs extends Table {
+  TextColumn get id => text()();
+  TextColumn get type => text()();
+  TextColumn get status => text()();
+  /// Owner-free, single-user app: `subjectId` scopes the job — a birthday id
+  /// for `ai_generate`, the signed-in account uid for `cloud_sync`.
+  TextColumn get subjectId => text()();
+  TextColumn get payload => text().nullable()();
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+  IntColumn get maxAttempts => integer().withDefault(const Constant(1))();
+  TextColumn get errorCode => text().nullable()();
+  TextColumn get errorMessage => text().nullable()();
+  TextColumn get resultRef => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get startedAt => dateTime().nullable()();
+  DateTimeColumn get finishedAt => dateTime().nullable()();
+  DateTimeColumn get nextRetryAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     Persons,
@@ -116,6 +151,7 @@ class DeliveryEvents extends Table {
     MessageDrafts,
     ReminderSettingsEntries,
     DeliveryEvents,
+    Jobs,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -131,7 +167,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -152,6 +188,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) {
         await m.createTable(deliveryEvents);
+      }
+      if (from < 5) {
+        await m.createTable(jobs);
       }
     },
     beforeOpen: (details) async {

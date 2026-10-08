@@ -16,6 +16,8 @@ class CloudSyncResult {
     this.uploadedCount = 0,
     this.downloadedCount = 0,
     this.error,
+    this.errorCode,
+    this.retryable = false,
     required this.timestamp,
   });
 
@@ -23,6 +25,14 @@ class CloudSyncResult {
   final int uploadedCount;
   final int downloadedCount;
   final String? error;
+
+  /// Stable failure classification consumed by the durable job worker:
+  /// `auth` (sign back in — permanent), `config` (permanent), or
+  /// `sync`/`network` (transient — retryable).
+  final String? errorCode;
+
+  /// Whether a failed result can reasonably be retried as-is.
+  final bool retryable;
   final DateTime timestamp;
 }
 
@@ -383,6 +393,8 @@ class CloudSyncService {
           success: false,
           uploadedCount: uploaded,
           error: error,
+          errorCode: 'sync',
+          retryable: true,
           timestamp: now,
         );
       }
@@ -410,6 +422,8 @@ class CloudSyncService {
         success: false,
         error:
             'Cloud backup could not be completed. Check your connection and try again.',
+        errorCode: 'network',
+        retryable: true,
         timestamp: now,
       );
     }
@@ -425,6 +439,7 @@ class CloudSyncService {
         error: authState.isSignedIn
             ? 'Your cloud session has expired. Sign in again before restoring.'
             : 'Please sign in to restore a cloud backup.',
+        errorCode: 'auth',
         timestamp: now,
       );
     }
@@ -433,6 +448,7 @@ class CloudSyncService {
       return CloudSyncResult(
         success: false,
         error: 'Cloud restore is not configured in this build.',
+        errorCode: 'config',
         timestamp: now,
       );
     }
@@ -680,6 +696,8 @@ class CloudSyncService {
         success: false,
         error:
             'Cloud restore could not be completed. Check your connection and try again.',
+        errorCode: 'network',
+        retryable: true,
         timestamp: now,
       );
     }

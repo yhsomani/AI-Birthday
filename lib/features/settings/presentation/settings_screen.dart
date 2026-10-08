@@ -2,6 +2,9 @@
 /// Subscription Entitlement, and Help & Guide (SSOT §5, §11, §17, §20).
 library;
 
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +18,8 @@ import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 import 'package:ai_birthday/features/auth/domain/auth_state.dart';
 import 'package:ai_birthday/features/auth/presentation/auth_bottom_sheet.dart';
+import 'package:ai_birthday/features/jobs/application/cloud_job_handler.dart';
+import 'package:ai_birthday/features/jobs/domain/job.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_providers.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
 import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
@@ -41,9 +46,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   GeminiConnectionResult? _connectionResult;
   DateTime? _lastVerifiedAt;
   bool _isPurchasing = false;
+  // Cloud backup/restore now run as durable background jobs: `_isSyncing`
+  // follows the account's active cloud job (truthful even after re-entry),
+  // and failures stay visible inline with a retry affordance.
   bool _isSyncing = false;
+  String? _cloudError;
   DateTime? _lastSyncTime;
   NanoState _nanoState = NanoState.unavailable;
+
+  // Durable job bookkeeping for the signed-in account's cloud_sync job.
+  StreamSubscription<JobRecord?>? _cloudJobSub;
+  String? _lastHandledCloudJobId;
+  JobStatus? _lastHandledCloudJobStatus;
+  // Set when THIS screen visit enqueues a job: gates the success/failure
+  // snackbar and picks backup- vs restore-specific copy.
+  String? _lastEnqueuedCloudJobId;
+  String? _pendingCloudOperation;
 
   // Bumped after a notification re-enable attempt so the revoked-state
   // FutureBuilder below re-queries OS permission (audit Scenario T).
@@ -55,12 +73,96 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _checkStoredKey();
     _checkNanoState();
     _loadLastSyncTime();
+    _initCloudJobWatch();
   }
 
   @override
   void dispose() {
+    _cloudJobSub?.cancel();
     _apiKeyController.dispose();
     super.dispose();
+  }
+
+  /// Follows the signed-in account's durable cloud job so backup/restore
+  /// status is truthful even when the job outlives this screen visit. Seat
+  /// the state with a one-shot read, then ride the worker's in-process
+  /// transition stream (a plain broadcast, so no drift query timers).
+  Future<void> _initCloudJobWatch() async {
+    final auth = ref.read(authControllerProvider).valueOrNull;
+    final identity = auth?.identity;
+    final accountId = identity?.firebaseUid ?? identity?.googleSubject;
+    if (accountId == null || accountId.isEmpty) return;
+    _cloudJobSub?.cancel();
+    final latest =
+        await ref.read(jobsRepositoryProvider).latestJob(JobTypes.cloudSync, accountId);
+    if (latest != null && mounted) _onCloudJobEvent(latest);
+    _cloudJobSub = ref
+        .read(jobWorkerProvider)
+        .events
+        .where(
+          (job) => job.type == JobTypes.cloudSync && job.subjectId == accountId,
+        )
+        .listen(_onCloudJobEvent);
+  }
+
+  void _onCloudJobEvent(JobRecord? job) {
+    if (job == null || !mounted) return;
+    if (job.id == _lastHandledCloudJobId &&
+        job.status == _lastHandledCloudJobStatus) {
+      return;
+    }
+    _lastHandledCloudJobId = job.id;
+    _lastHandledCloudJobStatus = job.status;
+
+    final ours = job.id == _lastEnqueuedCloudJobId;
+    final operation = _pendingCloudOperation ?? CloudJobPayload.backup;
+
+    switch (job.status) {
+      case JobStatus.queued || JobStatus.running || JobStatus.retrying:
+        setState(() {
+          _isSyncing = true;
+          _cloudError = null;
+        });
+      case JobStatus.succeeded:
+        setState(() {
+          _isSyncing = false;
+          _cloudError = null;
+        });
+        _loadLastSyncTime(); // Refresh the LAST SUCCESSFUL chip.
+        if (ours) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                operation == CloudJobPayload.restore
+                    ? 'Cloud restore complete!'
+                    : 'Cloud backup complete.',
+              ),
+            ),
+          );
+        }
+      case JobStatus.failed:
+        final message = job.errorMessage ?? 'Cloud operation failed.';
+        setState(() {
+          _isSyncing = false;
+          _cloudError = message;
+        });
+        if (ours) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                operation == CloudJobPayload.restore
+                    ? 'Restore failed: $message'
+                    : 'Backup failed: $message',
+              ),
+            ),
+          );
+        }
+      case JobStatus.canceled:
+        setState(() {
+          _isSyncing = false;
+          _cloudError = null;
+        });
+    }
   }
 
   Future<void> _checkStoredKey() async {
@@ -111,37 +213,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _handleCloudSync() async {
     HapticFeedback.lightImpact();
     final auth = ref.read(authControllerProvider).valueOrNull;
-    if (auth == null || !auth.isSignedIn) {
+    if (auth == null || !auth.isSignedIn || auth.identity == null) {
+      AuthBottomSheet.show(context);
+      return;
+    }
+    final accountId =
+        auth.identity!.firebaseUid ?? auth.identity!.googleSubject;
+    if (accountId.isEmpty) {
       AuthBottomSheet.show(context);
       return;
     }
 
-    setState(() => _isSyncing = true);
-    final syncService = ref.read(cloudSyncServiceProvider);
-    final result = await syncService.sync(auth);
+    // Durable backup job: the tap only enqueues; the worker uploads even if
+    // the user leaves Settings, and retries transient failures once.
+    final job = await ref.read(jobWorkerProvider).enqueue(
+      type: JobTypes.cloudSync,
+      subjectId: accountId,
+      payload: jsonEncode(const CloudJobPayload(operation: CloudJobPayload.backup).toJson()),
+      maxAttempts: 2,
+    );
+    _initCloudJobWatch();
     if (!mounted) return;
     setState(() {
-      _isSyncing = false;
-      if (result.success) {
-        _lastSyncTime = result.timestamp;
-      }
+      _isSyncing = true;
+      _cloudError = null;
+      _lastEnqueuedCloudJobId = job.id;
+      _pendingCloudOperation = CloudJobPayload.backup;
     });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          result.success
-              ? 'Cloud backup complete. ${result.uploadedCount} records saved.'
-              : 'Backup failed: ${result.error ?? 'Unknown error'}',
-        ),
-      ),
-    );
   }
 
   Future<void> _handleCloudRestore() async {
     HapticFeedback.lightImpact();
     final auth = ref.read(authControllerProvider).valueOrNull;
-    if (auth == null || !auth.isSignedIn) {
+    if (auth == null || !auth.isSignedIn || auth.identity == null) {
+      AuthBottomSheet.show(context);
+      return;
+    }
+    final accountId =
+        auth.identity!.firebaseUid ?? auth.identity!.googleSubject;
+    if (accountId.isEmpty) {
       AuthBottomSheet.show(context);
       return;
     }
@@ -168,21 +278,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (confirmed != true || !mounted) return;
 
-    setState(() => _isSyncing = true);
-    final syncService = ref.read(cloudSyncServiceProvider);
-    final result = await syncService.restore(auth);
-    if (!mounted) return;
-    setState(() => _isSyncing = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          result.success
-              ? 'Cloud restore complete! ${result.downloadedCount} records restored to your device.'
-              : 'Restore failed: ${result.error ?? 'Unknown error'}',
-        ),
-      ),
+    // Durable restore job. Restore is NOT auto-retried (maxAttempts 1): a
+    // destructive-looking merge should only re-run when the user asks.
+    final job = await ref.read(jobWorkerProvider).enqueue(
+      type: JobTypes.cloudSync,
+      subjectId: accountId,
+      payload: jsonEncode(const CloudJobPayload(operation: CloudJobPayload.restore).toJson()),
+      maxAttempts: 1,
     );
+    _initCloudJobWatch();
+    if (!mounted) return;
+    setState(() {
+      _isSyncing = true;
+      _cloudError = null;
+      _lastEnqueuedCloudJobId = job.id;
+      _pendingCloudOperation = CloudJobPayload.restore;
+    });
   }
 
   Future<void> _launchExternalUrl(String url) async {
@@ -599,6 +710,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ],
                   ),
+                  // Durable failure status: the job row remembers that the
+                  // last backup/restore failed, even after this screen was
+                  // closed and reopened. Tapping the button again retries.
+                  if (_cloudError != null) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 16,
+                          color: context.colors.danger,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '$_cloudError Tap "Back Up Now" (or "Restore from Cloud") to retry.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.colors.danger,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -75,6 +75,11 @@ class AppFailure implements Exception {
     _ => false,
   };
 
+  /// User-safe one-line description (message + detail + action). This is the
+  /// exact composition the studio used to render failures, shared so the job
+  /// worker persists the same copy the UI would have shown.
+  String get userMessage => '$message: ${detail ?? ''} ${action ?? ''}';
+
   /// Whether a configured credential exists but is invalid (never "missing").
   bool get isCredentialError => switch (code) {
     AppFailureCode.aiCredentialInvalid => true,

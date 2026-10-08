@@ -2,6 +2,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,8 @@ import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/delivery/data/whatsapp_handoff_builder.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
+import 'package:ai_birthday/features/jobs/application/ai_job_handler.dart';
+import 'package:ai_birthday/features/jobs/domain/job.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
@@ -47,9 +50,24 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   Person? _person;
   MessageDraft? _draft;
   bool _isLoading = true;
+  // AI work is a durable background job now: this flag tracks whether the
+  // active job (or a synchronous variations run) is in flight. The job row is
+  // the source of truth — the widget follows it even across re-entry.
   bool _isGenerating = false;
+  String? _retryingLabel;
   String? _errorMessage;
   AppFailureCode? _lastFailureCode;
+
+  // Durable-job bookkeeping for the birthday's latest ai_generate job.
+  StreamSubscription<JobRecord?>? _aiJobSub;
+  String? _lastHandledJobId;
+  JobStatus? _lastHandledJobStatus;
+  // Set when THIS screen visit enqueues a job: gates "ours" snackbars and
+  // the stale-result copy ("you edited while drafting").
+  String? _lastEnqueuedJobId;
+  int _enqueuedRevision = 0;
+  String? _pendingJobLabel;
+  String? _pendingStaleLabel;
 
   // Captured at load: dispose() runs after ref becomes unusable, but the
   // final draft save still needs the repository.
@@ -88,6 +106,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _aiJobSub?.cancel();
     _autosaveTimer?.cancel();
     if (_messageController.text.isNotEmpty && _person != null) {
       _saveDraft(status: _draft?.status ?? DraftStatus.draft);
@@ -140,6 +159,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     }
 
     if (birthday != null) {
+      final targetId = birthday.id;
       final person = await pRepo.getPerson(birthday.personId);
       final draft = await dRepo.getDraftForBirthday(birthday.id);
 
@@ -156,6 +176,24 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         }
         _isLoading = false;
       });
+
+      // Follow the birthday's durable generation job: in-flight states
+      // ("Drafting…", "Retrying…"), applied results, and failures all come
+      // from the job row so the studio stays truthful across re-entry. Seat
+      // the state with a one-shot read, then ride the worker's in-process
+      // transition stream (a plain broadcast, so no drift query timers).
+      _aiJobSub?.cancel();
+      final latest = await ref
+          .read(jobsRepositoryProvider)
+          .latestJob(JobTypes.aiGenerate, targetId);
+      if (latest != null && mounted) _handleJobEvent(latest);
+      _aiJobSub = ref
+          .read(jobWorkerProvider)
+          .events
+          .where(
+            (job) => job.type == JobTypes.aiGenerate && job.subjectId == targetId,
+          )
+          .listen(_handleJobEvent);
     } else {
       setState(() {
         _errorMessage = 'Birthday event not found.';
@@ -164,115 +202,163 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     }
   }
 
+  /// Primary "Generate with AI" action and the error-banner Retry path.
+  ///
+  /// Generation now runs as a durable background job: the tap only enqueues
+  /// (fast ack), the worker generates and persists the drafted message even
+  /// if the user leaves the screen, and [._handleJobEvent] applies the result
+  /// when it succeeds. [forceNano] retries with the on-device provider.
   Future<void> _generateWithAi({bool forceNano = false}) async {
-    if (_person == null) return;
+    await _enqueueGenerate(
+      customInstruction:
+          _customInstructionController.text.trim().isNotEmpty
+          ? _customInstructionController.text.trim()
+          : null,
+      existingMessage: _messageController.text.trim().isNotEmpty
+          ? _messageController.text.trim()
+          : null,
+      forceNano: forceNano,
+      successLabel: 'Message drafted with AI ✨',
+    );
+  }
 
+  /// Enqueues a durable `ai_generate` job. The job payload captures the
+  /// non-secret inputs plus the draft's `updatedAt` at enqueue time; the
+  /// worker discards the result if the draft changed in the meantime (the
+  /// stale-response guard that used to live in this widget now lives in the
+  /// job handler, so it also protects drafts saved from other screens).
+  Future<void> _enqueueGenerate({
+    MessageTone? tone,
+    MessageLength? length,
+    String? customInstruction,
+    String? existingMessage,
+    String? targetLanguage,
+    bool forceNano = false,
+    String? successLabel,
+    String? staleLabel,
+  }) async {
+    if (_person == null || _birthday == null) return;
+    final birthdayId = _activeBirthdayId;
+
+    // Snapshot the persisted draft so the worker can tell "user edited while
+    // the job was in flight" from "draft unchanged".
+    final revisedDraft = await ref
+        .read(draftsRepositoryProvider)
+        .getDraftForBirthday(birthdayId);
+
+    final job = await ref.read(jobWorkerProvider).enqueue(
+      type: JobTypes.aiGenerate,
+      subjectId: birthdayId,
+      payload: jsonEncode(
+        AiJobPayload(
+          birthdayId: birthdayId,
+          personId: _person!.id,
+          tone: tone ?? _selectedTone,
+          length: length ?? _selectedLength,
+          customInstruction: customInstruction,
+          existingMessage: existingMessage,
+          targetLanguage: targetLanguage,
+          forceNano: forceNano,
+          draftUpdatedAt: revisedDraft?.updatedAt.toIso8601String(),
+        ).toJson(),
+      ),
+      maxAttempts: 3,
+    );
+    if (!mounted) return;
     setState(() {
-      _isGenerating = true;
+      _lastEnqueuedJobId = job.id;
+      _enqueuedRevision = _editRevision;
+      _pendingJobLabel = successLabel ?? 'Message drafted with AI ✨';
+      _pendingStaleLabel =
+          staleLabel ??
+          'You edited the message while drafting. Your edits were kept — review before sending.';
       _errorMessage = null;
       _lastFailureCode = null;
+      _isGenerating = true;
+      _retryingLabel = null;
     });
+  }
 
-    final revision = _editRevision;
-    try {
-      final aiRouter = ref.read(aiRouterProvider);
-      final entitlement = ref.read(entitlementProvider);
+  /// Follows the birthday's durable generation job.
+  void _handleJobEvent(JobRecord? job) {
+    if (job == null || !mounted) return;
+    // Only react to actual transitions, not re-emissions of the same state.
+    if (job.id == _lastHandledJobId && job.status == _lastHandledJobStatus) {
+      return;
+    }
+    _lastHandledJobId = job.id;
+    _lastHandledJobStatus = job.status;
 
-      final request = AiGenerationRequest(
-        person: _person!,
-        tone: _selectedTone,
-        length: _selectedLength,
-        customInstruction: _customInstructionController.text.trim().isNotEmpty
-            ? _customInstructionController.text.trim()
-            : null,
-        existingMessage: _messageController.text.trim().isNotEmpty
-            ? _messageController.text.trim()
-            : null,
-      );
+    switch (job.status) {
+      case JobStatus.queued || JobStatus.running:
+        setState(() {
+          _isGenerating = true;
+          _retryingLabel = null;
+          _errorMessage = null;
+        });
+      case JobStatus.retrying:
+        setState(() {
+          _isGenerating = true;
+          _retryingLabel = 'Retrying (${job.attempts + 1}/${job.maxAttempts})';
+          _errorMessage = null;
+        });
+      case JobStatus.succeeded:
+        setState(() {
+          _isGenerating = false;
+          _retryingLabel = null;
+        });
+        _onAiJobSucceeded(job);
+      case JobStatus.failed:
+        setState(() {
+          _isGenerating = false;
+          _retryingLabel = null;
+          _errorMessage = job.errorMessage ?? 'AI drafting failed. Please retry.';
+          _lastFailureCode = AppFailureCode.values
+              .cast<AppFailureCode?>()
+              .firstWhere(
+                (code) => code?.name == job.errorCode,
+                orElse: () => null,
+              );
+        });
+      case JobStatus.canceled:
+        setState(() {
+          _isGenerating = false;
+          _retryingLabel = null;
+        });
+    }
+  }
 
-      final result = await aiRouter.generate(
-        request: request,
-        entitlement: entitlement,
-        forceNano: forceNano,
-      );
+  /// A generation job succeeded. The worker already persisted the draft, so
+  /// this only updates the visible editor and reports honestly:
+  /// - result applies if the user has not edited since enqueue;
+  /// - otherwise the newest text wins and the user is told their edits were
+  ///   kept (same stale-response guarantee as before, now durable).
+  Future<void> _onAiJobSucceeded(JobRecord job) async {
+    final ours = job.id == _lastEnqueuedJobId;
+    final draft = await ref
+        .read(draftsRepositoryProvider)
+        .getDraftForBirthday(_activeBirthdayId);
+    if (!mounted) return;
 
-      // If the user typed while the request was in flight, their newer text
-      // wins: applying this stale result would silently discard their edits.
-      if (revision != _editRevision) {
-        setState(() => _isGenerating = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'You edited the message while drafting. Your edits were kept — review before sending.',
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      _messageController.text = result.message;
-
-      // Update or create the single per-birthday draft. A stable id derived
-      // from the birthday key makes every save path (autosave, generate,
-      // handoff, dispose) idempotent: racing saves converge on one row
-      // instead of orphaning timestamp-id rows.
-      final draftId = _draft?.id ?? _activeBirthdayId;
-      final updatedDraft = MessageDraft(
-        id: draftId,
-        birthdayId: _activeBirthdayId,
-        personId: _person!.id,
-        body: result.message,
-        tone: _selectedTone,
-        length: _selectedLength,
-        status: DraftStatus.draft,
-        providerType: result.providerType,
-        createdAt: _draft?.createdAt ?? DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      await ref.read(draftsRepositoryProvider).saveDraft(updatedDraft);
-      await ref
-          .read(birthdaysRepositoryProvider)
-          .updateBirthdayStatus(
-            _activeBirthdayId,
-            BirthdayStatus.messageDrafted,
-            draftId: draftId,
-          );
-
+    final userEdited = _enqueuedRevision != _editRevision;
+    if (draft != null && !userEdited) {
       setState(() {
-        _draft = updatedDraft;
-        _isGenerating = false;
+        _messageController.text = draft.body;
+        _draft = draft;
+        _selectedTone = draft.tone;
+        _selectedLength = draft.length;
       });
-
-      if (mounted) {
+      if (ours) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Message drafted with AI ✨')),
+          SnackBar(content: Text(_pendingJobLabel ?? 'Message drafted with AI ✨')),
         );
       }
-    } on AppFailure catch (e) {
-      setState(() {
-        _errorMessage = '${e.message}: ${e.detail ?? ''} ${e.action ?? ''}';
-        _lastFailureCode = e.code;
-        _isGenerating = false;
-      });
-    } catch (e, st) {
-      // 🛡️ SECURITY: Prevent internal exception strings from leaking into the UI.
-      ref
-          .read(loggerProvider)
-          .error(
-            'MessageStudio',
-            'Unexpected error drafting message',
-            error: e,
-            stackTrace: st,
-          );
-      setState(() {
-        _errorMessage =
-            'An unexpected error occurred while drafting the message.';
-        _lastFailureCode = null;
-        _isGenerating = false;
-      });
+    } else if (ours && userEdited) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_pendingStaleLabel ?? 'Your edits were kept.'),
+        ),
+      );
     }
   }
 
@@ -545,85 +631,22 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       return;
     }
 
-    setState(() {
-      _isGenerating = true;
-      _errorMessage = null;
-    });
-
-    final revision = _editRevision;
-    try {
-      final aiRouter = ref.read(aiRouterProvider);
-      final entitlement = ref.read(entitlementProvider);
-
-      final request = AiGenerationRequest(
-        person: _person!,
-        tone: _selectedTone,
-        length: length ?? _selectedLength,
-        customInstruction: customInstruction,
-        existingMessage: currentText,
-        targetLanguage: targetLanguage,
-      );
-
-      final result = await aiRouter.generate(
-        request: request,
-        entitlement: entitlement,
-      );
-
-      // Never overwrite edits made while the rewrite was in flight.
-      if (revision != _editRevision) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'You edited the message while rewriting. Your edits were kept — review before sending.',
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      _messageController.text = result.message;
-      if (length != null) {
-        _selectedLength = length;
-      }
-
-      await _saveDraft();
-
-      if (mounted) {
-        final label = languageName != null
-            ? 'Translated to $languageName ✨'
-            : (length == MessageLength.short
-                  ? 'Message shortened ✂️'
-                  : length == MessageLength.expanded
-                  ? 'Message expanded 📝'
-                  : 'Message refined ✨');
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(label)));
-      }
-    } on AppFailure catch (e) {
-      setState(() {
-        _errorMessage = '${e.message}: ${e.detail ?? ''} ${e.action ?? ''}';
-        _lastFailureCode = e.code;
-      });
-    } catch (e, st) {
-      ref
-          .read(loggerProvider)
-          .error(
-            'MessageStudio',
-            'Unexpected error rewriting message',
-            error: e,
-            stackTrace: st,
-          );
-      setState(() {
-        _errorMessage = 'An error occurred while rewriting the message.';
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _isGenerating = false);
-      }
-    }
+    final label = languageName != null
+        ? 'Translated to $languageName ✨'
+        : (length == MessageLength.short
+              ? 'Message shortened ✂️'
+              : length == MessageLength.expanded
+              ? 'Message expanded 📝'
+              : 'Message refined ✨');
+    await _enqueueGenerate(
+      length: length,
+      customInstruction: customInstruction,
+      existingMessage: currentText,
+      targetLanguage: targetLanguage,
+      successLabel: label,
+      staleLabel:
+          'You edited the message while rewriting. Your edits were kept — review before sending.',
+    );
   }
 
   Future<void> _generateVariations() async {
@@ -1154,7 +1177,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                           )
                         : const Icon(Icons.auto_awesome),
                     label: Text(
-                      _isGenerating ? 'Drafting...' : 'Generate with AI',
+                      _isGenerating
+                          ? (_retryingLabel ?? 'Drafting...')
+                          : 'Generate with AI',
                     ),
                   ),
           ),

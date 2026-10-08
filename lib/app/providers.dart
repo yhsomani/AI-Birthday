@@ -23,6 +23,11 @@ import 'package:ai_birthday/core/security/flutter_secure_storage_driver.dart';
 import 'package:ai_birthday/features/people/domain/repositories/people_repository.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 import 'package:ai_birthday/features/sync/data/cloud_sync_service.dart';
+import 'package:ai_birthday/features/jobs/application/ai_job_handler.dart';
+import 'package:ai_birthday/features/jobs/application/cloud_job_handler.dart';
+import 'package:ai_birthday/features/jobs/application/job_worker.dart';
+import 'package:ai_birthday/features/jobs/data/jobs_repository.dart';
+import 'package:ai_birthday/features/jobs/domain/job.dart';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ai_birthday/core/core_providers.dart' as core;
@@ -179,6 +184,57 @@ final birthdaysRepositoryProvider = Provider<BirthdaysRepository>((ref) {
 final draftsRepositoryProvider = Provider<DraftsRepository>((ref) {
   final db = ref.watch(core.databaseProvider);
   return DriftDraftsRepository(db);
+});
+
+/// Durable job queue repository (SQLite-backed, background-jobs audit).
+final jobsRepositoryProvider = Provider<JobsRepository>((ref) {
+  final db = ref.watch(core.databaseProvider);
+  return DriftJobsRepository(db);
+});
+
+/// Handler for durable `ai_generate` jobs. Reads the AI router and the
+/// CURRENT entitlement at run time so late changes (key added, Pro unlocked)
+/// apply without rebuilding the worker.
+final aiJobHandlerProvider = Provider<JobHandler>((ref) {
+  return AiGenerationJobHandler(
+    peopleRepository: ref.read(peopleRepositoryProvider),
+    draftsRepository: ref.read(draftsRepositoryProvider),
+    birthdaysRepository: ref.read(birthdaysRepositoryProvider),
+    jobsRepository: ref.read(jobsRepositoryProvider),
+    generate: (request, {required bool forceNano}) {
+      return ref.read(aiRouterProvider).generate(
+        request: request,
+        entitlement: ref.read(entitlementProvider),
+        forceNano: forceNano,
+      );
+    },
+  );
+});
+
+/// Handler for durable `cloud_sync` jobs (backup/restore). Resolves the live
+/// signed-in session at run time; never stores the ID token in the job.
+final cloudJobHandlerProvider = Provider<JobHandler>((ref) {
+  return CloudSyncJobHandler(
+    service: ref.read(cloudSyncServiceProvider),
+    authState: () => ref.read(authControllerProvider.future),
+  );
+});
+
+/// The durable background-job worker. Watched at app boot (crash recovery +
+/// resume) and by any screen that enqueues jobs. One provider instance for
+/// the whole app lifetime.
+final jobWorkerProvider = Provider<JobWorker>((ref) {
+  final worker = JobWorker(
+    repository: ref.watch(jobsRepositoryProvider),
+    handlers: {
+      JobTypes.aiGenerate: ref.watch(aiJobHandlerProvider),
+      JobTypes.cloudSync: ref.watch(cloudJobHandlerProvider),
+    },
+    logger: ref.watch(loggerProvider),
+  );
+  worker.start();
+  ref.onDispose(worker.stop);
+  return worker;
 });
 
 /// Delivery-event Repository: persisted evidence of external-app launches

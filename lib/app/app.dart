@@ -35,6 +35,11 @@ class AiBirthdayApp extends ConsumerWidget {
     });
     ref.watch(authControllerProvider);
 
+    // Start the durable background-job worker at boot: crash recovery for
+    // jobs left running by a previous process, then resume anything queued
+    // (background-jobs audit).
+    ref.watch(jobWorkerProvider);
+
     return MaterialApp.router(
       title: 'AI-Birthday',
       debugShowCheckedModeBanner: false,
