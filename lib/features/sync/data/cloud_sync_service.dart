@@ -91,21 +91,128 @@ class CloudSyncService {
     return 'https://firestore.googleapis.com/v1/projects/$_projectId/databases/(default)/documents/users/$encodedUid/$collection';
   }
 
-  Future<bool> _patchDocument(
-    String collectionUrl,
-    String documentId,
-    Map<String, dynamic> fields,
+  static const int _firestoreCommitLimit = 500;
+
+  /// Firestore `commit` endpoint (collection-agnostic batch write).
+  String _commitUrl() {
+    return 'https://firestore.googleapis.com/v1/projects/$_projectId/databases/(default)/documents:commit?key=$_apiKey';
+  }
+
+  /// Resource name for a write target inside a commit request. This is a
+  /// resource path, not a URL: Firebase/Google uids are alphanumeric and
+  /// document ids are app-generated, so no escaping is required.
+  String _documentPath(String uid, String collection, String documentId) {
+    return 'projects/$_projectId/databases/(default)/documents/users/$uid/$collection/$documentId';
+  }
+
+  /// Sends up to 500 full-document writes in one Firestore `commit` call and
+  /// returns how many of them were accepted.
+  ///
+  /// A commit `update` without an `updateMask` overwrites the entire document
+  /// with the given fields (omitted fields are lost), which is what the former
+  /// per-document PATCH without a mask did — so this preserves the write
+  /// semantics while collapsing N round trips into `N/500`.
+  Future<int> _commitBatch(
+    List<Map<String, dynamic>> writes,
     Map<String, String> headers,
   ) async {
-    final encodedDoc = Uri.encodeComponent(documentId);
-    final url = Uri.parse('$collectionUrl/$encodedDoc?key=$_apiKey');
-    final response = await _http.patch(
-      url,
+    if (writes.isEmpty) return 0;
+    final response = await _http.post(
+      Uri.parse(_commitUrl()),
       headers: headers,
-      body: jsonEncode({'fields': fields}),
+      body: jsonEncode({'writes': writes}),
     );
-    return response.statusCode == 200;
+    if (response.statusCode != 200) return 0;
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      // HTTP 200 with an unparsable body: mirror the former "200 == saved" rule.
+      return writes.length;
+    }
+    if (decoded is! Map<String, dynamic>) return writes.length;
+    final results = decoded['writeResults'];
+    if (results is! List) return writes.length;
+    var ok = 0;
+    for (final result in results) {
+      if (result is Map<String, dynamic> && result['error'] != null) continue;
+      ok++;
+    }
+    return ok;
   }
+
+  /// Flushes [writes] in Firestore-sized batches, reporting per-batch outcomes
+  /// through [onResult].
+  Future<void> _flushWrites(
+    List<Map<String, dynamic>> writes,
+    Map<String, String> headers,
+    void Function(int ok, int total) onResult,
+  ) async {
+    for (var i = 0; i < writes.length; i += _firestoreCommitLimit) {
+      var end = i + _firestoreCommitLimit;
+      if (end > writes.length) end = writes.length;
+      final ok = await _commitBatch(writes.sublist(i, end), headers);
+      onResult(ok, end - i);
+    }
+  }
+
+  Map<String, dynamic> _personFields(Person p) => {
+    'id': _firestoreString(p.id),
+    'name': _firestoreString(p.name),
+    if (p.birthdayMonth != null) 'birthdayMonth': _firestoreInt(p.birthdayMonth!),
+    if (p.birthdayDay != null) 'birthdayDay': _firestoreInt(p.birthdayDay!),
+    if (p.birthYear != null) 'birthYear': _firestoreInt(p.birthYear!),
+    if (p.phoneNumber != null) 'phoneNumber': _firestoreString(p.phoneNumber!),
+    if (p.email != null) 'email': _firestoreString(p.email!),
+    'relationship': _firestoreString(p.relationship),
+    'relationshipCloseness': _firestoreString(p.relationshipCloseness),
+    'preferredLanguage': _firestoreString(p.preferredLanguage),
+    'preferredTone': _firestoreString(p.preferredTone),
+    'importantFacts': _firestoreString(p.importantFacts),
+    if (p.notes != null) 'notes': _firestoreString(p.notes!),
+    'preferredDeliveryChannel': _firestoreString(p.preferredDeliveryChannel),
+    if (p.timezone != null) 'timezone': _firestoreString(p.timezone!),
+    'autoPrepare': _firestoreBool(p.autoPrepare),
+    'autoSendPolicy': _firestoreString(p.autoSendPolicy),
+    'createdAt': _firestoreDate(p.createdAt),
+    'updatedAt': _firestoreDate(p.updatedAt),
+    'version': _firestoreInt(p.version),
+    if (p.deletedAt != null) 'deletedAt': _firestoreDate(p.deletedAt!),
+  };
+
+  Map<String, dynamic> _birthdayFields(Birthday b, Person? person) => {
+    'id': _firestoreString(b.id),
+    'personId': _firestoreString(b.personId),
+    'personName': _firestoreString(person?.name ?? 'Unknown'),
+    'cycleYear': _firestoreInt(b.cycleYear),
+    'date': _firestoreDate(b.date),
+    'status': _firestoreString(b.status),
+    if (b.draftId != null) 'draftId': _firestoreString(b.draftId!),
+    'createdAt': _firestoreDate(b.createdAt),
+    'updatedAt': _firestoreDate(b.updatedAt),
+  };
+
+  Map<String, dynamic> _draftFields(MessageDraft d) => {
+    'id': _firestoreString(d.id),
+    'birthdayId': _firestoreString(d.birthdayId),
+    'personId': _firestoreString(d.personId),
+    'body': _firestoreString(d.body),
+    'tone': _firestoreString(d.tone),
+    'length': _firestoreString(d.length),
+    'status': _firestoreString(d.status),
+    'providerType': _firestoreString(d.providerType),
+    'variationIndex': _firestoreInt(d.variationIndex),
+    'createdAt': _firestoreDate(d.createdAt),
+    'updatedAt': _firestoreDate(d.updatedAt),
+  };
+
+  Map<String, dynamic> _reminderFields(ReminderSettingsEntry setting) => {
+    'key': _firestoreString(setting.key),
+    'enabled': _firestoreBool(setting.enabled),
+    'kinds': _firestoreString(setting.kinds),
+    'quietHoursStartMinutes': _firestoreInt(setting.quietHoursStartMinutes),
+    'quietHoursEndMinutes': _firestoreInt(setting.quietHoursEndMinutes),
+  };
 
   Future<List<Map<String, dynamic>>> _listDocuments(
     String collectionUrl,
@@ -215,116 +322,49 @@ class CloudSyncService {
       final peopleMap = {for (final p in personRows) p.id: p};
       final headers = _headers(authState);
 
-      final peopleUrl = _collectionUrl(uid, 'people');
-      final birthdaysUrl = _collectionUrl(uid, 'birthdays');
-      final draftsUrl = _collectionUrl(uid, 'drafts');
-      final remindersUrl = _collectionUrl(uid, 'reminderSettings');
-
       var uploaded = 0;
       var totalItems = 0;
       var failures = 0;
 
-      for (final p in personRows) {
-        totalItems++;
-        final fields = <String, dynamic>{
-          'id': _firestoreString(p.id),
-          'name': _firestoreString(p.name),
-          if (p.birthdayMonth != null)
-            'birthdayMonth': _firestoreInt(p.birthdayMonth!),
-          if (p.birthdayDay != null)
-            'birthdayDay': _firestoreInt(p.birthdayDay!),
-          if (p.birthYear != null) 'birthYear': _firestoreInt(p.birthYear!),
-          if (p.phoneNumber != null)
-            'phoneNumber': _firestoreString(p.phoneNumber!),
-          if (p.email != null) 'email': _firestoreString(p.email!),
-          'relationship': _firestoreString(p.relationship),
-          'relationshipCloseness': _firestoreString(p.relationshipCloseness),
-          'preferredLanguage': _firestoreString(p.preferredLanguage),
-          'preferredTone': _firestoreString(p.preferredTone),
-          'importantFacts': _firestoreString(p.importantFacts),
-          if (p.notes != null) 'notes': _firestoreString(p.notes!),
-          'preferredDeliveryChannel': _firestoreString(
-            p.preferredDeliveryChannel,
-          ),
-          if (p.timezone != null) 'timezone': _firestoreString(p.timezone!),
-          'autoPrepare': _firestoreBool(p.autoPrepare),
-          'autoSendPolicy': _firestoreString(p.autoSendPolicy),
-          'createdAt': _firestoreDate(p.createdAt),
-          'updatedAt': _firestoreDate(p.updatedAt),
-          'version': _firestoreInt(p.version),
-          if (p.deletedAt != null) 'deletedAt': _firestoreDate(p.deletedAt!),
-        };
+      // Performance audit: previously each row was sent as its own HTTP PATCH
+      // (N round trips, one per row). Writes are now batched into Firestore
+      // `commit` calls of up to 500 — identical full-document replace semantics.
+      final writes = <Map<String, dynamic>>[
+        for (final p in personRows)
+          {
+            'update': {
+              'name': _documentPath(uid, 'people', p.id),
+              'fields': _personFields(p),
+            },
+          },
+        for (final b in birthdayRows)
+          {
+            'update': {
+              'name': _documentPath(uid, 'birthdays', b.id),
+              'fields': _birthdayFields(b, peopleMap[b.personId]),
+            },
+          },
+        for (final d in draftRows)
+          {
+            'update': {
+              'name': _documentPath(uid, 'drafts', d.id),
+              'fields': _draftFields(d),
+            },
+          },
+        for (final setting in reminderRows)
+          {
+            'update': {
+              'name': _documentPath(uid, 'reminderSettings', setting.key),
+              'fields': _reminderFields(setting),
+            },
+          },
+      ];
 
-        if (await _patchDocument(peopleUrl, p.id, fields, headers)) {
-          uploaded++;
-        } else {
-          failures++;
-        }
-      }
-
-      for (final b in birthdayRows) {
-        totalItems++;
-        final person = peopleMap[b.personId];
-        final fields = <String, dynamic>{
-          'id': _firestoreString(b.id),
-          'personId': _firestoreString(b.personId),
-          'personName': _firestoreString(person?.name ?? 'Unknown'),
-          'cycleYear': _firestoreInt(b.cycleYear),
-          'date': _firestoreDate(b.date),
-          'status': _firestoreString(b.status),
-          if (b.draftId != null) 'draftId': _firestoreString(b.draftId!),
-          'createdAt': _firestoreDate(b.createdAt),
-          'updatedAt': _firestoreDate(b.updatedAt),
-        };
-
-        if (await _patchDocument(birthdaysUrl, b.id, fields, headers)) {
-          uploaded++;
-        } else {
-          failures++;
-        }
-      }
-
-      for (final d in draftRows) {
-        totalItems++;
-        final fields = <String, dynamic>{
-          'id': _firestoreString(d.id),
-          'birthdayId': _firestoreString(d.birthdayId),
-          'personId': _firestoreString(d.personId),
-          'body': _firestoreString(d.body),
-          'tone': _firestoreString(d.tone),
-          'length': _firestoreString(d.length),
-          'status': _firestoreString(d.status),
-          'providerType': _firestoreString(d.providerType),
-          'variationIndex': _firestoreInt(d.variationIndex),
-          'createdAt': _firestoreDate(d.createdAt),
-          'updatedAt': _firestoreDate(d.updatedAt),
-        };
-
-        if (await _patchDocument(draftsUrl, d.id, fields, headers)) {
-          uploaded++;
-        } else {
-          failures++;
-        }
-      }
-
-      for (final setting in reminderRows) {
-        totalItems++;
-        final fields = <String, dynamic>{
-          'key': _firestoreString(setting.key),
-          'enabled': _firestoreBool(setting.enabled),
-          'kinds': _firestoreString(setting.kinds),
-          'quietHoursStartMinutes': _firestoreInt(
-            setting.quietHoursStartMinutes,
-          ),
-          'quietHoursEndMinutes': _firestoreInt(setting.quietHoursEndMinutes),
-        };
-
-        if (await _patchDocument(remindersUrl, setting.key, fields, headers)) {
-          uploaded++;
-        } else {
-          failures++;
-        }
-      }
+      await _flushWrites(writes, headers, (ok, total) {
+        totalItems += total;
+        uploaded += ok;
+        failures += total - ok;
+      });
 
       if (failures > 0) {
         final error = uploaded == 0
@@ -405,6 +445,14 @@ class CloudSyncService {
         _collectionUrl(uid, 'people'),
         headers,
       );
+      // Performance audit: load every existing row once instead of one SELECT
+      // per restored document (N+1 when restoring a large backup).
+      var existingPeople = const <String, Person>{};
+      if (peopleDocs.isNotEmpty) {
+        existingPeople = {
+          for (final row in await _db.select(_db.persons).get()) row.id: row,
+        };
+      }
       for (final doc in peopleDocs) {
         final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
         final id = _string(fields, 'id');
@@ -412,9 +460,7 @@ class CloudSyncService {
         if (id == null || name == null) continue;
 
         final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
-        final existing = await (_db.select(
-          _db.persons,
-        )..where((row) => row.id.equals(id))).getSingleOrNull();
+        final existing = existingPeople[id];
         if (existing != null && !remoteUpdatedAt.isAfter(existing.updatedAt)) {
           continue;
         }
@@ -476,6 +522,12 @@ class CloudSyncService {
         _collectionUrl(uid, 'birthdays'),
         headers,
       );
+      var existingBirthdays = const <String, Birthday>{};
+      if (birthdayDocs.isNotEmpty) {
+        existingBirthdays = {
+          for (final row in await _db.select(_db.birthdays).get()) row.id: row,
+        };
+      }
       for (final doc in birthdayDocs) {
         final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
         final id = _string(fields, 'id');
@@ -484,9 +536,7 @@ class CloudSyncService {
         if (id == null || personId == null || date == null) continue;
 
         final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
-        final existing = await (_db.select(
-          _db.birthdays,
-        )..where((row) => row.id.equals(id))).getSingleOrNull();
+        final existing = existingBirthdays[id];
         if (existing != null && !remoteUpdatedAt.isAfter(existing.updatedAt)) {
           continue;
         }
@@ -516,6 +566,13 @@ class CloudSyncService {
         _collectionUrl(uid, 'drafts'),
         headers,
       );
+      var existingDrafts = const <String, MessageDraft>{};
+      if (draftDocs.isNotEmpty) {
+        existingDrafts = {
+          for (final row in await _db.select(_db.messageDrafts).get())
+            row.id: row,
+        };
+      }
       for (final doc in draftDocs) {
         final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
         final id = _string(fields, 'id');
@@ -530,9 +587,7 @@ class CloudSyncService {
         }
 
         final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
-        final existing = await (_db.select(
-          _db.messageDrafts,
-        )..where((row) => row.id.equals(id))).getSingleOrNull();
+        final existing = existingDrafts[id];
         if (existing != null && !remoteUpdatedAt.isAfter(existing.updatedAt)) {
           continue;
         }
@@ -567,6 +622,13 @@ class CloudSyncService {
         _collectionUrl(uid, 'reminderSettings'),
         headers,
       );
+      var existingReminders = const <String, ReminderSettingsEntry>{};
+      if (reminderDocs.isNotEmpty) {
+        existingReminders = {
+          for (final row in await _db.select(_db.reminderSettingsEntries).get())
+            row.key: row,
+        };
+      }
       for (final doc in reminderDocs) {
         final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
         final key = _string(fields, 'key');
@@ -575,9 +637,7 @@ class CloudSyncService {
         // Reminder settings have no per-record sync timestamp. Preserve a
         // device-local preference rather than overwriting it with an older or
         // ambiguous cloud copy during a merge-style restore.
-        final existing = await (_db.select(
-          _db.reminderSettingsEntries,
-        )..where((row) => row.key.equals(key))).getSingleOrNull();
+        final existing = existingReminders[key];
         if (existing != null) continue;
 
         await _db

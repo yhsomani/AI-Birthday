@@ -23,6 +23,21 @@ class BirthdayLifecycleService {
     required BirthdaysRepository birthdaysRepository,
   }) async {
     final reference = _now();
+
+    // Performance audit: previously this loop issued one SELECT per person
+    // (`getBirthdayForPerson`), an N+1 that ran on every `birthdaysStreamProvider`
+    // build. Load all events once and index by person; a duplicate personId
+    // throws StateError, matching drift's `getSingleOrNull` contract.
+    final existingByPerson = <String, Birthday>{};
+    for (final birthday in await birthdaysRepository.getBirthdays()) {
+      if (existingByPerson.containsKey(birthday.personId)) {
+        throw StateError(
+          'Multiple birthdays exist for person ${birthday.personId}.',
+        );
+      }
+      existingByPerson[birthday.personId] = birthday;
+    }
+
     for (final person in people) {
       if (!person.hasBirthday) continue;
 
@@ -34,9 +49,7 @@ class BirthdayLifecycleService {
         reference: reference,
       );
 
-      final existing = await birthdaysRepository.getBirthdayForPerson(
-        person.id,
-      );
+      final existing = existingByPerson[person.id];
       final targetStatus = next.isToday
           ? BirthdayStatus.reminderDue
           : BirthdayStatus.upcoming;

@@ -11,6 +11,8 @@ import 'package:ai_birthday/features/auth/domain/auth_state.dart';
 import 'package:ai_birthday/features/auth/domain/google_identity.dart';
 import 'package:ai_birthday/features/sync/data/cloud_sync_service.dart';
 
+import '../../../helpers/counting_query_interceptor.dart';
+
 class InMemoryStoreDriver implements SecureStoreDriver {
   final Map<String, String> data = {};
 
@@ -25,6 +27,7 @@ class InMemoryStoreDriver implements SecureStoreDriver {
 }
 
 void main() {
+  allowMultipleInMemoryDatabases();
   group('CloudSyncService', () {
     late AppDatabase db;
     late InMemoryStoreDriver store;
@@ -48,7 +51,7 @@ void main() {
       expect(result.error, contains('Please sign in'));
     });
 
-    test('uploads birthdays to Firestore and updates timestamp', () async {
+    test('uploads all records in one batched Firestore commit', () async {
       final now = DateTime.now();
 
       // Seed a person and birthday
@@ -87,28 +90,63 @@ void main() {
             ),
           );
 
-      var patchCount = 0;
+      var commitCount = 0;
       final mockClient = MockClient((request) async {
-        expect(request.method, 'PATCH');
+        expect(request.method, 'POST');
+        expect(
+          request.url.path,
+          endsWith('documents:commit'),
+          reason: 'N+1 fix: records upload in one batch, not one PATCH each',
+        );
         expect(request.url.queryParameters['key'], isNotEmpty);
-        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        commitCount++;
 
-        if (request.url.path.contains('/users/uid-test/people/p-1')) {
-          expect(body['fields']['name']['stringValue'], 'Taylor Swift');
-          patchCount++;
-          return http.Response(
-            jsonEncode({'name': 'projects/.../documents/p-1'}),
-            200,
-          );
-        } else if (request.url.path.contains('/users/uid-test/birthdays/b-1')) {
-          expect(body['fields']['personName']['stringValue'], 'Taylor Swift');
-          patchCount++;
-          return http.Response(
-            jsonEncode({'name': 'projects/.../documents/b-1'}),
-            200,
-          );
-        }
-        return http.Response('Not Found', 404);
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final writes = body['writes'] as List;
+        expect(writes, hasLength(2));
+
+        final names = writes
+            .map(
+              (w) =>
+                  (((w as Map<String, dynamic>)['update'] as Map)['name']
+                      as String),
+            )
+            .toList();
+        expect(names, contains(endsWith('/people/p-1')));
+        expect(names, contains(endsWith('/birthdays/b-1')));
+
+        final personWrite = writes
+            .cast<Map<String, dynamic>>()
+            .firstWhere(
+              (w) =>
+                  ((w['update'] as Map)['name'] as String)
+                      .endsWith('/people/p-1'),
+            );
+        final personFields =
+            ((personWrite['update'] as Map)['fields'] as Map<String, dynamic>);
+        expect(personFields['name']['stringValue'], 'Taylor Swift');
+
+        final birthdayWrite = writes
+            .cast<Map<String, dynamic>>()
+            .firstWhere(
+              (w) =>
+                  ((w['update'] as Map)['name'] as String)
+                      .endsWith('/birthdays/b-1'),
+            );
+        final birthdayFields = ((birthdayWrite['update'] as Map)['fields']
+            as Map<String, dynamic>);
+        expect(birthdayFields['personName']['stringValue'], 'Taylor Swift');
+
+        return http.Response(
+          jsonEncode({
+            'commitTime': '2026-01-01T00:00:00Z',
+            'writeResults': [
+              {'updateTime': '2026-01-01T00:00:00Z'},
+              {'updateTime': '2026-01-01T00:00:00Z'},
+            ],
+          }),
+          200,
+        );
       });
 
       final service = CloudSyncService(
@@ -131,11 +169,154 @@ void main() {
       final result = await service.sync(auth);
       expect(result.success, isTrue);
       expect(result.uploadedCount, 2);
-      expect(patchCount, 2);
+      expect(commitCount, 1);
 
       // Verify timestamp stored
       final lastSync = await service.getLastSyncTime('uid-test');
       expect(lastSync, isNotNull);
+    });
+
+    test('chunks more than 500 writes across multiple commits', () async {
+      final now = DateTime.now();
+      for (var i = 0; i < 501; i++) {
+        await db
+            .into(db.persons)
+            .insert(
+              PersonsCompanion.insert(
+                id: 'p-$i',
+                name: 'Person $i',
+                relationship: 'Friend',
+                relationshipCloseness: 'close',
+                preferredLanguage: 'en',
+                preferredTone: 'warm',
+                importantFacts: '',
+                preferredDeliveryChannel: 'whatsapp',
+                autoSendPolicy: 'manualOnly',
+                createdAt: now,
+                updatedAt: now,
+                version: 1,
+              ),
+            );
+      }
+
+      final batchSizes = <int>[];
+      final mockClient = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final writes = body['writes'] as List;
+        batchSizes.add(writes.length);
+        return http.Response(
+          jsonEncode({
+            'writeResults': List.generate(
+              writes.length,
+              (_) => {'updateTime': '2026-01-01T00:00:00Z'},
+            ),
+          }),
+          200,
+        );
+      });
+
+      final service = CloudSyncService(
+        db: db,
+        store: store,
+        httpClient: mockClient,
+      );
+
+      final auth = const AuthState(
+        status: AuthStatus.signedIn,
+        identity: GoogleIdentity(
+          googleSubject: 'sub-test',
+          email: 'user@example.com',
+          displayName: 'User',
+          firebaseUid: 'uid-test',
+          idToken: 'test-id-token',
+        ),
+      );
+
+      final result = await service.sync(auth);
+      expect(result.success, isTrue);
+      expect(result.uploadedCount, 501);
+      expect(batchSizes, [500, 1]);
+    });
+
+    test('counts per-write failures inside a commit as incomplete', () async {
+      final now = DateTime.now();
+      await db
+          .into(db.persons)
+          .insert(
+            PersonsCompanion.insert(
+              id: 'p-ok',
+              name: 'Saved',
+              relationship: 'Friend',
+              relationshipCloseness: 'close',
+              preferredLanguage: 'en',
+              preferredTone: 'warm',
+              importantFacts: '',
+              preferredDeliveryChannel: 'whatsapp',
+              autoSendPolicy: 'manualOnly',
+              createdAt: now,
+              updatedAt: now,
+              version: 1,
+            ),
+          );
+      await db
+          .into(db.persons)
+          .insert(
+            PersonsCompanion.insert(
+              id: 'p-fail',
+              name: 'Rejected',
+              relationship: 'Friend',
+              relationshipCloseness: 'close',
+              preferredLanguage: 'en',
+              preferredTone: 'warm',
+              importantFacts: '',
+              preferredDeliveryChannel: 'whatsapp',
+              autoSendPolicy: 'manualOnly',
+              createdAt: now,
+              updatedAt: now,
+              version: 1,
+            ),
+          );
+
+      final mockClient = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'writeResults': [
+              {'updateTime': '2026-01-01T00:00:00Z'},
+              {
+                'error': {
+                  'code': 3,
+                  'message': 'document too large',
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      });
+
+      final service = CloudSyncService(
+        db: db,
+        store: store,
+        httpClient: mockClient,
+      );
+
+      final auth = const AuthState(
+        status: AuthStatus.signedIn,
+        identity: GoogleIdentity(
+          googleSubject: 'sub-test',
+          email: 'user@example.com',
+          displayName: 'User',
+          firebaseUid: 'uid-test',
+          idToken: 'test-id-token',
+        ),
+      );
+
+      final result = await service.sync(auth);
+      expect(result.success, isFalse);
+      expect(result.uploadedCount, 1);
+      expect(result.error, contains('1 of 2'));
+      final lastSync = await service.getLastSyncTime('uid-test');
+      expect(lastSync, isNull);
     });
 
     test(
@@ -361,5 +542,65 @@ void main() {
         expect(row.deletedAt, isNotNull, reason: 'local tombstone must win');
       },
     );
+
+    test('restore reads each collection once, not once per document', () async {
+      final interceptor = CountingQueryInterceptor();
+      final countedDb = AppDatabase(
+        NativeDatabase.memory().interceptWith(interceptor),
+      );
+      addTearDown(countedDb.close);
+
+      Map<String, dynamic> personDoc(String id) => {
+        'name': 'projects/t/databases/(default)/documents/users/uid-test/people/$id',
+        'fields': {
+          'id': {'stringValue': id},
+          'name': {'stringValue': 'Person $id'},
+        },
+      };
+
+      final peopleDocs = List.generate(150, (i) => personDoc('restored-$i'));
+
+      final mockClient = MockClient((request) async {
+        expect(request.method, 'GET');
+        if (request.url.path.endsWith('/people')) {
+          return http.Response(
+            jsonEncode({'documents': peopleDocs}),
+            200,
+          );
+        }
+        if (request.url.path.endsWith('/birthdays') ||
+            request.url.path.endsWith('/drafts') ||
+            request.url.path.endsWith('/reminderSettings')) {
+          return http.Response(jsonEncode({'documents': []}), 200);
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final service = CloudSyncService(
+        db: countedDb,
+        store: store,
+        httpClient: mockClient,
+      );
+
+      final auth = const AuthState(
+        status: AuthStatus.signedIn,
+        identity: GoogleIdentity(
+          googleSubject: 'sub-test',
+          email: 'user@example.com',
+          displayName: 'User',
+          firebaseUid: 'uid-test',
+          idToken: 'test-id-token',
+        ),
+      );
+
+      final result = await service.restore(auth);
+      expect(result.success, isTrue);
+      expect(result.downloadedCount, 150);
+
+      // Before the fix: 1 SELECT per restored document (150). Now: one
+      // preload per non-empty collection (1), empty collections are skipped.
+      expect(interceptor.selects, 1);
+      expect(interceptor.inserts, 150);
+    });
   });
 }

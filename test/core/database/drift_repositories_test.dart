@@ -1,14 +1,19 @@
 import 'package:ai_birthday/core/database/app_database.dart' hide MessageDraft;
 import 'package:ai_birthday/core/database/drift_repositories.dart';
+import 'package:ai_birthday/features/birthdays/application/birthday_lifecycle_service.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart'
     as domain;
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../helpers/counting_query_interceptor.dart';
+
 void main() {
+  allowMultipleInMemoryDatabases();
   group('DriftPeopleRepository', () {
     late AppDatabase db;
     late DriftPeopleRepository repo;
@@ -214,6 +219,84 @@ void main() {
       // (query audit Phase 4).
       final drafts = await repo.getAllDrafts();
       expect(drafts.map((d) => d.id).toList(), ['d-b', 'd-a']);
+    });
+  });
+
+  group('BirthdayLifecycleService refresh (no N+1, SQL level)', () {
+    test('reads people + birthdays once for 50 people', () async {
+      final interceptor = CountingQueryInterceptor();
+      final db = AppDatabase(
+        NativeDatabase.memory().interceptWith(interceptor),
+      );
+      addTearDown(db.close);
+
+      final peopleRepo = DriftPeopleRepository(db);
+      final birthdaysRepo = DriftBirthdaysRepository(db);
+      final now = DateTime.utc(2025, 1, 1, 8);
+
+      for (var i = 0; i < 50; i++) {
+        await peopleRepo.savePerson(
+          domain.Person(
+            id: 'p-$i',
+            name: 'Person $i',
+            birthdayMonth: 10,
+            birthdayDay: 15,
+            createdAt: now,
+            updatedAt: now,
+            version: 1,
+          ),
+        );
+      }
+
+      interceptor.selects = 0; // discount the seeding statements
+      interceptor.inserts = 0;
+      await const BirthdayLifecycleService().refresh(
+        people: await peopleRepo.getPeople(),
+        birthdaysRepository: birthdaysRepo,
+      );
+
+      // Before the fix this was 51 selects (getPeople + 50 × getBirthdayForPerson).
+      expect(interceptor.selects, 2);
+      expect(interceptor.inserts, 50);
+    });
+
+    test('batch read throws on duplicate personId like getSingleOrNull', () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final birthdaysRepo = DriftBirthdaysRepository(db);
+      final now = DateTime.utc(2025, 1, 1, 8);
+
+      for (final id in ['b-1', 'b-2']) {
+        await db.into(db.birthdays).insert(
+          BirthdaysCompanion.insert(
+            id: id,
+            personId: 'p-1',
+            cycleYear: 2025,
+            date: DateTime(2025, 10, 15),
+            status: 'upcoming',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+      }
+
+      await expectLater(
+        const BirthdayLifecycleService().refresh(
+          people: [
+            domain.Person(
+              id: 'p-1',
+              name: 'Ana',
+              birthdayMonth: 10,
+              birthdayDay: 15,
+              createdAt: now,
+              updatedAt: now,
+              version: 1,
+            ),
+          ],
+          birthdaysRepository: birthdaysRepo,
+        ),
+        throwsStateError,
+      );
     });
   });
 }
