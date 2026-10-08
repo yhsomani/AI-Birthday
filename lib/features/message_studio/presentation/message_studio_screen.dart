@@ -19,6 +19,7 @@ import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_r
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
+import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
 class MessageStudioScreen extends ConsumerStatefulWidget {
   const MessageStudioScreen({super.key, this.birthdayId, this.personId})
@@ -601,11 +602,11 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                               visualDensity: VisualDensity.compact,
                             ),
                             const Spacer(),
-                            const Text(
+                            Text(
                               'Tap to choose',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey,
+                                color: context.colors.textSecondary,
                               ),
                             ),
                           ],
@@ -1109,7 +1110,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                       ),
                       Text(
                         '${person.relationship.displayName} • ${person.phoneNumber ?? 'No phone'}',
-                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
                       ),
                       if (phoneMissing)
                         Text(
@@ -1152,7 +1153,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               const SizedBox(height: 4),
               Text(
                 person.importantFacts.join(' • '),
-                style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
               ),
             ],
           ],
@@ -1238,11 +1239,14 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (_isSaving)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(right: 8),
                     child: Text(
                       'Saving...',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: context.colors.textSecondary,
+                      ),
                     ),
                   )
                 else if (_lastSavedTime != null)
@@ -1255,7 +1259,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                   ),
                 Text(
                   '${_messageController.text.length} chars',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 11, color: context.colors.textSecondary),
                 ),
               ],
             ),
@@ -1264,7 +1268,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         const SizedBox(height: 2),
         Text(
           'Review and edit this before sending.',
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
         ),
         const SizedBox(height: 8),
         Semantics(

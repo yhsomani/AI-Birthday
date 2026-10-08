@@ -522,14 +522,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _lastSyncTime != null
                         ? 'Last backed up: ${DateFormat.yMMMd().add_jm().format(_lastSyncTime!)}'
                         : 'Save a recoverable copy of your birthdays and contacts to your signed-in cloud account.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'Privacy note: Cloud backup uploads your saved people, birthdays, message drafts, reminder settings, and related contact and personalization fields to this app\'s Firestore project under your signed-in account.',
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey[500],
+                      color: context.colors.textSecondary,
                       fontStyle: FontStyle.italic,
                     ),
                   ),
@@ -604,13 +604,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: entitlement.canUseAi
-                                ? context.colors.success
-                                : context.colors.textSecondary,
+                                ? AppTone.success.label(context.colors)
+                                : AppTone.neutral.label(context.colors),
                           ),
                         ),
                         backgroundColor: entitlement.canUseAi
-                            ? context.colors.success.withValues(alpha: 0.12)
-                            : Colors.grey.withValues(alpha: 0.12),
+                            ? AppTone.success.fill(context.colors)
+                            : AppTone.neutral.fill(context.colors),
                         visualDensity: VisualDensity.compact,
                       ),
                     ],
@@ -620,7 +620,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     entitlement.canUseAi
                         ? 'Full AI draft generation, rewrite variations, and personalized message studio are active.'
                         : 'Application AI features require an active subscription entitlement. Birthday tracking and manual drafting remain free forever.',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
                   ),
                   const SizedBox(height: 16),
                   if (!entitlement.canUseAi) ...[
@@ -715,7 +715,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     'Don\'t have an API key? Get one from Google AI Studio to unlock personalized AI message drafting.',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -894,7 +894,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                   child: Text(
                     'AI provider: your active AI-Birthday Pro access is required. When available, AI-Birthday uses your saved Gemini key; otherwise supported Android devices can use Gemini Nano on-device.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
                   ),
                 ),
               ],
@@ -1152,22 +1152,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildKeyStatusBadge() {
+    final colors = context.colors;
     if (_connectionResult?.status == GeminiConnectionStatus.connected) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: context.colors.success.withValues(alpha: 0.12),
+          color: AppTone.success.fill(colors),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle, size: 12, color: context.colors.success),
+            Icon(
+              Icons.check_circle,
+              size: 12,
+              color: AppTone.success.label(colors),
+            ),
             const SizedBox(width: 4),
             Text(
               'Connected',
               style: TextStyle(
-                color: context.colors.success,
+                color: AppTone.success.label(colors),
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
@@ -1179,13 +1184,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: context.colors.danger.withValues(alpha: 0.12),
+          color: AppTone.danger.fill(colors),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           'Invalid Key',
           style: TextStyle(
-            color: context.colors.danger,
+            color: AppTone.danger.label(colors),
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),
@@ -1196,13 +1201,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: context.colors.warning.withValues(alpha: 0.15),
+          color: AppTone.warning.fill(colors),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           'Quota Exceeded',
           style: TextStyle(
-            color: context.colors.warning,
+            color: AppTone.warning.label(colors),
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),
@@ -1215,7 +1220,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: context.colors.warning.withValues(alpha: 0.12),
+          color: AppTone.warning.fill(colors),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -1224,14 +1229,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Icon(
               Icons.verified_outlined,
               size: 12,
-              color: context.colors.warning,
+              color: AppTone.warning.label(colors),
             ),
             const SizedBox(width: 4),
             Text(
               'Verified · '
               '${MaterialLocalizations.of(context).formatMediumDate(_lastVerifiedAt!.toLocal())}',
               style: TextStyle(
-                color: context.colors.warning,
+                color: AppTone.warning.label(colors),
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
@@ -1245,13 +1250,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: context.colors.textSecondary.withValues(alpha: 0.12),
+          color: AppTone.neutral.fill(colors),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           'Unverified',
           style: TextStyle(
-            color: context.colors.textSecondary,
+            color: AppTone.neutral.label(colors),
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),
@@ -1261,13 +1266,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: context.colors.textSecondary.withValues(alpha: 0.12),
+          color: AppTone.neutral.fill(colors),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           'Not Configured',
           style: TextStyle(
-            color: context.colors.textSecondary,
+            color: AppTone.neutral.label(colors),
             fontSize: 11,
             fontWeight: FontWeight.bold,
           ),
@@ -1277,56 +1282,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildConnectionResultBanner(GeminiConnectionResult result) {
-    final (
-      Color bgColor,
-      Color borderColor,
-      Color textColor,
-      IconData icon,
-    ) = switch (result.status) {
+    final colors = context.colors;
+    final (AppTone tone, IconData icon) = switch (result.status) {
       GeminiConnectionStatus.connected => (
-        context.colors.success.withValues(alpha: 0.12),
-        context.colors.success,
-        context.colors.success,
+        AppTone.success,
         Icons.check_circle_outline,
       ),
       GeminiConnectionStatus.invalidKey => (
-        context.colors.danger.withValues(alpha: 0.10),
-        context.colors.danger,
-        context.colors.danger,
+        AppTone.danger,
         Icons.error_outline,
       ),
       GeminiConnectionStatus.quotaExceeded => (
-        context.colors.warning.withValues(alpha: 0.15),
-        context.colors.warning,
-        context.colors.warning,
+        AppTone.warning,
         Icons.warning_amber_rounded,
       ),
       GeminiConnectionStatus.networkUnavailable => (
-        context.colors.info.withValues(alpha: 0.12),
-        context.colors.info,
-        context.colors.info,
+        AppTone.info,
         Icons.wifi_off_outlined,
       ),
-      GeminiConnectionStatus.error => (
-        context.colors.danger.withValues(alpha: 0.10),
-        context.colors.danger,
-        context.colors.danger,
-        Icons.error_outline,
-      ),
+      GeminiConnectionStatus.error => (AppTone.danger, Icons.error_outline),
     };
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: tone.fill(colors),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: borderColor.withValues(alpha: 0.4)),
+        border: Border.all(color: tone.label(colors).withValues(alpha: 0.4)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: borderColor),
+          Icon(icon, size: 20, color: tone.label(colors)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1334,7 +1322,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: textColor,
+                color: tone.label(colors),
               ),
             ),
           ),
@@ -1674,7 +1662,7 @@ class _GuideStepTile extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 description,
-                style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
               ),
               ?action,
             ],

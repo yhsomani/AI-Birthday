@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
+import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
 /// Guided First-Run Onboarding Flow (SSOT §3, §14, §15).
 ///
@@ -348,7 +349,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 description,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: context.colors.textSecondary,
                   height: 1.3,
                 ),
               ),

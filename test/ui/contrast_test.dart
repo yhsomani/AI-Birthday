@@ -106,6 +106,21 @@ void main() {
           4.5,
         );
       });
+
+      test('status fills on surface ≥ 3:1 (non-text)', () {
+        // Settings key-status badges, the connection banner, and the
+        // entitlement chip are solid AppTone fills on Card surfaces (audit 05
+        // W5/W6). The old tone-on-0.12-tint paints failed 4.5:1 in light
+        // (success ≈4.2, warning ≈4.1); solid fill + label-on-fill is the
+        // asserted AA-safe recipe (label/fill pairs tested above). Fill stays
+        // distinguishable from the surface per WCAG 1.4.11. Neutral and info
+        // use the low-emphasis surfaceAlt fill by design (their label text
+        // carries the meaning), so only the three meaning-carrying fills are
+        // asserted here.
+        for (final tone in [AppTone.success, AppTone.warning, AppTone.danger]) {
+          expectPass('${tone.name} fill on surface', tone.fill(p), p.surface, 3.0);
+        }
+      });
     });
   }
 }

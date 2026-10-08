@@ -23,6 +23,7 @@ import 'package:ai_birthday/features/people/domain/person_enums.dart'
 import 'package:ai_birthday/features/people/domain/person_input.dart';
 import 'package:ai_birthday/features/people/domain/person_input_validator.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
+import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
 /// Add / edit recipient form with Progressive Disclosure (SSOT §7, §14).
 ///
@@ -414,7 +415,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                 ),
                 subtitle: Text(
                   'Customize message dynamics and tone',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
                 ),
                 children: [
                   Padding(
@@ -514,7 +515,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                 ),
                 subtitle: Text(
                   'Phone for WhatsApp handoff and timezone',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
                 ),
                 children: [
                   Padding(
@@ -599,7 +600,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                 ),
                 subtitle: Text(
                   'User-provided facts to personalize drafts',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
                 ),
                 children: [
                   Padding(

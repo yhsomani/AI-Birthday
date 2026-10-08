@@ -104,9 +104,9 @@ class PeopleScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Paste CSV with columns: Name, Month, Day, Year, Phone, Relationship.',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -235,9 +235,9 @@ class PeopleScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 2),
-            const Text(
+            Text(
               'Potential duplicates are unselected by default for safety.',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
+              style: TextStyle(fontSize: 11, color: context.colors.textSecondary),
             ),
             const Divider(),
             ConstrainedBox(
@@ -618,9 +618,12 @@ class PeopleScreen extends ConsumerWidget {
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'Add contacts manually or import birthdays directly from your phone.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.colors.textSecondary,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
@@ -830,7 +833,7 @@ class PeopleScreen extends ConsumerWidget {
                   ),
                   Text(
                     '${person.relationship.displayName} (${person.relationshipCloseness.displayName})',
-                    style: TextStyle(color: Colors.grey[600]),
+                    style: TextStyle(color: context.colors.textSecondary),
                   ),
                 ],
               ),
@@ -839,6 +842,7 @@ class PeopleScreen extends ConsumerWidget {
         ),
         const Divider(height: 32),
         _buildDetailRow(
+          context,
           'Birthday',
           person.hasBirthday
               ? DateFormat.MMMMd().format(
@@ -852,9 +856,14 @@ class PeopleScreen extends ConsumerWidget {
               : 'Not set',
         ),
         if (person.phoneNumber != null)
-          _buildDetailRow('Phone', person.phoneNumber!),
-        _buildDetailRow('Preferred Tone', person.preferredTone.displayName),
+          _buildDetailRow(context, 'Phone', person.phoneNumber!),
         _buildDetailRow(
+          context,
+          'Preferred Tone',
+          person.preferredTone.displayName,
+        ),
+        _buildDetailRow(
+          context,
           'Delivery Channel',
           person.preferredDeliveryChannel.displayName,
         ),
@@ -936,13 +945,13 @@ class PeopleScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey[600])),
+          Text(label, style: TextStyle(color: context.colors.textSecondary)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),

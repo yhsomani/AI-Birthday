@@ -15,6 +15,7 @@ import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
+import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -250,7 +251,7 @@ class DashboardScreen extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey[600],
+                  color: context.colors.textSecondary,
                 ),
               ),
             ],
@@ -358,7 +359,7 @@ class DashboardScreen extends ConsumerWidget {
                           fontSize: 13,
                           color: isToday
                               ? AppColors.primaryTerracotta
-                              : Colors.grey[700],
+                              : context.colors.textSecondary,
                           fontWeight: isToday
                               ? FontWeight.w600
                               : FontWeight.normal,
