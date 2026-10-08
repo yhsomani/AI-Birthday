@@ -23,23 +23,23 @@ class DriftPeopleRepository implements PeopleRepository {
 
   @override
   Stream<List<Person>> watchPeople() {
-    return (_database.select(_database.persons)
-          ..where((r) => r.deletedAt.isNull())
-          ..orderBy([(r) => OrderingTerm(expression: r.name.lower())]))
-        .watch()
-        .map((rows) {
-          return rows.map(_personFromRow).toList();
-        });
+    return (_database.select(
+      _database.persons,
+    )..where((r) => r.deletedAt.isNull())).watch().map((rows) {
+      final list = rows.map(_personFromRow).toList();
+      list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      return list;
+    });
   }
 
   @override
   Future<List<Person>> getPeople() async {
-    final rows =
-        await (_database.select(_database.persons)
-              ..where((r) => r.deletedAt.isNull())
-              ..orderBy([(r) => OrderingTerm(expression: r.name.lower())]))
-            .get();
-    return rows.map(_personFromRow).toList();
+    final rows = await (_database.select(
+      _database.persons,
+    )..where((r) => r.deletedAt.isNull())).get();
+    final list = rows.map(_personFromRow).toList();
+    list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return list;
   }
 
   @override
