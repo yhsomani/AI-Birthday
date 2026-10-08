@@ -137,15 +137,21 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
     }
   }
 
-  Future<void> _persistAndSync() async {
-    final snapshot = state;
-    final saved = await _saveToDatabase(snapshot);
-    if (saved) await _syncService();
+  Future<void> _persistAndSync(ReminderSettings previous) async {
+    final saved = await _saveToDatabase(state);
+    if (!saved) {
+      // Persistence failed: never keep a toggle the store rejected. Restore
+      // the pre-change value (UI back to truth) and keep the error visible.
+      state = previous.copyWith(syncError: state.syncError);
+      return;
+    }
+    await _syncService();
   }
 
   void setEnabled(bool enabled) {
+    final previous = state;
     state = state.copyWith(enabled: enabled, syncError: null);
-    unawaited(_persistAndSync());
+    unawaited(_persistAndSync(previous));
   }
 
   void setKind(ReminderKind kind, bool on) {
@@ -155,13 +161,15 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
     } else {
       kinds.remove(kind);
     }
+    final previous = state;
     state = state.copyWith(kinds: kinds, syncError: null);
-    unawaited(_persistAndSync());
+    unawaited(_persistAndSync(previous));
   }
 
   void setQuietHours(QuietHours quietHours) {
+    final previous = state;
     state = state.copyWith(quietHours: quietHours, syncError: null);
-    unawaited(_persistAndSync());
+    unawaited(_persistAndSync(previous));
   }
 }
 

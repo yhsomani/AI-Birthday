@@ -59,6 +59,12 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   Timer? _autosaveTimer;
   bool _isSaving = false;
   DateTime? _lastSavedTime;
+  // Single-flight guard: stops a rapid double-tap from launching the external
+  // delivery app twice (two SMS composers, two handoff records).
+  bool _isSending = false;
+  // Bumped on every user edit. AI results only apply if no edit happened
+  // while the request was in flight (stale-response guard).
+  int _editRevision = 0;
 
   MessageTone _selectedTone = MessageTone.warm;
   MessageLength _selectedLength = MessageLength.standard;
@@ -92,6 +98,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   }
 
   void _onMessageChanged(String text) {
+    _editRevision++;
     setState(() {});
     _autosaveTimer?.cancel();
     _autosaveTimer = Timer(const Duration(milliseconds: 750), () {
@@ -166,6 +173,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       _lastFailureCode = null;
     });
 
+    final revision = _editRevision;
     try {
       final aiRouter = ref.read(aiRouterProvider);
       final entitlement = ref.read(entitlementProvider);
@@ -188,11 +196,29 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         forceNano: forceNano,
       );
 
+      // If the user typed while the request was in flight, their newer text
+      // wins: applying this stale result would silently discard their edits.
+      if (revision != _editRevision) {
+        setState(() => _isGenerating = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'You edited the message while drafting. Your edits were kept — review before sending.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
       _messageController.text = result.message;
 
-      // Update or create draft
-      final draftId =
-          _draft?.id ?? 'draft-${DateTime.now().millisecondsSinceEpoch}';
+      // Update or create the single per-birthday draft. A stable id derived
+      // from the birthday key makes every save path (autosave, generate,
+      // handoff, dispose) idempotent: racing saves converge on one row
+      // instead of orphaning timestamp-id rows.
+      final draftId = _draft?.id ?? _activeBirthdayId;
       final updatedDraft = MessageDraft(
         id: draftId,
         birthdayId: _activeBirthdayId,
@@ -254,8 +280,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     if (_person == null) return;
     final repo = _draftsRepo;
     if (repo == null) return;
-    final draftId =
-        _draft?.id ?? 'draft-${DateTime.now().millisecondsSinceEpoch}';
+    final draftId = _draft?.id ?? _activeBirthdayId;
     final updatedDraft = MessageDraft(
       id: draftId,
       birthdayId: _activeBirthdayId,
@@ -278,6 +303,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   }
 
   Future<void> _handleWhatsAppSend() async {
+    if (_isSending) return;
     final message = _messageController.text.trim();
     if (message.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -298,6 +324,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       return;
     }
 
+    setState(() => _isSending = true);
     try {
       final builder = ref.read(whatsappHandoffBuilderProvider);
       final handoff = builder.buildHandoff(
@@ -358,10 +385,29 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           SnackBar(content: Text(e.detail ?? e.message ?? 'Handoff failed')),
         );
       }
+    } catch (e, st) {
+      ref
+          .read(loggerProvider)
+          .error(
+            'MessageStudio',
+            'Unexpected error launching WhatsApp handoff',
+            error: e,
+            stackTrace: st,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the delivery app.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
     }
   }
 
   Future<void> _handleSmsSend() async {
+    if (_isSending) return;
     final message = _messageController.text.trim();
     if (message.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -373,42 +419,59 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     }
 
     final phone = _person?.phoneNumber;
-    await _saveDraft(status: DraftStatus.ready);
-    final smsService = ref.read(smsDeliveryServiceProvider);
-    final launched = await smsService.sendSms(
-      phoneNumber: phone,
-      message: message,
-    );
-
-    if (launched) {
-      await ref
-          .read(birthdaysRepositoryProvider)
-          .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
-      await ref
-          .read(deliveryEventsRepositoryProvider)
-          .recordHandoff(
-            birthdayId: _activeBirthdayId,
-            channel: DeliveryChannel.sms,
-            at: DateTime.now(),
-          );
-    } else {
-      // Any channel that fails to open must surface as action-required, same
-      // as WhatsApp (audit 03 AC4/P2-2).
-      await ref
-          .read(birthdaysRepositoryProvider)
-          .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
+    if (phone == null || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Recipient does not have a phone number.'),
+        ),
+      );
+      return;
     }
 
-    if (mounted) {
-      _showHandoffConfirmationDialog(
-        phone != null ? 'Recipient: $phone' : 'Prepared message in SMS app',
-        wasLaunched: launched,
-        channelName: 'SMS',
+    setState(() => _isSending = true);
+    try {
+      await _saveDraft(status: DraftStatus.ready);
+      final smsService = ref.read(smsDeliveryServiceProvider);
+      final launched = await smsService.sendSms(
+        phoneNumber: phone,
+        message: message,
       );
+
+      if (launched) {
+        await ref
+            .read(birthdaysRepositoryProvider)
+            .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
+        await ref
+            .read(deliveryEventsRepositoryProvider)
+            .recordHandoff(
+              birthdayId: _activeBirthdayId,
+              channel: DeliveryChannel.sms,
+              at: DateTime.now(),
+            );
+      } else {
+        // Any channel that fails to open must surface as action-required, same
+        // as WhatsApp (audit 03 AC4/P2-2).
+        await ref
+            .read(birthdaysRepositoryProvider)
+            .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
+      }
+
+      if (mounted) {
+        _showHandoffConfirmationDialog(
+          'Recipient: $phone',
+          wasLaunched: launched,
+          channelName: 'SMS',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
     }
   }
 
   Future<void> _handleShareSend() async {
+    if (_isSending) return;
     final message = _messageController.text.trim();
     if (message.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -419,36 +482,53 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       return;
     }
 
-    await _saveDraft(status: DraftStatus.ready);
-    final shareService = ref.read(nativeShareServiceProvider);
-    final launched = await shareService.shareText(
-      text: message,
-      title: 'Birthday greeting for ${_person?.name}',
-    );
-
-    if (launched) {
-      await ref
-          .read(birthdaysRepositoryProvider)
-          .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
-      await ref
-          .read(deliveryEventsRepositoryProvider)
-          .recordHandoff(
-            birthdayId: _activeBirthdayId,
-            channel: DeliveryChannel.share,
-            at: DateTime.now(),
-          );
-    } else {
-      await ref
-          .read(birthdaysRepositoryProvider)
-          .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
+    final phone = _person?.phoneNumber;
+    if (phone == null || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Recipient does not have a phone number.'),
+        ),
+      );
+      return;
     }
 
-    if (mounted) {
-      _showHandoffConfirmationDialog(
-        'Shared via Android chooser',
-        wasLaunched: launched,
-        channelName: 'Share Sheet',
+    setState(() => _isSending = true);
+    try {
+      await _saveDraft(status: DraftStatus.ready);
+      final shareService = ref.read(nativeShareServiceProvider);
+      final launched = await shareService.shareText(
+        text: message,
+        title: 'Birthday greeting for ${_person?.name}',
       );
+
+      if (launched) {
+        await ref
+            .read(birthdaysRepositoryProvider)
+            .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
+        await ref
+            .read(deliveryEventsRepositoryProvider)
+            .recordHandoff(
+              birthdayId: _activeBirthdayId,
+              channel: DeliveryChannel.share,
+              at: DateTime.now(),
+            );
+      } else {
+        await ref
+            .read(birthdaysRepositoryProvider)
+            .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
+      }
+
+      if (mounted) {
+        _showHandoffConfirmationDialog(
+          'Shared via Android chooser',
+          wasLaunched: launched,
+          channelName: 'Share Sheet',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
     }
   }
 
@@ -470,6 +550,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       _errorMessage = null;
     });
 
+    final revision = _editRevision;
     try {
       final aiRouter = ref.read(aiRouterProvider);
       final entitlement = ref.read(entitlementProvider);
@@ -487,6 +568,20 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         request: request,
         entitlement: entitlement,
       );
+
+      // Never overwrite edits made while the rewrite was in flight.
+      if (revision != _editRevision) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'You edited the message while rewriting. Your edits were kept — review before sending.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
 
       _messageController.text = result.message;
       if (length != null) {
@@ -538,6 +633,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       _errorMessage = null;
     });
 
+    final revision = _editRevision;
     try {
       final aiRouter = ref.read(aiRouterProvider);
       final entitlement = ref.read(entitlementProvider);
@@ -625,12 +721,24 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       );
 
       if (selected != null && mounted) {
-        _messageController.text = selected;
-        await _saveDraft();
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Variation applied! ✨')));
+        // Don't let a picked variation clobber edits made while the three
+        // variations were generating or the sheet was open.
+        if (revision == _editRevision) {
+          _messageController.text = selected;
+          await _saveDraft();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Variation applied! ✨')),
+            );
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'You edited the message while preparing variations. Your edits were kept.',
+              ),
+            ),
+          );
         }
       }
     } catch (e) {
@@ -1022,7 +1130,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                     ),
                   )
                 : FilledButton.icon(
-                    onPressed: _handleWhatsAppSend,
+                    onPressed: _isSending ? null : _handleWhatsAppSend,
                     icon: const Icon(Icons.chat),
                     label: const Text('Send on WhatsApp'),
                     style: FilledButton.styleFrom(
@@ -1059,12 +1167,12 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             children: [
               if (hasUsablePhone)
                 OutlinedButton.icon(
-                  onPressed: _handleSmsSend,
+                  onPressed: _isSending ? null : _handleSmsSend,
                   icon: const Icon(Icons.sms_outlined, size: 18),
                   label: const Text('Send via SMS'),
                 ),
               OutlinedButton.icon(
-                onPressed: _handleShareSend,
+                onPressed: _isSending ? null : _handleShareSend,
                 icon: const Icon(Icons.share_outlined, size: 18),
                 label: const Text('Share Sheet'),
               ),
