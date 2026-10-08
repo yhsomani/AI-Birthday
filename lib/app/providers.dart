@@ -297,3 +297,12 @@ final draftsStreamProvider = StreamProvider<List<MessageDraft>>((ref) {
   final repo = ref.watch(draftsRepositoryProvider);
   return repo.watchDrafts();
 });
+
+/// One-shot orphan-draft sweep at the start of a session: legacy rows keyed by
+/// their own `draft-…` id that duplicate a canonical row, and drafts whose
+/// birthday was deleted, would otherwise stay visible in History forever
+/// (data-integrity audit). FutureProvider resolves once per app launch.
+final draftPruneProvider = FutureProvider<int>((ref) async {
+  final repo = ref.watch(draftsRepositoryProvider);
+  return repo.pruneOrphanedDrafts();
+});

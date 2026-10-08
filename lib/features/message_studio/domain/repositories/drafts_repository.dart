@@ -8,6 +8,13 @@ abstract interface class DraftsRepository {
   Future<MessageDraft?> getDraft(String id);
   Future<MessageDraft?> getDraftForBirthday(String birthdayId);
   Future<void> saveDraft(MessageDraft draft);
+
+  /// Removes unreachable draft rows and returns how many were deleted: drafts
+  /// whose birthday no longer exists, plus legacy rows keyed by their own id
+  /// (`draft-…`) that duplicate the canonical row for the same birthday. A
+  /// legacy-only draft for a live birthday is kept — the Studio still loads it
+  /// by birthdayId and would lose the user's text if removed.
+  Future<int> pruneOrphanedDrafts();
 }
 
 /// In-memory implementation of [DraftsRepository] for testing and offline prototyping.
@@ -48,6 +55,14 @@ class InMemoryDraftsRepository implements DraftsRepository {
   Future<void> saveDraft(MessageDraft draft) async {
     _store[draft.id] = draft;
     _controller.add(_sortedDrafts());
+  }
+
+  @override
+  Future<int> pruneOrphanedDrafts() async {
+    // This store is built in memory from explicit inputs and exposes no
+    // birthday knowledge, so it can never accumulate shadowed/orphaned rows
+    // the way the persistence layer can.
+    return 0;
   }
 
   List<MessageDraft> _sortedDrafts() {

@@ -40,6 +40,10 @@ class AiBirthdayApp extends ConsumerWidget {
     // (background-jobs audit).
     ref.watch(jobWorkerProvider);
 
+    // Sweep legacy orphan drafts once at boot so unreachable rows never show
+    // up in History (data-integrity audit).
+    ref.watch(draftPruneProvider);
+
     return MaterialApp.router(
       title: 'AI-Birthday',
       debugShowCheckedModeBanner: false,

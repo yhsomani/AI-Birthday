@@ -320,6 +320,51 @@ class DriftDraftsRepository implements DraftsRepository {
         );
   }
 
+  @override
+  Future<int> pruneOrphanedDrafts() async {
+    final before = (await _database.select(_database.messageDrafts).get()).length;
+
+    final liveBirthdayIds = (await _database.select(_database.birthdays).get())
+        .map((r) => r.id)
+        .toList();
+
+    if (liveBirthdayIds.isEmpty) {
+      // No birthdays at all: every draft is orphaned.
+      await _database.delete(_database.messageDrafts).go();
+    } else {
+      // Drafts whose birthday was deleted can never be applied again.
+      await (_database.delete(_database.messageDrafts)
+            ..where((r) => r.birthdayId.isNotIn(liveBirthdayIds)))
+          .go();
+    }
+
+    // Legacy rows keyed by their own id (`draft-…`) are shadowed duplicates
+    // once a canonical id == birthdayId row exists for the same birthday.
+    // Keep a legacy-only draft for a live birthday (the Studio still loads it
+    // by birthdayId) and remove only the shadow.
+    final remaining = await _database.select(_database.messageDrafts).get();
+    final canonicalBirthdayIds = remaining
+        .where((r) => r.id == r.birthdayId)
+        .map((r) => r.birthdayId)
+        .toSet();
+    final shadowedLegacyIds = remaining
+        .where(
+          (r) =>
+              r.id != r.birthdayId &&
+              canonicalBirthdayIds.contains(r.birthdayId),
+        )
+        .map((r) => r.id)
+        .toList();
+    if (shadowedLegacyIds.isNotEmpty) {
+      await (_database.delete(_database.messageDrafts)
+            ..where((r) => r.id.isIn(shadowedLegacyIds)))
+          .go();
+    }
+
+    final after = (await _database.select(_database.messageDrafts).get()).length;
+    return before - after;
+  }
+
   static MessageDraft _draftFromRow(db.MessageDraft row) {
     return MessageDraft(
       id: row.id,
