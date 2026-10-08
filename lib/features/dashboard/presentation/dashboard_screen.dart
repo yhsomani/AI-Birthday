@@ -27,40 +27,48 @@ class DashboardScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'AI-Birthday',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.3,
+      body: CustomScrollView(
+        slivers: [
+          // Collapsing command-center header: the large title shrinks into a
+          // pinned toolbar as the feed scrolls, instead of eating vertical
+          // space forever (dashboard sliver refactor).
+          SliverAppBar.large(
+            pinned: true,
+            // Default M3 two-state styling is used: headlineMedium while the
+            // header is expanded, titleLarge once it shrinks into the pinned
+            // toolbar (no style params — setting any would freeze both states
+            // to one size in this Flutter).
+            title: const Text('AI-Birthday'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.person_add_outlined),
+                tooltip: 'Add Birthday Contact',
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  context.push('/people/add');
+                },
+              ),
+            ],
           ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_add_outlined),
-            tooltip: 'Add Birthday Contact',
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              context.push('/people/add');
-            },
-          ),
-        ],
-      ),
-      body: birthdaysAsync.when(
+          birthdaysAsync.when(
         data: (birthdays) {
           return peopleAsync.when(
-            loading: () => const Center(
-              child: Padding(
-                padding: EdgeInsets.all(40),
-                child: CircularProgressIndicator(),
+            loading: () => const SliverFillRemaining(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.all(40),
+                  child: CircularProgressIndicator(),
+                ),
               ),
             ),
-            error: (err, stack) => const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'Could not load your contacts. Your birthday data is safe; retry from People.',
-                  textAlign: TextAlign.center,
+            error: (err, stack) => const SliverFillRemaining(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    'Could not load your contacts. Your birthday data is safe; retry from People.',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
             ),
@@ -96,14 +104,15 @@ class DashboardScreen extends ConsumerWidget {
                 }
               }
 
-              return ListView(
+              return SliverPadding(
                 padding: const EdgeInsets.fromLTRB(
                   16,
                   12,
                   16,
                   AppSpacing.bottomClearance,
                 ),
-                children: [
+                sliver: SliverList.list(
+                  children: [
                   // 1. Above-The-Fold Command Center Summary (What / Why / Next)
                   _buildCommandHeader(
                     context,
@@ -186,25 +195,32 @@ class DashboardScreen extends ConsumerWidget {
                   _buildQuickActions(context),
                   const SizedBox(height: AppSpacing.xl),
                 ],
+                ),
               );
             },
           );
         },
-        loading: () => const Center(
-          child: Padding(
-            padding: EdgeInsets.all(40),
-            child: CircularProgressIndicator(),
-          ),
-        ),
-        error: (err, _) => const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'We could not load your birthdays right now. Your saved data has not been deleted. Try again from the dashboard.',
-              textAlign: TextAlign.center,
+        loading: () => const SliverFillRemaining(
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator(),
             ),
           ),
         ),
+        error: (err, _) => const SliverFillRemaining(
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'We could not load your birthdays right now. Your saved data has not been deleted. Try again from the dashboard.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      ),
+        ],
       ),
     );
   }

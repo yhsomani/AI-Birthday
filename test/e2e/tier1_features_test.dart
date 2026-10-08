@@ -374,7 +374,7 @@ void main() {
           // Strict zero-overflow gate (audit 05 P0-2): the empty dashboard
           // must lay out at 360dp/1.5× without any RenderFlex overflow.
           expect(tester.takeException(), isNull);
-          expect(find.text('AI-Birthday'), findsOneWidget);
+          expect(find.text('AI-Birthday'), findsWidgets);
         },
       );
 

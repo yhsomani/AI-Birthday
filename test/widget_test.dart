@@ -66,7 +66,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify app title in AppBar
-      expect(find.text('AI-Birthday'), findsOneWidget);
+      expect(find.text('AI-Birthday'), findsWidgets);
 
       // Verify system theme enforcement
       final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
