@@ -77,6 +77,31 @@ class CloudSyncService {
     return null;
   }
 
+  /// Whole-second UTC floor of the last successful sync, minus one second of
+  /// backoff. Drift persists DateTimes at second granularity, so a row saved
+  /// in the second the previous backup ran — but after its snapshot read —
+  /// would otherwise sit below the boundary and be skipped forever. The
+  /// window only re-uploads a row or two that were already uploaded.
+  DateTime? _incrementalBoundary(String? lastSyncIso) {
+    if (lastSyncIso == null) return null;
+    final parsed = DateTime.tryParse(lastSyncIso);
+    if (parsed == null) return null;
+    final ms = parsed.toUtc().millisecondsSinceEpoch - 1000;
+    return DateTime.fromMillisecondsSinceEpoch(ms - ms % 1000, isUtc: true);
+  }
+
+  /// Rows whose change stamp (updatedAt — bumped on create, edit, and
+  /// tombstone) is at or after [boundary]. A null boundary keeps everything,
+  /// which is the very first backup.
+  List<T> _sinceBoundary<T>(
+    List<T> rows,
+    DateTime? boundary,
+    DateTime Function(T) changedAt,
+  ) {
+    if (boundary == null) return rows;
+    return rows.where((row) => !changedAt(row).isBefore(boundary)).toList();
+  }
+
   String? _authenticatedUid(AuthState authState) {
     if (!authState.isSignedIn || authState.identity == null) return null;
     final idToken = authState.identity!.idToken;
@@ -325,11 +350,32 @@ class CloudSyncService {
     }
 
     try {
-      final personRows = await _db.select(_db.persons).get();
-      final birthdayRows = await _db.select(_db.birthdays).get();
-      final draftRows = await _db.select(_db.messageDrafts).get();
+      // Incremental backup (data-integrity backlog): only rows changed since
+      // the last successful sync are uploaded; unchanged rows are left
+      // untouched. Reminder settings have no timestamp column, so they are
+      // always sent (the table is a handful of rows).
+      final boundary = _incrementalBoundary(
+        await _store.read(_lastSyncPrefix + uid),
+      );
+      final allPersonRows = await _db.select(_db.persons).get();
+      final allBirthdayRows = await _db.select(_db.birthdays).get();
+      final allDraftRows = await _db.select(_db.messageDrafts).get();
       final reminderRows = await _db.select(_db.reminderSettingsEntries).get();
-      final peopleMap = {for (final p in personRows) p.id: p};
+
+      final personRows = _sinceBoundary(
+        allPersonRows,
+        boundary,
+        (p) => p.updatedAt,
+      );
+      final birthdayRows = _sinceBoundary(
+        allBirthdayRows,
+        boundary,
+        (b) => b.updatedAt,
+      );
+      final draftRows = _sinceBoundary(allDraftRows, boundary, (d) => d.updatedAt);
+      // Resolve person names for birthday docs from the full set (tombstoned
+      // people included), matching the pre-incremental behavior.
+      final peopleMap = {for (final p in allPersonRows) p.id: p};
       final headers = _headers(authState);
 
       var uploaded = 0;

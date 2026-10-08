@@ -319,6 +319,171 @@ void main() {
       expect(lastSync, isNull);
     });
 
+    test('a backup with nothing new uploads zero rows', () async {
+      final now = DateTime.now();
+      await db
+          .into(db.persons)
+          .insert(
+            PersonsCompanion.insert(
+              id: 'p-stale',
+              name: 'Unchanged',
+              relationship: 'Friend',
+              relationshipCloseness: 'close',
+              preferredLanguage: 'en',
+              preferredTone: 'warm',
+              importantFacts: '',
+              preferredDeliveryChannel: 'whatsapp',
+              autoSendPolicy: 'manualOnly',
+              createdAt: now.subtract(const Duration(days: 1)),
+              updatedAt: now.subtract(const Duration(days: 1)),
+              version: 1,
+            ),
+          );
+
+      // A full backup already ran moments ago; nothing changed since.
+      store.data['cloud_last_sync_timestamp_uid-test'] =
+          now.toIso8601String();
+
+      var commitCount = 0;
+      final mockClient = MockClient((request) async {
+        commitCount++;
+        return http.Response(
+          jsonEncode({
+            'writeResults': [
+              {'updateTime': '2026-01-01T00:00:00Z'},
+            ],
+          }),
+          200,
+        );
+      });
+
+      final service = CloudSyncService(
+        db: db,
+        store: store,
+        httpClient: mockClient,
+      );
+
+      final result = await service.sync(_signedInAuth);
+      expect(result.success, isTrue);
+      expect(result.uploadedCount, 0);
+      expect(commitCount, 0, reason: 'no changes, no Firestore round trip');
+    });
+
+    test(
+      'a backup after the initial one uploads only rows changed since the '
+      'last sync, including tombstones',
+      () async {
+        final now = DateTime.now();
+        // Previous backup: one hour ago.
+        final lastSync = now.subtract(const Duration(hours: 1));
+        await db
+            .into(db.persons)
+            .insert(
+              PersonsCompanion.insert(
+                id: 'p-tomb',
+                name: 'Deleted Since',
+                relationship: 'Friend',
+                relationshipCloseness: 'close',
+                preferredLanguage: 'en',
+                preferredTone: 'warm',
+                importantFacts: '',
+                preferredDeliveryChannel: 'whatsapp',
+                autoSendPolicy: 'manualOnly',
+                createdAt: now.subtract(const Duration(days: 30)),
+                updatedAt: now,
+                version: 2,
+                deletedAt: Value(now),
+              ),
+            );
+        await db
+            .into(db.persons)
+            .insert(
+              PersonsCompanion.insert(
+                id: 'p-stale',
+                name: 'Already Uploaded',
+                relationship: 'Friend',
+                relationshipCloseness: 'close',
+                preferredLanguage: 'en',
+                preferredTone: 'warm',
+                importantFacts: '',
+                preferredDeliveryChannel: 'whatsapp',
+                autoSendPolicy: 'manualOnly',
+                createdAt: now.subtract(const Duration(hours: 2)),
+                updatedAt: now.subtract(const Duration(hours: 2)),
+                version: 1,
+              ),
+            );
+        await db
+            .into(db.messageDrafts)
+            .insert(
+              MessageDraftsCompanion.insert(
+                id: 'd-new',
+                birthdayId: 'b-1',
+                personId: 'p-1',
+                body: 'Edited since the last backup',
+                tone: 'warm',
+                length: 'short',
+                status: 'ready',
+                providerType: 'local',
+                createdAt: now.subtract(const Duration(hours: 2)),
+                updatedAt: now,
+              ),
+            );
+        await db
+            .into(db.messageDrafts)
+            .insert(
+              MessageDraftsCompanion.insert(
+                id: 'd-stale',
+                birthdayId: 'b-2',
+                personId: 'p-2',
+                body: 'Unchanged',
+                tone: 'warm',
+                length: 'short',
+                status: 'ready',
+                providerType: 'local',
+                createdAt: now.subtract(const Duration(hours: 3)),
+                updatedAt: now.subtract(const Duration(hours: 2)),
+              ),
+            );
+
+        store.data['cloud_last_sync_timestamp_uid-test'] =
+            lastSync.toIso8601String();
+
+        final uploadedNames = <String>[];
+        final mockClient = MockClient((request) async {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          final writes = body['writes'] as List;
+          expect(writes, hasLength(2));
+          for (final write in writes.cast<Map<String, dynamic>>()) {
+            final name = ((write['update'] as Map)['name'] as String);
+            uploadedNames.add(name.split('/').last);
+            expect(name, isNot(endsWith('/people/p-stale')));
+            expect(name, isNot(endsWith('/drafts/d-stale')));
+          }
+          return http.Response(
+            jsonEncode({
+              'writeResults': List.generate(
+                writes.length,
+                (_) => {'updateTime': '2026-01-01T00:00:00Z'},
+              ),
+            }),
+            200,
+          );
+        });
+
+        final service = CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: mockClient,
+        );
+
+        final result = await service.sync(_signedInAuth);
+        expect(result.success, isTrue);
+        expect(result.uploadedCount, 2);
+        expect(uploadedNames.toSet(), {'p-tomb', 'd-new'});
+      },
+    );
+
     test(
       'returns failure and does not store timestamp when cloud writes fail',
       () async {
@@ -604,3 +769,15 @@ void main() {
     });
   });
 }
+
+/// Signed-in identity used by the incremental-backup tests.
+const AuthState _signedInAuth = AuthState(
+  status: AuthStatus.signedIn,
+  identity: GoogleIdentity(
+    googleSubject: 'sub-test',
+    email: 'user@example.com',
+    displayName: 'User',
+    firebaseUid: 'uid-test',
+    idToken: 'test-id-token',
+  ),
+);
