@@ -63,13 +63,13 @@ class CloudSyncService {
   final String _apiKey;
   final Future<String?> Function()? _freshIdToken;
 
-  static const String _projectId = 'relateai-birthday-ysomani';
+  static const String _projectId = 'relateai-birthday-ysoman-a2372';
 
   /// Firebase web API key of the shipped project. Public identifier (it also
   /// ships in `google-services.json`), so release builds work without a
   /// `--dart-define`; the request still needs a signed-in user's ID token.
   static const String _defaultFirebaseApiKey =
-      'AIzaSyDUgbmii4EH0PCHVOxO9TXvGeXyFpyxWNQ';
+      'AIzaSyAhV3scPZPa_KBygWgg-57zkZL2QFf8HS4';
 
   static const String _lastSyncPrefix = 'cloud_last_sync_timestamp_';
 

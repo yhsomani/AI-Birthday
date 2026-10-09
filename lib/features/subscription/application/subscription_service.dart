@@ -44,7 +44,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     Future<String?> Function()? accountBindingProvider,
     DateTime Function()? now,
     String verificationEndpoint =
-        'https://asia-south1-relateai-birthday-ysomani.cloudfunctions.net/verifyPurchase',
+        'https://asia-south1-relateai-birthday-ysoman-a2372.cloudfunctions.net/verifyPurchase',
   }) : _store = store,
        _iap = inAppPurchase ?? iap.InAppPurchase.instance,
        _http = httpClient ?? http.Client(),

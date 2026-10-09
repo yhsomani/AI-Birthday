@@ -36,14 +36,14 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
   bool _initialized = false;
 
   static const String _serverClientId =
-      '339889410493-g5klr4838kfibddoqvk1rbbt39dblffp.apps.googleusercontent.com';
+      '492062763032-r83kp8a1ksanfi3k8dvhh5n42c9jpohj.apps.googleusercontent.com';
 
   /// Firebase web API key of the shipped project. This is a public identifier,
   /// not a secret: the same value ships in `google-services.json` and in every
   /// installed binary. It only names the project; requests still need a token.
   /// `--dart-define=FIREBASE_WEB_API_KEY=...` overrides it when needed.
   static const String _defaultFirebaseApiKey =
-      'AIzaSyDUgbmii4EH0PCHVOxO9TXvGeXyFpyxWNQ';
+      'AIzaSyAhV3scPZPa_KBygWgg-57zkZL2QFf8HS4';
 
   static const String _keySubject = 'auth_session_subject';
   static const String _keyEmail = 'auth_session_email';
