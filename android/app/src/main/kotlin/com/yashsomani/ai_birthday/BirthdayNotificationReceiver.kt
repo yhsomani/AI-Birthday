@@ -10,6 +10,16 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import org.json.JSONArray
+import org.json.JSONObject
+
+/** One scheduled reminder as persisted for reboot and package-update recovery. */
+data class PersistedTrigger(
+    val id: Int,
+    val timestampMs: Long,
+    val title: String,
+    val body: String,
+    val personId: String?,
+)
 
 class BirthdayNotificationReceiver : BroadcastReceiver() {
     companion object {
@@ -25,6 +35,36 @@ class BirthdayNotificationReceiver : BroadcastReceiver() {
         const val PREFS_NAME = "scheduled_reminders_prefs"
         const val KEY_SCHEDULED_ALARM_IDS = "scheduled_alarm_ids"
         const val KEY_SCHEDULED_TRIGGERS_JSON = "scheduled_triggers_json"
+
+        // Single codec for the persisted trigger payload. The scheduler (writer) and the
+        // reboot/package-update recovery (reader) both go through these helpers so the
+        // JSON keys can never drift apart again.
+        private const val JSON_ID = "id"
+        private const val JSON_TIMESTAMP_MS = "timestampMs"
+        private const val JSON_TITLE = "title"
+        private const val JSON_BODY = "body"
+        private const val JSON_PERSON_ID = "personId"
+
+        fun persistedTriggerToJson(trigger: PersistedTrigger): JSONObject = JSONObject().apply {
+            put(JSON_ID, trigger.id)
+            put(JSON_TIMESTAMP_MS, trigger.timestampMs)
+            put(JSON_TITLE, trigger.title)
+            put(JSON_BODY, trigger.body)
+            if (trigger.personId != null) put(JSON_PERSON_ID, trigger.personId)
+        }
+
+        fun parsePersistedTrigger(item: JSONObject): PersistedTrigger? {
+            val id = item.optInt(JSON_ID, -1)
+            val timestampMs = item.optLong(JSON_TIMESTAMP_MS, 0L)
+            if (id < 0 || timestampMs <= 0L) return null
+            return PersistedTrigger(
+                id = id,
+                timestampMs = timestampMs,
+                title = item.optString(JSON_TITLE, "Birthday Reminder"),
+                body = item.optString(JSON_BODY, ""),
+                personId = if (item.has(JSON_PERSON_ID)) item.optString(JSON_PERSON_ID) else null,
+            )
+        }
 
         fun reschedulePersisted(context: Context) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
@@ -49,23 +89,20 @@ class BirthdayNotificationReceiver : BroadcastReceiver() {
 
             for (index in 0 until triggers.length()) {
                 val item = triggers.optJSONObject(index) ?: continue
-                val id = item.optInt(EXTRA_ID, -1)
-                val timestampMs = item.optLong("timestampMs", 0L)
-                if (id < 0 || timestampMs <= now) continue
+                val trigger = parsePersistedTrigger(item) ?: continue
+                if (trigger.timestampMs <= now) continue
 
                 val reminderIntent = Intent(context, BirthdayNotificationReceiver::class.java).apply {
                     action = ACTION_BIRTHDAY_REMINDER
-                    putExtra(EXTRA_ID, id)
-                    putExtra(EXTRA_TITLE, item.optString(EXTRA_TITLE, "Birthday Reminder"))
-                    putExtra(EXTRA_BODY, item.optString(EXTRA_BODY, ""))
-                    if (item.has(EXTRA_PERSON_ID)) {
-                        putExtra(EXTRA_PERSON_ID, item.optString(EXTRA_PERSON_ID))
-                    }
+                    putExtra(EXTRA_ID, trigger.id)
+                    putExtra(EXTRA_TITLE, trigger.title)
+                    putExtra(EXTRA_BODY, trigger.body)
+                    putExtra(EXTRA_PERSON_ID, trigger.personId)
                 }
 
                 val pendingIntent = PendingIntent.getBroadcast(
                     context,
-                    id,
+                    trigger.id,
                     reminderIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
@@ -74,19 +111,19 @@ class BirthdayNotificationReceiver : BroadcastReceiver() {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         alarmManager.setExactAndAllowWhileIdle(
                             android.app.AlarmManager.RTC_WAKEUP,
-                            timestampMs,
+                            trigger.timestampMs,
                             pendingIntent
                         )
                     } else {
                         alarmManager.set(
                             android.app.AlarmManager.RTC_WAKEUP,
-                            timestampMs,
+                            trigger.timestampMs,
                             pendingIntent
                         )
                     }
-                    restoredIds.add(id.toString())
+                    restoredIds.add(trigger.id.toString())
                 } catch (e: SecurityException) {
-                    Log.e(TAG, "Failed to restore reminder id=$id after reboot.", e)
+                    Log.e(TAG, "Failed to restore reminder id=${trigger.id} after reboot.", e)
                 }
             }
 
@@ -116,7 +153,8 @@ class BirthdayNotificationReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra(EXTRA_TITLE) ?: return
         val body = intent.getStringExtra(EXTRA_BODY) ?: return
         val personId = intent.getStringExtra(EXTRA_PERSON_ID)
-        Log.i(TAG, "onReceive: notificationId=$notificationId title=$title")
+        // Never log the title: it carries the recipient's name (F21).
+        Log.i(TAG, "onReceive: notificationId=$notificationId")
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             ?: return

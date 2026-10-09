@@ -27,7 +27,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.json.JSONArray
-import org.json.JSONObject
 
 class MainActivity : FlutterActivity() {
     private val NOTIFICATIONS_CHANNEL = "com.yashsomani.ai_birthday/notifications"
@@ -467,13 +466,15 @@ class MainActivity : FlutterActivity() {
 
                 scheduledIds.add(id.toString())
                 scheduledTriggers.put(
-                    JSONObject().apply {
-                        put("id", id)
-                        put("timestampMs", timestampMs)
-                        put("title", title)
-                        put("body", body)
-                        if (personId != null) put("personId", personId)
-                    }
+                    BirthdayNotificationReceiver.persistedTriggerToJson(
+                        PersistedTrigger(
+                            id = id,
+                            timestampMs = timestampMs,
+                            title = title,
+                            body = body,
+                            personId = personId,
+                        )
+                    )
                 )
             } catch (e: SecurityException) {
                 Log.e("BirthdayReminder", "Exact alarm scheduling rejected for id=$id", e)
