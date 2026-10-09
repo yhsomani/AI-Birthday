@@ -109,7 +109,7 @@ class DriftPeopleStore implements PeopleStore {
     phoneNumber: row.phoneNumber,
     email: row.email,
     relationship: row.relationship,
-    relationshipCloseness: RelationshipCloseness.parse(
+    relationshipCloseness: RelationshipCloseness.fromStored(
       row.relationshipCloseness,
     ),
     preferredLanguage: row.preferredLanguage.isEmpty

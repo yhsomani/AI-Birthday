@@ -188,10 +188,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
     _timezone.text = person.timezone ?? '';
     _tone = person.preferredTone;
     _closeness =
-        _existingPerson?.relationshipCloseness ??
-        p_rel.RelationshipCloseness.fromString(
-          person.relationshipCloseness.name,
-        );
+        _existingPerson?.relationshipCloseness ?? person.relationshipCloseness;
     _preferredLanguage =
         _existingPerson?.preferredLanguage ??
         (person.preferredLanguage.isNotEmpty ? person.preferredLanguage : 'en');
@@ -262,9 +259,9 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       phoneNumber: emptyToNull(_phone.text),
       email: emptyToNull(_email.text),
       relationship: _relationship.text.trim(),
-      relationshipCloseness: p_enums.RelationshipCloseness.parse(
-        _closeness.name,
-      ),
+      // The form and the model share one closeness type, so no name round
+      // trip can lose a value (F10).
+      relationshipCloseness: _closeness,
       preferredLanguage: _preferredLanguage,
       preferredTone: _tone,
       importantFacts: _facts

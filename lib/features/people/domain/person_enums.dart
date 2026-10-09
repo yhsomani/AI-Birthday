@@ -1,20 +1,6 @@
-/// Enumeration of closeness relationships. Controls tone choices and message
-/// depth, never duplicate-detection merging.
-enum RelationshipCloseness {
-  family,
-  close,
-  goodFriend,
-  friend,
-  acquaintance,
-  colleague,
-  other;
-
-  static RelationshipCloseness parse(String value) =>
-      RelationshipCloseness.values.firstWhere(
-        (v) => v.name == value,
-        orElse: () => RelationshipCloseness.other,
-      );
-}
+// The closeness set has one definition (models/relationship.dart). It is
+// re-exported here so existing imports keep resolving to the same type (F10).
+export 'models/relationship.dart' show RelationshipCloseness;
 
 /// Preferred message tone for a recipient.
 enum PreferredTone {

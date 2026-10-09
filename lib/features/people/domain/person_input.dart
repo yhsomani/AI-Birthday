@@ -14,7 +14,7 @@ class PersonDraft {
     this.phoneNumber,
     this.email,
     this.relationship = '',
-    this.relationshipCloseness = RelationshipCloseness.other,
+    this.relationshipCloseness = RelationshipCloseness.casual,
     this.preferredLanguage = 'en',
     this.preferredTone = PreferredTone.warm,
     this.importantFacts = const [],

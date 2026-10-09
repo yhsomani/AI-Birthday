@@ -2,6 +2,7 @@ import 'package:ai_birthday/core/database/app_database.dart' as db;
 import 'package:ai_birthday/features/people/data/person_repository.dart';
 import 'package:ai_birthday/features/people/domain/person.dart';
 import 'package:ai_birthday/features/people/domain/person_enums.dart';
+import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -28,7 +29,7 @@ void main() {
       name: name,
       birthdayMonth: month,
       birthdayDay: day,
-      relationshipCloseness: RelationshipCloseness.goodFriend,
+      relationshipCloseness: RelationshipCloseness.close,
       preferredTone: PreferredTone.funny,
       importantFacts: ['loves jazz', 'allergic to peanuts'],
       preferredDeliveryChannel: DeliveryChannel.whatsapp,
@@ -45,7 +46,7 @@ void main() {
     expect(loaded, isNotNull);
     expect(loaded!.birthdayMonth, 2);
     expect(loaded.birthdayDay, 29);
-    expect(loaded.relationshipCloseness, RelationshipCloseness.goodFriend);
+    expect(loaded.relationshipCloseness, RelationshipCloseness.close);
     expect(loaded.preferredTone, PreferredTone.funny);
     expect(
       loaded.importantFacts,
@@ -119,4 +120,49 @@ void main() {
     final loaded = await clocked.getById('p1');
     expect(loaded!.deletedAt, DateTime.utc(2030, 3, 3));
   });
+
+  test(
+    'every canonical closeness level round-trips unchanged (audit F10)',
+    () async {
+      for (final level in RelationshipCloseness.values) {
+        final p = Person(
+          id: 'closeness-${level.name}',
+          name: 'Level ${level.name}',
+          birthdayMonth: 5,
+          birthdayDay: 6,
+          relationshipCloseness: level,
+          createdAt: DateTime.utc(2025, 1, 1),
+          updatedAt: DateTime.utc(2025, 1, 1),
+        );
+        await store.save(p);
+        final loaded = await store.getById(p.id);
+        expect(loaded!.relationshipCloseness, level, reason: level.name);
+      }
+    },
+  );
+
+  test(
+    'legacy stored closeness values collapse onto the three levels (F10)',
+    () async {
+      await store.save(person(id: 'legacy'));
+      final cases = {
+        'family': RelationshipCloseness.close,
+        'goodFriend': RelationshipCloseness.close,
+        'friend': RelationshipCloseness.casual,
+        'acquaintance': RelationshipCloseness.casual,
+        'colleague': RelationshipCloseness.casual,
+        'other': RelationshipCloseness.casual,
+        'distant': RelationshipCloseness.distant,
+      };
+      for (final entry in cases.entries) {
+        await (database.update(
+          database.persons,
+        )..where((t) => t.id.equals('legacy'))).write(
+          db.PersonsCompanion(relationshipCloseness: drift.Value(entry.key)),
+        );
+        final loaded = await store.getById('legacy');
+        expect(loaded!.relationshipCloseness, entry.value, reason: entry.key);
+      }
+    },
+  );
 }

@@ -11,6 +11,7 @@ against HEAD. Each finding was re-verified in source before any change.
 | F02 Reboot alarm payload | **Fixed** (source) | One codec (`persistedTriggerToJson` / `parsePersistedTrigger`) in `BirthdayNotificationReceiver.kt`, used by the writer in `MainActivity.kt` and by reboot recovery. Stored records use the `id`/`personId` keys the codec reads, so no migration is needed. |
 | F03 Deletion misses cloud backups | **Fixed** (backend and rules) | `controlPlane.ts` purges `accounts/{uid}` and `users/{uid}` and verifies both are absent. `backend/firestore.rules` denies owner backup writes while `coordinationPresence/{uid}` is `DELETING`. Emulator tests cover both; the fence test fails when the rule is removed. |
 | F04 Privacy notice | **Fixed** (copy) | `backend/hosting/privacy/index.html` and `public/privacy/index.html` now describe optional cloud backup. Hindi text is a translation that still needs native review. Static test updated. |
+| F10 Closeness loss (part) | **Fixed** (closeness only) | One closeness type (close, casual, distant), chosen by the owner. Legacy stored values collapse on read through `RelationshipCloseness.fromStored`, so no DB migration is needed. The form and model share the type, so no value is lost on save. Round-trip and legacy-mapping tests cover every level. Still open: the two Person models, their repositories, and the other field differences. |
 | F11 Reminder empty set | **Fixed** | `reminder_settings_controller.dart` keeps a stored empty set instead of falling back to the defaults. Regression test added; verified to fail with the old line. |
 | F16 Purchase acknowledgement | Partly fixed at HEAD | `subscription_service.dart` acknowledges only after a verified success (the audit's "acknowledges on failure" is stale). Purchase status is still a private field, not reactive state. |
 | F18 Wrong age in AI prompt | Partly fixed at HEAD | Studio and job paths pass `cycleYear` (commit `56d06dd2`). The edit-overwrite guard is still open. |
@@ -39,7 +40,8 @@ These need either a product decision or a larger change. Nothing here has been s
 
 - F05 remainder — delete superseded generations (storage grows without it).
 - F06 remainder — report malformed records as skipped instead of silently ignoring them.
-- F07, F08, F09, F10 — account partitioning, immutable birthday occurrences, midnight refresh, one Person model.
+- F07, F08, F09 — account partitioning, immutable birthday occurrences, midnight refresh.
+- F10 remainder — collapse the two Person models and repositories into one.
 - F13 remainder — quiet-hours policy and rolling renewal (product decisions); on-device verification.
 - F15 — purchase binding against Play.
 - F14 remainder — request deadlines, a single controlled retry, and disposal of the owned HTTP client.
@@ -61,7 +63,7 @@ These need either a product decision or a larger change. Nothing here has been s
 | `backend/functions`: Firestore emulator tests | Pass (20 tests: control plane and rules). Needs the JDK on PATH; it is installed at C:/Program Files/Java/jdk-26.0.2.1 but not on the system PATH. Run `npx firebase emulators:exec --only firestore "npx vitest run emulator"` after adding its bin folder to PATH. |
 | `backend/hosting`: `node --test` | Pass (12 tests) |
 | `flutter analyze` | No issues (re-run after formatting) |
-| `flutter test` (full suite) | Pass (381 tests, after the F12 change) |
+| `flutter test` (full suite) | Pass (383 tests, after the F10 closeness change) |
 | `dart format --set-exit-if-changed .` (CI gate) | Pass |
 | `flutter build apk --debug` | Pass (re-run after the F21 logging change) |
 | Reboot recovery on a device or emulator (schedule → reboot → notification) | Not run |

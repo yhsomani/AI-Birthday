@@ -40,11 +40,16 @@ enum RelationshipCloseness {
     RelationshipCloseness.distant => 'Distant',
   };
 
-  static RelationshipCloseness fromString(String? value) {
-    if (value == null) return RelationshipCloseness.casual;
-    return RelationshipCloseness.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
-      orElse: () => RelationshipCloseness.casual,
-    );
+  /// Reads a stored closeness. Rows written before the three-level set
+  /// (family, goodFriend, friend, acquaintance, colleague, other) collapse
+  /// onto the canonical levels here, so no migration is required (audit F10).
+  static RelationshipCloseness fromStored(String? value) {
+    return switch (value?.toLowerCase()) {
+      'close' || 'family' || 'goodfriend' => RelationshipCloseness.close,
+      'distant' => RelationshipCloseness.distant,
+      _ => RelationshipCloseness.casual,
+    };
   }
+
+  static RelationshipCloseness fromString(String? value) => fromStored(value);
 }
