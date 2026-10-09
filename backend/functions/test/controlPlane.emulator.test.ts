@@ -1220,6 +1220,19 @@ describe('Firestore transaction adapter', () => {
       .collection('testClaims')
       .doc('orphan-to-delete')
       .set({ orphan: true });
+    // Cloud backup and entitlement live under users/{uid}; deletion must remove them too.
+    await db
+      .collection('users')
+      .doc(uid)
+      .collection('birthdays')
+      .doc('seeded-backup-birthday')
+      .set({ name: 'Seeded' });
+    await db
+      .collection('users')
+      .doc(uid)
+      .collection('entitlement')
+      .doc('status')
+      .set({ status: 'active', canUseAi: true });
     const neverUsedAuth = {} as Auth;
     const orchestrator = new DeletionOrchestrator(
       db,
@@ -1228,6 +1241,14 @@ describe('Firestore transaction adapter', () => {
     );
     expect(await orchestrator.sweep(20)).toMatchObject({ drainsAdvanced: 1 });
     expect((await db.collection('accounts').doc(uid).get()).exists).toBe(false);
+    expect(
+      (await db.collection('users').doc(uid).collection('birthdays').get())
+        .empty,
+    ).toBe(true);
+    expect(
+      (await db.collection('users').doc(uid).collection('entitlement').get())
+        .empty,
+    ).toBe(true);
     expect(
       (await db.collection('accounts').doc(uid).collection('testClaims').get())
         .empty,

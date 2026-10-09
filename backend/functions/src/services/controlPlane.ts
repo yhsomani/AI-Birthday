@@ -384,14 +384,29 @@ export class ControlPlaneService {
     return snapshots.every(snapshot => snapshot.empty);
   }
 
+  /**
+   * Removes every Firestore tree that holds account data: the coordination tree
+   * at accounts/{uid} and the cloud backup and entitlement tree at users/{uid}.
+   * Firebase Auth deletion is a separate step and does not remove either tree.
+   */
+  private async purgeAccountTrees(uid: string): Promise<void> {
+    await this.db.recursiveDelete(accountPaths(this.db, uid).account);
+    await this.db.recursiveDelete(this.db.collection('users').doc(uid));
+  }
+
   private async accountTreeIsAbsent(uid: string): Promise<boolean> {
-    const account = accountPaths(this.db, uid).account;
-    if ((await account.get()).exists) {
-      return false;
-    }
-    for (const collection of await account.listCollections()) {
-      if (!(await collection.limit(1).get()).empty) {
+    const roots = [
+      accountPaths(this.db, uid).account,
+      this.db.collection('users').doc(uid),
+    ];
+    for (const root of roots) {
+      if ((await root.get()).exists) {
         return false;
+      }
+      for (const collection of await root.listCollections()) {
+        if (!(await collection.limit(1).get()).empty) {
+          return false;
+        }
       }
     }
     return true;
@@ -801,7 +816,7 @@ export class ControlPlaneService {
     if (operation.stage !== 'RELEASE_PURGING') {
       throw new LedgerCorruptError();
     }
-    await this.db.recursiveDelete(paths.account);
+    await this.purgeAccountTrees(uid);
     if (!(await this.accountTreeIsAbsent(uid))) {
       return inProgressResponse(operation);
     }
@@ -1963,7 +1978,7 @@ export class ControlPlaneService {
     if (decision?.kind !== 'READY_TO_PURGE' && decision?.kind !== 'PURGING') {
       return 'WAIT';
     }
-    await this.db.recursiveDelete(paths.account);
+    await this.purgeAccountTrees(uid);
     const receiptQuery = this.db
       .collection('coordinationOperationReceipts')
       .where('accountKey', '==', deriveOperationAccountKey(uid));

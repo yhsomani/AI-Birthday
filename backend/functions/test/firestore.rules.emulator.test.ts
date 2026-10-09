@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import {
   assertFails,
+  assertSucceeds,
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
@@ -63,6 +64,43 @@ describe('Firestore authorization rules', () => {
     );
     await assertFails(
       setDoc(doc(db, 'deletionTombstones/uid-one'), { stage: 'DRAINING' }),
+    );
+  });
+
+  it('fences owner backup writes while the account is being deleted (F03)', async () => {
+    const ownerDb = environment
+      .authenticatedContext('uid-fence', { email_verified: true })
+      .firestore();
+
+    // Before deletion starts, the owner can write.
+    await assertSucceeds(
+      setDoc(doc(ownerDb, 'users/uid-fence/people/before'), { name: 'Before' }),
+    );
+
+    // The server marks the account DELETING; the owner's backup writes must stop.
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'coordinationPresence/uid-fence'), {
+        state: 'DELETING',
+      });
+    });
+    await assertFails(
+      setDoc(doc(ownerDb, 'users/uid-fence/people/during'), { name: 'During' }),
+    );
+    await assertFails(
+      setDoc(doc(ownerDb, 'users/uid-fence/backup/during'), { name: 'During' }),
+    );
+
+    // Reads of the owner's own data remain allowed while the fence is up.
+    await assertSucceeds(getDoc(doc(ownerDb, 'users/uid-fence/people/before')));
+
+    // Once the fence is lifted, writes resume.
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'coordinationPresence/uid-fence'), {
+        state: 'ANDROID_STATE',
+      });
+    });
+    await assertSucceeds(
+      setDoc(doc(ownerDb, 'users/uid-fence/people/after'), { name: 'After' }),
     );
   });
 });

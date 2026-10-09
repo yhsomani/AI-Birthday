@@ -2,6 +2,13 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // True while the server has fenced this account for deletion. The presence
+    // document is server-only; get() reads it without client read access.
+    function deletionInProgress(userId) {
+      return exists(/databases/$(database)/documents/coordinationPresence/$(userId)) &&
+        get(/databases/$(database)/documents/coordinationPresence/$(userId)).data.state == 'DELETING';
+    }
+
     // Entitlement status is readable only by the authenticated owner, writable only by server.
     match /users/{userId}/entitlement/{document=**} {
       allow read: if request.auth != null && request.auth.uid == userId;
@@ -9,15 +16,22 @@ service cloud.firestore {
     }
 
     // Opt-in cloud backup data is readable & writable only by the authenticated owner.
+    // Writes are fenced while the account is being deleted, so a backup in
+    // flight cannot recreate data after the purge (audit F03).
     match /users/{userId}/backup/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId &&
+        !deletionInProgress(userId);
     }
 
     // The mobile app's opt-in cloud backup data is scoped to the signed-in owner.
     // This data is intentionally stored in separate collections from server-only coordination state.
     match /users/{userId}/{collection}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId &&
+      allow read: if request.auth != null && request.auth.uid == userId &&
         collection in ['people', 'birthdays', 'drafts', 'reminderSettings'];
+      allow write: if request.auth != null && request.auth.uid == userId &&
+        collection in ['people', 'birthdays', 'drafts', 'reminderSettings'] &&
+        !deletionInProgress(userId);
     }
 
     // The coordination ledger, entitlement writes, and unknown collections are server-only.
