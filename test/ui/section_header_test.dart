@@ -8,8 +8,8 @@ import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 void main() {
   Widget host(Widget child) => MaterialApp(
-        home: Scaffold(body: SingleChildScrollView(child: child)),
-      );
+    home: Scaffold(body: SingleChildScrollView(child: child)),
+  );
 
   testWidgets('announces the section title as a heading (header: true)', (
     tester,
@@ -19,8 +19,11 @@ void main() {
     );
 
     final node = tester.getSemantics(find.byType(AppSectionHeader));
-    expect(node.flagsCollection.isHeader, isTrue,
-        reason: 'TalkBack must announce section titles as headings');
+    expect(
+      node.flagsCollection.isHeader,
+      isTrue,
+      reason: 'TalkBack must announce section titles as headings',
+    );
   });
 
   testWidgets('renders the title uppercase with the count pill', (

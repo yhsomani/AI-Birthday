@@ -169,7 +169,8 @@ class AiGenerationJobHandler implements JobHandler {
     final enqueuedAt = payload.draftUpdatedAt == null
         ? null
         : DateTime.tryParse(payload.draftUpdatedAt!);
-    final stale = current != null &&
+    final stale =
+        current != null &&
         (enqueuedAt == null || current.updatedAt.isAfter(enqueuedAt));
     if (stale) return const JobSucceeded();
 

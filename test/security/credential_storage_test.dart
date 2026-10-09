@@ -44,34 +44,37 @@ void main() {
       expect(await storage.hasGeminiApiKey(), isFalse);
     });
 
-    test('key deletion clears verified-at; corrupted record reads as unverified',
-        () async {
-      // In-memory path: record → read → cleared on key deletion.
-      final storage = InMemoryCredentialStorage();
-      final when = DateTime.utc(2026, 10, 7, 12, 0);
+    test(
+      'key deletion clears verified-at; corrupted record reads as unverified',
+      () async {
+        // In-memory path: record → read → cleared on key deletion.
+        final storage = InMemoryCredentialStorage();
+        final when = DateTime.utc(2026, 10, 7, 12, 0);
 
-      await storage.recordGeminiKeyVerifiedAt(when);
-      expect(await storage.geminiKeyVerifiedAt(), when);
+        await storage.recordGeminiKeyVerifiedAt(when);
+        expect(await storage.geminiKeyVerifiedAt(), when);
 
-      await storage.saveGeminiApiKey('AIzaSyTestKey12345');
-      await storage.deleteGeminiApiKey();
-      expect(await storage.geminiKeyVerifiedAt(), isNull);
+        await storage.saveGeminiApiKey('AIzaSyTestKey12345');
+        await storage.deleteGeminiApiKey();
+        expect(await storage.geminiKeyVerifiedAt(), isNull);
 
-      // Secure path: a corrupted stored value degrades to "unverified",
-      // never throws (adversarial F-7 style guard).
-      final driver = _MapStoreDriver()..values['ai_birthday_gemini_key_verified_at'] = 'not-a-number';
-      final secure = SecureCredentialStorage(driver);
-      expect(await secure.geminiKeyVerifiedAt(), isNull);
+        // Secure path: a corrupted stored value degrades to "unverified",
+        // never throws (adversarial F-7 style guard).
+        final driver = _MapStoreDriver()
+          ..values['ai_birthday_gemini_key_verified_at'] = 'not-a-number';
+        final secure = SecureCredentialStorage(driver);
+        expect(await secure.geminiKeyVerifiedAt(), isNull);
 
-      await driver.write('ai_birthday_gemini_key_verified_at', '0');
-      expect(await secure.geminiKeyVerifiedAt(), isNull);
+        await driver.write('ai_birthday_gemini_key_verified_at', '0');
+        expect(await secure.geminiKeyVerifiedAt(), isNull);
 
-      await driver.write(
-        'ai_birthday_gemini_key_verified_at',
-        when.millisecondsSinceEpoch.toString(),
-      );
-      expect(await secure.geminiKeyVerifiedAt(), when);
-    });
+        await driver.write(
+          'ai_birthday_gemini_key_verified_at',
+          when.millisecondsSinceEpoch.toString(),
+        );
+        expect(await secure.geminiKeyVerifiedAt(), when);
+      },
+    );
 
     test(
       'ConsoleAppLogger and RecordingLogger redact sensitive keys automatically',

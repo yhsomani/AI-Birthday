@@ -93,10 +93,8 @@ void main() {
   CloudSyncJobHandler handler() {
     return CloudSyncJobHandler(
       service: service,
-      authState: () async => const AuthState(
-        status: AuthStatus.signedIn,
-        identity: _identity,
-      ),
+      authState: () async =>
+          const AuthState(status: AuthStatus.signedIn, identity: _identity),
     );
   }
 
@@ -107,37 +105,39 @@ void main() {
     await repo.enqueue(
       type: JobTypes.cloudSync,
       subjectId: subjectId,
-      payload: jsonEncode(
-        CloudJobPayload(operation: operation).toJson(),
-      ),
+      payload: jsonEncode(CloudJobPayload(operation: operation).toJson()),
       maxAttempts: 1,
     );
     return (await repo.claimNext(DateTime.now()))!;
   }
 
-  test('signed-out session fails permanently with auth before any call',
-      () async {
-    final handler = CloudSyncJobHandler(
-      service: service,
-      authState: () async => const AuthState(status: AuthStatus.signedOut),
-    );
+  test(
+    'signed-out session fails permanently with auth before any call',
+    () async {
+      final handler = CloudSyncJobHandler(
+        service: service,
+        authState: () async => const AuthState(status: AuthStatus.signedOut),
+      );
 
-    final outcome = await handler.run(
-      await claimedJob(operation: CloudJobPayload.backup),
-    );
+      final outcome = await handler.run(
+        await claimedJob(operation: CloudJobPayload.backup),
+      );
 
-    expect(outcome, isA<JobFailed>());
-    final failed = outcome as JobFailed;
-    expect(failed.retryable, isFalse);
-    expect(failed.code, 'auth');
-    expect(service.backupCalls, 0);
-    expect(service.restoreCalls, 0);
-  });
+      expect(outcome, isA<JobFailed>());
+      final failed = outcome as JobFailed;
+      expect(failed.retryable, isFalse);
+      expect(failed.code, 'auth');
+      expect(service.backupCalls, 0);
+      expect(service.restoreCalls, 0);
+    },
+  );
 
-  test('ownership guard: a job never runs under a different account',
-      () async {
+  test('ownership guard: a job never runs under a different account', () async {
     final outcome = await handler().run(
-      await claimedJob(operation: CloudJobPayload.backup, subjectId: 'stranger'),
+      await claimedJob(
+        operation: CloudJobPayload.backup,
+        subjectId: 'stranger',
+      ),
     );
 
     expect(outcome, isA<JobFailed>());
@@ -168,26 +168,28 @@ void main() {
     expect(service.backupCalls, 0);
   });
 
-  test('transient failures map to retryable JobFailed with their code',
-      () async {
-    service.backupResult = CloudSyncResult(
-      success: false,
-      error: 'Could not reach the service.',
-      errorCode: 'network',
-      retryable: true,
-      timestamp: DateTime.utc(2026, 1, 1),
-    );
+  test(
+    'transient failures map to retryable JobFailed with their code',
+    () async {
+      service.backupResult = CloudSyncResult(
+        success: false,
+        error: 'Could not reach the service.',
+        errorCode: 'network',
+        retryable: true,
+        timestamp: DateTime.utc(2026, 1, 1),
+      );
 
-    final outcome = await handler().run(
-      await claimedJob(operation: CloudJobPayload.backup),
-    );
+      final outcome = await handler().run(
+        await claimedJob(operation: CloudJobPayload.backup),
+      );
 
-    expect(outcome, isA<JobFailed>());
-    final failed = outcome as JobFailed;
-    expect(failed.retryable, isTrue);
-    expect(failed.code, 'network');
-    expect(failed.message, 'Could not reach the service.');
-  });
+      expect(outcome, isA<JobFailed>());
+      final failed = outcome as JobFailed;
+      expect(failed.retryable, isTrue);
+      expect(failed.code, 'network');
+      expect(failed.message, 'Could not reach the service.');
+    },
+  );
 
   test('permanent failures (auth/config) are never retried', () async {
     service.backupResult = CloudSyncResult(
@@ -255,51 +257,57 @@ void main() {
       await worker.stop();
     });
 
-    test('restore does NOT auto-retry (maxAttempts 1) — user must ask again',
-        () async {
-      service.restoreResult = CloudSyncResult(
-        success: false,
-        error: 'Could not reach the service.',
-        errorCode: 'network',
-        retryable: true,
-        timestamp: DateTime.utc(2026, 1, 1),
-      );
+    test(
+      'restore does NOT auto-retry (maxAttempts 1) — user must ask again',
+      () async {
+        service.restoreResult = CloudSyncResult(
+          success: false,
+          error: 'Could not reach the service.',
+          errorCode: 'network',
+          retryable: true,
+          timestamp: DateTime.utc(2026, 1, 1),
+        );
 
-      final worker = JobWorker(
-        repository: repo,
-        handlers: {
-          JobTypes.cloudSync: CloudSyncJobHandler(
-            service: service,
-            authState: () async => const AuthState(
-              status: AuthStatus.signedIn,
-              identity: _identity,
+        final worker = JobWorker(
+          repository: repo,
+          handlers: {
+            JobTypes.cloudSync: CloudSyncJobHandler(
+              service: service,
+              authState: () async => const AuthState(
+                status: AuthStatus.signedIn,
+                identity: _identity,
+              ),
             ),
+          },
+          backoffStep: Duration.zero,
+        );
+        worker.start();
+        final done = Completer<JobRecord>();
+        final sub = worker.events.listen((job) {
+          if (job.type == JobTypes.cloudSync &&
+              job.status == JobStatus.failed) {
+            done.complete(job);
+          }
+        });
+
+        await worker.enqueue(
+          type: JobTypes.cloudSync,
+          subjectId: 'acct-1',
+          payload: jsonEncode(
+            const CloudJobPayload(operation: CloudJobPayload.restore).toJson(),
           ),
-        },
-        backoffStep: Duration.zero,
-      );
-      worker.start();
-      final done = Completer<JobRecord>();
-      final sub = worker.events.listen((job) {
-        if (job.type == JobTypes.cloudSync && job.status == JobStatus.failed) {
-          done.complete(job);
-        }
-      });
+          maxAttempts: 1,
+        );
+        final job = await done.future;
+        await sub.cancel();
 
-      await worker.enqueue(
-        type: JobTypes.cloudSync,
-        subjectId: 'acct-1',
-        payload: jsonEncode(
-          const CloudJobPayload(operation: CloudJobPayload.restore).toJson(),
-        ),
-        maxAttempts: 1,
-      );
-      final job = await done.future;
-      await sub.cancel();
-
-      expect(service.restoreCalls, 1); // destructive merge only runs on demand
-      expect(job.status, JobStatus.failed);
-      await worker.stop();
-    });
+        expect(
+          service.restoreCalls,
+          1,
+        ); // destructive merge only runs on demand
+        expect(job.status, JobStatus.failed);
+        await worker.stop();
+      },
+    );
   });
 }

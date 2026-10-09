@@ -154,7 +154,8 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
           // Verification could not be completed (network/server). A
           // previously verified grant is preserved only for a bounded
           // window; past that, stop claiming Pro (audit P1-3).
-          final preserved = state.status.isEntitled &&
+          final preserved =
+              state.status.isEntitled &&
               state.canUseAi &&
               _lastVerifiedAt != null &&
               _now().difference(_lastVerifiedAt!) < _kPreserveTtl;
@@ -360,9 +361,11 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
 
     final run = _doRestorePurchases();
     _restoreRun = run;
-    unawaited(run.whenComplete(() {
-      if (identical(_restoreRun, run)) _restoreRun = null;
-    }));
+    unawaited(
+      run.whenComplete(() {
+        if (identical(_restoreRun, run)) _restoreRun = null;
+      }),
+    );
     return run;
   }
 

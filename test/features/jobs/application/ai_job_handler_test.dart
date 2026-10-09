@@ -110,110 +110,116 @@ void main() {
     return (await jobsRepo.claimNext(DateTime.now()))!;
   }
 
-  test('applies the generated message idempotently onto the stable draft row',
-      () async {
-    await seedPerson();
-    await seedBirthday();
+  test(
+    'applies the generated message idempotently onto the stable draft row',
+    () async {
+      await seedPerson();
+      await seedBirthday();
 
-    final outcome = await handler().run(
-      await claimedJob(
-        payload: AiJobPayload(
-          birthdayId: 'b1',
-          personId: 'p1',
-          tone: MessageTone.warm,
-          length: MessageLength.standard,
+      final outcome = await handler().run(
+        await claimedJob(
+          payload: AiJobPayload(
+            birthdayId: 'b1',
+            personId: 'p1',
+            tone: MessageTone.warm,
+            length: MessageLength.standard,
+          ),
         ),
-      ),
-    );
+      );
 
-    expect(outcome, isA<JobSucceeded>());
-    expect((outcome as JobSucceeded).resultRef, 'b1');
-    expect(generateCalls, 1);
-    final draft = (await draftsRepo.getDraftForBirthday('b1'))!;
-    expect(draft.id, 'b1'); // stable id = birthday id, never an orphan
-    expect(draft.body, 'AI drafted message');
-    expect(draft.birthdayId, 'b1');
-    expect(draft.personId, 'p1');
-    expect(draft.providerType, 'user_gemini');
-    final birthday = (await birthdaysRepo.getBirthday('b1'))!;
-    expect(birthday.status, BirthdayStatus.messageDrafted);
-    expect(birthday.draftId, 'b1');
-  });
+      expect(outcome, isA<JobSucceeded>());
+      expect((outcome as JobSucceeded).resultRef, 'b1');
+      expect(generateCalls, 1);
+      final draft = (await draftsRepo.getDraftForBirthday('b1'))!;
+      expect(draft.id, 'b1'); // stable id = birthday id, never an orphan
+      expect(draft.body, 'AI drafted message');
+      expect(draft.birthdayId, 'b1');
+      expect(draft.personId, 'p1');
+      expect(draft.providerType, 'user_gemini');
+      final birthday = (await birthdaysRepo.getBirthday('b1'))!;
+      expect(birthday.status, BirthdayStatus.messageDrafted);
+      expect(birthday.draftId, 'b1');
+    },
+  );
 
-  test('duplicate delivery converges instead of duplicating or clobbering',
-      () async {
-    await seedPerson();
-    await seedBirthday();
+  test(
+    'duplicate delivery converges instead of duplicating or clobbering',
+    () async {
+      await seedPerson();
+      await seedBirthday();
 
-    final h = handler();
-    final payload = AiJobPayload(
-      birthdayId: 'b1',
-      personId: 'p1',
-      tone: MessageTone.warm,
-      length: MessageLength.standard,
-    );
-    final job = await claimedJob(payload: payload);
-    await h.run(job);
-    // The same job delivered again (crash recovery): its own first apply has
-    // since bumped the draft's updatedAt, so the stale guard skips — the
-    // effect is already durable and nothing is rewritten or clobbered.
-    await h.run(job);
-
-    expect(generateCalls, 2); // delivered twice
-    final drafts = await draftsRepo.getAllDrafts();
-    expect(drafts, hasLength(1)); // one row, not an orphan, not a duplicate
-    expect(drafts.single.id, 'b1');
-    expect(drafts.single.body, 'AI drafted message');
-  });
-
-  test('stale guard: text written after enqueue wins, AI result is dropped',
-      () async {
-    await seedPerson();
-    await seedBirthday();
-    // The user has a draft before generating (enqueued at t0).
-    final t0 = now.subtract(const Duration(minutes: 1));
-    await draftsRepo.saveDraft(
-      MessageDraft(
-        id: 'b1',
+      final h = handler();
+      final payload = AiJobPayload(
         birthdayId: 'b1',
         personId: 'p1',
-        body: 'original draft',
-        createdAt: t0,
-        updatedAt: t0,
-      ),
-    );
+        tone: MessageTone.warm,
+        length: MessageLength.standard,
+      );
+      final job = await claimedJob(payload: payload);
+      await h.run(job);
+      // The same job delivered again (crash recovery): its own first apply has
+      // since bumped the draft's updatedAt, so the stale guard skips — the
+      // effect is already durable and nothing is rewritten or clobbered.
+      await h.run(job);
 
-    // While the job is in flight, the user edits the draft again (t1).
-    final t1 = now.subtract(const Duration(seconds: 30));
-    await draftsRepo.saveDraft(
-      MessageDraft(
-        id: 'b1',
-        birthdayId: 'b1',
-        personId: 'p1',
-        body: 'user edits made while drafting',
-        createdAt: t0,
-        updatedAt: t1,
-      ),
-    );
+      expect(generateCalls, 2); // delivered twice
+      final drafts = await draftsRepo.getAllDrafts();
+      expect(drafts, hasLength(1)); // one row, not an orphan, not a duplicate
+      expect(drafts.single.id, 'b1');
+      expect(drafts.single.body, 'AI drafted message');
+    },
+  );
 
-    final outcome = await handler().run(
-      await claimedJob(
-        payload: AiJobPayload(
+  test(
+    'stale guard: text written after enqueue wins, AI result is dropped',
+    () async {
+      await seedPerson();
+      await seedBirthday();
+      // The user has a draft before generating (enqueued at t0).
+      final t0 = now.subtract(const Duration(minutes: 1));
+      await draftsRepo.saveDraft(
+        MessageDraft(
+          id: 'b1',
           birthdayId: 'b1',
           personId: 'p1',
-          tone: MessageTone.warm,
-          length: MessageLength.standard,
-          draftUpdatedAt: t0.toUtc().toIso8601String(),
+          body: 'original draft',
+          createdAt: t0,
+          updatedAt: t0,
         ),
-      ),
-    );
+      );
 
-    expect(outcome, isA<JobSucceeded>());
-    final draft = (await draftsRepo.getDraftForBirthday('b1'))!;
-    expect(draft.body, 'user edits made while drafting'); // never clobbered
-    final birthday = (await birthdaysRepo.getBirthday('b1'))!;
-    expect(birthday.status, BirthdayStatus.messageNotPrepared); // untouched
-  });
+      // While the job is in flight, the user edits the draft again (t1).
+      final t1 = now.subtract(const Duration(seconds: 30));
+      await draftsRepo.saveDraft(
+        MessageDraft(
+          id: 'b1',
+          birthdayId: 'b1',
+          personId: 'p1',
+          body: 'user edits made while drafting',
+          createdAt: t0,
+          updatedAt: t1,
+        ),
+      );
+
+      final outcome = await handler().run(
+        await claimedJob(
+          payload: AiJobPayload(
+            birthdayId: 'b1',
+            personId: 'p1',
+            tone: MessageTone.warm,
+            length: MessageLength.standard,
+            draftUpdatedAt: t0.toUtc().toIso8601String(),
+          ),
+        ),
+      );
+
+      expect(outcome, isA<JobSucceeded>());
+      final draft = (await draftsRepo.getDraftForBirthday('b1'))!;
+      expect(draft.body, 'user edits made while drafting'); // never clobbered
+      final birthday = (await birthdaysRepo.getBirthday('b1'))!;
+      expect(birthday.status, BirthdayStatus.messageNotPrepared); // untouched
+    },
+  );
 
   test('missing person or birthday fails permanently with notFound', () async {
     // No person seeded.
@@ -248,29 +254,33 @@ void main() {
     expect(generateCalls, 0);
   });
 
-  test('cancel while running discards the result (worker leaves row canceled)',
-      () async {
-    await seedPerson();
-    await seedBirthday();
+  test(
+    'cancel while running discards the result (worker leaves row canceled)',
+    () async {
+      await seedPerson();
+      await seedBirthday();
 
-    final job = await claimedJob(
-      payload: AiJobPayload(
-        birthdayId: 'b1',
-        personId: 'p1',
-        tone: MessageTone.warm,
-        length: MessageLength.standard,
-      ),
-    );
-    await jobsRepo.cancel(job.id);
+      final job = await claimedJob(
+        payload: AiJobPayload(
+          birthdayId: 'b1',
+          personId: 'p1',
+          tone: MessageTone.warm,
+          length: MessageLength.standard,
+        ),
+      );
+      await jobsRepo.cancel(job.id);
 
-    final outcome = await handler().run(job);
+      final outcome = await handler().run(job);
 
-    expect(outcome, isA<JobSucceeded>()); // discarded, not an error
-    expect(generateCalls, 1); // the call itself happened
-    expect(await draftsRepo.getDraftForBirthday('b1'), isNull); // no apply
-    expect((await birthdaysRepo.getBirthday('b1'))!.status,
-        BirthdayStatus.messageNotPrepared);
-  });
+      expect(outcome, isA<JobSucceeded>()); // discarded, not an error
+      expect(generateCalls, 1); // the call itself happened
+      expect(await draftsRepo.getDraftForBirthday('b1'), isNull); // no apply
+      expect(
+        (await birthdaysRepo.getBirthday('b1'))!.status,
+        BirthdayStatus.messageNotPrepared,
+      );
+    },
+  );
 
   test('producer failures propagate for the worker to classify', () async {
     await seedPerson();

@@ -191,7 +191,8 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           .read(jobWorkerProvider)
           .events
           .where(
-            (job) => job.type == JobTypes.aiGenerate && job.subjectId == targetId,
+            (job) =>
+                job.type == JobTypes.aiGenerate && job.subjectId == targetId,
           )
           .listen(_handleJobEvent);
     } else {
@@ -210,8 +211,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   /// when it succeeds. [forceNano] retries with the on-device provider.
   Future<void> _generateWithAi({bool forceNano = false}) async {
     await _enqueueGenerate(
-      customInstruction:
-          _customInstructionController.text.trim().isNotEmpty
+      customInstruction: _customInstructionController.text.trim().isNotEmpty
           ? _customInstructionController.text.trim()
           : null,
       existingMessage: _messageController.text.trim().isNotEmpty
@@ -246,25 +246,27 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         .read(draftsRepositoryProvider)
         .getDraftForBirthday(birthdayId);
 
-    final job = await ref.read(jobWorkerProvider).enqueue(
-      type: JobTypes.aiGenerate,
-      subjectId: birthdayId,
-      payload: jsonEncode(
-        AiJobPayload(
-          birthdayId: birthdayId,
-          personId: _person!.id,
-          tone: tone ?? _selectedTone,
-          length: length ?? _selectedLength,
-          customInstruction: customInstruction,
-          existingMessage: existingMessage,
-          targetLanguage: targetLanguage,
-          targetCycleYear: _birthday!.cycleYear,
-          forceNano: forceNano,
-          draftUpdatedAt: revisedDraft?.updatedAt.toIso8601String(),
-        ).toJson(),
-      ),
-      maxAttempts: 3,
-    );
+    final job = await ref
+        .read(jobWorkerProvider)
+        .enqueue(
+          type: JobTypes.aiGenerate,
+          subjectId: birthdayId,
+          payload: jsonEncode(
+            AiJobPayload(
+              birthdayId: birthdayId,
+              personId: _person!.id,
+              tone: tone ?? _selectedTone,
+              length: length ?? _selectedLength,
+              customInstruction: customInstruction,
+              existingMessage: existingMessage,
+              targetLanguage: targetLanguage,
+              targetCycleYear: _birthday!.cycleYear,
+              forceNano: forceNano,
+              draftUpdatedAt: revisedDraft?.updatedAt.toIso8601String(),
+            ).toJson(),
+          ),
+          maxAttempts: 3,
+        );
     if (!mounted) return;
     setState(() {
       _lastEnqueuedJobId = job.id;
@@ -313,7 +315,8 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         setState(() {
           _isGenerating = false;
           _retryingLabel = null;
-          _errorMessage = job.errorMessage ?? 'AI drafting failed. Please retry.';
+          _errorMessage =
+              job.errorMessage ?? 'AI drafting failed. Please retry.';
           _lastFailureCode = AppFailureCode.values
               .cast<AppFailureCode?>()
               .firstWhere(
@@ -351,14 +354,14 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       });
       if (ours) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_pendingJobLabel ?? 'Message drafted with AI ✨')),
+          SnackBar(
+            content: Text(_pendingJobLabel ?? 'Message drafted with AI ✨'),
+          ),
         );
       }
     } else if (ours && userEdited) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_pendingStaleLabel ?? 'Your edits were kept.'),
-        ),
+        SnackBar(content: Text(_pendingStaleLabel ?? 'Your edits were kept.')),
       );
     }
   }

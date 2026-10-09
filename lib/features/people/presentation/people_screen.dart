@@ -383,9 +383,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     // onChanged hook), so refresh the reminder plan explicitly.
     await resyncReminderSchedule(ProviderScope.containerOf(context));
     messenger.showSnackBar(
-      SnackBar(
-        content: Text('Successfully imported $importedCount contacts.'),
-      ),
+      SnackBar(content: Text('Successfully imported $importedCount contacts.')),
     );
   }
 
@@ -669,175 +667,183 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           }
 
           final trimmed = _query.trim();
-            final filtered = trimmed.isEmpty
-                ? people
-                : people
-                      .where(
-                        (p) => p.name.toLowerCase().contains(
-                          trimmed.toLowerCase(),
-                        ),
-                      )
-                      .toList();
+          final filtered = trimmed.isEmpty
+              ? people
+              : people
+                    .where(
+                      (p) =>
+                          p.name.toLowerCase().contains(trimmed.toLowerCase()),
+                    )
+                    .toList();
 
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (value) => setState(() => _query = value),
-                    decoration: InputDecoration(
-                      hintText: 'Search contacts',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _query.isEmpty
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.close),
-                              tooltip: 'Clear search',
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _query = '');
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) => setState(() => _query = value),
+                  decoration: InputDecoration(
+                    hintText: 'Search contacts',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.close),
+                            tooltip: 'Clear search',
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _query = '');
+                            },
+                          ),
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? _noSearchResults(trimmed)
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(
+                          16,
+                          8,
+                          16,
+                          AppSpacing.bottomClearance,
+                        ),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final person = filtered[index];
+                          final next = _next(person);
+                          final dateStr = person.hasBirthday
+                              ? DateFormat.MMMMd().format(
+                                  next?.nextDate ??
+                                      DateTime(
+                                        DateTime.now().year,
+                                        person.birthdayMonth!,
+                                        person.birthdayDay!,
+                                      ),
+                                )
+                              : 'No birthday set';
+                          final ageTurn =
+                              (person.hasBirthday &&
+                                  person.birthYear != null &&
+                                  next != null)
+                              ? ' • turns ${next.year - person.birthYear!}'
+                              : '';
+
+                          return Card(
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              leading: CircleAvatar(
+                                backgroundColor: (next?.isToday ?? false)
+                                    ? AppColors.primaryTerracottaContainer
+                                    : null,
+                                foregroundColor: (next?.isToday ?? false)
+                                    ? AppColors.primaryTerracotta
+                                    : null,
+                                child: Text(
+                                  person.name.isNotEmpty
+                                      ? person.name[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                person.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '$dateStr$ageTurn • ${person.relationship.displayName}',
+                                  ),
+                                  if (next != null) ...[
+                                    const SizedBox(height: 4),
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: CountdownChip(
+                                        daysUntil: next.daysUntil,
+                                        isToday: next.isToday,
+                                        customLabel: _countdownLabel(next),
+                                      ),
+                                    ),
+                                  ],
+                                  if (person.importantFacts.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Facts: ${person.importantFacts.join(', ')}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                tooltip: 'Person actions',
+                                onSelected: (action) async {
+                                  if (action == 'message') {
+                                    // Person-scoped Studio route: no birthday lookup, so
+                                    // the action can never silently no-op on a missing row
+                                    // (same route notifications/calendar use).
+                                    context.push(
+                                      '/message-studio/person/${person.id}',
+                                    );
+                                  } else if (action == 'edit') {
+                                    context.push('/people/edit/${person.id}');
+                                  } else if (action == 'delete') {
+                                    _confirmAndDelete(context, ref, person);
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  if (person.hasBirthday)
+                                    const PopupMenuItem(
+                                      value: 'message',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.auto_awesome, size: 18),
+                                          SizedBox(width: 8),
+                                          Text('Message Studio'),
+                                        ],
+                                      ),
+                                    ),
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Text('Edit'),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                _showPersonDetailsModal(context, ref, person);
                               },
                             ),
-                      isDense: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                          );
+                        },
                       ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: filtered.isEmpty
-                      ? _noSearchResults(trimmed)
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(
-                            16,
-                            8,
-                            16,
-                            AppSpacing.bottomClearance,
-                          ),
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 8),
-                          itemBuilder: (context, index) {
-                            final person = filtered[index];
-              final next = _next(person);
-              final dateStr = person.hasBirthday
-                  ? DateFormat.MMMMd().format(
-                      next?.nextDate ??
-                          DateTime(
-                            DateTime.now().year,
-                            person.birthdayMonth!,
-                            person.birthdayDay!,
-                          ),
-                    )
-                  : 'No birthday set';
-              final ageTurn =
-                  (person.hasBirthday &&
-                      person.birthYear != null &&
-                      next != null)
-                  ? ' • turns ${next.year - person.birthYear!}'
-                  : '';
-
-              return Card(
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  leading: CircleAvatar(
-                    backgroundColor: (next?.isToday ?? false)
-                        ? AppColors.primaryTerracottaContainer
-                        : null,
-                    foregroundColor: (next?.isToday ?? false)
-                        ? AppColors.primaryTerracotta
-                        : null,
-                    child: Text(
-                      person.name.isNotEmpty
-                          ? person.name[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  title: Text(
-                    person.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 4),
-                      Text(
-                        '$dateStr$ageTurn • ${person.relationship.displayName}',
-                      ),
-                      if (next != null) ...[
-                        const SizedBox(height: 4),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: CountdownChip(
-                            daysUntil: next.daysUntil,
-                            isToday: next.isToday,
-                            customLabel: _countdownLabel(next),
-                          ),
-                        ),
-                      ],
-                      if (person.importantFacts.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Facts: ${person.importantFacts.join(', ')}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
-                  trailing: PopupMenuButton<String>(
-                    tooltip: 'Person actions',
-                    onSelected: (action) async {
-                      if (action == 'message') {
-                        // Person-scoped Studio route: no birthday lookup, so
-                        // the action can never silently no-op on a missing row
-                        // (same route notifications/calendar use).
-                        context.push('/message-studio/person/${person.id}');
-                      } else if (action == 'edit') {
-                        context.push('/people/edit/${person.id}');
-                      } else if (action == 'delete') {
-                        _confirmAndDelete(context, ref, person);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      if (person.hasBirthday)
-                        const PopupMenuItem(
-                          value: 'message',
-                          child: Row(
-                            children: [
-                              Icon(Icons.auto_awesome, size: 18),
-                              SizedBox(width: 8),
-                              Text('Message Studio'),
-                            ],
-                          ),
-                        ),
-                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Delete'),
-                      ),
-                    ],
-                  ),
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    _showPersonDetailsModal(context, ref, person);
-                  },
-                ),
-              );
-            },
-          ),
-                ),
-              ],
-            );
+              ),
+            ],
+          );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => const Center(

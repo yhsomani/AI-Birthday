@@ -93,8 +93,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final accountId = identity?.firebaseUid ?? identity?.googleSubject;
     if (accountId == null || accountId.isEmpty) return;
     _cloudJobSub?.cancel();
-    final latest =
-        await ref.read(jobsRepositoryProvider).latestJob(JobTypes.cloudSync, accountId);
+    final latest = await ref
+        .read(jobsRepositoryProvider)
+        .latestJob(JobTypes.cloudSync, accountId);
     if (latest != null && mounted) _onCloudJobEvent(latest);
     _cloudJobSub = ref
         .read(jobWorkerProvider)
@@ -226,12 +227,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     // Durable backup job: the tap only enqueues; the worker uploads even if
     // the user leaves Settings, and retries transient failures once.
-    final job = await ref.read(jobWorkerProvider).enqueue(
-      type: JobTypes.cloudSync,
-      subjectId: accountId,
-      payload: jsonEncode(const CloudJobPayload(operation: CloudJobPayload.backup).toJson()),
-      maxAttempts: 2,
-    );
+    final job = await ref
+        .read(jobWorkerProvider)
+        .enqueue(
+          type: JobTypes.cloudSync,
+          subjectId: accountId,
+          payload: jsonEncode(
+            const CloudJobPayload(operation: CloudJobPayload.backup).toJson(),
+          ),
+          maxAttempts: 2,
+        );
     _initCloudJobWatch();
     if (!mounted) return;
     setState(() {
@@ -280,12 +285,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     // Durable restore job. Restore is NOT auto-retried (maxAttempts 1): a
     // destructive-looking merge should only re-run when the user asks.
-    final job = await ref.read(jobWorkerProvider).enqueue(
-      type: JobTypes.cloudSync,
-      subjectId: accountId,
-      payload: jsonEncode(const CloudJobPayload(operation: CloudJobPayload.restore).toJson()),
-      maxAttempts: 1,
-    );
+    final job = await ref
+        .read(jobWorkerProvider)
+        .enqueue(
+          type: JobTypes.cloudSync,
+          subjectId: accountId,
+          payload: jsonEncode(
+            const CloudJobPayload(operation: CloudJobPayload.restore).toJson(),
+          ),
+          maxAttempts: 1,
+        );
     _initCloudJobWatch();
     if (!mounted) return;
     setState(() {

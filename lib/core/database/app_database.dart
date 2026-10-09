@@ -126,6 +126,7 @@ class Jobs extends Table {
   TextColumn get id => text()();
   TextColumn get type => text()();
   TextColumn get status => text()();
+
   /// Owner-free, single-user app: `subjectId` scopes the job — a birthday id
   /// for `ai_generate`, the signed-in account uid for `cloud_sync`.
   TextColumn get subjectId => text()();

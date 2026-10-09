@@ -35,11 +35,7 @@ class JobSucceeded extends JobOutcome {
 /// The handler failed. `retryable` decides between `retrying` (when attempts
 /// remain) and final `failed`. `code`/`message` are user-safe.
 class JobFailed extends JobOutcome {
-  const JobFailed({
-    required this.retryable,
-    this.code,
-    this.message,
-  });
+  const JobFailed({required this.retryable, this.code, this.message});
   final bool retryable;
   final String? code;
   final String? message;
@@ -183,12 +179,14 @@ class JobWorker {
         errorCode: 'unknown',
         errorMessage: 'This job type is no longer supported.',
       );
-      _emit(job.copyWith(
-        status: JobStatus.failed,
-        errorCode: 'unknown',
-        errorMessage: 'This job type is no longer supported.',
-        finishedAt: DateTime.now(),
-      ));
+      _emit(
+        job.copyWith(
+          status: JobStatus.failed,
+          errorCode: 'unknown',
+          errorMessage: 'This job type is no longer supported.',
+          finishedAt: DateTime.now(),
+        ),
+      );
       return;
     }
 
@@ -224,10 +222,9 @@ class JobWorker {
         'Job canceled while running; result discarded',
         params: {'job': job.id},
       );
-      _emit(job.copyWith(
-        status: JobStatus.canceled,
-        finishedAt: DateTime.now(),
-      ));
+      _emit(
+        job.copyWith(status: JobStatus.canceled, finishedAt: DateTime.now()),
+      );
       return;
     }
 
@@ -240,15 +237,18 @@ class JobWorker {
           params: {
             'job': job.id,
             'type': job.type,
-            'durationMs':
-                DateTime.now().difference(job.startedAt ?? job.createdAt).inMilliseconds,
+            'durationMs': DateTime.now()
+                .difference(job.startedAt ?? job.createdAt)
+                .inMilliseconds,
           },
         );
-        _emit(job.copyWith(
-          status: JobStatus.succeeded,
-          resultRef: resultRef,
-          finishedAt: DateTime.now(),
-        ));
+        _emit(
+          job.copyWith(
+            status: JobStatus.succeeded,
+            resultRef: resultRef,
+            finishedAt: DateTime.now(),
+          ),
+        );
       case JobFailed(:final retryable, :final code, :final message):
         if (retryable && job.attempts < job.maxAttempts) {
           final delay = _backoff(job.attempts);
@@ -270,12 +270,14 @@ class JobWorker {
               'retryInMs': delay.inMilliseconds,
             },
           );
-          _emit(job.copyWith(
-            status: JobStatus.retrying,
-            errorCode: code,
-            errorMessage: message,
-            nextRetryAt: nextRetryAt,
-          ));
+          _emit(
+            job.copyWith(
+              status: JobStatus.retrying,
+              errorCode: code,
+              errorMessage: message,
+              nextRetryAt: nextRetryAt,
+            ),
+          );
           _scheduleRetry(delay);
         } else {
           await _repository.markFailed(
@@ -294,12 +296,14 @@ class JobWorker {
               'retryable': retryable,
             },
           );
-          _emit(job.copyWith(
-            status: JobStatus.failed,
-            errorCode: code,
-            errorMessage: message,
-            finishedAt: DateTime.now(),
-          ));
+          _emit(
+            job.copyWith(
+              status: JobStatus.failed,
+              errorCode: code,
+              errorMessage: message,
+              finishedAt: DateTime.now(),
+            ),
+          );
         }
     }
   }

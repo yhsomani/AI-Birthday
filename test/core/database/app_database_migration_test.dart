@@ -37,7 +37,9 @@ void main() {
     // DDL for every pre-existing table; only `jobs` did not exist back then,
     // so drop it and pin user_version at 4 to reproduce that exact state.
     final v4 = appdb.AppDatabase(NativeDatabase(dbFile));
-    await v4.into(v4.birthdays).insert(
+    await v4
+        .into(v4.birthdays)
+        .insert(
           appdb.BirthdaysCompanion.insert(
             id: 'b-keep',
             personId: 'p-keep',
@@ -51,9 +53,9 @@ void main() {
     await v4.customStatement('DROP TABLE jobs');
     await v4.customStatement('PRAGMA user_version = 4');
     expect(
-      (await v4.customSelect('PRAGMA user_version').get())
-          .single
-          .read<int>('user_version'),
+      (await v4.customSelect('PRAGMA user_version').get()).single.read<int>(
+        'user_version',
+      ),
       4,
     );
     await v4.close();
@@ -62,9 +64,9 @@ void main() {
     // runs onUpgrade(4 -> 5), which must only create the jobs table.
     final db = appdb.AppDatabase(NativeDatabase(dbFile));
     expect(
-      (await db.customSelect('PRAGMA user_version').get())
-          .single
-          .read<int>('user_version'),
+      (await db.customSelect('PRAGMA user_version').get()).single.read<int>(
+        'user_version',
+      ),
       5,
     );
 
@@ -81,9 +83,9 @@ void main() {
     expect(row.status, JobStatus.queued);
 
     // Pre-existing data survived the upgrade untouched.
-    final kept = await (db.select(db.birthdays)
-          ..where((t) => t.id.equals('b-keep')))
-        .getSingle();
+    final kept = await (db.select(
+      db.birthdays,
+    )..where((t) => t.id.equals('b-keep'))).getSingle();
     expect(kept.personId, 'p-keep');
     expect(kept.cycleYear, 2026);
     expect(kept.status, 'upcoming');

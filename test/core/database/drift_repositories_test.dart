@@ -221,55 +221,54 @@ void main() {
       expect(drafts.map((d) => d.id).toList(), ['d-b', 'd-a']);
     });
 
-    test(
-      'pruneOrphanedDrafts removes shadowed legacy rows and dead-birthday '
-      'drafts, keeps live ones, and is idempotent',
-      () async {
-        final t = DateTime.utc(2026, 1, 1, 9);
-        Future<void> seedBirthday(String id) => db.into(db.birthdays).insert(
-              BirthdaysCompanion.insert(
-                id: id,
-                personId: 'p-$id',
-                cycleYear: 2026,
-                date: DateTime(2026, 10, 15),
-                status: 'upcoming',
-                createdAt: t,
-                updatedAt: t,
-              ),
-            );
-        Future<void> seedDraft({
-          required String id,
-          required String birthdayId,
-        }) => repo.saveDraft(
-              MessageDraft(
-                id: id,
-                birthdayId: birthdayId,
-                personId: 'p',
-                body: 'x',
-                status: DraftStatus.ready,
-                createdAt: t,
-                updatedAt: t,
-              ),
-            );
+    test('pruneOrphanedDrafts removes shadowed legacy rows and dead-birthday '
+        'drafts, keeps live ones, and is idempotent', () async {
+      final t = DateTime.utc(2026, 1, 1, 9);
+      Future<void> seedBirthday(String id) => db
+          .into(db.birthdays)
+          .insert(
+            BirthdaysCompanion.insert(
+              id: id,
+              personId: 'p-$id',
+              cycleYear: 2026,
+              date: DateTime(2026, 10, 15),
+              status: 'upcoming',
+              createdAt: t,
+              updatedAt: t,
+            ),
+          );
+      Future<void> seedDraft({
+        required String id,
+        required String birthdayId,
+      }) => repo.saveDraft(
+        MessageDraft(
+          id: id,
+          birthdayId: birthdayId,
+          personId: 'p',
+          body: 'x',
+          status: DraftStatus.ready,
+          createdAt: t,
+          updatedAt: t,
+        ),
+      );
 
-        await seedBirthday('b1');
-        await seedBirthday('b2');
-        await seedDraft(id: 'b1', birthdayId: 'b1'); // canonical, live
-        await seedDraft(id: 'draft-legacy', birthdayId: 'b1'); // shadowed dupe
-        await seedDraft(id: 'draft-only', birthdayId: 'b2'); // legacy-only, live
-        await seedDraft(id: 'draft-dead', birthdayId: 'b-gone'); // dead birthday
+      await seedBirthday('b1');
+      await seedBirthday('b2');
+      await seedDraft(id: 'b1', birthdayId: 'b1'); // canonical, live
+      await seedDraft(id: 'draft-legacy', birthdayId: 'b1'); // shadowed dupe
+      await seedDraft(id: 'draft-only', birthdayId: 'b2'); // legacy-only, live
+      await seedDraft(id: 'draft-dead', birthdayId: 'b-gone'); // dead birthday
 
-        expect(await repo.pruneOrphanedDrafts(), 2);
+      expect(await repo.pruneOrphanedDrafts(), 2);
 
-        final remaining = await repo.getAllDrafts();
-        expect(remaining.map((d) => d.id).toSet(), {'b1', 'draft-only'});
-        // The canonical row is still what the Studio resolves by birthdayId.
-        expect((await repo.getDraftForBirthday('b1'))?.id, 'b1');
+      final remaining = await repo.getAllDrafts();
+      expect(remaining.map((d) => d.id).toSet(), {'b1', 'draft-only'});
+      // The canonical row is still what the Studio resolves by birthdayId.
+      expect((await repo.getDraftForBirthday('b1'))?.id, 'b1');
 
-        // A second sweep finds nothing to remove.
-        expect(await repo.pruneOrphanedDrafts(), 0);
-      },
-    );
+      // A second sweep finds nothing to remove.
+      expect(await repo.pruneOrphanedDrafts(), 0);
+    });
 
     test('pruneOrphanedDrafts with no birthdays removes every draft', () async {
       final t = DateTime.utc(2026, 1, 1, 9);
@@ -339,43 +338,48 @@ void main() {
       expect(interceptor.inserts, 50);
     });
 
-    test('batch read throws on duplicate personId like getSingleOrNull', () async {
-      final db = AppDatabase(NativeDatabase.memory());
-      addTearDown(db.close);
-      final birthdaysRepo = DriftBirthdaysRepository(db);
-      final now = DateTime.utc(2025, 1, 1, 8);
+    test(
+      'batch read throws on duplicate personId like getSingleOrNull',
+      () async {
+        final db = AppDatabase(NativeDatabase.memory());
+        addTearDown(db.close);
+        final birthdaysRepo = DriftBirthdaysRepository(db);
+        final now = DateTime.utc(2025, 1, 1, 8);
 
-      for (final id in ['b-1', 'b-2']) {
-        await db.into(db.birthdays).insert(
-          BirthdaysCompanion.insert(
-            id: id,
-            personId: 'p-1',
-            cycleYear: 2025,
-            date: DateTime(2025, 10, 15),
-            status: 'upcoming',
-            createdAt: now,
-            updatedAt: now,
+        for (final id in ['b-1', 'b-2']) {
+          await db
+              .into(db.birthdays)
+              .insert(
+                BirthdaysCompanion.insert(
+                  id: id,
+                  personId: 'p-1',
+                  cycleYear: 2025,
+                  date: DateTime(2025, 10, 15),
+                  status: 'upcoming',
+                  createdAt: now,
+                  updatedAt: now,
+                ),
+              );
+        }
+
+        await expectLater(
+          const BirthdayLifecycleService().refresh(
+            people: [
+              domain.Person(
+                id: 'p-1',
+                name: 'Ana',
+                birthdayMonth: 10,
+                birthdayDay: 15,
+                createdAt: now,
+                updatedAt: now,
+                version: 1,
+              ),
+            ],
+            birthdaysRepository: birthdaysRepo,
           ),
+          throwsStateError,
         );
-      }
-
-      await expectLater(
-        const BirthdayLifecycleService().refresh(
-          people: [
-            domain.Person(
-              id: 'p-1',
-              name: 'Ana',
-              birthdayMonth: 10,
-              birthdayDay: 15,
-              createdAt: now,
-              updatedAt: now,
-              version: 1,
-            ),
-          ],
-          birthdaysRepository: birthdaysRepo,
-        ),
-        throwsStateError,
-      );
-    });
+      },
+    );
   });
 }

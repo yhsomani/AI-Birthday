@@ -248,8 +248,7 @@ class _RecordingBirthdaysRepository implements BirthdaysRepository {
     String id,
     BirthdayStatus status, {
     String? draftId,
-  }) =>
-      _inner.updateBirthdayStatus(id, status, draftId: draftId);
+  }) => _inner.updateBirthdayStatus(id, status, draftId: draftId);
 
   @override
   Future<void> deleteBirthday(String id) => _inner.deleteBirthday(id);

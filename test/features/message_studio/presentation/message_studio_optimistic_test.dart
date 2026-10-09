@@ -122,9 +122,7 @@ void main() {
         await pumpStudio(
           tester,
           phone: '+14155552671',
-          extraOverrides: [
-            userGeminiApiProvider.overrideWithValue(okGemini()),
-          ],
+          extraOverrides: [userGeminiApiProvider.overrideWithValue(okGemini())],
         );
 
         await tester.ensureVisible(editorFinder());

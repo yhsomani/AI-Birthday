@@ -28,7 +28,8 @@ enum JobStatus {
   bool get isActive => this == JobStatus.queued || this == JobStatus.running;
 
   /// Whether the job has reached an end state and will not run again.
-  bool get isTerminal => this == JobStatus.succeeded ||
+  bool get isTerminal =>
+      this == JobStatus.succeeded ||
       this == JobStatus.failed ||
       this == JobStatus.canceled;
 }

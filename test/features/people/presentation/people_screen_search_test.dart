@@ -79,8 +79,10 @@ void main() {
     await tester.pump();
 
     expect(find.text('No contacts found'), findsOneWidget);
-    expect(find.text('Nothing matches "zzz". Try a different name.'),
-        findsOneWidget);
+    expect(
+      find.text('Nothing matches "zzz". Try a different name.'),
+      findsOneWidget,
+    );
     expect(find.text('Ana'), findsNothing);
 
     // Dispose the tree inside the test so Drift's zero-delay stream-close

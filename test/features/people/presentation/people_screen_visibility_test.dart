@@ -123,9 +123,7 @@ void main() {
       tester.platformDispatcher.textScaleFactorTestValue = 2.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      addTearDown(
-        tester.platformDispatcher.clearTextScaleFactorTestValue,
-      );
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
 
       final now = DateTime.now();
       final existingSarah = Person(

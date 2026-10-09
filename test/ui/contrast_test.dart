@@ -118,7 +118,12 @@ void main() {
         // carries the meaning), so only the three meaning-carrying fills are
         // asserted here.
         for (final tone in [AppTone.success, AppTone.warning, AppTone.danger]) {
-          expectPass('${tone.name} fill on surface', tone.fill(p), p.surface, 3.0);
+          expectPass(
+            '${tone.name} fill on surface',
+            tone.fill(p),
+            p.surface,
+            3.0,
+          );
         }
       });
     });

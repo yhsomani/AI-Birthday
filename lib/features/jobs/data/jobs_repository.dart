@@ -48,16 +48,16 @@ abstract interface class JobsRepository {
 
   Future<void> markSucceeded(String id, {String? resultRef});
 
-  Future<void> markFailed(String id, {
-    String? errorCode,
-    String? errorMessage,
-  });
+  Future<void> markFailed(String id, {String? errorCode, String? errorMessage});
 
   Future<void> cancel(String id);
 
   /// Crash recovery: rolls jobs left `running` longer than [grace] back to
   /// `queued` (they never completed). Returns the number reset.
-  Future<int> resetStale(DateTime now, {Duration grace = const Duration(minutes: 2)});
+  Future<int> resetStale(
+    DateTime now, {
+    Duration grace = const Duration(minutes: 2),
+  });
 }
 
 /// Drift/SQLite implementation of [JobsRepository].
@@ -68,29 +68,34 @@ class DriftJobsRepository implements JobsRepository {
 
   @override
   Future<JobRecord?> activeJob(String type, String subjectId) async {
-    final row = await (_database.select(_database.jobs)
-          ..where(
-            (j) => j.type.equals(type) &
-                j.subjectId.equals(subjectId) &
-                j.status.isIn([
-                  JobStatus.queued.name,
-                  JobStatus.running.name,
-                  JobStatus.retrying.name,
-                ]),
-          )
-          ..orderBy([(j) => drift.OrderingTerm.asc(j.createdAt)])
-          ..limit(1))
-        .getSingleOrNull();
+    final row =
+        await (_database.select(_database.jobs)
+              ..where(
+                (j) =>
+                    j.type.equals(type) &
+                    j.subjectId.equals(subjectId) &
+                    j.status.isIn([
+                      JobStatus.queued.name,
+                      JobStatus.running.name,
+                      JobStatus.retrying.name,
+                    ]),
+              )
+              ..orderBy([(j) => drift.OrderingTerm.asc(j.createdAt)])
+              ..limit(1))
+            .getSingleOrNull();
     return row == null ? null : _fromRow(row);
   }
 
   @override
   Future<JobRecord?> latestJob(String type, String subjectId) async {
-    final row = await (_database.select(_database.jobs)
-          ..where((j) => j.type.equals(type) & j.subjectId.equals(subjectId))
-          ..orderBy([(j) => drift.OrderingTerm.desc(j.createdAt)])
-          ..limit(1))
-        .getSingleOrNull();
+    final row =
+        await (_database.select(_database.jobs)
+              ..where(
+                (j) => j.type.equals(type) & j.subjectId.equals(subjectId),
+              )
+              ..orderBy([(j) => drift.OrderingTerm.desc(j.createdAt)])
+              ..limit(1))
+            .getSingleOrNull();
     return row == null ? null : _fromRow(row);
   }
 
@@ -106,18 +111,20 @@ class DriftJobsRepository implements JobsRepository {
 
     final now = DateTime.now();
     final id = '${type}_${subjectId}_${now.microsecondsSinceEpoch}';
-    await _database.into(_database.jobs).insert(
-      db.JobsCompanion.insert(
-        id: id,
-        type: type,
-        status: JobStatus.queued.name,
-        subjectId: subjectId,
-        payload: drift.Value(payload),
-        attempts: const drift.Value(0),
-        maxAttempts: drift.Value(maxAttempts),
-        createdAt: now,
-      ),
-    );
+    await _database
+        .into(_database.jobs)
+        .insert(
+          db.JobsCompanion.insert(
+            id: id,
+            type: type,
+            status: JobStatus.queued.name,
+            subjectId: subjectId,
+            payload: drift.Value(payload),
+            attempts: const drift.Value(0),
+            maxAttempts: drift.Value(maxAttempts),
+            createdAt: now,
+          ),
+        );
     return (await getById(id))!;
   }
 
@@ -127,18 +134,18 @@ class DriftJobsRepository implements JobsRepository {
       final query = _database.select(_database.jobs)
         ..where(
           (j) =>
-              j.status
-                  .isIn([JobStatus.queued.name, JobStatus.retrying.name]) &
-              (j.nextRetryAt.isNull() | j.nextRetryAt.isSmallerOrEqualValue(now)),
+              j.status.isIn([JobStatus.queued.name, JobStatus.retrying.name]) &
+              (j.nextRetryAt.isNull() |
+                  j.nextRetryAt.isSmallerOrEqualValue(now)),
         )
         ..orderBy([(j) => drift.OrderingTerm.asc(j.createdAt)])
         ..limit(1);
       final row = await query.getSingleOrNull();
       if (row == null) return null;
 
-      await (_database.update(_database.jobs)
-            ..where((j) => j.id.equals(row.id)))
-          .write(
+      await (_database.update(
+        _database.jobs,
+      )..where((j) => j.id.equals(row.id))).write(
         db.JobsCompanion(
           status: drift.Value(JobStatus.running.name),
           attempts: drift.Value(row.attempts + 1),
@@ -148,11 +155,13 @@ class DriftJobsRepository implements JobsRepository {
           nextRetryAt: const drift.Value(null),
         ),
       );
-      return _fromRow(row.copyWith(
-        status: JobStatus.running.name,
-        attempts: row.attempts + 1,
-        startedAt: drift.Value(now),
-      ));
+      return _fromRow(
+        row.copyWith(
+          status: JobStatus.running.name,
+          attempts: row.attempts + 1,
+          startedAt: drift.Value(now),
+        ),
+      );
     });
   }
 
@@ -179,8 +188,9 @@ class DriftJobsRepository implements JobsRepository {
     required String? errorCode,
     required String? errorMessage,
   }) async {
-    await (_database.update(_database.jobs)..where((j) => j.id.equals(id)))
-        .write(
+    await (_database.update(
+      _database.jobs,
+    )..where((j) => j.id.equals(id))).write(
       db.JobsCompanion(
         status: drift.Value(JobStatus.retrying.name),
         startedAt: const drift.Value(null),
@@ -199,8 +209,9 @@ class DriftJobsRepository implements JobsRepository {
       )..where((j) => j.id.equals(id))).getSingleOrNull();
       if (row == null) return;
 
-      await (_database.update(_database.jobs)..where((j) => j.id.equals(id)))
-          .write(
+      await (_database.update(
+        _database.jobs,
+      )..where((j) => j.id.equals(id))).write(
         db.JobsCompanion(
           status: drift.Value(JobStatus.succeeded.name),
           finishedAt: drift.Value(DateTime.now()),
@@ -213,18 +224,17 @@ class DriftJobsRepository implements JobsRepository {
 
       // Retention: keep only the active job + latest terminal row per
       // (type, subject) so the queue stays bounded on long-lived birthdays.
-      await (_database.delete(_database.jobs)
-            ..where(
-              (j) =>
-                  j.type.equals(row.type) &
-                  j.subjectId.equals(row.subjectId) &
-                  j.id.equals(row.id).not() &
-                  j.status.isIn([
-                    JobStatus.succeeded.name,
-                    JobStatus.failed.name,
-                    JobStatus.canceled.name,
-                  ]),
-            ))
+      await (_database.delete(_database.jobs)..where(
+            (j) =>
+                j.type.equals(row.type) &
+                j.subjectId.equals(row.subjectId) &
+                j.id.equals(row.id).not() &
+                j.status.isIn([
+                  JobStatus.succeeded.name,
+                  JobStatus.failed.name,
+                  JobStatus.canceled.name,
+                ]),
+          ))
           .go();
     });
   }
@@ -235,8 +245,9 @@ class DriftJobsRepository implements JobsRepository {
     String? errorCode,
     String? errorMessage,
   }) async {
-    await (_database.update(_database.jobs)..where((j) => j.id.equals(id)))
-        .write(
+    await (_database.update(
+      _database.jobs,
+    )..where((j) => j.id.equals(id))).write(
       db.JobsCompanion(
         status: drift.Value(JobStatus.failed.name),
         finishedAt: drift.Value(DateTime.now()),
@@ -249,22 +260,21 @@ class DriftJobsRepository implements JobsRepository {
 
   @override
   Future<void> cancel(String id) async {
-    await (_database.update(_database.jobs)
-          ..where(
-            (j) =>
-                j.id.equals(id) &
-                j.status.isIn([
-                  JobStatus.queued.name,
-                  JobStatus.running.name,
-                  JobStatus.retrying.name,
-                ]),
-          ))
+    await (_database.update(_database.jobs)..where(
+          (j) =>
+              j.id.equals(id) &
+              j.status.isIn([
+                JobStatus.queued.name,
+                JobStatus.running.name,
+                JobStatus.retrying.name,
+              ]),
+        ))
         .write(
-      db.JobsCompanion(
-        status: drift.Value(JobStatus.canceled.name),
-        finishedAt: drift.Value(DateTime.now()),
-      ),
-    );
+          db.JobsCompanion(
+            status: drift.Value(JobStatus.canceled.name),
+            finishedAt: drift.Value(DateTime.now()),
+          ),
+        );
   }
 
   @override
@@ -273,26 +283,26 @@ class DriftJobsRepository implements JobsRepository {
     Duration grace = const Duration(minutes: 2),
   }) async {
     final cutoff = now.subtract(grace);
-    final staleJobIds = await (_database.select(
-      _database.jobs,
-    )..where(
-      (j) => j.status.equals(JobStatus.running.name) &
-          j.startedAt.isSmallerThanValue(cutoff),
-    )).get();
+    final staleJobIds =
+        await (_database.select(_database.jobs)..where(
+              (j) =>
+                  j.status.equals(JobStatus.running.name) &
+                  j.startedAt.isSmallerThanValue(cutoff),
+            ))
+            .get();
     if (staleJobIds.isEmpty) return 0;
 
-    await (_database.update(_database.jobs)
-          ..where(
-            (j) =>
-                j.status.equals(JobStatus.running.name) &
-                j.startedAt.isSmallerThanValue(cutoff),
-          ))
+    await (_database.update(_database.jobs)..where(
+          (j) =>
+              j.status.equals(JobStatus.running.name) &
+              j.startedAt.isSmallerThanValue(cutoff),
+        ))
         .write(
-      db.JobsCompanion(
-        status: drift.Value(JobStatus.queued.name),
-        startedAt: const drift.Value(null),
-      ),
-    );
+          db.JobsCompanion(
+            status: drift.Value(JobStatus.queued.name),
+            startedAt: const drift.Value(null),
+          ),
+        );
     return staleJobIds.length;
   }
 

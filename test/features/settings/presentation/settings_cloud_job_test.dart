@@ -114,7 +114,8 @@ void main() {
     testWidgets(
       'backup shows truthful running state, then completes with the snackbar',
       (tester) async {
-        final service = GatedCloudSyncService(db: harness.db)..gate = Completer();
+        final service = GatedCloudSyncService(db: harness.db)
+          ..gate = Completer();
         await pumpSettings(tester, service: service);
         await signIn(tester);
 
@@ -133,9 +134,7 @@ void main() {
         expect(find.text('Back Up Now'), findsOneWidget);
 
         // The job row carries the durable verdict.
-        final latest = await harness.db
-            .select(harness.db.jobs)
-            .getSingle();
+        final latest = await harness.db.select(harness.db.jobs).getSingle();
         expect(latest.status, 'succeeded');
       },
     );

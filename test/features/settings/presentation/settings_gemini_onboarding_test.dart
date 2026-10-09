@@ -48,8 +48,7 @@ class InMemoryCredentialStorage implements CredentialStorage {
   Future<bool> hasCompletedOnboarding() async => false;
 
   @override
-  Future<void> setCompletedOnboarding(bool completed)
-      async {}
+  Future<void> setCompletedOnboarding(bool completed) async {}
 }
 
 void main() {

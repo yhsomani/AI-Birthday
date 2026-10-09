@@ -322,7 +322,8 @@ class DriftDraftsRepository implements DraftsRepository {
 
   @override
   Future<int> pruneOrphanedDrafts() async {
-    final before = (await _database.select(_database.messageDrafts).get()).length;
+    final before =
+        (await _database.select(_database.messageDrafts).get()).length;
 
     final liveBirthdayIds = (await _database.select(_database.birthdays).get())
         .map((r) => r.id)
@@ -333,9 +334,9 @@ class DriftDraftsRepository implements DraftsRepository {
       await _database.delete(_database.messageDrafts).go();
     } else {
       // Drafts whose birthday was deleted can never be applied again.
-      await (_database.delete(_database.messageDrafts)
-            ..where((r) => r.birthdayId.isNotIn(liveBirthdayIds)))
-          .go();
+      await (_database.delete(
+        _database.messageDrafts,
+      )..where((r) => r.birthdayId.isNotIn(liveBirthdayIds))).go();
     }
 
     // Legacy rows keyed by their own id (`draft-…`) are shadowed duplicates
@@ -356,12 +357,13 @@ class DriftDraftsRepository implements DraftsRepository {
         .map((r) => r.id)
         .toList();
     if (shadowedLegacyIds.isNotEmpty) {
-      await (_database.delete(_database.messageDrafts)
-            ..where((r) => r.id.isIn(shadowedLegacyIds)))
-          .go();
+      await (_database.delete(
+        _database.messageDrafts,
+      )..where((r) => r.id.isIn(shadowedLegacyIds))).go();
     }
 
-    final after = (await _database.select(_database.messageDrafts).get()).length;
+    final after =
+        (await _database.select(_database.messageDrafts).get()).length;
     return before - after;
   }
 

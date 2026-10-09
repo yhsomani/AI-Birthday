@@ -116,7 +116,10 @@ void main() {
             credentialStorage: harness.credentialStorage,
             httpSender: (uri, headers, body) async {
               await beforeRespond();
-              return const HttpResponsePayload(statusCode: 200, body: _aiPayload);
+              return const HttpResponsePayload(
+                statusCode: 200,
+                body: _aiPayload,
+              );
             },
           ),
         ),
@@ -148,9 +151,11 @@ void main() {
         // the spinner animates until the gate releases).
         await tester.ensureVisible(find.text('Generate with AI'));
         await tester.tap(find.text('Generate with AI'));
-        for (var i = 0;
-            i < 20 && find.text('Drafting...').evaluate().isEmpty;
-            i++) {
+        for (
+          var i = 0;
+          i < 20 && find.text('Drafting...').evaluate().isEmpty;
+          i++
+        ) {
           await tester.pump(const Duration(milliseconds: 50));
         }
         expect(find.text('Drafting...'), findsOneWidget);
@@ -167,10 +172,12 @@ void main() {
         gate.complete();
         // The worker's completion does not schedule widget frames (no studio
         // is listening), so poll the durable effect explicitly.
-        for (var i = 0;
-            i < 40 &&
-                await harness.draftsRepo.getDraftForBirthday('b-test') == null;
-            i++) {
+        for (
+          var i = 0;
+          i < 40 &&
+              await harness.draftsRepo.getDraftForBirthday('b-test') == null;
+          i++
+        ) {
           await tester.pump(const Duration(milliseconds: 50));
         }
 
