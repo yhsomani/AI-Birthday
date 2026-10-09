@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_birthday/core/database/app_database.dart' show AppDatabase;
 import 'package:ai_birthday/core/database/drift_repositories.dart';
 import 'package:ai_birthday/core/errors/app_failure.dart';
+import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/ai/domain/ai_provider.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/jobs/application/ai_job_handler.dart';
@@ -305,4 +306,67 @@ void main() {
       ),
     );
   });
+
+  test(
+    'prompt targetCycleYear comes from the payload, falling back to the birthday',
+    () async {
+      await seedPerson();
+      await seedBirthday();
+      // A second birthday whose cycleYear differs from the current calendar
+      // year proves the fallback reads the birthday row, not DateTime.now().
+      final fallbackYear = now.year - 2;
+      await birthdaysRepo.saveBirthday(
+        Birthday(
+          id: 'b-fallback',
+          personId: 'p1',
+          cycleYear: fallbackYear,
+          date: now,
+          status: BirthdayStatus.messageNotPrepared,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      AiGenerationRequest? captured;
+      final h = AiGenerationJobHandler(
+        peopleRepository: peopleRepo,
+        draftsRepository: draftsRepo,
+        birthdaysRepository: birthdaysRepo,
+        jobsRepository: jobsRepo,
+        generate: (request, {required bool forceNano}) async {
+          captured = request;
+          return const AiGenerationResult(
+            message: 'drafted',
+            providerType: 'user_gemini',
+          );
+        },
+      );
+
+      await h.run(
+        await claimedJob(
+          payload: AiJobPayload(
+            birthdayId: 'b1',
+            personId: 'p1',
+            tone: MessageTone.warm,
+            length: MessageLength.standard,
+            targetCycleYear: 2027,
+          ),
+        ),
+      );
+      expect(captured!.targetCycleYear, 2027);
+
+      // Jobs queued before the field existed fall back to the birthday row.
+      await h.run(
+        await claimedJob(
+          payload: AiJobPayload(
+            birthdayId: 'b-fallback',
+            personId: 'p1',
+            tone: MessageTone.warm,
+            length: MessageLength.standard,
+          ),
+        ),
+      );
+      expect(captured!.targetCycleYear, fallbackYear);
+    },
+  );
 }

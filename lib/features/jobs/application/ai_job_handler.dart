@@ -42,6 +42,7 @@ class AiJobPayload {
     this.targetLanguage,
     this.forceNano = false,
     this.draftUpdatedAt,
+    this.targetCycleYear,
   });
 
   final String birthdayId;
@@ -58,6 +59,11 @@ class AiJobPayload {
   /// result only if the draft is still unchanged.
   final String? draftUpdatedAt;
 
+  /// Calendar year this message targets (the birthday row's `cycleYear`),
+  /// persisted so "Turning age" in the prompt is stable across restarts and
+  /// year boundaries instead of drifting to `DateTime.now().year`.
+  final int? targetCycleYear;
+
   Map<String, dynamic> toJson() => {
     'birthdayId': birthdayId,
     'personId': personId,
@@ -68,6 +74,7 @@ class AiJobPayload {
     'targetLanguage': targetLanguage,
     'forceNano': forceNano,
     'draftUpdatedAt': draftUpdatedAt,
+    'targetCycleYear': targetCycleYear,
   };
 
   static AiJobPayload fromJson(String? raw) {
@@ -82,6 +89,7 @@ class AiJobPayload {
       targetLanguage: json['targetLanguage'] as String?,
       forceNano: json['forceNano'] as bool? ?? false,
       draftUpdatedAt: json['draftUpdatedAt'] as String?,
+      targetCycleYear: json['targetCycleYear'] as int?,
     );
   }
 }
@@ -142,6 +150,7 @@ class AiGenerationJobHandler implements JobHandler {
         customInstruction: payload.customInstruction,
         existingMessage: payload.existingMessage,
         targetLanguage: payload.targetLanguage,
+        targetCycleYear: payload.targetCycleYear ?? birthday.cycleYear,
       ),
       forceNano: payload.forceNano,
     );

@@ -258,6 +258,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           customInstruction: customInstruction,
           existingMessage: existingMessage,
           targetLanguage: targetLanguage,
+          targetCycleYear: _birthday!.cycleYear,
           forceNano: forceNano,
           draftUpdatedAt: revisedDraft?.updatedAt.toIso8601String(),
         ).toJson(),
@@ -672,6 +673,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             person: _person!,
             tone: t,
             length: _selectedLength,
+            targetCycleYear: _birthday?.cycleYear,
           );
           final res = await aiRouter.generate(
             request: req,

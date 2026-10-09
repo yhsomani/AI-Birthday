@@ -13,6 +13,7 @@ class AiGenerationRequest {
     this.customInstruction,
     this.existingMessage,
     this.targetLanguage,
+    this.targetCycleYear,
   });
 
   final Person person;
@@ -27,6 +28,12 @@ class AiGenerationRequest {
 
   /// Optional language translation target (defaults to person.preferredLanguage).
   final String? targetLanguage;
+
+  /// Calendar year this message is for (the birthday row's `cycleYear`).
+  /// Persisted in the durable job payload so "Turning age" is stable across
+  /// restarts and year boundaries. When omitted, falls back to the current
+  /// calendar year (direct/builder-only callers).
+  final int? targetCycleYear;
 }
 
 /// Constructs prompts conforming to the authoritative prompt policy in SSOT §21.
@@ -52,7 +59,7 @@ class AiPromptBuilder {
       'Relationship: ${person.relationship.displayName} (Closeness: ${person.relationshipCloseness.displayName})',
     );
     if (person.birthYear != null) {
-      final currentYear = DateTime.now().year;
+      final currentYear = request.targetCycleYear ?? DateTime.now().year;
       final age = currentYear - person.birthYear!;
       if (age > 0) {
         buffer.writeln('Turning age: $age');

@@ -127,5 +127,35 @@ void main() {
         ),
       );
     });
+
+    test(
+      'Turning age uses the target cycle year, not the current calendar year',
+      () {
+        final person = Person(
+          id: 'p-age',
+          name: 'Eve',
+          birthdayMonth: 2,
+          birthdayDay: 14,
+          birthYear: 1990,
+          relationship: RelationshipCategory.friend,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
+        final prompt = builder.buildPrompt(
+          AiGenerationRequest(person: person, targetCycleYear: 2026),
+        );
+        expect(prompt, contains('Turning age: 36'));
+
+        // Without a target year the builder falls back to the current year.
+        final fallback = builder.buildPrompt(
+          AiGenerationRequest(person: person),
+        );
+        expect(
+          fallback,
+          contains('Turning age: ${DateTime.now().year - 1990}'),
+        );
+      },
+    );
   });
 }
