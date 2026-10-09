@@ -15,6 +15,16 @@ import 'package:ai_birthday/core/config/firebase_config.dart';
 /// State of an in-flight purchase operation.
 enum PurchaseStatus { idle, purchasing, verifying, success, cancelled, error }
 
+/// Why the last purchase could not be started, so the UI can say what to do.
+enum PurchaseFailure {
+  none,
+  signInRequired,
+  storeUnavailable,
+  productUnavailable,
+  verificationUnavailable,
+  unknown,
+}
+
 class _VerifiedEntitlement {
   const _VerifiedEntitlement({
     required this.status,
@@ -71,6 +81,9 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   Completer<bool>? _restoreCompleter;
   PurchaseStatus _purchaseStatus = PurchaseStatus.idle;
   PurchaseStatus get purchaseStatus => _purchaseStatus;
+
+  PurchaseFailure _lastPurchaseFailure = PurchaseFailure.none;
+  PurchaseFailure get lastPurchaseFailure => _lastPurchaseFailure;
 
   static const String _kProMonthlyId = 'ai_birthday_pro_monthly';
   // MUST match android/app/build.gradle.kts applicationId. The previous value
@@ -300,6 +313,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   Future<bool> purchaseProMonthly() async {
     _logger.info('Subscription', 'Starting Pro Monthly purchase flow');
     _purchaseStatus = PurchaseStatus.purchasing;
+    _lastPurchaseFailure = PurchaseFailure.none;
 
     try {
       final authToken = await _authTokenProvider?.call();
@@ -308,20 +322,21 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
           authToken.isEmpty ||
           accountBinding == null ||
           accountBinding.isEmpty) {
-        _purchaseStatus = PurchaseStatus.error;
-        return false;
+        return _failPurchase(PurchaseFailure.signInRequired);
+      }
+
+      // Never bill for a Pro entitlement the backend cannot grant. Confirm the
+      // verification function answers before Google Play takes any money.
+      if (!await _verificationEndpointReachable(authToken)) {
+        return _failPurchase(PurchaseFailure.verificationUnavailable);
       }
 
       final isAvailable = await _iap.isAvailable();
-      if (!isAvailable) {
-        _purchaseStatus = PurchaseStatus.error;
-        return false;
-      }
+      if (!isAvailable) return _failPurchase(PurchaseFailure.storeUnavailable);
 
       final response = await _iap.queryProductDetails({_kProMonthlyId});
       if (response.productDetails.isEmpty) {
-        _purchaseStatus = PurchaseStatus.error;
-        return false;
+        return _failPurchase(PurchaseFailure.productUnavailable);
       }
 
       final product = response.productDetails.first;
@@ -332,20 +347,50 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
       _purchaseStatus = PurchaseStatus.purchasing;
       return await _iap.buyNonConsumable(purchaseParam: purchaseParam);
     } catch (error, stackTrace) {
-      _purchaseStatus = PurchaseStatus.error;
       _logger.error(
         'Subscription',
         'Purchase flow failed.',
         error: error,
         stackTrace: stackTrace,
       );
-      return false;
+      return _failPurchase(PurchaseFailure.unknown);
     } finally {
       _purchaseStatus = PurchaseStatus.idle;
     }
   }
 
-  /// Requests store purchase restoration and waits for its verification event.
+  bool _failPurchase(PurchaseFailure reason) {
+    _purchaseStatus = PurchaseStatus.error;
+    _lastPurchaseFailure = reason;
+    return false;
+  }
+
+  /// True when the verification callable is deployed and answering. A 404
+  /// means it is not deployed; 5xx or no answer means it cannot grant access.
+  Future<bool> _verificationEndpointReachable(String authToken) async {
+    try {
+      final response = await _http
+          .post(
+            Uri.parse(_verificationEndpoint),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $authToken',
+            },
+            body: jsonEncode({'data': <String, dynamic>{}}),
+          )
+          .timeout(_kVerifyTimeout);
+      return response.statusCode != 404 && response.statusCode < 500;
+    } catch (error, stackTrace) {
+      _logger.warning(
+        'Subscription',
+        'Purchase verification endpoint is unreachable.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return false;
+    }
+  }
+
   Future<bool> restorePurchases() async {
     return _restorePurchases();
   }

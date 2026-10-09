@@ -20,6 +20,7 @@ import 'package:ai_birthday/features/auth/presentation/auth_bottom_sheet.dart';
 import 'package:ai_birthday/features/jobs/application/cloud_job_handler.dart';
 import 'package:ai_birthday/features/jobs/domain/job.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_providers.dart';
+import 'package:ai_birthday/features/subscription/application/subscription_service.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
 import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
 import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
@@ -580,16 +581,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted) return;
     setState(() => _isPurchasing = false);
 
+    final reason = ref
+        .read(subscriptionNotifierProvider.notifier)
+        .lastPurchaseFailure;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           success
               ? 'Purchase flow opened. Google Play will verify the subscription before AI is unlocked.'
-              : 'Purchase could not be started. Sign in and try again.',
+              : _purchaseFailureMessage(reason),
         ),
       ),
     );
   }
+
+  String _purchaseFailureMessage(PurchaseFailure reason) => switch (reason) {
+    PurchaseFailure.signInRequired =>
+      'Sign in with Google to subscribe to Pro.',
+    PurchaseFailure.storeUnavailable =>
+      'Google Play Billing is not available on this device.',
+    PurchaseFailure.productUnavailable =>
+      'Pro is not available on this install. Install AI-Birthday from Google Play to subscribe.',
+    PurchaseFailure.verificationUnavailable =>
+      'Pro purchases are temporarily unavailable. You have not been charged. Try again later.',
+    _ => 'Purchase could not be started. Try again.',
+  };
 
   Future<void> _handleRestorePurchases() async {
     HapticFeedback.lightImpact();
