@@ -53,3 +53,14 @@ enum RelationshipCloseness {
 
   static RelationshipCloseness fromString(String? value) => fromStored(value);
 }
+
+/// Label for a contact card. A contact with no relationship category reads as
+/// "Other", which contradicts the closeness chosen in the form, so the closeness
+/// level is shown in its place (device test: a card said "Other" beside Casual).
+String relationshipCardLabel(
+  RelationshipCategory category,
+  RelationshipCloseness closeness,
+) {
+  if (category == RelationshipCategory.other) return closeness.displayName;
+  return category.displayName;
+}

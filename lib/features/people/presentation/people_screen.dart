@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart'
@@ -768,7 +769,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                 children: [
                                   const SizedBox(height: 4),
                                   Text(
-                                    '$dateStr$ageTurn • ${person.relationship.displayName}',
+                                    '$dateStr$ageTurn • ${relationshipCardLabel(person.relationship, person.relationshipCloseness)}',
                                   ),
                                   if (next != null) ...[
                                     const SizedBox(height: 4),

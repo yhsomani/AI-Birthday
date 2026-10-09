@@ -27,7 +27,7 @@ Physical phone: not attached, so not tested. Gemini API key: not entered and not
 
 | Tab | Result |
 |---|---|
-| People | Lists Asha Test with date and Today badge. Subtitle shows "Other" while the closeness is Casual (open, see below). |
+| People | Lists Asha Test with date and Today badge. Fixed: the card showed "Other" beside a Casual closeness; it now shows the closeness when no category is set (verified on device). |
 | Calendar | Month renders with a marker on the birthday day. |
 | History | Shows the saved draft with Copy and Studio actions. |
 | Settings | Cloud backup buttons misaligned (fixed: full-width Wrap, verified after rebuild). |

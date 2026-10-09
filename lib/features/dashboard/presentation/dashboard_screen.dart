@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
@@ -495,7 +496,7 @@ class DashboardScreen extends ConsumerWidget {
     final now = DateTime.now();
     final days = birthday.daysUntil(now);
     final subtitle =
-        '${person?.relationship.displayName ?? 'Friend'} • ${DateFormat.MMMd().format(birthday.date)}';
+        '${person == null ? 'Friend' : relationshipCardLabel(person.relationship, person.relationshipCloseness)} • ${DateFormat.MMMd().format(birthday.date)}';
 
     return CelebrationCard(
       name: person?.name ?? 'Unknown',
