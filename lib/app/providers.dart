@@ -1,6 +1,8 @@
 /// Global Riverpod dependency injection and service providers (SSOT §3, §24, §28).
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ai_birthday/core/security/credential_storage.dart';
@@ -302,9 +304,24 @@ final peopleStreamProvider = StreamProvider<List<Person>>((ref) {
 });
 
 /// Stream of all tracked birthdays.
+/// Time from [now] until the next local midnight, when birthday occurrences
+/// roll over (audit F09).
+Duration durationUntilNextLocalMidnight(DateTime now) {
+  final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+  return nextMidnight.difference(now);
+}
+
 final birthdaysStreamProvider = StreamProvider<List<Birthday>>((ref) async* {
   final birthdayRepo = ref.watch(birthdaysRepositoryProvider);
   final peopleRepo = ref.watch(peopleRepositoryProvider);
+
+  // Reconcile again at each local midnight: an app left open across a birthday
+  // boundary must not keep the previous day's occurrence state (audit F09).
+  final midnight = Timer(
+    durationUntilNextLocalMidnight(DateTime.now()),
+    () => ref.invalidateSelf(),
+  );
+  ref.onDispose(midnight.cancel);
 
   // Reconcile the active occurrence before any screen consumes birthday data.
   final people = await peopleRepo.getPeople();

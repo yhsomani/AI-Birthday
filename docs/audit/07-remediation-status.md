@@ -18,6 +18,7 @@ against HEAD. Each finding was re-verified in source before any change.
 | F14 Backup with an expired token | Partly fixed | `cloud_sync_service.dart` refreshes the ID token before each backup and restore (`freshIdToken`, wired in `providers.dart`). Test sends the refreshed token and fails with the refresh disabled. Still open: request deadlines, one controlled retry, and disposing the HTTP client. |
 | F05 Overwrites and stale devices | **Fixed** (snapshot backup) | Each backup writes a complete immutable generation under `users/{uid}/generations/{id}`, then one commit writes the manifest and moves `backup/current` to it. A failed row write never moves the pointer (test). Rules fence generation writes during deletion (emulator test). |
 | F06 Restore all-or-nothing | **Fixed** (manifest and count check) | Restore reads the `backup/current` pointer and its manifest, checks each collection count against the manifest, and only then applies one local transaction. Test: an incomplete download writes nothing. Still open: malformed records are skipped while success is reported. |
+| F09 Stale occurrences across midnight | **Partly fixed** | The birthday stream now schedules a reconcile at each local midnight (`birthdaysStreamProvider`, using `durationUntilNextLocalMidnight`, unit-tested). Still open: reconcile on app foreground resume, on timezone change and after restore; the form and import date helper still uses the timezone-unaware static calculation. |
 | F20 Handoff history and transactions | **Partly fixed** | History labels a handoff from the recorded delivery event. The evidence row and the birthday status now change in one transaction (`recordHandoffAndMarkHandedOff`, used by WhatsApp, SMS and Share), covered by a Drift test. Still open: the draft stays `ready` after handoff (the draft status enum has no handed-off state yet), and the draft save path is not serialized. |
 | F24 Dependency audit not enforced | **Partly fixed** | CI now runs `npm audit --omit=dev --audit-level=high` on the backend, which passes locally. Dev-only advisories (in the full tree) are still reported and not blocking. The audit:ci script is unchanged. |
 | F21 Recipient name in Android log | **Fixed** | `BirthdayNotificationReceiver.kt` no longer logs the notification title. |
@@ -40,7 +41,7 @@ These need either a product decision or a larger change. Nothing here has been s
 
 - F05 remainder — delete superseded generations (storage grows without it).
 - F06 remainder — report malformed records as skipped instead of silently ignoring them.
-- F07, F08, F09 — account partitioning, immutable birthday occurrences, midnight refresh.
+- F07, F08 — account partitioning and immutable birthday occurrences. F09 remainder — reconcile on foreground resume, timezone change and restore.
 - F10 remainder — collapse the two Person models and repositories into one.
 - F13 remainder — quiet-hours policy and rolling renewal (product decisions); on-device verification.
 - F15 — purchase binding against Play.
