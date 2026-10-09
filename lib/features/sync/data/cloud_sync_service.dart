@@ -81,31 +81,6 @@ class CloudSyncService {
     return null;
   }
 
-  /// Whole-second UTC floor of the last successful sync, minus one second of
-  /// backoff. Drift persists DateTimes at second granularity, so a row saved
-  /// in the second the previous backup ran — but after its snapshot read —
-  /// would otherwise sit below the boundary and be skipped forever. The
-  /// window only re-uploads a row or two that were already uploaded.
-  DateTime? _incrementalBoundary(String? lastSyncIso) {
-    if (lastSyncIso == null) return null;
-    final parsed = DateTime.tryParse(lastSyncIso);
-    if (parsed == null) return null;
-    final ms = parsed.toUtc().millisecondsSinceEpoch - 1000;
-    return DateTime.fromMillisecondsSinceEpoch(ms - ms % 1000, isUtc: true);
-  }
-
-  /// Rows whose change stamp (updatedAt — bumped on create, edit, and
-  /// tombstone) is at or after [boundary]. A null boundary keeps everything,
-  /// which is the very first backup.
-  List<T> _sinceBoundary<T>(
-    List<T> rows,
-    DateTime? boundary,
-    DateTime Function(T) changedAt,
-  ) {
-    if (boundary == null) return rows;
-    return rows.where((row) => !changedAt(row).isBefore(boundary)).toList();
-  }
-
   /// Returns [authState] with a freshly refreshed ID token when a provider is
   /// configured. A failed or empty refresh keeps the stored state, so the
   /// request still goes out and the server reports any real rejection (F14).
@@ -166,6 +141,36 @@ class CloudSyncService {
   /// document ids are app-generated, so no escaping is required.
   String _documentPath(String uid, String collection, String documentId) {
     return 'projects/$_projectId/databases/(default)/documents/users/$uid/$collection/$documentId';
+  }
+
+  static const int _snapshotSchemaVersion = 1;
+
+  /// Identifier for one immutable backup generation (audit F05).
+  String _newGenerationId(DateTime now) =>
+      'g${now.toUtc().microsecondsSinceEpoch}';
+
+  /// Document URL under the owner's tree, for single-document reads.
+  String _documentUrl(String uid, String path) {
+    final encodedUid = Uri.encodeComponent(uid);
+    return 'https://firestore.googleapis.com/v1/projects/$_projectId/databases/(default)/documents/users/$encodedUid/$path';
+  }
+
+  /// Fields of one document, or null when it does not exist.
+  Future<Map<String, dynamic>?> _getDocumentFields(
+    String url,
+    Map<String, String> headers,
+  ) async {
+    final uri = Uri.parse(url).replace(queryParameters: {'key': _apiKey});
+    final response = await _http.get(uri, headers: headers);
+    if (response.statusCode == 404) return null;
+    if (response.statusCode != 200) {
+      throw const FormatException('CLOUD_GET_FAILED');
+    }
+    final body = jsonDecode(response.body);
+    if (body is! Map<String, dynamic>) {
+      throw const FormatException('CLOUD_GET_INVALID_RESPONSE');
+    }
+    return (body['fields'] as Map<String, dynamic>?) ?? <String, dynamic>{};
   }
 
   /// Sends up to 500 full-document writes in one Firestore `commit` call and
@@ -380,78 +385,60 @@ class CloudSyncService {
     }
 
     try {
-      // Incremental backup (data-integrity backlog): only rows changed since
-      // the last successful sync are uploaded; unchanged rows are left
-      // untouched. Reminder settings have no timestamp column, so they are
-      // always sent (the table is a handful of rows).
-      final boundary = _incrementalBoundary(
-        await _store.read(_lastSyncPrefix + uid),
-      );
+      // Snapshot backup (audit F05): every row goes into a new immutable
+      // generation, including unchanged rows, so each generation is complete.
+      // The `backup/current` pointer only moves after the whole generation and
+      // its manifest are stored, so a failed run leaves the last backup intact.
+      final generationId = _newGenerationId(now);
       final allPersonRows = await _db.select(_db.persons).get();
       final allBirthdayRows = await _db.select(_db.birthdays).get();
       final allDraftRows = await _db.select(_db.messageDrafts).get();
       final reminderRows = await _db.select(_db.reminderSettingsEntries).get();
-
-      final personRows = _sinceBoundary(
-        allPersonRows,
-        boundary,
-        (p) => p.updatedAt,
-      );
-      final birthdayRows = _sinceBoundary(
-        allBirthdayRows,
-        boundary,
-        (b) => b.updatedAt,
-      );
-      final draftRows = _sinceBoundary(
-        allDraftRows,
-        boundary,
-        (d) => d.updatedAt,
-      );
       // Resolve person names for birthday docs from the full set (tombstoned
-      // people included), matching the pre-incremental behavior.
+      // people included).
       final peopleMap = {for (final p in allPersonRows) p.id: p};
       final headers = _headers(authState);
+      final generationPath = 'generations/$generationId';
 
-      var uploaded = 0;
-      var totalItems = 0;
-      var failures = 0;
-
-      // Performance audit: previously each row was sent as its own HTTP PATCH
-      // (N round trips, one per row). Writes are now batched into Firestore
-      // `commit` calls of up to 500 — identical full-document replace semantics.
       final writes = <Map<String, dynamic>>[
-        for (final p in personRows)
+        for (final p in allPersonRows)
           {
             'update': {
-              'name': _documentPath(uid, 'people', p.id),
+              'name': _documentPath(uid, '$generationPath/people', p.id),
               'fields': _personFields(p),
             },
           },
-        for (final b in birthdayRows)
+        for (final b in allBirthdayRows)
           {
             'update': {
-              'name': _documentPath(uid, 'birthdays', b.id),
+              'name': _documentPath(uid, '$generationPath/birthdays', b.id),
               'fields': _birthdayFields(b, peopleMap[b.personId]),
             },
           },
-        for (final d in draftRows)
+        for (final d in allDraftRows)
           {
             'update': {
-              'name': _documentPath(uid, 'drafts', d.id),
+              'name': _documentPath(uid, '$generationPath/drafts', d.id),
               'fields': _draftFields(d),
             },
           },
         for (final setting in reminderRows)
           {
             'update': {
-              'name': _documentPath(uid, 'reminderSettings', setting.key),
+              'name': _documentPath(
+                uid,
+                '$generationPath/reminderSettings',
+                setting.key,
+              ),
               'fields': _reminderFields(setting),
             },
           },
       ];
+      final totalItems = writes.length;
+      var uploaded = 0;
+      var failures = 0;
 
       await _flushWrites(writes, headers, (ok, total) {
-        totalItems += total;
         uploaded += ok;
         failures += total - ok;
       });
@@ -473,6 +460,46 @@ class CloudSyncService {
           success: false,
           uploadedCount: uploaded,
           error: error,
+          errorCode: 'sync',
+          retryable: true,
+          timestamp: now,
+        );
+      }
+
+      // Publish: the manifest records the exact counts, and the pointer moves
+      // last, in its own commit, so restore never sees a partial generation.
+      final published = await _commitBatch([
+        {
+          'update': {
+            'name': _documentPath(uid, 'generations', generationId),
+            'fields': {
+              'schemaVersion': _firestoreInt(_snapshotSchemaVersion),
+              'generationId': _firestoreString(generationId),
+              'createdAt': _firestoreDate(now),
+              'people': _firestoreInt(allPersonRows.length),
+              'birthdays': _firestoreInt(allBirthdayRows.length),
+              'drafts': _firestoreInt(allDraftRows.length),
+              'reminderSettings': _firestoreInt(reminderRows.length),
+            },
+          },
+        },
+        {
+          'update': {
+            'name': _documentPath(uid, 'backup', 'current'),
+            'fields': {
+              'schemaVersion': _firestoreInt(_snapshotSchemaVersion),
+              'generationId': _firestoreString(generationId),
+              'publishedAt': _firestoreDate(now),
+            },
+          },
+        },
+      ], headers);
+      if (published != 2) {
+        return CloudSyncResult(
+          success: false,
+          uploadedCount: uploaded,
+          error:
+              'Cloud backup could not be published. Your previous backup is unchanged.',
           errorCode: 'sync',
           retryable: true,
           timestamp: now,
@@ -538,24 +565,61 @@ class CloudSyncService {
       final headers = _headers(authState);
       var restored = 0;
 
-      // Fetch the whole backup before any local write (F06). A download failure
-      // now leaves the local database exactly as it was.
+      // Read the published pointer, its manifest, and the generation's
+      // collections. Every collection is checked against the manifest before
+      // any local write, so an incomplete snapshot changes nothing (F06).
+      final pointer = await _getDocumentFields(
+        _documentUrl(uid, 'backup/current'),
+        headers,
+      );
+      if (pointer == null) {
+        return CloudSyncResult(
+          success: false,
+          error: 'No cloud backup has been saved for this account yet.',
+          errorCode: 'not-found',
+          timestamp: now,
+        );
+      }
+      final generationId = _string(pointer, 'generationId');
+      if (generationId == null || generationId.isEmpty) {
+        throw const FormatException('CLOUD_POINTER_INVALID');
+      }
+      final manifest = await _getDocumentFields(
+        _documentUrl(uid, 'generations/$generationId'),
+        headers,
+      );
+      if (manifest == null ||
+          _integer(manifest, 'schemaVersion') != _snapshotSchemaVersion) {
+        throw const FormatException('CLOUD_MANIFEST_INVALID');
+      }
+
       final peopleDocs = await _listDocuments(
-        _collectionUrl(uid, 'people'),
+        _collectionUrl(uid, 'generations/$generationId/people'),
         headers,
       );
       final birthdayDocs = await _listDocuments(
-        _collectionUrl(uid, 'birthdays'),
+        _collectionUrl(uid, 'generations/$generationId/birthdays'),
         headers,
       );
       final draftDocs = await _listDocuments(
-        _collectionUrl(uid, 'drafts'),
+        _collectionUrl(uid, 'generations/$generationId/drafts'),
         headers,
       );
       final reminderDocs = await _listDocuments(
-        _collectionUrl(uid, 'reminderSettings'),
+        _collectionUrl(uid, 'generations/$generationId/reminderSettings'),
         headers,
       );
+      final downloaded = <String, List<Map<String, dynamic>>>{
+        'people': peopleDocs,
+        'birthdays': birthdayDocs,
+        'drafts': draftDocs,
+        'reminderSettings': reminderDocs,
+      };
+      for (final entry in downloaded.entries) {
+        if (entry.value.length != _integer(manifest, entry.key)) {
+          throw FormatException('CLOUD_SNAPSHOT_INCOMPLETE:${entry.key}');
+        }
+      }
 
       // Apply every local write in one transaction, so a failure part-way
       // cannot leave a mixed dataset.

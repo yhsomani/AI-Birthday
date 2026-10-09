@@ -103,4 +103,37 @@ describe('Firestore authorization rules', () => {
       setDoc(doc(ownerDb, 'users/uid-fence/people/after'), { name: 'After' }),
     );
   });
+
+  it('lets owners write immutable backup generations and fences them during deletion (F05)', async () => {
+    const ownerDb = environment
+      .authenticatedContext('uid-gen', { email_verified: true })
+      .firestore();
+    const otherDb = environment
+      .authenticatedContext('uid-other', { email_verified: true })
+      .firestore();
+
+    await assertSucceeds(
+      setDoc(doc(ownerDb, 'users/uid-gen/generations/g1'), { schemaVersion: 1 }),
+    );
+    await assertSucceeds(
+      setDoc(doc(ownerDb, 'users/uid-gen/generations/g1/people/p1'), {
+        name: 'Gen',
+      }),
+    );
+    await assertFails(
+      setDoc(doc(ownerDb, 'users/uid-gen/generations/g1/secrets/x'), { v: 1 }),
+    );
+    await assertFails(
+      setDoc(doc(otherDb, 'users/uid-gen/generations/g1/people/p2'), { name: 'X' }),
+    );
+
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'coordinationPresence/uid-gen'), {
+        state: 'DELETING',
+      });
+    });
+    await assertFails(
+      setDoc(doc(ownerDb, 'users/uid-gen/generations/g2/people/p3'), { name: 'Late' }),
+    );
+  });
 });

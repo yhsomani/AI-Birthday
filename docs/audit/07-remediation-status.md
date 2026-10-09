@@ -15,7 +15,8 @@ against HEAD. Each finding was re-verified in source before any change.
 | F16 Purchase acknowledgement | Partly fixed at HEAD | `subscription_service.dart` acknowledges only after a verified success (the audit's "acknowledges on failure" is stale). Purchase status is still a private field, not reactive state. |
 | F18 Wrong age in AI prompt | Partly fixed at HEAD | Studio and job paths pass `cycleYear` (commit `56d06dd2`). The edit-overwrite guard is still open. |
 | F14 Backup with an expired token | Partly fixed | `cloud_sync_service.dart` refreshes the ID token before each backup and restore (`freshIdToken`, wired in `providers.dart`). Test sends the refreshed token and fails with the refresh disabled. Still open: request deadlines, one controlled retry, and disposing the HTTP client. |
-| F06 Partial restore | Partly fixed | `cloud_sync_service.dart` restore now downloads all four collections before any local write and applies the writes in one `_db.transaction`. Test: a failure on the birthdays download leaves the people table empty. Still open: malformed records are skipped while reporting success, and there is no complete-backup manifest (that needs snapshot backup). |
+| F05 Overwrites and stale devices | **Fixed** (snapshot backup) | Each backup writes a complete immutable generation under `users/{uid}/generations/{id}`, then one commit writes the manifest and moves `backup/current` to it. A failed row write never moves the pointer (test). Rules fence generation writes during deletion (emulator test). |
+| F06 Restore all-or-nothing | **Fixed** (manifest and count check) | Restore reads the `backup/current` pointer and its manifest, checks each collection count against the manifest, and only then applies one local transaction. Test: an incomplete download writes nothing. Still open: malformed records are skipped while success is reported. |
 | F21 Recipient name in Android log | **Fixed** | `BirthdayNotificationReceiver.kt` no longer logs the notification title. |
 | F23 Dart format gate | **Fixed** | `dart format --set-exit-if-changed .` passes. 37 files were reformatted (indentation only, one separate commit recommended). Line endings normalised to LF to match the index. |
 | F19 CSV round-trip and validation | **Fixed** (import/export core) | Quote-aware record splitting; real month/day validation (April 31 rejected, Feb 29 accepted); formula guard on export, stripped on import. Phone numbers are exempt from the guard. |
@@ -32,7 +33,8 @@ Status: none of the three has been started. Snapshot backup is blocked on a Fire
 
 These need either a product decision or a larger change. Nothing here has been started except where noted above.
 
-- F05 — backup conflicts (needs snapshot backup). F06 remainder — manifest and malformed-record reporting.
+- F05 remainder — delete superseded generations (storage grows without it).
+- F06 remainder — report malformed records as skipped instead of silently ignoring them.
 - F07, F08, F09, F10 — account partitioning, immutable birthday occurrences, midnight refresh, one Person model.
 - F12, F13, F15 — import/restore reminder refresh, alarm replacement safety, purchase binding against Play.
 - F14 remainder — request deadlines, a single controlled retry, and disposal of the owned HTTP client.
@@ -51,10 +53,10 @@ These need either a product decision or a larger change. Nothing here has been s
 | Check | Result |
 |---|---|
 | `backend/functions`: typecheck, lint, unit tests | Pass (75 tests) |
-| `backend/functions`: Firestore emulator tests | Pass (19 tests: control plane and rules). Needs the JDK on PATH; it is installed at C:/Program Files/Java/jdk-26.0.2.1 but not on the system PATH. Run `npx firebase emulators:exec --only firestore "npx vitest run emulator"` after adding its bin folder to PATH. |
+| `backend/functions`: Firestore emulator tests | Pass (20 tests: control plane and rules). Needs the JDK on PATH; it is installed at C:/Program Files/Java/jdk-26.0.2.1 but not on the system PATH. Run `npx firebase emulators:exec --only firestore "npx vitest run emulator"` after adding its bin folder to PATH. |
 | `backend/hosting`: `node --test` | Pass (12 tests) |
 | `flutter analyze` | No issues (re-run after formatting) |
-| `flutter test` (full suite) | Pass (378 tests, after the F06 change) |
+| `flutter test` (full suite) | Pass (378 tests, after the snapshot backup change) |
 | `dart format --set-exit-if-changed .` (CI gate) | Pass |
 | `flutter build apk --debug` | Pass (re-run after the F21 logging change) |
 | Reboot recovery on a device or emulator (schedule → reboot → notification) | Not run |

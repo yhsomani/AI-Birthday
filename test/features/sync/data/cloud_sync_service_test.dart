@@ -103,6 +103,25 @@ void main() {
 
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         final writes = body['writes'] as List;
+        final isPublish = writes.any(
+          (w) => (((w as Map)['update'] as Map)['name'] as String).endsWith(
+            '/backup/current',
+          ),
+        );
+        if (isPublish) {
+          // The second commit publishes the generation: manifest, then pointer.
+          expect(writes, hasLength(2));
+          return http.Response(
+            jsonEncode({
+              'commitTime': '2026-01-01T00:00:00Z',
+              'writeResults': [
+                {'updateTime': '2026-01-01T00:00:00Z'},
+                {'updateTime': '2026-01-01T00:00:00Z'},
+              ],
+            }),
+            200,
+          );
+        }
         expect(writes, hasLength(2));
 
         final names = writes
@@ -165,7 +184,7 @@ void main() {
       final result = await service.sync(auth);
       expect(result.success, isTrue);
       expect(result.uploadedCount, 2);
-      expect(commitCount, 1);
+      expect(commitCount, 2, reason: 'rows first, then the publish commit');
 
       // Verify timestamp stored
       final lastSync = await service.getLastSyncTime('uid-test');
@@ -231,7 +250,8 @@ void main() {
       final result = await service.sync(auth);
       expect(result.success, isTrue);
       expect(result.uploadedCount, 501);
-      expect(batchSizes, [500, 1]);
+      // Row chunks first; the manifest and pointer are published last (F05).
+      expect(batchSizes, [500, 1, 2]);
     });
 
     test('counts per-write failures inside a commit as incomplete', () async {
@@ -312,165 +332,111 @@ void main() {
       expect(lastSync, isNull);
     });
 
-    test('a backup with nothing new uploads zero rows', () async {
-      final now = DateTime.now();
-      await db
-          .into(db.persons)
-          .insert(
-            PersonsCompanion.insert(
-              id: 'p-stale',
-              name: 'Unchanged',
-              relationship: 'Friend',
-              relationshipCloseness: 'close',
-              preferredLanguage: 'en',
-              preferredTone: 'warm',
-              importantFacts: '',
-              preferredDeliveryChannel: 'whatsapp',
-              autoSendPolicy: 'manualOnly',
-              createdAt: now.subtract(const Duration(days: 1)),
-              updatedAt: now.subtract(const Duration(days: 1)),
-              version: 1,
-            ),
+    test(
+      'every backup writes a complete generation, including unchanged rows (F05)',
+      () async {
+        final now = DateTime.now();
+        await db
+            .into(db.persons)
+            .insert(
+              PersonsCompanion.insert(
+                id: 'p-complete',
+                name: 'Unchanged Person',
+                relationship: 'Friend',
+                relationshipCloseness: 'close',
+                preferredLanguage: 'en',
+                preferredTone: 'warm',
+                importantFacts: '',
+                preferredDeliveryChannel: 'WhatsApp',
+                autoSendPolicy: 'manual',
+                createdAt: now.subtract(const Duration(days: 30)),
+                updatedAt: now.subtract(const Duration(days: 30)),
+                version: 1,
+              ),
+            );
+
+        final rowNames = <String>[];
+        final client = MockClient((request) async {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          final writes = body['writes'] as List;
+          for (final w in writes) {
+            rowNames.add(((w as Map)['update'] as Map)['name'] as String);
+          }
+          return http.Response(
+            jsonEncode({
+              'writeResults': List.generate(
+                writes.length,
+                (_) => {'updateTime': '2026-01-01T00:00:00Z'},
+              ),
+            }),
+            200,
           );
+        });
 
-      // A full backup already ran moments ago; nothing changed since.
-      store.data['cloud_last_sync_timestamp_uid-test'] = now.toIso8601String();
-
-      var commitCount = 0;
-      final mockClient = MockClient((request) async {
-        commitCount++;
-        return http.Response(
-          jsonEncode({
-            'writeResults': [
-              {'updateTime': '2026-01-01T00:00:00Z'},
-            ],
-          }),
-          200,
+        // A previous backup ran after this row last changed. Snapshot semantics
+        // still send the row, so the new generation is complete.
+        store.data['cloud_last_sync_timestamp_uid-test'] = now
+            .toIso8601String();
+        final service = CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: client,
         );
-      });
+        final result = await service.sync(_signedInAuth);
 
-      final service = CloudSyncService(
-        db: db,
-        store: store,
-        httpClient: mockClient,
-      );
+        expect(result.success, isTrue);
+        expect(result.uploadedCount, 1);
+        expect(
+          rowNames.where((n) => n.endsWith('/people/p-complete')),
+          hasLength(1),
+        );
+      },
+    );
 
-      final result = await service.sync(_signedInAuth);
-      expect(result.success, isTrue);
-      expect(result.uploadedCount, 0);
-      expect(commitCount, 0, reason: 'no changes, no Firestore round trip');
-    });
-
-    test('a backup after the initial one uploads only rows changed since the '
-        'last sync, including tombstones', () async {
+    test('a failed row write never publishes the pointer (F05)', () async {
       final now = DateTime.now();
-      // Previous backup: one hour ago.
-      final lastSync = now.subtract(const Duration(hours: 1));
       await db
           .into(db.persons)
           .insert(
             PersonsCompanion.insert(
-              id: 'p-tomb',
-              name: 'Deleted Since',
+              id: 'p-unpublished',
+              name: 'Not Published',
               relationship: 'Friend',
               relationshipCloseness: 'close',
               preferredLanguage: 'en',
               preferredTone: 'warm',
               importantFacts: '',
-              preferredDeliveryChannel: 'whatsapp',
-              autoSendPolicy: 'manualOnly',
-              createdAt: now.subtract(const Duration(days: 30)),
+              preferredDeliveryChannel: 'WhatsApp',
+              autoSendPolicy: 'manual',
+              createdAt: now,
               updatedAt: now,
-              version: 2,
-              deletedAt: Value(now),
-            ),
-          );
-      await db
-          .into(db.persons)
-          .insert(
-            PersonsCompanion.insert(
-              id: 'p-stale',
-              name: 'Already Uploaded',
-              relationship: 'Friend',
-              relationshipCloseness: 'close',
-              preferredLanguage: 'en',
-              preferredTone: 'warm',
-              importantFacts: '',
-              preferredDeliveryChannel: 'whatsapp',
-              autoSendPolicy: 'manualOnly',
-              createdAt: now.subtract(const Duration(hours: 2)),
-              updatedAt: now.subtract(const Duration(hours: 2)),
               version: 1,
             ),
           );
-      await db
-          .into(db.messageDrafts)
-          .insert(
-            MessageDraftsCompanion.insert(
-              id: 'd-new',
-              birthdayId: 'b-1',
-              personId: 'p-1',
-              body: 'Edited since the last backup',
-              tone: 'warm',
-              length: 'short',
-              status: 'ready',
-              providerType: 'local',
-              createdAt: now.subtract(const Duration(hours: 2)),
-              updatedAt: now,
-            ),
-          );
-      await db
-          .into(db.messageDrafts)
-          .insert(
-            MessageDraftsCompanion.insert(
-              id: 'd-stale',
-              birthdayId: 'b-2',
-              personId: 'p-2',
-              body: 'Unchanged',
-              tone: 'warm',
-              length: 'short',
-              status: 'ready',
-              providerType: 'local',
-              createdAt: now.subtract(const Duration(hours: 3)),
-              updatedAt: now.subtract(const Duration(hours: 2)),
-            ),
-          );
 
-      store.data['cloud_last_sync_timestamp_uid-test'] = lastSync
-          .toIso8601String();
-
-      final uploadedNames = <String>[];
-      final mockClient = MockClient((request) async {
+      final requestedPaths = <String>[];
+      final client = MockClient((request) async {
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         final writes = body['writes'] as List;
-        expect(writes, hasLength(2));
-        for (final write in writes.cast<Map<String, dynamic>>()) {
-          final name = ((write['update'] as Map)['name'] as String);
-          uploadedNames.add(name.split('/').last);
-          expect(name, isNot(endsWith('/people/p-stale')));
-          expect(name, isNot(endsWith('/drafts/d-stale')));
-        }
-        return http.Response(
-          jsonEncode({
-            'writeResults': List.generate(
-              writes.length,
-              (_) => {'updateTime': '2026-01-01T00:00:00Z'},
-            ),
-          }),
-          200,
+        requestedPaths.addAll(
+          writes.map((w) => ((w as Map)['update'] as Map)['name'] as String),
         );
+        return http.Response('Server Error', 500);
       });
 
       final service = CloudSyncService(
         db: db,
         store: store,
-        httpClient: mockClient,
+        httpClient: client,
       );
-
       final result = await service.sync(_signedInAuth);
-      expect(result.success, isTrue);
-      expect(result.uploadedCount, 2);
-      expect(uploadedNames.toSet(), {'p-tomb', 'd-new'});
+
+      expect(result.success, isFalse);
+      expect(
+        requestedPaths.where((n) => n.endsWith('/backup/current')),
+        isEmpty,
+        reason: 'the pointer moves only after every row is stored',
+      );
     });
 
     test(
@@ -541,35 +507,37 @@ void main() {
             ),
           );
 
-      final mockClient = MockClient((request) async {
-        expect(request.method, 'GET');
-        if (request.url.path.endsWith('/people') ||
-            request.url.path.endsWith('/birthdays') ||
-            request.url.path.endsWith('/drafts')) {
-          return http.Response(jsonEncode({'documents': []}), 200);
-        }
-        if (request.url.path.endsWith('/reminderSettings')) {
-          return http.Response(
-            jsonEncode({
-              'documents': [
-                {
-                  'name':
-                      'projects/test/databases/(default)/documents/users/uid-test/reminderSettings/default',
-                  'fields': {
-                    'key': {'stringValue': 'default'},
-                    'enabled': {'booleanValue': false},
-                    'kinds': {'stringValue': 'prepare'},
-                    'quietHoursStartMinutes': {'integerValue': '900'},
-                    'quietHoursEndMinutes': {'integerValue': '1020'},
+      final mockClient = MockClient(
+        (outer) => servePublished(outer, (request) async {
+          expect(request.method, 'GET');
+          if (request.url.path.endsWith('/people') ||
+              request.url.path.endsWith('/birthdays') ||
+              request.url.path.endsWith('/drafts')) {
+            return http.Response(jsonEncode({'documents': []}), 200);
+          }
+          if (request.url.path.endsWith('/reminderSettings')) {
+            return http.Response(
+              jsonEncode({
+                'documents': [
+                  {
+                    'name':
+                        'projects/test/databases/(default)/documents/users/uid-test/reminderSettings/default',
+                    'fields': {
+                      'key': {'stringValue': 'default'},
+                      'enabled': {'booleanValue': false},
+                      'kinds': {'stringValue': 'prepare'},
+                      'quietHoursStartMinutes': {'integerValue': '900'},
+                      'quietHoursEndMinutes': {'integerValue': '1020'},
+                    },
                   },
-                },
-              ],
-            }),
-            200,
-          );
-        }
-        return http.Response('Not Found', 404);
-      });
+                ],
+              }),
+              200,
+            );
+          }
+          return http.Response('Not Found', 404);
+        }),
+      );
 
       final service = CloudSyncService(
         db: db,
@@ -624,47 +592,49 @@ void main() {
             ),
           );
 
-      final mockClient = MockClient((request) async {
-        expect(request.method, 'GET');
-        if (request.url.path.endsWith('/people')) {
-          // Cloud copy is NEWER than the local tombstone but still live:
-          // it predates the on-device deletion (no deletedAt field).
-          return http.Response(
-            jsonEncode({
-              'documents': [
-                {
-                  'name':
-                      'projects/t/databases/(default)/documents/users/uid-test/people/p-del',
-                  'fields': {
-                    'id': {'stringValue': 'p-del'},
-                    'name': {'stringValue': 'Deleted Locally'},
-                    'relationship': {'stringValue': 'Friend'},
-                    'relationshipCloseness': {'stringValue': 'close'},
-                    'preferredLanguage': {'stringValue': 'en'},
-                    'preferredTone': {'stringValue': 'warm'},
-                    'importantFacts': {'stringValue': ''},
-                    'preferredDeliveryChannel': {'stringValue': 'whatsapp'},
-                    'autoSendPolicy': {'stringValue': 'manualOnly'},
-                    'createdAt': {
-                      'stringValue': now
-                          .subtract(const Duration(days: 30))
-                          .toIso8601String(),
+      final mockClient = MockClient(
+        (outer) => servePublished(outer, (request) async {
+          expect(request.method, 'GET');
+          if (request.url.path.endsWith('/people')) {
+            // Cloud copy is NEWER than the local tombstone but still live:
+            // it predates the on-device deletion (no deletedAt field).
+            return http.Response(
+              jsonEncode({
+                'documents': [
+                  {
+                    'name':
+                        'projects/t/databases/(default)/documents/users/uid-test/people/p-del',
+                    'fields': {
+                      'id': {'stringValue': 'p-del'},
+                      'name': {'stringValue': 'Deleted Locally'},
+                      'relationship': {'stringValue': 'Friend'},
+                      'relationshipCloseness': {'stringValue': 'close'},
+                      'preferredLanguage': {'stringValue': 'en'},
+                      'preferredTone': {'stringValue': 'warm'},
+                      'importantFacts': {'stringValue': ''},
+                      'preferredDeliveryChannel': {'stringValue': 'whatsapp'},
+                      'autoSendPolicy': {'stringValue': 'manualOnly'},
+                      'createdAt': {
+                        'stringValue': now
+                            .subtract(const Duration(days: 30))
+                            .toIso8601String(),
+                      },
+                      'updatedAt': {
+                        'stringValue': now
+                            .add(const Duration(days: 1))
+                            .toIso8601String(),
+                      },
+                      'version': {'integerValue': '2'},
                     },
-                    'updatedAt': {
-                      'stringValue': now
-                          .add(const Duration(days: 1))
-                          .toIso8601String(),
-                    },
-                    'version': {'integerValue': '2'},
                   },
-                },
-              ],
-            }),
-            200,
-          );
-        }
-        return http.Response(jsonEncode({'documents': []}), 200);
-      });
+                ],
+              }),
+              200,
+            );
+          }
+          return http.Response(jsonEncode({'documents': []}), 200);
+        }),
+      );
 
       final service = CloudSyncService(
         db: db,
@@ -710,18 +680,20 @@ void main() {
 
       final peopleDocs = List.generate(150, (i) => personDoc('restored-$i'));
 
-      final mockClient = MockClient((request) async {
-        expect(request.method, 'GET');
-        if (request.url.path.endsWith('/people')) {
-          return http.Response(jsonEncode({'documents': peopleDocs}), 200);
-        }
-        if (request.url.path.endsWith('/birthdays') ||
-            request.url.path.endsWith('/drafts') ||
-            request.url.path.endsWith('/reminderSettings')) {
-          return http.Response(jsonEncode({'documents': []}), 200);
-        }
-        return http.Response('Not Found', 404);
-      });
+      final mockClient = MockClient(
+        (outer) => servePublished(outer, (request) async {
+          expect(request.method, 'GET');
+          if (request.url.path.endsWith('/people')) {
+            return http.Response(jsonEncode({'documents': peopleDocs}), 200);
+          }
+          if (request.url.path.endsWith('/birthdays') ||
+              request.url.path.endsWith('/drafts') ||
+              request.url.path.endsWith('/reminderSettings')) {
+            return http.Response(jsonEncode({'documents': []}), 200);
+          }
+          return http.Response('Not Found', 404);
+        }),
+      );
 
       final service = CloudSyncService(
         db: countedDb,
@@ -762,20 +734,22 @@ void main() {
           },
         };
 
-        final mockClient = MockClient((request) async {
-          if (request.url.path.endsWith('/people')) {
-            return http.Response(
-              jsonEncode({
-                'documents': [personDoc('a'), personDoc('b')],
-              }),
-              200,
-            );
-          }
-          if (request.url.path.endsWith('/birthdays')) {
-            return http.Response('Server Error', 500);
-          }
-          return http.Response(jsonEncode({'documents': []}), 200);
-        });
+        final mockClient = MockClient(
+          (outer) => servePublished(outer, (request) async {
+            if (request.url.path.endsWith('/people')) {
+              return http.Response(
+                jsonEncode({
+                  'documents': [personDoc('a'), personDoc('b')],
+                }),
+                200,
+              );
+            }
+            if (request.url.path.endsWith('/birthdays')) {
+              return http.Response('Server Error', 500);
+            }
+            return http.Response(jsonEncode({'documents': []}), 200);
+          }),
+        );
 
         final service = CloudSyncService(
           db: db,
@@ -870,3 +844,52 @@ const AuthState _signedInAuth = AuthState(
     idToken: 'test-id-token',
   ),
 );
+
+const _publishedGeneration = 'g-test';
+const _snapshotCollections = [
+  'people',
+  'birthdays',
+  'drafts',
+  'reminderSettings',
+];
+
+/// Serves a published backup generation for restore tests. The pointer and
+/// manifest are synthesised, with per-collection counts taken from the
+/// responses [serve] gives for each collection, so each test keeps its own
+/// documents and the restore's count check still runs.
+Future<http.Response> servePublished(
+  http.Request request,
+  Future<http.Response> Function(http.Request request) serve,
+) async {
+  final path = request.url.path;
+  if (path.endsWith('/backup/current')) {
+    return http.Response(
+      jsonEncode({
+        'fields': {
+          'generationId': {'stringValue': _publishedGeneration},
+        },
+      }),
+      200,
+    );
+  }
+  if (path.endsWith('/generations/$_publishedGeneration')) {
+    final fields = <String, dynamic>{
+      'schemaVersion': {'integerValue': '1'},
+    };
+    for (final name in _snapshotCollections) {
+      final served = await serve(
+        http.Request(
+          'GET',
+          request.url.replace(
+            path: '/v1/users/uid-test/generations/$_publishedGeneration/$name',
+          ),
+        ),
+      );
+      final body = jsonDecode(served.body) as Map<String, dynamic>;
+      final documents = (body['documents'] as List?) ?? const [];
+      fields[name] = {'integerValue': '${documents.length}'};
+    }
+    return http.Response(jsonEncode({'fields': fields}), 200);
+  }
+  return serve(request);
+}
