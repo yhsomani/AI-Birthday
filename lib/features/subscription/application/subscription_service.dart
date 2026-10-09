@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/core/security/credential_storage.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
+import 'package:ai_birthday/core/config/firebase_config.dart';
 
 /// State of an in-flight purchase operation.
 enum PurchaseStatus { idle, purchasing, verifying, success, cancelled, error }
@@ -43,8 +44,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     Future<String?> Function()? authTokenProvider,
     Future<String?> Function()? accountBindingProvider,
     DateTime Function()? now,
-    String verificationEndpoint =
-        'https://asia-south1-relateai-birthday-ysoman-a2372.cloudfunctions.net/verifyPurchase',
+    String? verificationEndpoint,
   }) : _store = store,
        _iap = inAppPurchase ?? iap.InAppPurchase.instance,
        _http = httpClient ?? http.Client(),
@@ -52,7 +52,8 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
        _authTokenProvider = authTokenProvider,
        _accountBindingProvider = accountBindingProvider,
        _now = now ?? clock.clock.now,
-       _verificationEndpoint = verificationEndpoint,
+       _verificationEndpoint =
+           verificationEndpoint ?? FirebaseConfig.functionUrl('verifyPurchase'),
        super(initial) {
     _initIapAndRestore();
   }

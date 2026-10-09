@@ -6,6 +6,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/security/credential_storage.dart';
 import '../application/google_auth_gateway.dart';
 import '../domain/google_identity.dart';
+import 'package:ai_birthday/core/config/firebase_config.dart';
 
 /// Production Google Sign-In and Firebase Auth gateway (SSOT §12, FR-001).
 ///
@@ -23,11 +24,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
   }) : _store = store,
        _http = httpClient ?? http.Client(),
        _logger = logger,
-       _firebaseApiKey =
-           firebaseApiKey ??
-           (const String.fromEnvironment('FIREBASE_WEB_API_KEY').isNotEmpty
-               ? const String.fromEnvironment('FIREBASE_WEB_API_KEY')
-               : _defaultFirebaseApiKey);
+       _firebaseApiKey = firebaseApiKey ?? _defaultFirebaseApiKey;
 
   final SecureStoreDriver _store;
   final http.Client _http;
@@ -35,15 +32,13 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
   final String _firebaseApiKey;
   bool _initialized = false;
 
-  static const String _serverClientId =
-      '492062763032-r83kp8a1ksanfi3k8dvhh5n42c9jpohj.apps.googleusercontent.com';
+  static const String _serverClientId = FirebaseConfig.webClientId;
 
   /// Firebase web API key of the shipped project. This is a public identifier,
   /// not a secret: the same value ships in `google-services.json` and in every
   /// installed binary. It only names the project; requests still need a token.
   /// `--dart-define=FIREBASE_WEB_API_KEY=...` overrides it when needed.
-  static const String _defaultFirebaseApiKey =
-      'AIzaSyAhV3scPZPa_KBygWgg-57zkZL2QFf8HS4';
+  static const String _defaultFirebaseApiKey = FirebaseConfig.webApiKey;
 
   static const String _keySubject = 'auth_session_subject';
   static const String _keyEmail = 'auth_session_email';

@@ -10,6 +10,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/security/credential_storage.dart';
 import '../../auth/domain/auth_state.dart';
 import '../../auth/domain/google_identity.dart';
+import 'package:ai_birthday/core/config/firebase_config.dart';
 
 class CloudSyncResult {
   const CloudSyncResult({
@@ -63,13 +64,12 @@ class CloudSyncService {
   final String _apiKey;
   final Future<String?> Function()? _freshIdToken;
 
-  static const String _projectId = 'relateai-birthday-ysoman-a2372';
+  static const String _projectId = FirebaseConfig.projectId;
 
   /// Firebase web API key of the shipped project. Public identifier (it also
   /// ships in `google-services.json`), so release builds work without a
   /// `--dart-define`; the request still needs a signed-in user's ID token.
-  static const String _defaultFirebaseApiKey =
-      'AIzaSyAhV3scPZPa_KBygWgg-57zkZL2QFf8HS4';
+  static const String _defaultFirebaseApiKey = FirebaseConfig.webApiKey;
 
   static const String _lastSyncPrefix = 'cloud_last_sync_timestamp_';
 
