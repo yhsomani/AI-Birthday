@@ -8,7 +8,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -24,6 +23,7 @@ import 'package:ai_birthday/features/reminders/application/reminder_providers.da
 import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
 import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
 import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
+import 'package:ai_birthday/features/settings/presentation/widgets/cloud_backup_card.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
@@ -626,133 +626,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           // Section 1.5: Cloud Backup (SSOT §13)
           AppSectionHeader(title: 'Cloud Backup', isAccent: true),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.cloud_upload_outlined,
-                        color: context.colors.success,
-                      ),
-                      const SizedBox(width: 8),
-                      // Expanded so the title wraps instead of overflowing at
-                      // large text scales (audit 05 P2-3 sibling).
-                      const Expanded(
-                        child: Text(
-                          'Cloud Backup (Firestore)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      if (_lastSyncTime != null) ...[
-                        const SizedBox(width: 8),
-                        Chip(
-                          label: Text(
-                            'LAST SUCCESSFUL',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: context.colors.success,
-                            ),
-                          ),
-                          backgroundColor: context.colors.success.withValues(
-                            alpha: 0.12,
-                          ),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _lastSyncTime != null
-                        ? 'Last backed up: ${DateFormat.yMMMd().add_jm().format(_lastSyncTime!)}'
-                        : 'Save a recoverable copy of your birthdays and contacts to your signed-in cloud account.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.colors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Privacy note: Cloud backup uploads your saved people, birthdays, message drafts, reminder settings, and related contact and personalization fields to this app\'s Firestore project under your signed-in account.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: context.colors.textSecondary,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Full width, so a wrapped second button right-aligns to the
-                  // card edge instead of the first button's width (device fix).
-                  SizedBox(
-                    width: double.infinity,
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      alignment: WrapAlignment.end,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: _isSyncing ? null : _handleCloudRestore,
-                          icon: const Icon(
-                            Icons.cloud_download_outlined,
-                            size: 18,
-                          ),
-                          label: const Text('Restore from Cloud'),
-                        ),
-                        FilledButton.tonalIcon(
-                          onPressed: _isSyncing ? null : _handleCloudSync,
-                          icon: _isSyncing
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.cloud_upload, size: 18),
-                          label: Text(
-                            _isSyncing ? 'Backing up...' : 'Back Up Now',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Durable failure status: the job row remembers that the
-                  // last backup/restore failed, even after this screen was
-                  // closed and reopened. Tapping the button again retries.
-                  if (_cloudError != null) ...[
-                    const SizedBox(height: 10),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 16,
-                          color: context.colors.danger,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '$_cloudError Tap "Back Up Now" (or "Restore from Cloud") to retry.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.colors.danger,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
+          CloudBackupCard(
+            lastSyncTime: _lastSyncTime,
+            cloudError: _cloudError,
+            isSyncing: _isSyncing,
+            onBackup: _handleCloudSync,
+            onRestore: _handleCloudRestore,
           ),
           const SizedBox(height: 20),
 
