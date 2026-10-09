@@ -136,7 +136,16 @@ test('deletion and privacy copy state the irreducible boundaries', () => {
     /no advertising, analytics, session replay, or non-essential cookies/iu,
   );
   assert.match(privacy, /400 days/iu);
-  assert.match(privacy, /never stores raw contacts/iu);
+  // Optional cloud backup writes People, birthdays, drafts and reminder settings
+  // directly to Firestore, so the notice must not claim the opposite.
+  assert.match(privacy, /Cloud backup is optional/iu);
+  assert.match(privacy, /users\/\{your account\}/iu);
+  assert.doesNotMatch(privacy, /Firestore never/iu);
+  assert.doesNotMatch(privacy, /no direct Firestore access/iu);
+  for (const generated of [read('public/privacy/index.html')]) {
+    assert.match(generated, /Cloud backup is optional/iu);
+    assert.doesNotMatch(generated, /Firestore never/iu);
+  }
   assert.match(privacy, /temporary session storage/iu);
 });
 
