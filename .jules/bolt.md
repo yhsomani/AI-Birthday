@@ -35,3 +35,7 @@
 ## 2024-05-18 - Remove replaceAll string manipulations in hot paths
 **Learning:** Using `replaceAll` on strings inside frequently called functions like a logger adds significant hidden overhead (e.g., O(N) allocation x2 per log parameter). Pre-compiling a slightly more complex regular expression to account for punctuation is much faster (~2x) in high-volume logging pathways.
 **Action:** When performing string sanitization or checks in hot code paths, use robust RegExp patterns instead of chaining string manipulation functions.
+
+## 2024-10-25 - Push String Case Sorting to Database Layer
+**Learning:** Sorting database entity lists inside Dart using `a.name.toLowerCase().compareTo(b.name.toLowerCase())` is an anti-pattern. This causes excessive O(N log N) string allocations inside a UI/watch stream.
+**Action:** Optimize by pushing the sorting workload directly into the database query via `orderBy` with `LOWER(field)` (e.g., `OrderingTerm.asc(CustomExpression<String>('LOWER(name)'))`), offloading string instantiation to the C-layer and leveraging SQL efficiency.
