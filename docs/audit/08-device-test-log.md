@@ -23,6 +23,15 @@ Physical phone: not attached, so not tested. Gemini API key: not entered and not
 1. **Cancel label wraps and clips** on the Add birthday app bar. Cause: the leading slot is about 56dp wide. Fix: `leadingWidth: 96` in `person_form_screen.dart`.
 2. **Duplicate on the dashboard.** A birthday needing action appeared in both Action Needed and Today's Birthdays. Fix: Today's list excludes items already under Action Needed (`dashboard_screen.dart`).
 
+## Tabs checked on the emulator
+
+| Tab | Result |
+|---|---|
+| People | Lists Asha Test with date and Today badge. Subtitle shows "Other" while the closeness is Casual (open, see below). |
+| Calendar | Month renders with a marker on the birthday day. |
+| History | Shows the saved draft with Copy and Studio actions. |
+| Settings | Cloud backup buttons misaligned (fixed: full-width Wrap, verified after rebuild). |
+
 ## Observed, not yet fixed
 
 - A contact with no relationship text shows "Other" on the card, while the closeness control shows Casual. The labels disagree.
@@ -30,8 +39,8 @@ Physical phone: not attached, so not tested. Gemini API key: not entered and not
 
 ## Not yet tested on the device
 
-- People, Calendar, History and Settings tabs.
 - Entering the Gemini key in Settings and generating a draft (AI).
+- Settings sign-in and the subscription purchase flow (needs a Google account and Play).
 - Handoff to WhatsApp and the confirmation dialog.
 - Reminder scheduling and reboot recovery (needs a reboot and an alarm firing).
 

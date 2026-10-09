@@ -689,35 +689,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.end,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _isSyncing ? null : _handleCloudRestore,
-                        icon: const Icon(
-                          Icons.cloud_download_outlined,
-                          size: 18,
+                  // Full width, so a wrapped second button right-aligns to the
+                  // card edge instead of the first button's width (device fix).
+                  SizedBox(
+                    width: double.infinity,
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.end,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _isSyncing ? null : _handleCloudRestore,
+                          icon: const Icon(
+                            Icons.cloud_download_outlined,
+                            size: 18,
+                          ),
+                          label: const Text('Restore from Cloud'),
                         ),
-                        label: const Text('Restore from Cloud'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: _isSyncing ? null : _handleCloudSync,
-                        icon: _isSyncing
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.cloud_upload, size: 18),
-                        label: Text(
-                          _isSyncing ? 'Backing up...' : 'Back Up Now',
+                        FilledButton.tonalIcon(
+                          onPressed: _isSyncing ? null : _handleCloudSync,
+                          icon: _isSyncing
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.cloud_upload, size: 18),
+                          label: Text(
+                            _isSyncing ? 'Backing up...' : 'Back Up Now',
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   // Durable failure status: the job row remembers that the
                   // last backup/restore failed, even after this screen was
