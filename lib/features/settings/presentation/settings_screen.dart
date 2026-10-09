@@ -608,6 +608,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  /// On-device section is only shown when Gemini Nano can run or be set up here.
+  bool get _nanoSupported =>
+      _nanoState == NanoState.available ||
+      _nanoState == NanoState.downloadable ||
+      _nanoState == NanoState.downloading;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -622,364 +628,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // Section 1: Account
           AppSectionHeader(title: 'Account', isAccent: true),
           Card(child: const _AuthTile()),
-          const SizedBox(height: 20),
-
-          // Section 1.5: Cloud Backup (SSOT §13)
-          AppSectionHeader(title: 'Cloud Backup', isAccent: true),
-          CloudBackupCard(
-            lastSyncTime: _lastSyncTime,
-            cloudError: _cloudError,
-            isSyncing: _isSyncing,
-            onBackup: _handleCloudSync,
-            onRestore: _handleCloudRestore,
-          ),
-          const SizedBox(height: 20),
-
-          // Section 2: Subscription & Entitlement (SSOT §11)
-          AppSectionHeader(title: 'Subscription & Entitlement', isAccent: true),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        entitlement.canUseAi
-                            ? Icons.verified
-                            : Icons.lock_outline,
-                        color: entitlement.canUseAi
-                            ? context.colors.warning
-                            : context.colors.textSecondary,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        entitlement.status.displayName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const Spacer(),
-                      Chip(
-                        label: Text(
-                          entitlement.canUseAi ? 'UNLOCKED' : 'FREE TIER',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: entitlement.canUseAi
-                                ? AppTone.success.label(context.colors)
-                                : AppTone.neutral.label(context.colors),
-                          ),
-                        ),
-                        backgroundColor: entitlement.canUseAi
-                            ? AppTone.success.fill(context.colors)
-                            : AppTone.neutral.fill(context.colors),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    entitlement.canUseAi
-                        ? 'Full AI draft generation, rewrite variations, and personalized message studio are active.'
-                        : 'Application AI features require an active subscription entitlement. Birthday tracking and manual drafting remain free forever.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: context.colors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (!entitlement.canUseAi) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _isPurchasing ? null : _handlePurchasePro,
-                        icon: _isPurchasing
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.star_outline),
-                        label: Text(
-                          _isPurchasing
-                              ? 'Verifying Purchase...'
-                              : 'Upgrade to Pro (\$2.99/mo)',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  if (!entitlement.canUseAi &&
-                      ref
-                          .read(subscriptionNotifierProvider.notifier)
-                          .hasPendingVerification) ...[
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 16,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Purchase verification failed. Tap “Restore Purchases” to try again.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.colors.textSecondary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: _handleRestorePurchases,
-                        child: const Text('Restore Purchases'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Section 3: AI Provider & Personal Gemini API Key (SSOT §5, §20)
-          AppSectionHeader(title: 'AI provider', isAccent: true),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.key,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Personal Gemini API Key',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const Spacer(),
-                      _buildKeyStatusBadge(),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Don\'t have an API key? Get one from Google AI Studio to unlock personalized AI message drafting.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: context.colors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton.tonalIcon(
-                        onPressed: () => _launchExternalUrl(_geminiApiKeyUrl),
-                        icon: const Icon(Icons.open_in_new, size: 16),
-                        label: const Text('Get Gemini API key ↗'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => _showGeminiSetupGuide(context),
-                        icon: const Icon(Icons.help_outline, size: 16),
-                        label: const Text('How to connect'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _apiKeyController,
-                    obscureText: _obscureKey,
-                    onChanged: (_) {
-                      if (_connectionResult != null) {
-                        setState(() => _connectionResult = null);
-                      }
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Paste your Gemini API key',
-                      hintText: 'AIzaSy...',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureKey ? Icons.visibility : Icons.visibility_off,
-                        ),
-                        tooltip: _obscureKey ? 'Show API key' : 'Hide API key',
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          setState(() => _obscureKey = !_obscureKey);
-                        },
-                      ),
-                    ),
-                  ),
-                  if (_connectionResult != null) ...[
-                    const SizedBox(height: 12),
-                    _buildConnectionResultBanner(_connectionResult!),
-                  ],
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.end,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      if (_hasKey)
-                        TextButton(
-                          onPressed: () {
-                            _apiKeyController.clear();
-                            _removeKey();
-                          },
-                          child: Text(
-                            'Remove Key',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                        ),
-                      OutlinedButton(
-                        onPressed: _saveKey,
-                        child: const Text('Save Key'),
-                      ),
-                      FilledButton.icon(
-                        onPressed: _isTestingKey ? null : _testConnection,
-                        icon: _isTestingKey
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.bolt, size: 18),
-                        label: Text(
-                          _isTestingKey ? 'Testing...' : 'Test Connection',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('🔒 ', style: TextStyle(fontSize: 13)),
-                      Expanded(
-                        child: Text(
-                          'Stored securely on this device in hardware-backed encrypted storage. Sent directly to Google Gemini API only when generating messages, and never to AI-Birthday servers. Never included in sync or application logs.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Semantics(
-                    link: true,
-                    child: InkWell(
-                      onTap: () => _launchExternalUrl(_geminiBillingUrl),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(minHeight: 48),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.open_in_new,
-                                size: 14,
-                                color: theme.colorScheme.primary,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Gemini API billing, quotas & free limits ↗',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: theme.colorScheme.primary,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Section 4: On-Device AI / Gemini Nano (SSOT §5, §25)
-          AppSectionHeader(title: 'On-Device Intelligence', isAccent: true),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: Icon(Icons.memory, color: context.colors.success),
-                  title: const Text('Gemini Nano (AICore)'),
-                  subtitle: Text(switch (_nanoState) {
-                    NanoState.available =>
-                      'Ready on device for offline generation.',
-                    NanoState.downloadable =>
-                      'Model available for download on this device.',
-                    NanoState.downloading => 'Downloading on-device model...',
-                    _ =>
-                      'Not available on this device hardware (requires Google AICore on Android 14+).',
-                  }),
-                  trailing: Chip(
-                    label: Text(
-                      _nanoState == NanoState.available
-                          ? 'AVAILABLE'
-                          : 'NOT AVAILABLE',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: _nanoState == NanoState.available
-                            ? context.colors.success
-                            : context.colors.textSecondary,
-                      ),
-                    ),
-                    backgroundColor: _nanoState == NanoState.available
-                        ? context.colors.success.withValues(alpha: 0.12)
-                        : Colors.grey.withValues(alpha: 0.12),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                  child: Text(
-                    'AI provider: your active AI-Birthday Pro access is required. When available, AI-Birthday uses your saved Gemini key; otherwise supported Android devices can use Gemini Nano on-device.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.colors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 20),
 
           // Section 5: Reminders & Quiet Hours (SSOT §17)
@@ -1116,6 +764,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       .hasExactAlarmPermission(),
                   builder: (context, snapshot) {
                     final exactReady = snapshot.data != false;
+                    // Only surface the row when reminders are on and Android is
+                    // blocking precise alarms; a healthy state needs no row.
+                    if (exactReady || !reminderSettings.enabled) {
+                      return const SizedBox.shrink();
+                    }
                     return ListTile(
                       leading: Icon(
                         exactReady
@@ -1200,6 +853,359 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 20),
+
+          // Section 1.5: Cloud Backup (SSOT §13)
+          AppSectionHeader(title: 'Cloud Backup', isAccent: true),
+          CloudBackupCard(
+            lastSyncTime: _lastSyncTime,
+            cloudError: _cloudError,
+            isSyncing: _isSyncing,
+            onBackup: _handleCloudSync,
+            onRestore: _handleCloudRestore,
+          ),
+          const SizedBox(height: 20),
+
+          // Section 2: Subscription & Entitlement (SSOT §11)
+          AppSectionHeader(title: 'Subscription & Entitlement', isAccent: true),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        entitlement.canUseAi
+                            ? Icons.verified
+                            : Icons.lock_outline,
+                        color: entitlement.canUseAi
+                            ? context.colors.warning
+                            : context.colors.textSecondary,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        entitlement.status.displayName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    entitlement.canUseAi
+                        ? 'Full AI draft generation, rewrite variations, and personalized message studio are active.'
+                        : 'Application AI features require an active subscription entitlement. Birthday tracking and manual drafting remain free forever.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.colors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (!entitlement.canUseAi) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _isPurchasing ? null : _handlePurchasePro,
+                        icon: _isPurchasing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.star_outline),
+                        label: Text(
+                          _isPurchasing
+                              ? 'Verifying Purchase...'
+                              : 'Upgrade to Pro (\$2.99/mo)',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (!entitlement.canUseAi &&
+                      ref
+                          .read(subscriptionNotifierProvider.notifier)
+                          .hasPendingVerification) ...[
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Purchase verification failed. Tap “Restore Purchases” to try again.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.colors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: _handleRestorePurchases,
+                        child: const Text('Restore Purchases'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Section 3: AI Provider & Personal Gemini API Key (SSOT §5, §20)
+          AppSectionHeader(title: 'AI provider', isAccent: true),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: ExpansionTile(
+              initiallyExpanded: !_hasKey,
+              leading: Icon(
+                Icons.key,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: const Text('Gemini API key'),
+              subtitle: Text(
+                _hasKey
+                    ? 'Saved on this device'
+                    : 'Add a key to unlock personalized AI drafts',
+              ),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              expandedCrossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.key,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Personal Gemini API Key',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const Spacer(),
+                    _buildKeyStatusBadge(),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Don\'t have an API key? Get one from Google AI Studio to unlock personalized AI message drafting.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: context.colors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.tonalIcon(
+                      onPressed: () => _launchExternalUrl(_geminiApiKeyUrl),
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: const Text('Get Gemini API key ↗'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _showGeminiSetupGuide(context),
+                      icon: const Icon(Icons.help_outline, size: 16),
+                      label: const Text('How to connect'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _apiKeyController,
+                  obscureText: _obscureKey,
+                  onChanged: (_) {
+                    if (_connectionResult != null) {
+                      setState(() => _connectionResult = null);
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Paste your Gemini API key',
+                    hintText: 'AIzaSy...',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureKey ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      tooltip: _obscureKey ? 'Show API key' : 'Hide API key',
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        setState(() => _obscureKey = !_obscureKey);
+                      },
+                    ),
+                  ),
+                ),
+                if (_connectionResult != null) ...[
+                  const SizedBox(height: 12),
+                  _buildConnectionResultBanner(_connectionResult!),
+                ],
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (_hasKey)
+                      TextButton(
+                        onPressed: () {
+                          _apiKeyController.clear();
+                          _removeKey();
+                        },
+                        child: Text(
+                          'Remove Key',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    OutlinedButton(
+                      onPressed: _saveKey,
+                      child: const Text('Save Key'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: _isTestingKey ? null : _testConnection,
+                      icon: _isTestingKey
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.bolt, size: 18),
+                      label: Text(
+                        _isTestingKey ? 'Testing...' : 'Test Connection',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('🔒 ', style: TextStyle(fontSize: 13)),
+                    Expanded(
+                      child: Text(
+                        'Stored securely on this device in hardware-backed encrypted storage. Sent directly to Google Gemini API only when generating messages, and never to AI-Birthday servers. Never included in sync or application logs.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Semantics(
+                  link: true,
+                  child: InkWell(
+                    onTap: () => _launchExternalUrl(_geminiBillingUrl),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.open_in_new,
+                              size: 14,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Gemini API billing, quotas & free limits ↗',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.primary,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Section 4: On-Device AI / Gemini Nano (SSOT §5, §25)
+          if (_nanoSupported) ...[
+            AppSectionHeader(title: 'On-Device Intelligence', isAccent: true),
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: Icon(Icons.memory, color: context.colors.success),
+                    title: const Text('Gemini Nano (AICore)'),
+                    subtitle: Text(switch (_nanoState) {
+                      NanoState.available =>
+                        'Ready on device for offline generation.',
+                      NanoState.downloadable =>
+                        'Model available for download on this device.',
+                      NanoState.downloading => 'Downloading on-device model...',
+                      _ =>
+                        'Not available on this device hardware (requires Google AICore on Android 14+).',
+                    }),
+                    trailing: Chip(
+                      label: Text(
+                        _nanoState == NanoState.available
+                            ? 'AVAILABLE'
+                            : 'NOT AVAILABLE',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _nanoState == NanoState.available
+                              ? context.colors.success
+                              : context.colors.textSecondary,
+                        ),
+                      ),
+                      backgroundColor: _nanoState == NanoState.available
+                          ? context.colors.success.withValues(alpha: 0.12)
+                          : Colors.grey.withValues(alpha: 0.12),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                    child: Text(
+                      'AI provider: your active AI-Birthday Pro access is required. When available, AI-Birthday uses your saved Gemini key; otherwise supported Android devices can use Gemini Nano on-device.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
 
           // Section 6: Help & Guide
           AppSectionHeader(title: 'Help & Guide', isAccent: true),

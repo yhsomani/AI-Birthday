@@ -102,7 +102,9 @@ void main() {
         find.text('Gemini API billing, quotas & free limits ↗'),
         findsOneWidget,
       );
-      expect(find.text('Gemini Nano (AICore)'), findsOneWidget);
+      // Unsupported devices hide the on-device section rather than showing a
+      // "NOT AVAILABLE" row nobody can act on.
+      expect(find.text('Gemini Nano (AICore)'), findsNothing);
     },
   );
 
