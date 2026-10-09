@@ -32,19 +32,22 @@ void main() {
       await db.close();
     });
 
-    test('deletePerson tombstones the row and bumps the sync version', () async {
-      await repo.savePerson(person(version: 3));
+    test(
+      'deletePerson tombstones the row and bumps the sync version',
+      () async {
+        await repo.savePerson(person(version: 3));
 
-      await repo.deletePerson('p');
+        await repo.deletePerson('p');
 
-      final rows = await db.select(db.persons).get();
-      expect(rows, hasLength(1));
-      expect(rows.single.deletedAt, isNotNull);
-      expect(rows.single.version, 4);
-      // Tombstoned rows must no longer surface through the repository API.
-      expect(await repo.getPeople(), isEmpty);
-      expect(await repo.getPerson('p'), isNull);
-    });
+        final rows = await db.select(db.persons).get();
+        expect(rows, hasLength(1));
+        expect(rows.single.deletedAt, isNotNull);
+        expect(rows.single.version, 4);
+        // Tombstoned rows must no longer surface through the repository API.
+        expect(await repo.getPeople(), isEmpty);
+        expect(await repo.getPerson('p'), isNull);
+      },
+    );
 
     test('savePerson never resurrects a tombstoned row', () async {
       await repo.savePerson(person());
@@ -54,9 +57,9 @@ void main() {
       // deletedAt back to null (audit F-1).
       await repo.savePerson(person());
 
-      final row = await (db.select(db.persons)
-            ..where((r) => r.id.equals('p')))
-          .getSingle();
+      final row = await (db.select(
+        db.persons,
+      )..where((r) => r.id.equals('p'))).getSingle();
       expect(row.deletedAt, isNotNull);
     });
   });
