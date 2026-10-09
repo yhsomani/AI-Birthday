@@ -36,24 +36,14 @@ class HistoryScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('History & Activity')),
       body: draftsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'We could not load your activity right now. Your saved messages have not been deleted.',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                TextButton.icon(
-                  onPressed: () => ref.invalidate(draftsStreamProvider),
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Try again'),
-                ),
-              ],
-            ),
+        error: (_, _) => EmptyState(
+          icon: Icons.cloud_off_outlined,
+          title: 'Could not load activity',
+          message: 'Your saved messages have not been deleted.',
+          action: TextButton.icon(
+            onPressed: () => ref.invalidate(draftsStreamProvider),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try again'),
           ),
         ),
         data: (drafts) {

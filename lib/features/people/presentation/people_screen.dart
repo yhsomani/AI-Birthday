@@ -847,13 +847,14 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'We could not load your contacts right now. Your saved birthdays have not been deleted. Try again later.',
-              textAlign: TextAlign.center,
-            ),
+        error: (_, _) => EmptyState(
+          icon: Icons.cloud_off_outlined,
+          title: 'Could not load contacts',
+          message: 'Your saved birthdays have not been deleted.',
+          action: TextButton.icon(
+            onPressed: () => ref.invalidate(peopleStreamProvider),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try again'),
           ),
         ),
       ),

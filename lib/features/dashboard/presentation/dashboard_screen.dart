@@ -62,14 +62,15 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                error: (err, stack) => const SliverFillRemaining(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'Could not load your contacts. Your birthday data is safe; retry from People.',
-                        textAlign: TextAlign.center,
-                      ),
+                error: (err, stack) => SliverFillRemaining(
+                  child: EmptyState(
+                    icon: Icons.cloud_off_outlined,
+                    title: 'Could not load contacts',
+                    message: 'Your birthday data is safe.',
+                    action: TextButton.icon(
+                      onPressed: () => ref.invalidate(peopleStreamProvider),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Try again'),
                     ),
                   ),
                 ),
@@ -215,14 +216,15 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            error: (err, _) => const SliverFillRemaining(
-              child: Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text(
-                    'We could not load your birthdays right now. Your saved data has not been deleted. Try again from the dashboard.',
-                    textAlign: TextAlign.center,
-                  ),
+            error: (err, _) => SliverFillRemaining(
+              child: EmptyState(
+                icon: Icons.cloud_off_outlined,
+                title: 'Could not load birthdays',
+                message: 'Your saved data has not been deleted.',
+                action: TextButton.icon(
+                  onPressed: () => ref.invalidate(birthdaysStreamProvider),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Try again'),
                 ),
               ),
             ),

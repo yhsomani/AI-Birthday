@@ -113,8 +113,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       appBar: AppBar(title: const Text('Calendar')),
       body: peopleAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) =>
-            const Center(child: Text('Could not load birthdays.')),
+        error: (error, stackTrace) => EmptyState(
+          icon: Icons.cloud_off_outlined,
+          title: 'Could not load birthdays',
+          message: 'Your saved birthdays have not been deleted.',
+          action: TextButton.icon(
+            onPressed: () => ref.invalidate(personListProvider),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try again'),
+          ),
+        ),
         data: (people) {
           if (people.isEmpty) {
             return EmptyState(
