@@ -42,11 +42,16 @@ class CloudSyncJobHandler implements JobHandler {
   CloudSyncJobHandler({
     required CloudSyncService service,
     required Future<AuthState> Function() authState,
+    this.onRestored,
   }) : _service = service,
        _authState = authState;
 
   final CloudSyncService _service;
   final Future<AuthState> Function() _authState;
+
+  /// Runs after a restore succeeds. A restore writes local rows directly, so
+  /// reminders and the settings controller must be re-planned from them (F12).
+  final Future<void> Function()? onRestored;
 
   @override
   Future<JobOutcome> run(JobRecord job) async {
@@ -75,6 +80,9 @@ class CloudSyncJobHandler implements JobHandler {
         : await _service.sync(auth);
 
     if (result.success) {
+      if (payload.operation == CloudJobPayload.restore) {
+        await onRestored?.call();
+      }
       return JobSucceeded(result.timestamp.toIso8601String());
     }
     return JobFailed(

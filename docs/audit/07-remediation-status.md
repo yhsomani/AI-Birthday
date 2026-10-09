@@ -19,6 +19,7 @@ against HEAD. Each finding was re-verified in source before any change.
 | F06 Restore all-or-nothing | **Fixed** (manifest and count check) | Restore reads the `backup/current` pointer and its manifest, checks each collection count against the manifest, and only then applies one local transaction. Test: an incomplete download writes nothing. Still open: malformed records are skipped while success is reported. |
 | F21 Recipient name in Android log | **Fixed** | `BirthdayNotificationReceiver.kt` no longer logs the notification title. |
 | F23 Dart format gate | **Fixed** | `dart format --set-exit-if-changed .` passes. 37 files were reformatted (indentation only, one separate commit recommended). Line endings normalised to LF to match the index. |
+| F12 Import and restore skip reminders | **Fixed** | CSV and device imports already re-plan reminders. A successful cloud restore now invalidates the reminder settings controller and re-plans reminders through `CloudSyncJobHandler.onRestored`. Failed restores do not re-plan. Three handler tests cover backup, restore and failed restore. |
 | F13 Scheduling loses alarms | **Partly fixed** (native) | `MainActivity.kt` checks exact-alarm permission before touching anything, schedules the new plan first, and cancels only alarms the new plan drops. Reminders are no longer cancelled on reschedule, and posted notifications are no longer cleared. APK builds; not run on a device. Open: quiet-hours policy (suppressed reminders are still discarded) and rolling renewal of future occurrences. |
 | F19 CSV round-trip and validation | **Fixed** (import/export core) | Quote-aware record splitting; real month/day validation (April 31 rejected, Feb 29 accepted); formula guard on export, stripped on import. Phone numbers are exempt from the guard. |
 
@@ -37,7 +38,6 @@ These need either a product decision or a larger change. Nothing here has been s
 - F05 remainder — delete superseded generations (storage grows without it).
 - F06 remainder — report malformed records as skipped instead of silently ignoring them.
 - F07, F08, F09, F10 — account partitioning, immutable birthday occurrences, midnight refresh, one Person model.
-- F12 — import/restore reminder refresh.
 - F13 remainder — quiet-hours policy and rolling renewal (product decisions); on-device verification.
 - F15 — purchase binding against Play.
 - F14 remainder — request deadlines, a single controlled retry, and disposal of the owned HTTP client.
@@ -59,7 +59,7 @@ These need either a product decision or a larger change. Nothing here has been s
 | `backend/functions`: Firestore emulator tests | Pass (20 tests: control plane and rules). Needs the JDK on PATH; it is installed at C:/Program Files/Java/jdk-26.0.2.1 but not on the system PATH. Run `npx firebase emulators:exec --only firestore "npx vitest run emulator"` after adding its bin folder to PATH. |
 | `backend/hosting`: `node --test` | Pass (12 tests) |
 | `flutter analyze` | No issues (re-run after formatting) |
-| `flutter test` (full suite) | Pass (378 tests, after the snapshot backup change) |
+| `flutter test` (full suite) | Pass (381 tests, after the F12 change) |
 | `dart format --set-exit-if-changed .` (CI gate) | Pass |
 | `flutter build apk --debug` | Pass (re-run after the F21 logging change) |
 | Reboot recovery on a device or emulator (schedule → reboot → notification) | Not run |

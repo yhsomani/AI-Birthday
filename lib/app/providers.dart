@@ -16,6 +16,8 @@ import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dar
 import 'package:ai_birthday/features/delivery/domain/repositories/delivery_events_repository.dart';
 import 'package:ai_birthday/features/people/data/contact_csv_service.dart';
 import 'package:ai_birthday/features/people/data/device_contacts_service.dart';
+import 'package:ai_birthday/features/people/data/person_providers.dart';
+import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
@@ -226,6 +228,12 @@ final cloudJobHandlerProvider = Provider<JobHandler>((ref) {
   return CloudSyncJobHandler(
     service: ref.read(cloudSyncServiceProvider),
     authState: () => ref.read(authControllerProvider.future),
+    // Re-plan reminders after a restore: restored contacts and birthdays are
+    // written directly to the database (audit F12).
+    onRestored: () async {
+      ref.invalidate(reminderSettingsProvider);
+      await resyncReminderSchedule(ref.container);
+    },
   );
 });
 

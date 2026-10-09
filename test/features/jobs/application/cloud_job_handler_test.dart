@@ -168,6 +168,45 @@ void main() {
     expect(service.backupCalls, 0);
   });
 
+  CloudSyncJobHandler handlerWithReplan(void Function() onReplan) {
+    return CloudSyncJobHandler(
+      service: service,
+      authState: () async =>
+          const AuthState(status: AuthStatus.signedIn, identity: _identity),
+      onRestored: () async => onReplan(),
+    );
+  }
+
+  test('a successful restore re-plans reminders (F12)', () async {
+    var replans = 0;
+    await handlerWithReplan(
+      () => replans++,
+    ).run(await claimedJob(operation: CloudJobPayload.restore));
+    expect(replans, 1);
+  });
+
+  test('a backup does not re-plan reminders (F12)', () async {
+    var replans = 0;
+    await handlerWithReplan(
+      () => replans++,
+    ).run(await claimedJob(operation: CloudJobPayload.backup));
+    expect(replans, 0, reason: 'a backup does not change local rows');
+  });
+
+  test('a failed restore does not re-plan reminders (F12)', () async {
+    service.restoreResult = CloudSyncResult(
+      success: false,
+      error: 'Cloud backup is not configured in this build.',
+      errorCode: 'config',
+      timestamp: DateTime.now(),
+    );
+    var replans = 0;
+    await handlerWithReplan(
+      () => replans++,
+    ).run(await claimedJob(operation: CloudJobPayload.restore));
+    expect(replans, 0, reason: 'a failed restore changed nothing to re-plan');
+  });
+
   test(
     'transient failures map to retryable JobFailed with their code',
     () async {
