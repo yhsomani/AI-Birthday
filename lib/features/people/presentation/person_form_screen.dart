@@ -372,6 +372,9 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(title),
+          // The default leading slot is too narrow for a labelled button, which
+          // wrapped "Cancel" onto two clipped lines on device.
+          leadingWidth: 96,
           leading: TextButton(
             // Explicit labeled cancel: the default back affordance would hide
             // the abandon action and silently drop edits. maybePop routes

@@ -104,6 +104,12 @@ class DashboardScreen extends ConsumerWidget {
                     }
                   }
 
+                  // A person who needs action appears once, under Action Needed,
+                  // not again in Today's Birthdays (dashboard duplicate fix).
+                  final celebrateToday = todayBirthdays
+                      .where((b) => !actionNeededBirthdays.contains(b))
+                      .toList();
+
                   return SliverPadding(
                     padding: const EdgeInsets.fromLTRB(
                       16,
@@ -138,14 +144,14 @@ class DashboardScreen extends ConsumerWidget {
                         ],
 
                         // 3. Today's Celebrations Section
-                        if (todayBirthdays.isNotEmpty) ...[
+                        if (celebrateToday.isNotEmpty) ...[
                           AppSectionHeader(
                             title: "Today's Birthdays",
-                            count: todayBirthdays.length,
+                            count: celebrateToday.length,
                             isAccent: true,
                           ),
                           const SizedBox(height: AppSpacing.xs),
-                          ...todayBirthdays.map((b) {
+                          ...celebrateToday.map((b) {
                             final person = peopleMap[b.personId];
                             return _buildCelebrationCard(
                               context,
