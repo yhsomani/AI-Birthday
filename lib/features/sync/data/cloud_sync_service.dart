@@ -9,6 +9,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/security/credential_storage.dart';
 import '../../auth/domain/auth_state.dart';
+import '../../auth/domain/google_identity.dart';
 
 class CloudSyncResult {
   const CloudSyncResult({
@@ -43,10 +44,12 @@ class CloudSyncService {
     http.Client? httpClient,
     AppLogger? logger,
     String? apiKey,
+    Future<String?> Function()? freshIdToken,
   }) : _db = db,
        _store = store,
        _http = httpClient ?? http.Client(),
        _logger = logger,
+       _freshIdToken = freshIdToken,
        _apiKey =
            apiKey ??
            (const String.fromEnvironment('FIREBASE_WEB_API_KEY').isNotEmpty
@@ -58,6 +61,7 @@ class CloudSyncService {
   final http.Client _http;
   final AppLogger? _logger;
   final String _apiKey;
+  final Future<String?> Function()? _freshIdToken;
 
   static const String _projectId = 'relateai-birthday-ysomani';
 
@@ -100,6 +104,30 @@ class CloudSyncService {
   ) {
     if (boundary == null) return rows;
     return rows.where((row) => !changedAt(row).isBefore(boundary)).toList();
+  }
+
+  /// Returns [authState] with a freshly refreshed ID token when a provider is
+  /// configured. A failed or empty refresh keeps the stored state, so the
+  /// request still goes out and the server reports any real rejection (F14).
+  Future<AuthState> _withFreshIdToken(AuthState authState) async {
+    final provider = _freshIdToken;
+    final identity = authState.identity;
+    if (provider == null || identity == null || !authState.isSignedIn) {
+      return authState;
+    }
+    final token = await provider();
+    if (token == null || token.isEmpty) return authState;
+    return AuthState(
+      status: authState.status,
+      identity: GoogleIdentity(
+        googleSubject: identity.googleSubject,
+        email: identity.email,
+        displayName: identity.displayName,
+        photoUrl: identity.photoUrl,
+        firebaseUid: identity.firebaseUid,
+        idToken: token,
+      ),
+    );
   }
 
   String? _authenticatedUid(AuthState authState) {
@@ -194,7 +222,8 @@ class CloudSyncService {
   Map<String, dynamic> _personFields(Person p) => {
     'id': _firestoreString(p.id),
     'name': _firestoreString(p.name),
-    if (p.birthdayMonth != null) 'birthdayMonth': _firestoreInt(p.birthdayMonth!),
+    if (p.birthdayMonth != null)
+      'birthdayMonth': _firestoreInt(p.birthdayMonth!),
     if (p.birthdayDay != null) 'birthdayDay': _firestoreInt(p.birthdayDay!),
     if (p.birthYear != null) 'birthYear': _firestoreInt(p.birthYear!),
     if (p.phoneNumber != null) 'phoneNumber': _firestoreString(p.phoneNumber!),
@@ -329,6 +358,7 @@ class CloudSyncService {
 
   Future<CloudSyncResult> sync(AuthState authState) async {
     final now = DateTime.now();
+    authState = await _withFreshIdToken(authState);
     final uid = _authenticatedUid(authState);
 
     if (uid == null) {
@@ -372,7 +402,11 @@ class CloudSyncService {
         boundary,
         (b) => b.updatedAt,
       );
-      final draftRows = _sinceBoundary(allDraftRows, boundary, (d) => d.updatedAt);
+      final draftRows = _sinceBoundary(
+        allDraftRows,
+        boundary,
+        (d) => d.updatedAt,
+      );
       // Resolve person names for birthday docs from the full set (tombstoned
       // people included), matching the pre-incremental behavior.
       final peopleMap = {for (final p in allPersonRows) p.id: p};
@@ -477,6 +511,7 @@ class CloudSyncService {
 
   Future<CloudSyncResult> restore(AuthState authState) async {
     final now = DateTime.now();
+    authState = await _withFreshIdToken(authState);
     final uid = _authenticatedUid(authState);
 
     if (uid == null) {
@@ -503,222 +538,234 @@ class CloudSyncService {
       final headers = _headers(authState);
       var restored = 0;
 
+      // Fetch the whole backup before any local write (F06). A download failure
+      // now leaves the local database exactly as it was.
       final peopleDocs = await _listDocuments(
         _collectionUrl(uid, 'people'),
         headers,
       );
-      // Performance audit: load every existing row once instead of one SELECT
-      // per restored document (N+1 when restoring a large backup).
-      var existingPeople = const <String, Person>{};
-      if (peopleDocs.isNotEmpty) {
-        existingPeople = {
-          for (final row in await _db.select(_db.persons).get()) row.id: row,
-        };
-      }
-      for (final doc in peopleDocs) {
-        final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
-        final id = _string(fields, 'id');
-        final name = _string(fields, 'name');
-        if (id == null || name == null) continue;
-
-        final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
-        final existing = existingPeople[id];
-        if (existing != null && !remoteUpdatedAt.isAfter(existing.updatedAt)) {
-          continue;
-        }
-
-        final deletedAt = _date(fields, 'deletedAt');
-        // A local tombstone outranks a live cloud copy that has no tombstone:
-        // restore must never resurrect a contact the user deleted on-device
-        // (audit F-2). Tombstones in the cloud still apply below.
-        if (existing?.deletedAt != null && deletedAt == null) continue;
-
-        final createdAt = _date(fields, 'createdAt') ?? remoteUpdatedAt;
-        await _db
-            .into(_db.persons)
-            .insertOnConflictUpdate(
-              PersonsCompanion(
-                id: drift.Value(id),
-                name: drift.Value(name),
-                birthdayMonth: drift.Value(_integer(fields, 'birthdayMonth')),
-                birthdayDay: drift.Value(_integer(fields, 'birthdayDay')),
-                birthYear: drift.Value(_integer(fields, 'birthYear')),
-                phoneNumber: drift.Value(_string(fields, 'phoneNumber')),
-                email: drift.Value(_string(fields, 'email')),
-                relationship: drift.Value(
-                  _string(fields, 'relationship') ?? 'friend',
-                ),
-                relationshipCloseness: drift.Value(
-                  _string(fields, 'relationshipCloseness') ?? 'close',
-                ),
-                preferredLanguage: drift.Value(
-                  _string(fields, 'preferredLanguage') ?? 'en',
-                ),
-                preferredTone: drift.Value(
-                  _string(fields, 'preferredTone') ?? 'warm',
-                ),
-                importantFacts: drift.Value(
-                  _string(fields, 'importantFacts') ?? '',
-                ),
-                notes: drift.Value(_string(fields, 'notes')),
-                preferredDeliveryChannel: drift.Value(
-                  _string(fields, 'preferredDeliveryChannel') ?? 'whatsapp',
-                ),
-                timezone: drift.Value(_string(fields, 'timezone')),
-                autoPrepare: drift.Value(
-                  _boolean(fields, 'autoPrepare') ?? false,
-                ),
-                autoSendPolicy: drift.Value(
-                  _string(fields, 'autoSendPolicy') ?? 'manualOnly',
-                ),
-                createdAt: drift.Value(createdAt),
-                updatedAt: drift.Value(remoteUpdatedAt),
-                version: drift.Value(_integer(fields, 'version') ?? 1),
-                deletedAt: drift.Value(deletedAt),
-              ),
-            );
-        restored++;
-      }
-
       final birthdayDocs = await _listDocuments(
         _collectionUrl(uid, 'birthdays'),
         headers,
       );
-      var existingBirthdays = const <String, Birthday>{};
-      if (birthdayDocs.isNotEmpty) {
-        existingBirthdays = {
-          for (final row in await _db.select(_db.birthdays).get()) row.id: row,
-        };
-      }
-      for (final doc in birthdayDocs) {
-        final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
-        final id = _string(fields, 'id');
-        final personId = _string(fields, 'personId');
-        final date = _date(fields, 'date');
-        if (id == null || personId == null || date == null) continue;
-
-        final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
-        final existing = existingBirthdays[id];
-        if (existing != null && !remoteUpdatedAt.isAfter(existing.updatedAt)) {
-          continue;
-        }
-
-        await _db
-            .into(_db.birthdays)
-            .insertOnConflictUpdate(
-              BirthdaysCompanion(
-                id: drift.Value(id),
-                personId: drift.Value(personId),
-                cycleYear: drift.Value(
-                  _integer(fields, 'cycleYear') ?? date.year,
-                ),
-                date: drift.Value(date),
-                status: drift.Value(_string(fields, 'status') ?? 'upcoming'),
-                draftId: drift.Value(_string(fields, 'draftId')),
-                createdAt: drift.Value(
-                  _date(fields, 'createdAt') ?? remoteUpdatedAt,
-                ),
-                updatedAt: drift.Value(remoteUpdatedAt),
-              ),
-            );
-        restored++;
-      }
-
       final draftDocs = await _listDocuments(
         _collectionUrl(uid, 'drafts'),
         headers,
       );
-      var existingDrafts = const <String, MessageDraft>{};
-      if (draftDocs.isNotEmpty) {
-        existingDrafts = {
-          for (final row in await _db.select(_db.messageDrafts).get())
-            row.id: row,
-        };
-      }
-      for (final doc in draftDocs) {
-        final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
-        final id = _string(fields, 'id');
-        final birthdayId = _string(fields, 'birthdayId');
-        final personId = _string(fields, 'personId');
-        final body = _string(fields, 'body');
-        if (id == null ||
-            birthdayId == null ||
-            personId == null ||
-            body == null) {
-          continue;
-        }
-
-        final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
-        final existing = existingDrafts[id];
-        if (existing != null && !remoteUpdatedAt.isAfter(existing.updatedAt)) {
-          continue;
-        }
-
-        await _db
-            .into(_db.messageDrafts)
-            .insertOnConflictUpdate(
-              MessageDraftsCompanion(
-                id: drift.Value(id),
-                birthdayId: drift.Value(birthdayId),
-                personId: drift.Value(personId),
-                body: drift.Value(body),
-                tone: drift.Value(_string(fields, 'tone') ?? 'warm'),
-                length: drift.Value(_string(fields, 'length') ?? 'medium'),
-                status: drift.Value(_string(fields, 'status') ?? 'draft'),
-                providerType: drift.Value(
-                  _string(fields, 'providerType') ?? 'manual',
-                ),
-                variationIndex: drift.Value(
-                  _integer(fields, 'variationIndex') ?? 0,
-                ),
-                createdAt: drift.Value(
-                  _date(fields, 'createdAt') ?? remoteUpdatedAt,
-                ),
-                updatedAt: drift.Value(remoteUpdatedAt),
-              ),
-            );
-        restored++;
-      }
-
       final reminderDocs = await _listDocuments(
         _collectionUrl(uid, 'reminderSettings'),
         headers,
       );
-      var existingReminders = const <String, ReminderSettingsEntry>{};
-      if (reminderDocs.isNotEmpty) {
-        existingReminders = {
-          for (final row in await _db.select(_db.reminderSettingsEntries).get())
-            row.key: row,
-        };
-      }
-      for (final doc in reminderDocs) {
-        final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
-        final key = _string(fields, 'key');
-        if (key == null) continue;
 
-        // Reminder settings have no per-record sync timestamp. Preserve a
-        // device-local preference rather than overwriting it with an older or
-        // ambiguous cloud copy during a merge-style restore.
-        final existing = existingReminders[key];
-        if (existing != null) continue;
+      // Apply every local write in one transaction, so a failure part-way
+      // cannot leave a mixed dataset.
+      await _db.transaction(() async {
+        // Performance audit: load every existing row once instead of one SELECT
+        // per restored document (N+1 when restoring a large backup).
+        var existingPeople = const <String, Person>{};
+        if (peopleDocs.isNotEmpty) {
+          existingPeople = {
+            for (final row in await _db.select(_db.persons).get()) row.id: row,
+          };
+        }
+        for (final doc in peopleDocs) {
+          final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
+          final id = _string(fields, 'id');
+          final name = _string(fields, 'name');
+          if (id == null || name == null) continue;
 
-        await _db
-            .into(_db.reminderSettingsEntries)
-            .insertOnConflictUpdate(
-              ReminderSettingsEntriesCompanion(
-                key: drift.Value(key),
-                enabled: drift.Value(_boolean(fields, 'enabled') ?? false),
-                kinds: drift.Value(_string(fields, 'kinds') ?? ''),
-                quietHoursStartMinutes: drift.Value(
-                  _integer(fields, 'quietHoursStartMinutes') ?? 0,
+          final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
+          final existing = existingPeople[id];
+          if (existing != null &&
+              !remoteUpdatedAt.isAfter(existing.updatedAt)) {
+            continue;
+          }
+
+          final deletedAt = _date(fields, 'deletedAt');
+          // A local tombstone outranks a live cloud copy that has no tombstone:
+          // restore must never resurrect a contact the user deleted on-device
+          // (audit F-2). Tombstones in the cloud still apply below.
+          if (existing?.deletedAt != null && deletedAt == null) continue;
+
+          final createdAt = _date(fields, 'createdAt') ?? remoteUpdatedAt;
+          await _db
+              .into(_db.persons)
+              .insertOnConflictUpdate(
+                PersonsCompanion(
+                  id: drift.Value(id),
+                  name: drift.Value(name),
+                  birthdayMonth: drift.Value(_integer(fields, 'birthdayMonth')),
+                  birthdayDay: drift.Value(_integer(fields, 'birthdayDay')),
+                  birthYear: drift.Value(_integer(fields, 'birthYear')),
+                  phoneNumber: drift.Value(_string(fields, 'phoneNumber')),
+                  email: drift.Value(_string(fields, 'email')),
+                  relationship: drift.Value(
+                    _string(fields, 'relationship') ?? 'friend',
+                  ),
+                  relationshipCloseness: drift.Value(
+                    _string(fields, 'relationshipCloseness') ?? 'close',
+                  ),
+                  preferredLanguage: drift.Value(
+                    _string(fields, 'preferredLanguage') ?? 'en',
+                  ),
+                  preferredTone: drift.Value(
+                    _string(fields, 'preferredTone') ?? 'warm',
+                  ),
+                  importantFacts: drift.Value(
+                    _string(fields, 'importantFacts') ?? '',
+                  ),
+                  notes: drift.Value(_string(fields, 'notes')),
+                  preferredDeliveryChannel: drift.Value(
+                    _string(fields, 'preferredDeliveryChannel') ?? 'whatsapp',
+                  ),
+                  timezone: drift.Value(_string(fields, 'timezone')),
+                  autoPrepare: drift.Value(
+                    _boolean(fields, 'autoPrepare') ?? false,
+                  ),
+                  autoSendPolicy: drift.Value(
+                    _string(fields, 'autoSendPolicy') ?? 'manualOnly',
+                  ),
+                  createdAt: drift.Value(createdAt),
+                  updatedAt: drift.Value(remoteUpdatedAt),
+                  version: drift.Value(_integer(fields, 'version') ?? 1),
+                  deletedAt: drift.Value(deletedAt),
                 ),
-                quietHoursEndMinutes: drift.Value(
-                  _integer(fields, 'quietHoursEndMinutes') ?? 0,
+              );
+          restored++;
+        }
+
+        var existingBirthdays = const <String, Birthday>{};
+        if (birthdayDocs.isNotEmpty) {
+          existingBirthdays = {
+            for (final row in await _db.select(_db.birthdays).get())
+              row.id: row,
+          };
+        }
+        for (final doc in birthdayDocs) {
+          final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
+          final id = _string(fields, 'id');
+          final personId = _string(fields, 'personId');
+          final date = _date(fields, 'date');
+          if (id == null || personId == null || date == null) continue;
+
+          final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
+          final existing = existingBirthdays[id];
+          if (existing != null &&
+              !remoteUpdatedAt.isAfter(existing.updatedAt)) {
+            continue;
+          }
+
+          await _db
+              .into(_db.birthdays)
+              .insertOnConflictUpdate(
+                BirthdaysCompanion(
+                  id: drift.Value(id),
+                  personId: drift.Value(personId),
+                  cycleYear: drift.Value(
+                    _integer(fields, 'cycleYear') ?? date.year,
+                  ),
+                  date: drift.Value(date),
+                  status: drift.Value(_string(fields, 'status') ?? 'upcoming'),
+                  draftId: drift.Value(_string(fields, 'draftId')),
+                  createdAt: drift.Value(
+                    _date(fields, 'createdAt') ?? remoteUpdatedAt,
+                  ),
+                  updatedAt: drift.Value(remoteUpdatedAt),
                 ),
-              ),
-            );
-        restored++;
-      }
+              );
+          restored++;
+        }
+
+        var existingDrafts = const <String, MessageDraft>{};
+        if (draftDocs.isNotEmpty) {
+          existingDrafts = {
+            for (final row in await _db.select(_db.messageDrafts).get())
+              row.id: row,
+          };
+        }
+        for (final doc in draftDocs) {
+          final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
+          final id = _string(fields, 'id');
+          final birthdayId = _string(fields, 'birthdayId');
+          final personId = _string(fields, 'personId');
+          final body = _string(fields, 'body');
+          if (id == null ||
+              birthdayId == null ||
+              personId == null ||
+              body == null) {
+            continue;
+          }
+
+          final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
+          final existing = existingDrafts[id];
+          if (existing != null &&
+              !remoteUpdatedAt.isAfter(existing.updatedAt)) {
+            continue;
+          }
+
+          await _db
+              .into(_db.messageDrafts)
+              .insertOnConflictUpdate(
+                MessageDraftsCompanion(
+                  id: drift.Value(id),
+                  birthdayId: drift.Value(birthdayId),
+                  personId: drift.Value(personId),
+                  body: drift.Value(body),
+                  tone: drift.Value(_string(fields, 'tone') ?? 'warm'),
+                  length: drift.Value(_string(fields, 'length') ?? 'medium'),
+                  status: drift.Value(_string(fields, 'status') ?? 'draft'),
+                  providerType: drift.Value(
+                    _string(fields, 'providerType') ?? 'manual',
+                  ),
+                  variationIndex: drift.Value(
+                    _integer(fields, 'variationIndex') ?? 0,
+                  ),
+                  createdAt: drift.Value(
+                    _date(fields, 'createdAt') ?? remoteUpdatedAt,
+                  ),
+                  updatedAt: drift.Value(remoteUpdatedAt),
+                ),
+              );
+          restored++;
+        }
+
+        var existingReminders = const <String, ReminderSettingsEntry>{};
+        if (reminderDocs.isNotEmpty) {
+          existingReminders = {
+            for (final row
+                in await _db.select(_db.reminderSettingsEntries).get())
+              row.key: row,
+          };
+        }
+        for (final doc in reminderDocs) {
+          final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
+          final key = _string(fields, 'key');
+          if (key == null) continue;
+
+          // Reminder settings have no per-record sync timestamp. Preserve a
+          // device-local preference rather than overwriting it with an older or
+          // ambiguous cloud copy during a merge-style restore.
+          final existing = existingReminders[key];
+          if (existing != null) continue;
+
+          await _db
+              .into(_db.reminderSettingsEntries)
+              .insertOnConflictUpdate(
+                ReminderSettingsEntriesCompanion(
+                  key: drift.Value(key),
+                  enabled: drift.Value(_boolean(fields, 'enabled') ?? false),
+                  kinds: drift.Value(_string(fields, 'kinds') ?? ''),
+                  quietHoursStartMinutes: drift.Value(
+                    _integer(fields, 'quietHoursStartMinutes') ?? 0,
+                  ),
+                  quietHoursEndMinutes: drift.Value(
+                    _integer(fields, 'quietHoursEndMinutes') ?? 0,
+                  ),
+                ),
+              );
+          restored++;
+        }
+      });
 
       _logger?.info(
         'CloudRestore',

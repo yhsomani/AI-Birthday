@@ -119,7 +119,14 @@ final cloudSyncServiceProvider = Provider<CloudSyncService>((ref) {
     const FlutterSecureStorage(),
     logger,
   );
-  return CloudSyncService(db: db, store: store, logger: logger);
+  return CloudSyncService(
+    db: db,
+    store: store,
+    logger: logger,
+    // Refresh the Firebase ID token before each backup or restore (F14).
+    freshIdToken: () =>
+        ref.read(authControllerProvider.notifier).getValidIdToken(),
+  );
 });
 
 /// Gemini Nano Platform provider.
@@ -202,11 +209,13 @@ final aiJobHandlerProvider = Provider<JobHandler>((ref) {
     birthdaysRepository: ref.read(birthdaysRepositoryProvider),
     jobsRepository: ref.read(jobsRepositoryProvider),
     generate: (request, {required bool forceNano}) {
-      return ref.read(aiRouterProvider).generate(
-        request: request,
-        entitlement: ref.read(entitlementProvider),
-        forceNano: forceNano,
-      );
+      return ref
+          .read(aiRouterProvider)
+          .generate(
+            request: request,
+            entitlement: ref.read(entitlementProvider),
+            forceNano: forceNano,
+          );
     },
   );
 });

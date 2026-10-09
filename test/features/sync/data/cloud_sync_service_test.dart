@@ -115,26 +115,22 @@ void main() {
         expect(names, contains(endsWith('/people/p-1')));
         expect(names, contains(endsWith('/birthdays/b-1')));
 
-        final personWrite = writes
-            .cast<Map<String, dynamic>>()
-            .firstWhere(
-              (w) =>
-                  ((w['update'] as Map)['name'] as String)
-                      .endsWith('/people/p-1'),
-            );
+        final personWrite = writes.cast<Map<String, dynamic>>().firstWhere(
+          (w) =>
+              ((w['update'] as Map)['name'] as String).endsWith('/people/p-1'),
+        );
         final personFields =
             ((personWrite['update'] as Map)['fields'] as Map<String, dynamic>);
         expect(personFields['name']['stringValue'], 'Taylor Swift');
 
-        final birthdayWrite = writes
-            .cast<Map<String, dynamic>>()
-            .firstWhere(
-              (w) =>
-                  ((w['update'] as Map)['name'] as String)
-                      .endsWith('/birthdays/b-1'),
-            );
-        final birthdayFields = ((birthdayWrite['update'] as Map)['fields']
-            as Map<String, dynamic>);
+        final birthdayWrite = writes.cast<Map<String, dynamic>>().firstWhere(
+          (w) => ((w['update'] as Map)['name'] as String).endsWith(
+            '/birthdays/b-1',
+          ),
+        );
+        final birthdayFields =
+            ((birthdayWrite['update'] as Map)['fields']
+                as Map<String, dynamic>);
         expect(birthdayFields['personName']['stringValue'], 'Taylor Swift');
 
         return http.Response(
@@ -283,10 +279,7 @@ void main() {
             'writeResults': [
               {'updateTime': '2026-01-01T00:00:00Z'},
               {
-                'error': {
-                  'code': 3,
-                  'message': 'document too large',
-                },
+                'error': {'code': 3, 'message': 'document too large'},
               },
             ],
           }),
@@ -341,8 +334,7 @@ void main() {
           );
 
       // A full backup already ran moments ago; nothing changed since.
-      store.data['cloud_last_sync_timestamp_uid-test'] =
-          now.toIso8601String();
+      store.data['cloud_last_sync_timestamp_uid-test'] = now.toIso8601String();
 
       var commitCount = 0;
       final mockClient = MockClient((request) async {
@@ -369,120 +361,117 @@ void main() {
       expect(commitCount, 0, reason: 'no changes, no Firestore round trip');
     });
 
-    test(
-      'a backup after the initial one uploads only rows changed since the '
-      'last sync, including tombstones',
-      () async {
-        final now = DateTime.now();
-        // Previous backup: one hour ago.
-        final lastSync = now.subtract(const Duration(hours: 1));
-        await db
-            .into(db.persons)
-            .insert(
-              PersonsCompanion.insert(
-                id: 'p-tomb',
-                name: 'Deleted Since',
-                relationship: 'Friend',
-                relationshipCloseness: 'close',
-                preferredLanguage: 'en',
-                preferredTone: 'warm',
-                importantFacts: '',
-                preferredDeliveryChannel: 'whatsapp',
-                autoSendPolicy: 'manualOnly',
-                createdAt: now.subtract(const Duration(days: 30)),
-                updatedAt: now,
-                version: 2,
-                deletedAt: Value(now),
-              ),
-            );
-        await db
-            .into(db.persons)
-            .insert(
-              PersonsCompanion.insert(
-                id: 'p-stale',
-                name: 'Already Uploaded',
-                relationship: 'Friend',
-                relationshipCloseness: 'close',
-                preferredLanguage: 'en',
-                preferredTone: 'warm',
-                importantFacts: '',
-                preferredDeliveryChannel: 'whatsapp',
-                autoSendPolicy: 'manualOnly',
-                createdAt: now.subtract(const Duration(hours: 2)),
-                updatedAt: now.subtract(const Duration(hours: 2)),
-                version: 1,
-              ),
-            );
-        await db
-            .into(db.messageDrafts)
-            .insert(
-              MessageDraftsCompanion.insert(
-                id: 'd-new',
-                birthdayId: 'b-1',
-                personId: 'p-1',
-                body: 'Edited since the last backup',
-                tone: 'warm',
-                length: 'short',
-                status: 'ready',
-                providerType: 'local',
-                createdAt: now.subtract(const Duration(hours: 2)),
-                updatedAt: now,
-              ),
-            );
-        await db
-            .into(db.messageDrafts)
-            .insert(
-              MessageDraftsCompanion.insert(
-                id: 'd-stale',
-                birthdayId: 'b-2',
-                personId: 'p-2',
-                body: 'Unchanged',
-                tone: 'warm',
-                length: 'short',
-                status: 'ready',
-                providerType: 'local',
-                createdAt: now.subtract(const Duration(hours: 3)),
-                updatedAt: now.subtract(const Duration(hours: 2)),
-              ),
-            );
-
-        store.data['cloud_last_sync_timestamp_uid-test'] =
-            lastSync.toIso8601String();
-
-        final uploadedNames = <String>[];
-        final mockClient = MockClient((request) async {
-          final body = jsonDecode(request.body) as Map<String, dynamic>;
-          final writes = body['writes'] as List;
-          expect(writes, hasLength(2));
-          for (final write in writes.cast<Map<String, dynamic>>()) {
-            final name = ((write['update'] as Map)['name'] as String);
-            uploadedNames.add(name.split('/').last);
-            expect(name, isNot(endsWith('/people/p-stale')));
-            expect(name, isNot(endsWith('/drafts/d-stale')));
-          }
-          return http.Response(
-            jsonEncode({
-              'writeResults': List.generate(
-                writes.length,
-                (_) => {'updateTime': '2026-01-01T00:00:00Z'},
-              ),
-            }),
-            200,
+    test('a backup after the initial one uploads only rows changed since the '
+        'last sync, including tombstones', () async {
+      final now = DateTime.now();
+      // Previous backup: one hour ago.
+      final lastSync = now.subtract(const Duration(hours: 1));
+      await db
+          .into(db.persons)
+          .insert(
+            PersonsCompanion.insert(
+              id: 'p-tomb',
+              name: 'Deleted Since',
+              relationship: 'Friend',
+              relationshipCloseness: 'close',
+              preferredLanguage: 'en',
+              preferredTone: 'warm',
+              importantFacts: '',
+              preferredDeliveryChannel: 'whatsapp',
+              autoSendPolicy: 'manualOnly',
+              createdAt: now.subtract(const Duration(days: 30)),
+              updatedAt: now,
+              version: 2,
+              deletedAt: Value(now),
+            ),
           );
-        });
+      await db
+          .into(db.persons)
+          .insert(
+            PersonsCompanion.insert(
+              id: 'p-stale',
+              name: 'Already Uploaded',
+              relationship: 'Friend',
+              relationshipCloseness: 'close',
+              preferredLanguage: 'en',
+              preferredTone: 'warm',
+              importantFacts: '',
+              preferredDeliveryChannel: 'whatsapp',
+              autoSendPolicy: 'manualOnly',
+              createdAt: now.subtract(const Duration(hours: 2)),
+              updatedAt: now.subtract(const Duration(hours: 2)),
+              version: 1,
+            ),
+          );
+      await db
+          .into(db.messageDrafts)
+          .insert(
+            MessageDraftsCompanion.insert(
+              id: 'd-new',
+              birthdayId: 'b-1',
+              personId: 'p-1',
+              body: 'Edited since the last backup',
+              tone: 'warm',
+              length: 'short',
+              status: 'ready',
+              providerType: 'local',
+              createdAt: now.subtract(const Duration(hours: 2)),
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.messageDrafts)
+          .insert(
+            MessageDraftsCompanion.insert(
+              id: 'd-stale',
+              birthdayId: 'b-2',
+              personId: 'p-2',
+              body: 'Unchanged',
+              tone: 'warm',
+              length: 'short',
+              status: 'ready',
+              providerType: 'local',
+              createdAt: now.subtract(const Duration(hours: 3)),
+              updatedAt: now.subtract(const Duration(hours: 2)),
+            ),
+          );
 
-        final service = CloudSyncService(
-          db: db,
-          store: store,
-          httpClient: mockClient,
+      store.data['cloud_last_sync_timestamp_uid-test'] = lastSync
+          .toIso8601String();
+
+      final uploadedNames = <String>[];
+      final mockClient = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final writes = body['writes'] as List;
+        expect(writes, hasLength(2));
+        for (final write in writes.cast<Map<String, dynamic>>()) {
+          final name = ((write['update'] as Map)['name'] as String);
+          uploadedNames.add(name.split('/').last);
+          expect(name, isNot(endsWith('/people/p-stale')));
+          expect(name, isNot(endsWith('/drafts/d-stale')));
+        }
+        return http.Response(
+          jsonEncode({
+            'writeResults': List.generate(
+              writes.length,
+              (_) => {'updateTime': '2026-01-01T00:00:00Z'},
+            ),
+          }),
+          200,
         );
+      });
 
-        final result = await service.sync(_signedInAuth);
-        expect(result.success, isTrue);
-        expect(result.uploadedCount, 2);
-        expect(uploadedNames.toSet(), {'p-tomb', 'd-new'});
-      },
-    );
+      final service = CloudSyncService(
+        db: db,
+        store: store,
+        httpClient: mockClient,
+      );
+
+      final result = await service.sync(_signedInAuth);
+      expect(result.success, isTrue);
+      expect(result.uploadedCount, 2);
+      expect(uploadedNames.toSet(), {'p-tomb', 'd-new'});
+    });
 
     test(
       'returns failure and does not store timestamp when cloud writes fail',
@@ -612,101 +601,96 @@ void main() {
       expect(local.quietHoursEndMinutes, 360);
     });
 
-    test(
-      'restore does not resurrect a locally-tombstoned contact when the '
-      'cloud copy has no tombstone',
-      () async {
-        final now = DateTime.now().toUtc();
-        await db
-            .into(db.persons)
-            .insert(
-              PersonsCompanion.insert(
-                id: 'p-del',
-                name: 'Deleted Locally',
-                relationship: 'Friend',
-                relationshipCloseness: 'close',
-                preferredLanguage: 'en',
-                preferredTone: 'warm',
-                importantFacts: '',
-                preferredDeliveryChannel: 'whatsapp',
-                autoSendPolicy: 'manualOnly',
-                createdAt: now.subtract(const Duration(days: 30)),
-                updatedAt: now,
-                version: 2,
-                deletedAt: Value(now),
-              ),
-            );
+    test('restore does not resurrect a locally-tombstoned contact when the '
+        'cloud copy has no tombstone', () async {
+      final now = DateTime.now().toUtc();
+      await db
+          .into(db.persons)
+          .insert(
+            PersonsCompanion.insert(
+              id: 'p-del',
+              name: 'Deleted Locally',
+              relationship: 'Friend',
+              relationshipCloseness: 'close',
+              preferredLanguage: 'en',
+              preferredTone: 'warm',
+              importantFacts: '',
+              preferredDeliveryChannel: 'whatsapp',
+              autoSendPolicy: 'manualOnly',
+              createdAt: now.subtract(const Duration(days: 30)),
+              updatedAt: now,
+              version: 2,
+              deletedAt: Value(now),
+            ),
+          );
 
-        final mockClient = MockClient((request) async {
-          expect(request.method, 'GET');
-          if (request.url.path.endsWith('/people')) {
-            // Cloud copy is NEWER than the local tombstone but still live:
-            // it predates the on-device deletion (no deletedAt field).
-            return http.Response(
-              jsonEncode({
-                'documents': [
-                  {
-                    'name':
-                        'projects/t/databases/(default)/documents/users/uid-test/people/p-del',
-                    'fields': {
-                      'id': {'stringValue': 'p-del'},
-                      'name': {'stringValue': 'Deleted Locally'},
-                      'relationship': {'stringValue': 'Friend'},
-                      'relationshipCloseness': {'stringValue': 'close'},
-                      'preferredLanguage': {'stringValue': 'en'},
-                      'preferredTone': {'stringValue': 'warm'},
-                      'importantFacts': {'stringValue': ''},
-                      'preferredDeliveryChannel': {
-                        'stringValue': 'whatsapp',
-                      },
-                      'autoSendPolicy': {'stringValue': 'manualOnly'},
-                      'createdAt': {
-                        'stringValue': now
-                            .subtract(const Duration(days: 30))
-                            .toIso8601String(),
-                      },
-                      'updatedAt': {
-                        'stringValue': now
-                            .add(const Duration(days: 1))
-                            .toIso8601String(),
-                      },
-                      'version': {'integerValue': '2'},
+      final mockClient = MockClient((request) async {
+        expect(request.method, 'GET');
+        if (request.url.path.endsWith('/people')) {
+          // Cloud copy is NEWER than the local tombstone but still live:
+          // it predates the on-device deletion (no deletedAt field).
+          return http.Response(
+            jsonEncode({
+              'documents': [
+                {
+                  'name':
+                      'projects/t/databases/(default)/documents/users/uid-test/people/p-del',
+                  'fields': {
+                    'id': {'stringValue': 'p-del'},
+                    'name': {'stringValue': 'Deleted Locally'},
+                    'relationship': {'stringValue': 'Friend'},
+                    'relationshipCloseness': {'stringValue': 'close'},
+                    'preferredLanguage': {'stringValue': 'en'},
+                    'preferredTone': {'stringValue': 'warm'},
+                    'importantFacts': {'stringValue': ''},
+                    'preferredDeliveryChannel': {'stringValue': 'whatsapp'},
+                    'autoSendPolicy': {'stringValue': 'manualOnly'},
+                    'createdAt': {
+                      'stringValue': now
+                          .subtract(const Duration(days: 30))
+                          .toIso8601String(),
                     },
+                    'updatedAt': {
+                      'stringValue': now
+                          .add(const Duration(days: 1))
+                          .toIso8601String(),
+                    },
+                    'version': {'integerValue': '2'},
                   },
-                ],
-              }),
-              200,
-            );
-          }
-          return http.Response(jsonEncode({'documents': []}), 200);
-        });
+                },
+              ],
+            }),
+            200,
+          );
+        }
+        return http.Response(jsonEncode({'documents': []}), 200);
+      });
 
-        final service = CloudSyncService(
-          db: db,
-          store: store,
-          httpClient: mockClient,
-        );
+      final service = CloudSyncService(
+        db: db,
+        store: store,
+        httpClient: mockClient,
+      );
 
-        final auth = const AuthState(
-          status: AuthStatus.signedIn,
-          identity: GoogleIdentity(
-            googleSubject: 'sub-test',
-            email: 'user@example.com',
-            displayName: 'User',
-            firebaseUid: 'uid-test',
-            idToken: 'test-id-token',
-          ),
-        );
+      final auth = const AuthState(
+        status: AuthStatus.signedIn,
+        identity: GoogleIdentity(
+          googleSubject: 'sub-test',
+          email: 'user@example.com',
+          displayName: 'User',
+          firebaseUid: 'uid-test',
+          idToken: 'test-id-token',
+        ),
+      );
 
-        final result = await service.restore(auth);
-        expect(result.success, isTrue);
+      final result = await service.restore(auth);
+      expect(result.success, isTrue);
 
-        final row = await (db.select(db.persons)
-              ..where((r) => r.id.equals('p-del')))
-            .getSingle();
-        expect(row.deletedAt, isNotNull, reason: 'local tombstone must win');
-      },
-    );
+      final row = await (db.select(
+        db.persons,
+      )..where((r) => r.id.equals('p-del'))).getSingle();
+      expect(row.deletedAt, isNotNull, reason: 'local tombstone must win');
+    });
 
     test('restore reads each collection once, not once per document', () async {
       final interceptor = CountingQueryInterceptor();
@@ -716,7 +700,8 @@ void main() {
       addTearDown(countedDb.close);
 
       Map<String, dynamic> personDoc(String id) => {
-        'name': 'projects/t/databases/(default)/documents/users/uid-test/people/$id',
+        'name':
+            'projects/t/databases/(default)/documents/users/uid-test/people/$id',
         'fields': {
           'id': {'stringValue': id},
           'name': {'stringValue': 'Person $id'},
@@ -728,10 +713,7 @@ void main() {
       final mockClient = MockClient((request) async {
         expect(request.method, 'GET');
         if (request.url.path.endsWith('/people')) {
-          return http.Response(
-            jsonEncode({'documents': peopleDocs}),
-            200,
-          );
+          return http.Response(jsonEncode({'documents': peopleDocs}), 200);
         }
         if (request.url.path.endsWith('/birthdays') ||
             request.url.path.endsWith('/drafts') ||
@@ -767,6 +749,113 @@ void main() {
       expect(interceptor.selects, 1);
       expect(interceptor.inserts, 150);
     });
+
+    test(
+      'a restore that fails on a later collection writes nothing locally (F06)',
+      () async {
+        Map<String, dynamic> personDoc(String id) => {
+          'name':
+              'projects/t/databases/(default)/documents/users/uid-test/people/$id',
+          'fields': {
+            'id': {'stringValue': id},
+            'name': {'stringValue': 'Person $id'},
+          },
+        };
+
+        final mockClient = MockClient((request) async {
+          if (request.url.path.endsWith('/people')) {
+            return http.Response(
+              jsonEncode({
+                'documents': [personDoc('a'), personDoc('b')],
+              }),
+              200,
+            );
+          }
+          if (request.url.path.endsWith('/birthdays')) {
+            return http.Response('Server Error', 500);
+          }
+          return http.Response(jsonEncode({'documents': []}), 200);
+        });
+
+        final service = CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: mockClient,
+        );
+
+        final auth = const AuthState(
+          status: AuthStatus.signedIn,
+          identity: GoogleIdentity(
+            googleSubject: 'sub-test',
+            email: 'user@example.com',
+            displayName: 'User',
+            firebaseUid: 'uid-test',
+            idToken: 'test-id-token',
+          ),
+        );
+
+        final result = await service.restore(auth);
+        expect(result.success, isFalse);
+
+        // People downloaded fine, but the failure on a later collection happens
+        // before any local write, so the local dataset is unchanged.
+        expect(await db.select(db.persons).get(), isEmpty);
+      },
+    );
+
+    test(
+      'backup sends a freshly refreshed ID token, not the stored one (F14)',
+      () async {
+        final now = DateTime.now();
+        await db
+            .into(db.persons)
+            .insert(
+              PersonsCompanion.insert(
+                id: 'p-token',
+                name: 'Token Check',
+                birthdayMonth: const Value(3),
+                birthdayDay: const Value(4),
+                relationship: 'Friend',
+                relationshipCloseness: 'close',
+                preferredLanguage: 'en',
+                preferredTone: 'warm',
+                importantFacts: '',
+                preferredDeliveryChannel: 'WhatsApp',
+                autoSendPolicy: 'manual',
+                createdAt: now,
+                updatedAt: now,
+                version: 1,
+              ),
+            );
+
+        final authorizations = <String?>[];
+        final client = MockClient((request) async {
+          authorizations.add(request.headers['Authorization']);
+          return http.Response('{}', 500);
+        });
+        final service = CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: client,
+          freshIdToken: () async => 'fresh-token',
+        );
+
+        const expiredAuth = AuthState(
+          status: AuthStatus.signedIn,
+          identity: GoogleIdentity(
+            googleSubject: 'sub-token',
+            email: 'user@example.com',
+            displayName: 'User',
+            firebaseUid: 'uid-token',
+            idToken: 'expired-token',
+          ),
+        );
+        await service.sync(expiredAuth);
+
+        expect(authorizations, isNotEmpty);
+        expect(authorizations, everyElement('Bearer fresh-token'));
+      },
+    );
   });
 }
 
