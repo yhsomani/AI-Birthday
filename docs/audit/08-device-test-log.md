@@ -32,6 +32,17 @@ Physical phone: not attached, so not tested. Gemini API key: not entered and not
 | History | Shows the saved draft with Copy and Studio actions. |
 | Settings | Cloud backup buttons misaligned (fixed: full-width Wrap, verified after rebuild). |
 
+## AI flow (device, emulator)
+
+| Step | Result |
+|---|---|
+| Save personal Gemini key in Settings | Saved to secure storage, status Unverified |
+| Test Connection | Connected ("Gemini is ready") |
+| Studio without Pro | Was locked ("Pro feature"); fixed: a saved personal key unlocks drafting |
+| Generate with AI | Returned a 128-character draft and filled the editor (pass) |
+
+Open: a late AI result overwrites a draft the user is editing (audit F18, not fixed).
+
 ## Observed, not yet fixed
 
 - A contact with no relationship text shows "Other" on the card, while the closeness control shows Casual. The labels disagree.
@@ -39,7 +50,6 @@ Physical phone: not attached, so not tested. Gemini API key: not entered and not
 
 ## Not yet tested on the device
 
-- Entering the Gemini key in Settings and generating a draft (AI).
 - Settings sign-in and the subscription purchase flow (needs a Google account and Play).
 - Handoff to WhatsApp and the confirmation dialog.
 - Reminder scheduling and reboot recovery (needs a reboot and an alarm firing).

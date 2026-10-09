@@ -65,6 +65,26 @@ void main() {
       );
     });
 
+    test(
+      'a personal key unlocks drafting without an app subscription',
+      () async {
+        await credentialStorage.saveGeminiApiKey('AIzaSyDummyKey');
+
+        final router = AiRouter(
+          credentialStorage: credentialStorage,
+          userGeminiProvider: mockGeminiProvider,
+          nanoProvider: mockNanoProvider,
+        );
+
+        final result = await router.generate(
+          request: AiGenerationRequest(person: testPerson),
+          entitlement: UserEntitlement.free,
+        );
+
+        expect(result.providerType, 'user_gemini');
+      },
+    );
+
     test('Throws AppFailure.lockedAi when entitlement is not active', () async {
       final router = AiRouter(
         credentialStorage: credentialStorage,

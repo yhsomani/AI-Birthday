@@ -51,6 +51,13 @@ final credentialStorageProvider = Provider<CredentialStorage>((ref) {
   );
 });
 
+/// Whether the user saved their own Gemini key. Such a key unlocks AI drafting
+/// without the app subscription, so the studio must not show the Pro lock.
+/// Re-read each time the studio opens, so a newly saved key takes effect.
+final hasOwnGeminiKeyProvider = FutureProvider.autoDispose<bool>(
+  (ref) => ref.watch(credentialStorageProvider).hasGeminiApiKey(),
+);
+
 /// Subscription Notifier managing entitlement through purchase & verification lifecycle (SSOT §11).
 final subscriptionNotifierProvider =
     StateNotifierProvider<SubscriptionNotifier, UserEntitlement>((ref) {

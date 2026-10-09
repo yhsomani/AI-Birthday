@@ -1012,9 +1012,11 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     final person = _person!;
     final birthday = _birthday!;
     final entitlement = ref.watch(entitlementProvider);
-    // The AI router gates on entitlement first, so a non-entitled user can
-    // never generate: pre-warn instead of failing on tap (audit H/G).
-    final aiLocked = !entitlement.canUseAi;
+    // A saved personal Gemini key unlocks drafting without Pro (BYOK product
+    // decision), so only lock when there is neither a subscription nor a key.
+    // The router enforces the same rule, so the UI never offers a dead button.
+    final ownKey = ref.watch(hasOwnGeminiKeyProvider).valueOrNull ?? false;
+    final aiLocked = !entitlement.canUseAi && !ownKey;
     final isCompleted = birthday.status == BirthdayStatus.completed;
     final isHandedOff = birthday.status == BirthdayStatus.handedOff;
     final rawPhone = person.phoneNumber?.trim() ?? '';
