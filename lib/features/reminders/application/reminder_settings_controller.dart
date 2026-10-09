@@ -72,7 +72,9 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
             .toSet();
         state = ReminderSettings(
           enabled: row.enabled,
-          kinds: kinds.isEmpty ? state.kinds : kinds,
+          // A stored empty string is a deliberate "no milestones" choice, not
+          // missing data, so it must not fall back to the default set.
+          kinds: kinds,
           quietHours: QuietHours(
             start: Duration(minutes: row.quietHoursStartMinutes),
             end: Duration(minutes: row.quietHoursEndMinutes),
