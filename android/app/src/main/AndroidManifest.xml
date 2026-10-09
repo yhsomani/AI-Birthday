@@ -9,6 +9,7 @@
     <application
         android:label="AI-Birthday"
         android:name="${applicationName}"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher">
         <receiver
             android:name=".BirthdayNotificationReceiver"
