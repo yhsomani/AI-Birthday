@@ -7,3 +7,8 @@
 
 **Learning:** List items that navigate or open modals (e.g., in `PeopleScreen`) are primary interactive elements. Missing haptic feedback on these actions breaks the physical response expected from primary UI components.
 **Action:** Ensure `HapticFeedback.lightImpact()` is included in the `onTap` handlers of list items that trigger state changes or navigation to maintain a consistent, responsive feel.
+
+## 2024-10-09 - Calendar Navigation Haptics
+
+**Learning:** Essential navigation controls such as Previous/Next Month in calendar components (`IconButton`) lack haptic feedback, making them feel unresponsive or disconnected compared to primary action buttons.
+**Action:** Ensure `HapticFeedback.lightImpact()` is added to icon buttons that trigger major state changes like pagination or month shifts to provide consistent physical feedback.
