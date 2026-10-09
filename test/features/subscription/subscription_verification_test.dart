@@ -114,7 +114,7 @@ void main() {
           final body = jsonDecode(request.body) as Map<String, dynamic>;
           final data = body['data'] as Map<String, dynamic>;
           expect(data['purchaseToken'], 'server-token');
-          expect(data['packageName'], 'com.yashomani.ai_birthday');
+          expect(data['packageName'], 'com.yashsomani.ai_birthday');
           expect(data['productId'], 'ai_birthday_pro_monthly');
           return http.Response(
             activeResult(

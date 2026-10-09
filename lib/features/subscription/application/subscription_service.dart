@@ -72,7 +72,11 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   PurchaseStatus get purchaseStatus => _purchaseStatus;
 
   static const String _kProMonthlyId = 'ai_birthday_pro_monthly';
-  static const String _kPackageName = 'com.yashomani.ai_birthday';
+  // MUST match android/app/build.gradle.kts applicationId. The previous value
+  // here ('com.yashomani.ai_birthday', one 's') matched the server constant but
+  // NOT the installed app, so Google Play's purchases API returned 404 for the
+  // real package and every purchase verified as 'none'.
+  static const String _kPackageName = 'com.yashsomani.ai_birthday';
   static const String _kBindingPrefix = 'purchase_binding_';
 
   /// How long an in-session grant survives failed re-verification before the

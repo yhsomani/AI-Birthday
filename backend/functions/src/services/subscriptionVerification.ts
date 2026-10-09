@@ -15,7 +15,10 @@ import {
 } from './googlePlaySubscriptionClient.js';
 
 export const PRO_PRODUCT_ID = 'ai_birthday_pro_monthly';
-export const EXPECTED_PACKAGE_NAME = 'com.yashomani.ai_birthday';
+// MUST match android/app/build.gradle.kts applicationId (`com.yashsomani.ai_birthday`).
+// One 's' (com.yashomani...) made Google Play return 404 for the purchases API
+// call, so every subscription verified as 'none'.
+export const EXPECTED_PACKAGE_NAME = 'com.yashsomani.ai_birthday';
 
 const ENTITLED_STATES = new Set([
   'SUBSCRIPTION_STATE_ACTIVE',
