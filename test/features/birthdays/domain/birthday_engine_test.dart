@@ -131,6 +131,25 @@ void main() {
       );
       expect(sameDay.isToday, isTrue);
     });
+
+    test('a UTC reference is read as the local calendar date', () {
+      // Pick an instant whose local calendar date differs from its UTC date
+      // on this host, so the test is sensitive to the frame. On a UTC host
+      // no such hour exists and the case degenerates to a plain check.
+      final instant = List.generate(24, (h) => DateTime.utc(2025, 3, 15, h))
+          .firstWhere(
+            (t) => t.toLocal().day != t.day,
+            orElse: () => DateTime.utc(2025, 3, 15, 12),
+          );
+      final local = instant.toLocal();
+      final next = engine.computeNext(
+        month: local.month,
+        day: local.day,
+        reference: instant,
+      );
+      expect(next.isToday, isTrue);
+      expect(next.daysUntil, 0);
+    });
   });
 
   group('BirthdayEngine.computeNext (named timezone frame)', () {

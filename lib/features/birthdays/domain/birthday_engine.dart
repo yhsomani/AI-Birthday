@@ -129,11 +129,14 @@ class BirthdayEngine {
         reference: ref.toUtc(),
       );
     }
+    // Wall-clock frame is the device's local calendar. A UTC default has UTC
+    // wall-clock fields, which show yesterday's date between local midnight
+    // and the UTC offset (fixed after a manual test at 00:30 IST).
     return _computeWallClock(
       month: month,
       day: day,
       leapDay: leapDay,
-      reference: ref,
+      reference: ref.isUtc ? ref.toLocal() : ref,
     );
   }
 
