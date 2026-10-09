@@ -895,27 +895,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  InkWell(
-                    onTap: () => _launchExternalUrl(_geminiBillingUrl),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.open_in_new,
-                            size: 14,
-                            color: theme.colorScheme.primary,
+                  Semantics(
+                    link: true,
+                    child: InkWell(
+                      onTap: () => _launchExternalUrl(_geminiBillingUrl),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 48),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.open_in_new,
+                                size: 14,
+                                color: theme.colorScheme.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Gemini API billing, quotas & free limits ↗',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.primary,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Gemini API billing, quotas & free limits ↗',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: theme.colorScheme.primary,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
