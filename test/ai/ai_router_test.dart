@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/core/security/credential_storage.dart';
@@ -22,6 +24,17 @@ class MockAiProvider implements AiMessageProvider {
       message: responseMessage,
       providerType: providerId,
     );
+  }
+}
+
+/// Provider that never completes — used to prove the router's timeout bound.
+class HangingAiProvider implements AiMessageProvider {
+  @override
+  final String providerId = 'hanging';
+
+  @override
+  Future<AiGenerationResult> generateMessage(AiGenerationRequest request) {
+    return Completer<AiGenerationResult>().future;
   }
 }
 
@@ -135,6 +148,33 @@ void main() {
               (e) => e.code,
               'code',
               AppFailureCode.aiCredentialMissing,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'a stalled provider maps to a retryable aiTimeout instead of hanging',
+      () async {
+        await credentialStorage.saveGeminiApiKey('AIzaSyDummyKey');
+
+        final router = AiRouter(
+          credentialStorage: credentialStorage,
+          userGeminiProvider: HangingAiProvider(),
+          generationTimeout: const Duration(milliseconds: 50),
+        );
+
+        expect(
+          () => router.generate(
+            request: AiGenerationRequest(person: testPerson),
+            entitlement: UserEntitlement.proActive,
+          ),
+          throwsA(
+            isA<AppFailure>().having(
+              (e) => e.code,
+              'code',
+              AppFailureCode.aiTimeout,
             ),
           ),
         );

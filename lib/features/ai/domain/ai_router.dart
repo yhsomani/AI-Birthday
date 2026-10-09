@@ -1,6 +1,8 @@
 /// Authoritative AI Router implementing the routing rule defined in SSOT §5.
 library;
 
+import 'dart:async';
+
 import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/core/security/credential_storage.dart';
@@ -20,6 +22,7 @@ class AiRouter {
     AiMessageProvider? nanoProvider,
     Future<GeminiNanoStatus> Function()? nanoStatusChecker,
     AppLogger? logger,
+    this.generationTimeout = const Duration(seconds: 30),
   }) : _credentialStorage = credentialStorage,
        _userGeminiProvider = userGeminiProvider,
        _nanoProvider = nanoProvider,
@@ -31,6 +34,11 @@ class AiRouter {
   final AiMessageProvider? _nanoProvider;
   final Future<GeminiNanoStatus> Function()? _nanoStatusChecker;
   final AppLogger _logger;
+
+  /// Upper bound for a single provider request; maps to a retryable
+  /// [AppFailureCode.aiTimeout]. Injectable so tests do not wait the real
+  /// production window.
+  final Duration generationTimeout;
 
   /// Generates a birthday message, strictly enforcing the entitlement and provider routing sequence.
   Future<AiGenerationResult> generate({
@@ -57,7 +65,7 @@ class AiRouter {
 
       if (nanoStatus == GeminiNanoStatus.available && _nanoProvider != null) {
         _logger.info('AiRouter', 'Routing request to Gemini Nano');
-        return _nanoProvider.generateMessage(request);
+        return _withTimeout(_nanoProvider.generateMessage(request));
       }
 
       if (forceNano) {
@@ -70,7 +78,7 @@ class AiRouter {
     // 2. User Gemini API key check
     if (hasUserKey) {
       _logger.info('AiRouter', 'Routing request to User Gemini API');
-      return _userGeminiProvider.generateMessage(request);
+      return _withTimeout(_userGeminiProvider.generateMessage(request));
     }
 
     // 3. Neither provider is available
@@ -79,5 +87,19 @@ class AiRouter {
       action:
           'AI is not currently available on this device. Add your Google Gemini API key in Settings, or use Gemini Nano when available on this device.',
     );
+  }
+
+  /// Bounds a single AI request so a stalled provider (no response, no error)
+  /// cannot hold a durable job in `running` forever. Timeouts map to the
+  /// retryable [AppFailureCode.aiTimeout] so the job worker retries it.
+  Future<AiGenerationResult> _withTimeout(
+    Future<AiGenerationResult> request,
+  ) async {
+    try {
+      return await request.timeout(generationTimeout);
+    } on TimeoutException {
+      _logger.info('AiRouter', 'AI request timed out; will retry.');
+      throw const AppFailure.timeout();
+    }
   }
 }
