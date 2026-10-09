@@ -12,6 +12,14 @@ abstract interface class DeliveryEventsRepository {
     required DateTime at,
   });
 
+  /// Records the handoff and moves the birthday to handed off in one
+  /// transaction, so the evidence row and the status can never diverge (F20).
+  Future<void> recordHandoffAndMarkHandedOff({
+    required String birthdayId,
+    required DeliveryChannel channel,
+    required DateTime at,
+  });
+
   /// The most recent known handoff for a birthday, or null if none.
   Future<DeliveryHandoff?> latestHandoffForBirthday(String birthdayId);
 

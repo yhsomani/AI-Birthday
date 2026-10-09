@@ -24,6 +24,13 @@ class _FakeDeliveryEventsRepository implements DeliveryEventsRepository {
   }) async {}
 
   @override
+  Future<void> recordHandoffAndMarkHandedOff({
+    required String birthdayId,
+    required DeliveryChannel channel,
+    required DateTime at,
+  }) async {}
+
+  @override
   Future<DeliveryHandoff?> latestHandoffForBirthday(String birthdayId) async {
     for (final h in handoffs.reversed) {
       if (h.birthdayId == birthdayId) return h;

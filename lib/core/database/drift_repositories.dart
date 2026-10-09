@@ -418,6 +418,27 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
   }
 
   @override
+  Future<void> recordHandoffAndMarkHandedOff({
+    required String birthdayId,
+    required DeliveryChannel channel,
+    required DateTime at,
+  }) {
+    // One transaction: a failure part-way cannot leave a handed-off birthday
+    // without its evidence row, or the reverse (audit F20).
+    return _database.transaction(() async {
+      await recordHandoff(birthdayId: birthdayId, channel: channel, at: at);
+      await (_database.update(
+        _database.birthdays,
+      )..where((r) => r.id.equals(birthdayId))).write(
+        db.BirthdaysCompanion(
+          status: Value(BirthdayStatus.handedOff.name),
+          updatedAt: Value(at.toUtc()),
+        ),
+      );
+    });
+  }
+
+  @override
   Future<DeliveryHandoff?> latestHandoffForBirthday(String birthdayId) async {
     final row =
         await (_database.select(_database.deliveryEvents)

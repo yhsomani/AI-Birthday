@@ -177,6 +177,53 @@ void main() {
     });
   });
 
+  group('recordHandoffAndMarkHandedOff is one transaction (audit F20)', () {
+    late AppDatabase db;
+    late DriftDeliveryEventsRepository repo;
+
+    setUp(() {
+      db = AppDatabase(NativeDatabase.memory());
+      repo = DriftDeliveryEventsRepository(db);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    test(
+      'the evidence row and the handed-off status are written together',
+      () async {
+        final now = DateTime.utc(2026, 1, 1, 9);
+        await db
+            .into(db.birthdays)
+            .insert(
+              BirthdaysCompanion.insert(
+                id: 'b-tx',
+                personId: 'p-tx',
+                cycleYear: 2026,
+                date: DateTime.utc(2026, 1, 1),
+                status: 'pending',
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+
+        await repo.recordHandoffAndMarkHandedOff(
+          birthdayId: 'b-tx',
+          channel: DeliveryChannel.whatsapp,
+          at: now,
+        );
+
+        final handoff = await repo.latestHandoffForBirthday('b-tx');
+        expect(handoff?.channel, DeliveryChannel.whatsapp);
+        final row = await (db.select(
+          db.birthdays,
+        )..where((r) => r.id.equals('b-tx'))).getSingle();
+        expect(row.status, 'handedOff');
+      },
+    );
+  });
+
   group('DriftDraftsRepository (stable ordering)', () {
     late AppDatabase db;
     late DriftDraftsRepository repo;

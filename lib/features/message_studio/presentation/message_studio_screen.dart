@@ -444,14 +444,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
 
       // Track handoff status only when launch succeeds; otherwise action required (SSOT §9)
       if (launched) {
-        await ref
-            .read(birthdaysRepositoryProvider)
-            .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
-        // Persist the launch as evidence (audit 03 P1-1): History renders
-        // "Opened in WhatsApp" from this record, never from status alone.
+        // Evidence and the handed-off status move in one transaction (audit F20).
         await ref
             .read(deliveryEventsRepositoryProvider)
-            .recordHandoff(
+            .recordHandoffAndMarkHandedOff(
               birthdayId: _activeBirthdayId,
               channel: DeliveryChannel.whatsapp,
               at: DateTime.now(),
@@ -528,12 +524,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       );
 
       if (launched) {
-        await ref
-            .read(birthdaysRepositoryProvider)
-            .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
+        // Evidence and the handed-off status move in one transaction (audit F20).
         await ref
             .read(deliveryEventsRepositoryProvider)
-            .recordHandoff(
+            .recordHandoffAndMarkHandedOff(
               birthdayId: _activeBirthdayId,
               channel: DeliveryChannel.sms,
               at: DateTime.now(),
@@ -592,12 +586,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       );
 
       if (launched) {
-        await ref
-            .read(birthdaysRepositoryProvider)
-            .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.handedOff);
+        // Evidence and the handed-off status move in one transaction (audit F20).
         await ref
             .read(deliveryEventsRepositoryProvider)
-            .recordHandoff(
+            .recordHandoffAndMarkHandedOff(
               birthdayId: _activeBirthdayId,
               channel: DeliveryChannel.share,
               at: DateTime.now(),
