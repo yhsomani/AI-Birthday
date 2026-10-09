@@ -18,6 +18,7 @@ against HEAD. Each finding was re-verified in source before any change.
 | F05 Overwrites and stale devices | **Fixed** (snapshot backup) | Each backup writes a complete immutable generation under `users/{uid}/generations/{id}`, then one commit writes the manifest and moves `backup/current` to it. A failed row write never moves the pointer (test). Rules fence generation writes during deletion (emulator test). |
 | F06 Restore all-or-nothing | **Fixed** (manifest and count check) | Restore reads the `backup/current` pointer and its manifest, checks each collection count against the manifest, and only then applies one local transaction. Test: an incomplete download writes nothing. Still open: malformed records are skipped while success is reported. |
 | F20 Handoff history label | Partly fixed (verified at HEAD) | History labels a handoff from the recorded delivery event (`history_screen.dart`, `_handoffLabel`), not from status, and the WhatsApp launch records evidence. Still open: the draft stays `ready` after handoff, and the birthday and draft writes are not one transaction. |
+| F24 Dependency audit not enforced | **Partly fixed** | CI now runs `npm audit --omit=dev --audit-level=high` on the backend, which passes locally. Dev-only advisories (in the full tree) are still reported and not blocking. The audit:ci script is unchanged. |
 | F21 Recipient name in Android log | **Fixed** | `BirthdayNotificationReceiver.kt` no longer logs the notification title. |
 | F23 Dart format gate | **Fixed** | `dart format --set-exit-if-changed .` passes. 37 files were reformatted (indentation only, one separate commit recommended). Line endings normalised to LF to match the index. |
 | F12 Import and restore skip reminders | **Fixed** | CSV and device imports already re-plan reminders. A successful cloud restore now invalidates the reminder settings controller and re-plans reminders through `CloudSyncJobHandler.onRestored`. Failed restores do not re-plan. Three handler tests cover backup, restore and failed restore. |
@@ -47,7 +48,7 @@ These need either a product decision or a larger change. Nothing here has been s
 - F20, F22 — delivery attempts and channel history; splitting oversized screens.
 - F21 remainder — App Check initialisation and validation of backup documents.
 - F23 remainder — pin the Flutter version, add hosting checks to CI, review goldens.
-- F24 — dependency audit policy in CI.
+- F24 remainder — triage and upgrade the moderate production advisories and the dev-tree advisories.
 - F19 remainder — export of email, language, timezone, closeness and preferences; duplicate detection within an import batch.
 - F03 remainder — decide retention for `subscriptionPurchaseOwnership/` (a product and legal decision).
 - Privacy — the Gemini paragraph differs between the source and generated pages. One of them is wrong; check the Gemini prompt code before editing.

@@ -72,6 +72,11 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      # Production dependencies must have no high or critical advisories (audit F24).
+      # Dev-only advisories are reported in the audit output but do not block.
+      - name: Production Dependency Audit
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Install Java for Firebase Emulator
         uses: actions/setup-java@v6
         with:
