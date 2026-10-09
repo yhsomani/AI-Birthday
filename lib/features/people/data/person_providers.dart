@@ -20,24 +20,32 @@ final personServiceProvider = Provider<PersonService>(
     ref.watch(loggerProvider),
     onChanged: () async {
       if (WidgetsBinding.instance is! WidgetsFlutterBinding) return;
-      try {
-        final reminderService = ref.read(reminderServiceProvider);
-        final settings = ref.read(reminderSettingsProvider);
-        final people = await ref.read(peopleStoreProvider).getAll();
-        await reminderService.sync(people: people, settings: settings);
-      } catch (error, stackTrace) {
-        ref
-            .read(loggerProvider)
-            .warning(
-              'people',
-              'Reminder schedule refresh failed after a contact change.',
-              error: error,
-              stackTrace: stackTrace,
-            );
-      }
+      await resyncReminderSchedule(ref.container);
     },
   ),
 );
+
+/// Refreshes the reminder plan after contact changes that bypass
+/// [PersonService]'s onChanged hook (CSV / device-contacts imports, which
+/// batch-write through the repositories). Failures are logged, never thrown —
+/// an import must not be blocked by schedule refresh.
+Future<void> resyncReminderSchedule(ProviderContainer container) async {
+  try {
+    final reminderService = container.read(reminderServiceProvider);
+    final settings = container.read(reminderSettingsProvider);
+    final people = await container.read(peopleStoreProvider).getAll();
+    await reminderService.sync(people: people, settings: settings);
+  } catch (error, stackTrace) {
+    container
+        .read(loggerProvider)
+        .warning(
+          'people',
+          'Reminder schedule refresh failed after a contact import.',
+          error: error,
+          stackTrace: stackTrace,
+        );
+  }
+}
 
 /// Live, sorted list of active recipients.
 final personListProvider = StreamProvider<List<Person>>(

@@ -10,7 +10,7 @@ import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart'
     as b_models;
 import 'package:ai_birthday/features/people/data/contact_csv_service.dart';
 import 'package:ai_birthday/features/people/data/person_providers.dart'
-    show personServiceProvider;
+    show personServiceProvider, resyncReminderSchedule;
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 import 'package:ai_birthday/ui/design_system/app_tokens.dart';
@@ -376,13 +376,17 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
       importedCount++;
     }
 
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Successfully imported $importedCount contacts.'),
-        ),
-      );
-    }
+    if (!context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    // Batch imports write through the repositories (bypassing PersonService's
+    // onChanged hook), so refresh the reminder plan explicitly.
+    await resyncReminderSchedule(ProviderScope.containerOf(context));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Successfully imported $importedCount contacts.'),
+      ),
+    );
   }
 
   Future<void> _syncDeviceContacts(
