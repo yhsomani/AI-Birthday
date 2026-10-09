@@ -19,6 +19,7 @@ against HEAD. Each finding was re-verified in source before any change.
 | F06 Restore all-or-nothing | **Fixed** (manifest and count check) | Restore reads the `backup/current` pointer and its manifest, checks each collection count against the manifest, and only then applies one local transaction. Test: an incomplete download writes nothing. Still open: malformed records are skipped while success is reported. |
 | F21 Recipient name in Android log | **Fixed** | `BirthdayNotificationReceiver.kt` no longer logs the notification title. |
 | F23 Dart format gate | **Fixed** | `dart format --set-exit-if-changed .` passes. 37 files were reformatted (indentation only, one separate commit recommended). Line endings normalised to LF to match the index. |
+| F13 Scheduling loses alarms | **Partly fixed** (native) | `MainActivity.kt` checks exact-alarm permission before touching anything, schedules the new plan first, and cancels only alarms the new plan drops. Reminders are no longer cancelled on reschedule, and posted notifications are no longer cleared. APK builds; not run on a device. Open: quiet-hours policy (suppressed reminders are still discarded) and rolling renewal of future occurrences. |
 | F19 CSV round-trip and validation | **Fixed** (import/export core) | Quote-aware record splitting; real month/day validation (April 31 rejected, Feb 29 accepted); formula guard on export, stripped on import. Phone numbers are exempt from the guard. |
 
 ## Decisions settled by the project owner
@@ -36,7 +37,9 @@ These need either a product decision or a larger change. Nothing here has been s
 - F05 remainder — delete superseded generations (storage grows without it).
 - F06 remainder — report malformed records as skipped instead of silently ignoring them.
 - F07, F08, F09, F10 — account partitioning, immutable birthday occurrences, midnight refresh, one Person model.
-- F12, F13, F15 — import/restore reminder refresh, alarm replacement safety, purchase binding against Play.
+- F12 — import/restore reminder refresh.
+- F13 remainder — quiet-hours policy and rolling renewal (product decisions); on-device verification.
+- F15 — purchase binding against Play.
 - F14 remainder — request deadlines, a single controlled retry, and disposal of the owned HTTP client.
 - F16 — make purchase status reactive and add a durable retry for pending verification.
 - F17 — auto-prepare: implement or remove (product decision).

@@ -405,8 +405,21 @@ class MainActivity : FlutterActivity() {
         val now = System.currentTimeMillis()
         val prefs = getSharedPreferences(BirthdayNotificationReceiver.PREFS_NAME, Context.MODE_PRIVATE)
 
-        // Cancel previous alarms first to avoid duplicate pending intents.
-        var allScheduled = cancelAllReminders()
+        // Validate before replacing anything (audit F13). Without exact-alarm
+        // permission the current schedule is kept, not erased.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            Log.w("BirthdayReminder", "Exact alarm permission is unavailable; keeping the existing schedule.")
+            return false
+        }
+
+        // Previously scheduled alarms. New alarms reuse their request codes, so
+        // scheduling replaces a pending intent in place; only alarms that are
+        // no longer in the plan are cancelled afterwards.
+        val previousIds = prefs.getStringSet(
+            BirthdayNotificationReceiver.KEY_SCHEDULED_ALARM_IDS,
+            emptySet()
+        ) ?: emptySet()
+        var allScheduled = true
 
         val scheduledIds = mutableSetOf<String>()
         val scheduledTriggers = JSONArray()
@@ -482,12 +495,45 @@ class MainActivity : FlutterActivity() {
             }
         }
 
+        // Only now that the new plan is in place, drop alarms it no longer covers.
+        if (!cancelScheduledIds(previousIds - scheduledIds)) {
+            allScheduled = false
+        }
+
         prefs.edit()
             .putStringSet(BirthdayNotificationReceiver.KEY_SCHEDULED_ALARM_IDS, scheduledIds)
             .putString(BirthdayNotificationReceiver.KEY_SCHEDULED_TRIGGERS_JSON, scheduledTriggers.toString())
             .apply()
 
         return allScheduled
+    }
+
+    /** Cancels the pending alarms for [ids]. Returns false if any cancel failed. */
+    private fun cancelScheduledIds(ids: Set<String>): Boolean {
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return false
+        var allCancelled = true
+        for (idStr in ids) {
+            val id = idStr.toIntOrNull() ?: continue
+            val intent = Intent(this, BirthdayNotificationReceiver::class.java).apply {
+                action = BirthdayNotificationReceiver.ACTION_BIRTHDAY_REMINDER
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                this,
+                id,
+                intent,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (pendingIntent != null) {
+                try {
+                    alarmManager.cancel(pendingIntent)
+                    pendingIntent.cancel()
+                } catch (e: Exception) {
+                    Log.e("BirthdayReminder", "Failed to cancel reminder id=$id", e)
+                    allCancelled = false
+                }
+            }
+        }
+        return allCancelled
     }
 
     private fun cancelAllReminders(): Boolean {
@@ -499,28 +545,8 @@ class MainActivity : FlutterActivity() {
         ) ?: emptySet()
         var allCancelled = true
 
-        if (alarmManager != null) {
-            for (idStr in scheduledIds) {
-                val id = idStr.toIntOrNull() ?: continue
-                val intent = Intent(this, BirthdayNotificationReceiver::class.java).apply {
-                    action = BirthdayNotificationReceiver.ACTION_BIRTHDAY_REMINDER
-                }
-                val pendingIntent = PendingIntent.getBroadcast(
-                    this,
-                    id,
-                    intent,
-                    PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-                )
-                if (pendingIntent != null) {
-                    try {
-                        alarmManager.cancel(pendingIntent)
-                        pendingIntent.cancel()
-                    } catch (e: Exception) {
-                        Log.e("BirthdayReminder", "Failed to cancel reminder id=$id", e)
-                        allCancelled = false
-                    }
-                }
-            }
+        if (alarmManager != null && !cancelScheduledIds(scheduledIds)) {
+            allCancelled = false
         }
         prefs.edit()
             .remove(BirthdayNotificationReceiver.KEY_SCHEDULED_ALARM_IDS)
