@@ -40,13 +40,7 @@ class ParsedContactCandidate {
   bool get isPotentialDuplicate => duplicateWarning != null;
 
   /// Returns true if this candidate has a valid birthday specified.
-  bool get hasBirthday =>
-      birthdayMonth != null &&
-      birthdayDay != null &&
-      birthdayMonth! >= 1 &&
-      birthdayMonth! <= 12 &&
-      birthdayDay! >= 1 &&
-      birthdayDay! <= 31;
+  bool get hasBirthday => _isValidMonthDay(birthdayMonth, birthdayDay);
 
   Person toPerson({String? id}) {
     final now = DateTime.now();
@@ -93,7 +87,7 @@ class ContactCsvService {
         person.hasBirthday ? person.birthdayMonth.toString() : '',
         person.hasBirthday ? person.birthdayDay.toString() : '',
         person.birthYear?.toString() ?? '',
-        _escapeCsv(person.phoneNumber ?? ''),
+        _escapeCsv(person.phoneNumber ?? '', guardFormulas: false),
         _escapeCsv(person.relationship.displayName),
         _escapeCsv(person.preferredTone.displayName),
         _escapeCsv(person.importantFacts.join('; ')),
@@ -121,20 +115,21 @@ class ContactCsvService {
     String csvContent, {
     List<Person> existingPeople = const [],
   }) {
-    final lines = csvContent.split(RegExp(r'\r?\n'));
-    if (lines.isEmpty) return const CsvParseResult(candidates: []);
+    final records = _splitRecords(csvContent);
+    if (records.isEmpty) return const CsvParseResult(candidates: []);
 
     final candidates = <ParsedContactCandidate>[];
     final invalidRows = <String>[];
     bool isFirstLine = true;
     int rowNumber = 0;
 
-    for (final rawLine in lines) {
+    for (final record in records) {
       rowNumber++;
-      final line = rawLine.trim();
-      if (line.isEmpty) continue;
+      if (record.trim().isEmpty) continue;
 
-      final fields = _parseCsvLine(line);
+      // Parse the whole record, not the trimmed text, so quoted newlines and
+      // trailing spaces inside a quoted field survive.
+      final fields = _parseCsvLine(record);
       if (fields.isEmpty) continue;
 
       // Skip header row if detected
@@ -161,13 +156,8 @@ class ContactCsvService {
         day = int.tryParse(fields[2].trim());
       }
 
-      // If month/day are null or out of range, try parsing as a unified date string (e.g. "1990-05-12" or "05/12")
-      if (month == null ||
-          day == null ||
-          month < 1 ||
-          month > 12 ||
-          day < 1 ||
-          day > 31) {
+      // If month/day are null or impossible, try parsing as a unified date string (e.g. "1990-05-12" or "05/12")
+      if (!_isValidMonthDay(month, day)) {
         if (fields.length >= 2) {
           final parsed = _parseDateString(fields[1].trim());
           if (parsed != null) {
@@ -179,12 +169,7 @@ class ContactCsvService {
       }
 
       // Validation fallback: Skip if valid birthday cannot be resolved
-      if (month == null ||
-          day == null ||
-          month < 1 ||
-          month > 12 ||
-          day < 1 ||
-          day > 31) {
+      if (!_isValidMonthDay(month, day)) {
         invalidRows.add(
           'Row $rowNumber ("$name"): Missing or invalid birthday',
         );
@@ -264,14 +249,50 @@ class ContactCsvService {
   static String _cleanPhone(String phone) =>
       phone.replaceAll(RegExp(r'\D'), '');
 
-  static String _escapeCsv(String value) {
-    if (value.contains(',') ||
-        value.contains('"') ||
-        value.contains('\n') ||
-        value.contains(';')) {
-      return '"${value.replaceAll('"', '""')}"';
+  static String _escapeCsv(String value, {bool guardFormulas = true}) {
+    // Spreadsheet-safe export: a leading = + - @ or tab/CR would be evaluated as
+    // a formula when opened in a spreadsheet, so a single quote is prefixed.
+    // Phone numbers are exempt: a leading + is part of the number itself.
+    final guarded = guardFormulas && _formulaGuardPattern.hasMatch(value)
+        ? "'$value"
+        : value;
+    if (guarded.contains(',') ||
+        guarded.contains('"') ||
+        guarded.contains('\n') ||
+        guarded.contains('\r') ||
+        guarded.contains(';')) {
+      return '"${guarded.replaceAll('"', '""')}"';
     }
-    return value;
+    return guarded;
+  }
+
+  static final RegExp _formulaGuardPattern = RegExp(r'^[=+\-@\t\r]');
+
+  /// Splits [content] into records. Line breaks inside a quoted field belong to
+  /// that field, so only unquoted CR, LF or CRLF end a record.
+  static List<String> _splitRecords(String content) {
+    final records = <String>[];
+    final buffer = StringBuffer();
+    bool insideQuotes = false;
+
+    for (int i = 0; i < content.length; i++) {
+      final char = content[i];
+      if (char == '"') {
+        // An escaped "" toggles twice, so the quote state stays correct.
+        insideQuotes = !insideQuotes;
+        buffer.write(char);
+      } else if (!insideQuotes && (char == '\n' || char == '\r')) {
+        if (char == '\r' && i + 1 < content.length && content[i + 1] == '\n') {
+          i++;
+        }
+        records.add(buffer.toString());
+        buffer.clear();
+      } else {
+        buffer.write(char);
+      }
+    }
+    records.add(buffer.toString());
+    return records;
   }
 
   static List<String> _parseCsvLine(String line) {
@@ -289,14 +310,24 @@ class ContactCsvService {
           insideQuotes = !insideQuotes;
         }
       } else if (char == ',' && !insideQuotes) {
-        fields.add(buffer.toString());
+        fields.add(_stripFormulaGuard(buffer.toString()));
         buffer.clear();
       } else {
         buffer.write(char);
       }
     }
-    fields.add(buffer.toString());
+    fields.add(_stripFormulaGuard(buffer.toString()));
     return fields;
+  }
+
+  /// Removes the guard added by [_escapeCsv] so an exported file round-trips.
+  static String _stripFormulaGuard(String field) {
+    if (field.length > 1 &&
+        field[0] == "'" &&
+        _formulaGuardPattern.hasMatch(field.substring(1))) {
+      return field.substring(1);
+    }
+    return field;
   }
 
   static Map<String, int?>? _parseDateString(String dateStr) {
@@ -328,4 +359,14 @@ class ContactCsvService {
     }
     return null;
   }
+}
+
+/// True when [month]/[day] is a real calendar day. Feb 29 is accepted because a
+/// birthday may omit the year, so the leap day cannot be ruled out.
+bool _isValidMonthDay(int? month, int? day) {
+  if (month == null || day == null || month < 1 || month > 12 || day < 1) {
+    return false;
+  }
+  const daysInMonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= daysInMonth[month - 1];
 }

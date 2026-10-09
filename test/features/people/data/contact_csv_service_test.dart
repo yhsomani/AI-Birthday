@@ -149,5 +149,64 @@ Dr. Brown,1955-11-05
         expect(person.name, 'Friend Without Birthday');
       },
     );
+
+    test('multiline notes survive an export and re-import (F19)', () {
+      final notes = 'Line one\nLine two, with "quotes"';
+      final person = Person(
+        id: 'multi',
+        name: 'Multi Line',
+        birthdayMonth: 6,
+        birthdayDay: 15,
+        relationship: RelationshipCategory.friend,
+        preferredTone: MessageTone.warm,
+        notes: notes,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final csv = service.exportToCsv([person]);
+      final result = service.parseCsvWithResult(csv);
+
+      expect(result.invalidRows, isEmpty);
+      expect(result.candidates, hasLength(1));
+      expect(result.candidates.single.notes, notes);
+      expect(result.candidates.single.birthdayMonth, 6);
+      expect(result.candidates.single.birthdayDay, 15);
+    });
+
+    test('rejects impossible calendar days but accepts Feb 29 (F19)', () {
+      final result = service.parseCsvWithResult(
+        'Name,Month,Day\nApril Thirty-One,4,31\nLeap Day,2,29',
+      );
+
+      expect(result.candidates.map((c) => c.name), ['Leap Day']);
+      expect(result.invalidRows, hasLength(1));
+      expect(result.invalidRows.single, contains('April Thirty-One'));
+    });
+
+    test(
+      'formula-leading names are guarded on export and restored on import (F19)',
+      () {
+        final person = Person(
+          id: 'formula',
+          name: '=HYPERLINK("https://example.test")',
+          birthdayMonth: 1,
+          birthdayDay: 2,
+          relationship: RelationshipCategory.friend,
+          preferredTone: MessageTone.warm,
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final csv = service.exportToCsv([person]);
+        expect(csv, contains("'=HYPERLINK"));
+
+        final result = service.parseCsvWithResult(csv);
+        expect(
+          result.candidates.single.name,
+          '=HYPERLINK("https://example.test")',
+        );
+      },
+    );
   });
 }
