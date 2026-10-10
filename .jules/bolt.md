@@ -35,3 +35,6 @@
 ## 2024-05-18 - Remove replaceAll string manipulations in hot paths
 **Learning:** Using `replaceAll` on strings inside frequently called functions like a logger adds significant hidden overhead (e.g., O(N) allocation x2 per log parameter). Pre-compiling a slightly more complex regular expression to account for punctuation is much faster (~2x) in high-volume logging pathways.
 **Action:** When performing string sanitization or checks in hot code paths, use robust RegExp patterns instead of chaining string manipulation functions.
+## 2025-02-23 - Offloading string sorting and transformations to SQLite
+**Learning:** Dart's list `.sort()` paired with inline string `.toLowerCase()` causes repeated, expensive `O(N log N)` String allocations during comparisons, leading to massive memory pressure and long block times on large query sets (e.g. 50k rows taking 1.4 seconds locally).
+**Action:** When filtering or sorting data from Drift (SQLite), shift string transformations (`LOWER(name)`) and the ordering entirely to the database query itself using `..orderBy()`. SQLite executes this much faster internally and completely eliminates the intermediate Dart String garbage collection overhead, making the Dart layer strictly responsible for mapping domain classes.
