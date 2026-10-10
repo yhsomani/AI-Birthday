@@ -7,3 +7,7 @@
 
 **Learning:** List items that navigate or open modals (e.g., in `PeopleScreen`) are primary interactive elements. Missing haptic feedback on these actions breaks the physical response expected from primary UI components.
 **Action:** Ensure `HapticFeedback.lightImpact()` is included in the `onTap` handlers of list items that trigger state changes or navigation to maintain a consistent, responsive feel.
+
+## 2024-05-24 - Add Spinner to Primary Action Buttons
+**Learning:** Users lack confidence that form submission is actually processing if the primary action button only changes its text (e.g. 'Saving...'). Incorporating a visual spinner alongside the text is crucial for perceived responsiveness during async submissions.
+**Action:** Always combine a `CircularProgressIndicator` inside a `SizedBox` with text changes in the primary action button during async states.
