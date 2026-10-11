@@ -109,6 +109,21 @@ void main() {
           ),
           returnsNormally,
         );
+
+        final captured = <String>[];
+        final diagnosticLogger = ConsoleAppLogger(sink: captured.add);
+        diagnosticLogger.error(
+          'Network',
+          'Failed request',
+          errorCategory: 'timeout',
+          error: StateError('Connection aborted'),
+          params: {'endpoint': 'https://api.example.com'},
+        );
+        expect(captured, hasLength(1));
+        expect(captured.single, contains('[error] Network'));
+        expect(captured.single, contains('[category:timeout]'));
+        expect(captured.single, contains('error=StateError'));
+        expect(captured.single, contains('endpoint=https://api.example.com'));
       },
     );
   });

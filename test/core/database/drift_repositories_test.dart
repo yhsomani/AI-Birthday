@@ -85,22 +85,28 @@ void main() {
       expect(people.map((p) => p.id).toList(), ['p-a', 'p-b']);
     });
 
-    test('getPeople sorts case-insensitively using database lower(name)', () async {
-      await repo.savePerson(person(id: 'p-1', name: 'charlie'));
-      await repo.savePerson(person(id: 'p-2', name: 'Alice'));
-      await repo.savePerson(person(id: 'p-3', name: 'bob'));
+    test(
+      'getPeople sorts case-insensitively using database lower(name)',
+      () async {
+        await repo.savePerson(person(id: 'p-1', name: 'charlie'));
+        await repo.savePerson(person(id: 'p-2', name: 'Alice'));
+        await repo.savePerson(person(id: 'p-3', name: 'bob'));
 
-      final people = await repo.getPeople();
-      expect(people.map((p) => p.name).toList(), ['Alice', 'bob', 'charlie']);
-    });
+        final people = await repo.getPeople();
+        expect(people.map((p) => p.name).toList(), ['Alice', 'bob', 'charlie']);
+      },
+    );
 
-    test('watchPeople sorts case-insensitively using database lower(name)', () async {
-      await repo.savePerson(person(id: 'p-1', name: 'bob'));
-      await repo.savePerson(person(id: 'p-2', name: 'Alice'));
+    test(
+      'watchPeople sorts case-insensitively using database lower(name)',
+      () async {
+        await repo.savePerson(person(id: 'p-1', name: 'bob'));
+        await repo.savePerson(person(id: 'p-2', name: 'Alice'));
 
-      final firstEmission = await repo.watchPeople().first;
-      expect(firstEmission.map((p) => p.name).toList(), ['Alice', 'bob']);
-    });
+        final firstEmission = await repo.watchPeople().first;
+        expect(firstEmission.map((p) => p.name).toList(), ['Alice', 'bob']);
+      },
+    );
   });
 
   group('DriftDeliveryEventsRepository (audit 03 P1-1)', () {

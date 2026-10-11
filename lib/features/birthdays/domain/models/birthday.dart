@@ -82,7 +82,11 @@ class Birthday {
   int daysUntil(DateTime referenceDate) {
     final ref = referenceDate.isUtc ? referenceDate : referenceDate.toLocal();
     final normalized = referenceDate.isUtc ? date.toUtc() : date.toLocal();
-    final targetUtc = DateTime.utc(normalized.year, normalized.month, normalized.day);
+    final targetUtc = DateTime.utc(
+      normalized.year,
+      normalized.month,
+      normalized.day,
+    );
     final refUtc = DateTime.utc(ref.year, ref.month, ref.day);
     return targetUtc.difference(refUtc).inDays;
   }

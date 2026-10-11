@@ -396,8 +396,12 @@ class CloudSyncService {
       // The `backup/current` pointer only moves after the whole generation and
       // its manifest are stored, so a failed run leaves the last backup intact.
       final generationId = _newGenerationId(now);
-      final (allPersonRows, allBirthdayRows, allDraftRows, reminderRows) =
-          await _db.transaction(() async {
+      final (
+        allPersonRows,
+        allBirthdayRows,
+        allDraftRows,
+        reminderRows,
+      ) = await _db.transaction(() async {
         final p = await _db.select(_db.persons).get();
         final b = await _db.select(_db.birthdays).get();
         final d = await _db.select(_db.messageDrafts).get();

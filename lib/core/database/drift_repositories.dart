@@ -115,7 +115,6 @@ class DriftPeopleRepository implements PeopleRepository {
     )..where((r) => r.id.equals(id))).getSingleOrNull();
   }
 
-
   static Person _personFromRow(db.Person row) {
     return Person(
       id: row.id,

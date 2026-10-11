@@ -99,39 +99,45 @@ void main() {
       expect(second.read(reminderSettingsProvider).kinds, isEmpty);
     });
 
-    testWidgets('rapid toggles execute sequentially and preserve final state (AUD-015)', (
-      tester,
-    ) async {
-      final harness = E2ETestHarness()..setUp();
-      addTearDown(() => harness.db.close());
+    testWidgets(
+      'rapid toggles execute sequentially and preserve final state (AUD-015)',
+      (tester) async {
+        final harness = E2ETestHarness()..setUp();
+        addTearDown(() => harness.db.close());
 
-      final container = ProviderContainer(overrides: harness.providerOverrides);
-      addTearDown(container.dispose);
+        final container = ProviderContainer(
+          overrides: harness.providerOverrides,
+        );
+        addTearDown(container.dispose);
 
-      final notifier = container.read(reminderSettingsProvider.notifier);
-      await tester.pump();
-      await tester.pump();
+        final notifier = container.read(reminderSettingsProvider.notifier);
+        await tester.pump();
+        await tester.pump();
 
-      // Fire rapid mutations synchronously
-      notifier.setEnabled(true);
-      notifier.setKind(ReminderKind.approaching, false);
-      notifier.setKind(ReminderKind.prepare, false);
-      notifier.setEnabled(false);
+        // Fire rapid mutations synchronously
+        notifier.setEnabled(true);
+        notifier.setKind(ReminderKind.approaching, false);
+        notifier.setKind(ReminderKind.prepare, false);
+        notifier.setEnabled(false);
 
-      await tester.pump();
-      await tester.pump();
-      await tester.pump();
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
 
-      final state = container.read(reminderSettingsProvider);
-      expect(state.enabled, isFalse);
-      expect(state.kinds.contains(ReminderKind.approaching), isFalse);
-      expect(state.kinds.contains(ReminderKind.prepare), isFalse);
+        final state = container.read(reminderSettingsProvider);
+        expect(state.enabled, isFalse);
+        expect(state.kinds.contains(ReminderKind.approaching), isFalse);
+        expect(state.kinds.contains(ReminderKind.prepare), isFalse);
 
-      final db = container.read(databaseProvider);
-      final rows = await (db.select(db.reminderSettingsEntries)).get();
-      expect(rows, hasLength(1));
-      expect(rows.single.enabled, isFalse);
-      expect(rows.single.kinds, isNot(contains(ReminderKind.approaching.name)));
-    });
+        final db = container.read(databaseProvider);
+        final rows = await (db.select(db.reminderSettingsEntries)).get();
+        expect(rows, hasLength(1));
+        expect(rows.single.enabled, isFalse);
+        expect(
+          rows.single.kinds,
+          isNot(contains(ReminderKind.approaching.name)),
+        );
+      },
+    );
   });
 }

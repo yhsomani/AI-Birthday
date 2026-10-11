@@ -129,8 +129,17 @@ class ConsoleAppLogger implements AppLogger {
     final opacity = record.operationId == null
         ? ''
         : ' [op:${record.operationId}]';
+    final categoryInfo = record.errorCategory == null
+        ? ''
+        : ' [category:${record.errorCategory}]';
+    final durationInfo = record.durationMs == null
+        ? ''
+        : ' (${record.durationMs}ms)';
+    final errorInfo = record.error == null
+        ? ''
+        : ' error=${record.error.runtimeType}';
     sink(
-      '[${record.level.name}] ${record.category}$opacity: ${record.message}$extra',
+      '[${record.level.name}] ${record.category}$opacity$categoryInfo: ${record.message}$durationInfo$extra$errorInfo',
     );
   }
 

@@ -153,22 +153,24 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
   void _schedulePersistAndSync() {
     _revision++;
     final rev = _revision;
-    _persistChain = _persistChain.then((_) async {
-      final target = state;
-      final saved = await _saveToDatabase(target);
-      if (!saved) {
-        if (rev == _revision) {
-          // Persistence failed: never keep a toggle the store rejected. Restore
-          // the pre-change value (UI back to truth) and keep the error visible.
-          state = _lastCommitted.copyWith(syncError: state.syncError);
-        }
-        return;
-      }
-      _lastCommitted = target;
-      if (rev == _revision) {
-        await _syncService();
-      }
-    }).catchError((_) {});
+    _persistChain = _persistChain
+        .then((_) async {
+          final target = state;
+          final saved = await _saveToDatabase(target);
+          if (!saved) {
+            if (rev == _revision) {
+              // Persistence failed: never keep a toggle the store rejected. Restore
+              // the pre-change value (UI back to truth) and keep the error visible.
+              state = _lastCommitted.copyWith(syncError: state.syncError);
+            }
+            return;
+          }
+          _lastCommitted = target;
+          if (rev == _revision) {
+            await _syncService();
+          }
+        })
+        .catchError((_) {});
   }
 
   void setEnabled(bool enabled) {

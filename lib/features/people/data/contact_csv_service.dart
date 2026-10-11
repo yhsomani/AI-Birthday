@@ -207,10 +207,9 @@ class ContactCsvService {
           }
           return null;
         }
-        final pos =
-            (fields.length >= 10 && extendedPos != null)
-                ? extendedPos
-                : legacyPos;
+        final pos = (fields.length >= 10 && extendedPos != null)
+            ? extendedPos
+            : legacyPos;
         if (pos >= 0 && pos < fields.length) {
           final v = fields[pos].trim();
           return v.isNotEmpty ? v : null;
@@ -270,14 +269,13 @@ class ContactCsvService {
       final preferredLanguage = languageStr ?? 'en';
       final autoPrepare = (autoPrepareStr ?? 'true').toLowerCase() != 'false';
 
-      final facts =
-          factsStr != null && factsStr.isNotEmpty
-              ? factsStr
-                  .split(';')
-                  .map((s) => s.trim())
-                  .where((s) => s.isNotEmpty)
-                  .toList()
-              : <String>[];
+      final facts = factsStr != null && factsStr.isNotEmpty
+          ? factsStr
+                .split(';')
+                .map((s) => s.trim())
+                .where((s) => s.isNotEmpty)
+                .toList()
+          : <String>[];
 
       // Duplicate candidate check (SSOT §18 & AUD-011)
       String? duplicateWarning;
@@ -311,8 +309,7 @@ class ContactCsvService {
       // Check intra-batch duplicates (AUD-011)
       if (duplicateWarning == null) {
         for (final prev in candidates) {
-          final sameName =
-              prev.name.trim().toLowerCase() == name.toLowerCase();
+          final sameName = prev.name.trim().toLowerCase() == name.toLowerCase();
           final samePhone =
               phone != null &&
               prev.phoneNumber != null &&

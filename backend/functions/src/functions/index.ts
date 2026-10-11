@@ -305,11 +305,11 @@ export const companionStatus = onCall(commonOptions, async request => {
 });
 
 const enforceAppCheckOnPurchase =
-  process.env.ENFORCE_APP_CHECK_ON_PURCHASE === 'true';
+  process.env.ENFORCE_APP_CHECK_ON_PURCHASE !== 'false';
 
 // Purchase verification uses Firebase Auth plus a cryptographically verified
-// Google Play purchase token. App Check is configurable via ENFORCE_APP_CHECK_ON_PURCHASE
-// (defaulting to false for clients prior to native App Check provider initialization).
+// Google Play purchase token. App Check is enforced by default (can be disabled
+// in emulator/test environments via ENFORCE_APP_CHECK_ON_PURCHASE=false).
 export const verifyPurchase = onCall(
   {
     ...commonOptions,

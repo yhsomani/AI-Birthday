@@ -116,29 +116,35 @@ void main() {
     expect(restored!.deletedAt, isNull);
   });
 
-  test('update allows editing a contact that has no birthday (AUD-010)', () async {
-    // Contact imported without birthday
-    final noBdayPerson = Person(
-      id: 'imported-no-bday',
-      name: 'No Birthday Contact',
-      createdAt: DateTime.utc(2025, 6, 15, 9),
-      updatedAt: DateTime.utc(2025, 6, 15, 9),
-    );
-    final store = DriftPeopleStore(db, now: () => DateTime.utc(2025, 6, 15, 9));
-    await store.save(noBdayPerson);
-
-    // Edit notes and phone without adding birthday
-    final updated = await service.update(
-      noBdayPerson,
-      const PersonDraft(
+  test(
+    'update allows editing a contact that has no birthday (AUD-010)',
+    () async {
+      // Contact imported without birthday
+      final noBdayPerson = Person(
+        id: 'imported-no-bday',
         name: 'No Birthday Contact',
-        phoneNumber: '+1234567890',
-        notes: 'Added some notes',
-      ),
-    );
+        createdAt: DateTime.utc(2025, 6, 15, 9),
+        updatedAt: DateTime.utc(2025, 6, 15, 9),
+      );
+      final store = DriftPeopleStore(
+        db,
+        now: () => DateTime.utc(2025, 6, 15, 9),
+      );
+      await store.save(noBdayPerson);
 
-    expect(updated.phoneNumber, '+1234567890');
-    expect(updated.notes, 'Added some notes');
-    expect(updated.hasBirthday, isFalse);
-  });
+      // Edit notes and phone without adding birthday
+      final updated = await service.update(
+        noBdayPerson,
+        const PersonDraft(
+          name: 'No Birthday Contact',
+          phoneNumber: '+1234567890',
+          notes: 'Added some notes',
+        ),
+      );
+
+      expect(updated.phoneNumber, '+1234567890');
+      expect(updated.notes, 'Added some notes');
+      expect(updated.hasBirthday, isFalse);
+    },
+  );
 }

@@ -201,6 +201,15 @@ class AppDatabase extends _$AppDatabase {
       await customStatement(
         'CREATE INDEX IF NOT EXISTS idx_delivery_events_birthday_id ON delivery_events (birthday_id)',
       );
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_birthdays_person_id ON birthdays (person_id)',
+      );
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_message_drafts_birthday_id ON message_drafts (birthday_id)',
+      );
+      await customStatement(
+        'CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs (status)',
+      );
     },
   );
 }

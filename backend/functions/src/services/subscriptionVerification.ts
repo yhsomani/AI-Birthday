@@ -80,7 +80,6 @@ export class SubscriptionVerificationService {
 
     if (
       purchase.obfuscatedExternalAccountId !== null &&
-      purchase.obfuscatedExternalAccountId !== undefined &&
       purchase.obfuscatedExternalAccountId.length > 0 &&
       purchase.obfuscatedExternalAccountId !== request.accountBinding
     ) {
@@ -199,25 +198,27 @@ export class SubscriptionVerificationService {
       .get();
     if (existingDoc.exists) {
       const data = existingDoc.data() as Record<string, unknown> | undefined;
-      const currentExpiry =
-        typeof data?.expiryDateMs === 'number' ? data.expiryDateMs : 0;
-      const canUseAi = data?.canUseAi === true;
-      const existingTokenHash = data?.purchaseTokenHash;
-      if (
-        canUseAi &&
-        currentExpiry > Date.now() &&
-        (!purchaseTokenHash || existingTokenHash !== purchaseTokenHash)
-      ) {
-        return {
-          status: 'active',
-          productId:
-            typeof data?.productId === 'string'
-              ? data.productId
-              : PRO_PRODUCT_ID,
-          expiryDateMs: currentExpiry,
-          canUseAi: true,
-          isAutoRenewing: data?.isAutoRenewing === true,
-        };
+      if (data) {
+        const currentExpiry =
+          typeof data.expiryDateMs === 'number' ? data.expiryDateMs : 0;
+        const canUseAi = data.canUseAi === true;
+        const existingTokenHash = data.purchaseTokenHash;
+        if (
+          canUseAi &&
+          currentExpiry > Date.now() &&
+          (!purchaseTokenHash || existingTokenHash !== purchaseTokenHash)
+        ) {
+          return {
+            status: 'active',
+            productId:
+              typeof data.productId === 'string'
+                ? data.productId
+                : PRO_PRODUCT_ID,
+            expiryDateMs: currentExpiry,
+            canUseAi: true,
+            isAutoRenewing: data.isAutoRenewing === true,
+          };
+        }
       }
     }
     return null;

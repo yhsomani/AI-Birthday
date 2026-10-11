@@ -52,9 +52,7 @@ void main() {
             birthdaysRepositoryProvider.overrideWithValue(_FakeBirthdaysRepo()),
             loggerProvider.overrideWithValue(RecordingLogger()),
           ],
-          child: const MaterialApp(
-            home: Scaffold(body: PersonFormScreen()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: PersonFormScreen())),
         ),
       );
       await tester.pumpAndSettle();
