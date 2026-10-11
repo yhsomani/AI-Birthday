@@ -161,6 +161,16 @@ class AiGenerationJobHandler implements JobHandler {
       return const JobSucceeded();
     }
 
+    // Cycle rollover guard: re-verify the birthday still exists and targets the
+    // same cycle year so generation results are never applied across year boundaries.
+    final latestBirthday = await _birthdaysRepository.getBirthday(
+      payload.birthdayId,
+    );
+    final targetCycleYear = payload.targetCycleYear ?? birthday.cycleYear;
+    if (latestBirthday == null || latestBirthday.cycleYear != targetCycleYear) {
+      return const JobSucceeded();
+    }
+
     // Stale guard: if the draft changed after this job was enqueued, the
     // newer text wins and the AI text is deliberately dropped (no clobber).
     final current = await _draftsRepository.getDraftForBirthday(

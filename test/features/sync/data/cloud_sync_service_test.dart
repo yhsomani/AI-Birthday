@@ -662,6 +662,119 @@ void main() {
       expect(row.deletedAt, isNotNull, reason: 'local tombstone must win');
     });
 
+    test(
+      'restore does not reintroduce orphaned birthdays or drafts for a tombstoned contact (AUD-004)',
+      () async {
+        final now = DateTime.now().toUtc();
+        await db
+            .into(db.persons)
+            .insert(
+              PersonsCompanion.insert(
+                id: 'p-tombstoned',
+                name: 'Deleted Person',
+                relationship: 'Friend',
+                relationshipCloseness: 'close',
+                preferredLanguage: 'en',
+                preferredTone: 'warm',
+                importantFacts: '',
+                preferredDeliveryChannel: 'whatsapp',
+                autoSendPolicy: 'manualOnly',
+                createdAt: now.subtract(const Duration(days: 10)),
+                updatedAt: now,
+                version: 2,
+                deletedAt: Value(now),
+              ),
+            );
+
+        final mockClient = MockClient(
+          (outer) => servePublished(outer, (request) async {
+            if (request.url.path.endsWith('/birthdays')) {
+              return http.Response(
+                jsonEncode({
+                  'documents': [
+                    {
+                      'name':
+                          'projects/t/databases/(default)/documents/users/uid-test/birthdays/b-orphaned',
+                      'fields': {
+                        'id': {'stringValue': 'b-orphaned'},
+                        'personId': {'stringValue': 'p-tombstoned'},
+                        'date': {'stringValue': now.toIso8601String()},
+                        'cycleYear': {'integerValue': '2026'},
+                        'status': {'stringValue': 'upcoming'},
+                        'createdAt': {'stringValue': now.toIso8601String()},
+                        'updatedAt': {'stringValue': now.toIso8601String()},
+                      },
+                    },
+                  ],
+                }),
+                200,
+              );
+            }
+            if (request.url.path.endsWith('/message_drafts')) {
+              return http.Response(
+                jsonEncode({
+                  'documents': [
+                    {
+                      'name':
+                          'projects/t/databases/(default)/documents/users/uid-test/message_drafts/d-orphaned',
+                      'fields': {
+                        'id': {'stringValue': 'd-orphaned'},
+                        'birthdayId': {'stringValue': 'b-orphaned'},
+                        'personId': {'stringValue': 'p-tombstoned'},
+                        'body': {'stringValue': 'Orphaned Draft'},
+                        'tone': {'stringValue': 'warm'},
+                        'length': {'stringValue': 'medium'},
+                        'status': {'stringValue': 'draft'},
+                        'providerType': {'stringValue': 'manual'},
+                        'createdAt': {'stringValue': now.toIso8601String()},
+                        'updatedAt': {'stringValue': now.toIso8601String()},
+                      },
+                    },
+                  ],
+                }),
+                200,
+              );
+            }
+            return http.Response(jsonEncode({'documents': []}), 200);
+          }),
+        );
+
+        final service = CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: mockClient,
+        );
+
+        final auth = const AuthState(
+          status: AuthStatus.signedIn,
+          identity: GoogleIdentity(
+            googleSubject: 'sub-test',
+            email: 'user@example.com',
+            displayName: 'User',
+            firebaseUid: 'uid-test',
+            idToken: 'test-id-token',
+          ),
+        );
+
+        final result = await service.restore(auth);
+        expect(result.success, isTrue);
+
+        final birthdays = await db.select(db.birthdays).get();
+        expect(
+          birthdays,
+          isEmpty,
+          reason: 'must not restore birthday for tombstoned person',
+        );
+
+        final drafts = await db.select(db.messageDrafts).get();
+        expect(
+          drafts,
+          isEmpty,
+          reason: 'must not restore draft for tombstoned person',
+        );
+      },
+    );
+
     test('restore reads each collection once, not once per document', () async {
       final interceptor = CountingQueryInterceptor();
       final countedDb = AppDatabase(

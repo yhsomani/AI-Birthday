@@ -111,9 +111,9 @@ Opening WhatsApp is not treated as delivery confirmation.
 
 ## 5. Authentication
 
-Google Sign-In is implemented through `LiveGoogleAuthGateway`. A successful Google identity is exchanged with Firebase Identity Platform when Firebase configuration is present, then the resulting Firebase UID and ID token are stored in secure storage.
+Google Sign-In is implemented through `LiveGoogleAuthGateway`. A successful Google identity is exchanged with Firebase Identity Platform when Firebase configuration is present, then the resulting Firebase UID, ID token, and refresh token are stored in secure storage.
 
-The current client persists an ID token but does not implement an explicit refresh-token lifecycle. Cloud and subscription calls therefore require a currently usable Firebase ID token.
+The gateway implements automated session refresh via Google's Secure Token API (`https://securetoken.googleapis.com/v1/token`). When a refresh token is expired or revoked (HTTP 400/401), the gateway invalidates stored credentials and triggers a clean signed-out transition.
 
 ## 6. Cloud backup
 
@@ -140,14 +140,15 @@ Flow:
 
 Google Play purchase
 → purchase stream
-→ authenticated server request
+→ pre-purchase callable reachability probe (blocking billing on 401/403/404/5xx)
+→ authenticated server request (with optional Firebase App Check token)
 → Cloud Function
 → Google Play Developer API `subscriptionsv2`
 → verify product/package/account binding/state/expiry
 → write entitlement
 → client unlocks AI.
 
-The verification endpoint currently requires Firebase authentication. Firebase App Check is not yet enabled on this endpoint because the client does not initialize App Check.
+The verification endpoint supports Firebase authentication and Firebase App Check (via `X-Firebase-AppCheck` header and `enforceAppCheckOnPurchase` configuration).
 
 ## 8. AI provider routing
 
@@ -155,9 +156,9 @@ The verification endpoint currently requires Firebase authentication. Firebase A
 
 Rules:
 
-1. No active entitlement → AI locked.
-2. User Gemini API key exists → route to user Gemini.
-3. No user key + Gemini Nano is usable → route to Nano.
+1. User personal Gemini API key exists (BYOK) → route to user Gemini (unlocked without application subscription).
+2. No user key + Pro entitlement active + Gemini Nano is usable → route to on-device Nano.
+3. No user key + No active Pro entitlement → AI locked.
 4. Otherwise → truthful provider-unavailable error.
 
 The user's Gemini key is never stored in the SQLite database or sent to Firestore backup.
@@ -182,11 +183,9 @@ Android alarms and notifications are handled through platform services. The Flut
 
 These are real unresolved items, not hypothetical tasks:
 
-1. Firebase App Check is disabled for the purchase verification callable.
-2. Authentication currently relies on a stored Firebase ID token and has no explicit client refresh lifecycle.
-3. Android release signing requires `android/key.properties` or equivalent CI signing configuration; CI must provide it for a Play-ready artifact.
-4. Gemini Nano availability depends on the native Android AICore bridge and device/model support.
-5. Full Flutter/backend runtime verification must be executed in CI or a development environment; repository inspection alone is not evidence that every integration test passes.
+1. Android release signing requires `android/key.properties` or equivalent CI signing configuration; CI must provide it for a Play-ready artifact.
+2. Gemini Nano availability depends on the native Android AICore bridge and device/model support.
+3. Full Flutter/backend runtime verification must be executed in CI or a development environment; repository inspection alone is not evidence that every integration test passes.
 
 ## 12. Architectural rule
 

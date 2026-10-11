@@ -566,16 +566,6 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       return;
     }
 
-    final phone = _person?.phoneNumber;
-    if (phone == null || phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Recipient does not have a phone number.'),
-        ),
-      );
-      return;
-    }
-
     setState(() => _isSending = true);
     try {
       await _saveDraft(status: DraftStatus.ready);

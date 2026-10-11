@@ -113,6 +113,7 @@ void main() {
         required http.Client client,
         required iap.InAppPurchase iapFake,
         String? token = 'id-token',
+        String? appCheckToken,
       }) {
         return SubscriptionNotifier(
           inAppPurchase: iapFake,
@@ -120,6 +121,9 @@ void main() {
           verificationEndpoint: endpoint,
           authTokenProvider: () async => token,
           accountBindingProvider: () async => 'binding-1',
+          appCheckTokenProvider: appCheckToken != null
+              ? () async => appCheckToken
+              : null,
         );
       }
 
@@ -161,6 +165,52 @@ void main() {
         expect(iapFake.availabilityChecks, 0);
         notifier.dispose();
       });
+
+      test(
+        'auth or App Check rejection (401/403) on probe blocks billing (AUD-001)',
+        () async {
+          for (final status in [401, 403]) {
+            final iapFake = CountingIap();
+            final notifier = build(
+              client: MockClient((_) async => http.Response('denied', status)),
+              iapFake: iapFake,
+            );
+
+            await Future<void>.delayed(Duration.zero);
+            iapFake.availabilityChecks = 0;
+            expect(await notifier.purchaseProMonthly(), isFalse);
+            expect(
+              notifier.lastPurchaseFailure,
+              PurchaseFailure.verificationUnavailable,
+            );
+            expect(iapFake.availabilityChecks, 0);
+            notifier.dispose();
+          }
+        },
+      );
+
+      test(
+        'probe and verification send X-Firebase-AppCheck header when configured (AUD-001)',
+        () async {
+          http.Request? capturedProbe;
+          final notifier = build(
+            client: MockClient((request) async {
+              capturedProbe = request;
+              return http.Response('{}', 400);
+            }),
+            iapFake: FakeUnavailableIap(),
+            appCheckToken: 'test-app-check-token',
+          );
+
+          await notifier.purchaseProMonthly();
+          expect(capturedProbe, isNotNull);
+          expect(
+            capturedProbe!.headers['X-Firebase-AppCheck'],
+            'test-app-check-token',
+          );
+          notifier.dispose();
+        },
+      );
 
       test(
         'a deployed function with no Play store reports the store',

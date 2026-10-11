@@ -500,13 +500,11 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
 
     if (confirmed != true || !context.mounted) return;
 
-    final peopleRepo = ref.read(peopleRepositoryProvider);
     final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
     final associatedBirthday = await birthdaysRepo.getBirthdayForPerson(
       person.id,
     );
 
-    await peopleRepo.deletePerson(person.id);
     if (associatedBirthday != null) {
       await birthdaysRepo.deleteBirthday(associatedBirthday.id);
     }

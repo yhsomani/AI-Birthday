@@ -332,6 +332,15 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
             'Firebase ID token refreshed successfully',
           );
         }
+      } else if (res.statusCode == 400 || res.statusCode == 401) {
+        // AUD-008: Revoked or expired refresh token. Purge stored session keys
+        // so the app cleanly transitions to signed-out / reauthentication state.
+        _logger?.warning(
+          'AuthGateway',
+          'Firebase session revoked or expired (HTTP ${res.statusCode}); invalidating session keys.',
+        );
+        await _clearSessionKeys();
+        return null;
       } else {
         _logger?.warning(
           'AuthGateway',

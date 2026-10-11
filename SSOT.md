@@ -105,20 +105,20 @@ DeliveryService
 
 ## 5. Final AI routing rule
 
-Application subscription is checked first.
+AI routing prioritizes personal credentials (BYOK) before checking subscription entitlement:
 
 ```text
 AI request
   ↓
-Active application entitlement?
-  ├── NO  → AI_LOCKED
-  └── YES
-       ↓
-User Gemini API credential configured?
-  ├── YES → UserGeminiApiProvider
+User personal Gemini API key configured? (BYOK)
+  ├── YES → UserGeminiApiProvider (unlocked, personal quota & billing)
   └── NO
        ↓
-Gemini Nano/AICore available?
+Active application Pro entitlement?
+  ├── NO  → AI_LOCKED (subscription required for app-provided AI)
+  └── YES
+       ↓
+Gemini Nano/AICore available on device?
   ├── YES → GeminiNanoProvider
   └── NO  → AI_UNAVAILABLE
 ```
@@ -294,11 +294,13 @@ Delivery semantics must distinguish:
 
 ## 11. Subscription
 
-Application AI requires active entitlement.
+Application-provided AI (Gemini Nano on-device) requires active Pro entitlement.
+Users who supply their own personal Gemini API key (BYOK) can generate messages without an active Pro subscription (personal quota and billing).
 
 ```text
-NO ENTITLEMENT → ALL AI LOCKED
-ENTITLEMENT     → PROVIDER ROUTING ALLOWED
+BYOK (Personal Gemini Key) → UNLOCKED (free, user-owned key)
+NO KEY + NO ENTITLEMENT    → ALL AI LOCKED (Pro subscription required)
+NO KEY + PRO ENTITLEMENT   → GEMINI NANO ALLOWED
 ```
 
 Android purchase path:
@@ -395,7 +397,7 @@ Examples:
 - birthday day: birthday today
 
 Respect:
-- quiet hours
+- quiet hours (reminders occurring inside the quiet hours window are suppressed/skipped so sleep is never disturbed)
 - timezone
 - notification permission
 - disabled/denied permission states
@@ -428,6 +430,10 @@ Each sync entity should include:
 - deletedAt where applicable
 
 Use deterministic conflict handling and tombstones.
+
+Restore enforces referential integrity: birthdays and message drafts belonging to tombstoned or non-existent recipients are omitted to prevent orphaned records. Device-local reminder preferences are preserved during merge-style restoration.
+
+Backup generations are stored immutably and published atomically via the `backup/current` pointer; historical generations are managed under server-side retention policies.
 
 Never sync Gemini credentials.
 

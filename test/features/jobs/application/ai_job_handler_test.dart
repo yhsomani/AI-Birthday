@@ -221,6 +221,46 @@ void main() {
     },
   );
 
+  test(
+    'cycle rollover guard: birthday advanced to new cycle while job in flight drops result',
+    () async {
+      await seedPerson();
+      final birthday = await seedBirthday();
+
+      final h = AiGenerationJobHandler(
+        peopleRepository: peopleRepo,
+        draftsRepository: draftsRepo,
+        birthdaysRepository: birthdaysRepo,
+        jobsRepository: jobsRepo,
+        generate: (request, {required bool forceNano}) async {
+          await birthdaysRepo.saveBirthday(
+            birthday.copyWith(cycleYear: now.year + 1),
+          );
+          return const AiGenerationResult(
+            message: 'stale cycle message',
+            providerType: 'user_gemini',
+          );
+        },
+      );
+
+      final outcome = await h.run(
+        await claimedJob(
+          payload: AiJobPayload(
+            birthdayId: 'b1',
+            personId: 'p1',
+            tone: MessageTone.warm,
+            length: MessageLength.standard,
+            targetCycleYear: now.year,
+          ),
+        ),
+      );
+
+      expect(outcome, isA<JobSucceeded>());
+      final draft = await draftsRepo.getDraftForBirthday('b1');
+      expect(draft, isNull);
+    },
+  );
+
   test('missing person or birthday fails permanently with notFound', () async {
     // No person seeded.
     final missingPerson = await handler().run(

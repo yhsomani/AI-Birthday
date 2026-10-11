@@ -676,11 +676,17 @@ class CloudSyncService {
         // Performance audit: load every existing row once instead of one SELECT
         // per restored document (N+1 when restoring a large backup).
         var existingPeople = const <String, Person>{};
-        if (peopleDocs.isNotEmpty) {
+        if (peopleDocs.isNotEmpty ||
+            birthdayDocs.isNotEmpty ||
+            draftDocs.isNotEmpty) {
           existingPeople = {
             for (final row in await _db.select(_db.persons).get()) row.id: row,
           };
         }
+        final activePersonIds = <String>{
+          for (final p in existingPeople.values)
+            if (p.deletedAt == null) p.id,
+        };
         for (final doc in peopleDocs) {
           final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
           final id = _string(fields, 'id');
@@ -744,6 +750,11 @@ class CloudSyncService {
                   deletedAt: drift.Value(deletedAt),
                 ),
               );
+          if (deletedAt != null) {
+            activePersonIds.remove(id);
+          } else {
+            activePersonIds.add(id);
+          }
           restored++;
         }
 
@@ -754,12 +765,16 @@ class CloudSyncService {
               row.id: row,
           };
         }
+        final validBirthdayIds = {...existingBirthdays.keys};
         for (final doc in birthdayDocs) {
           final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
           final id = _string(fields, 'id');
           final personId = _string(fields, 'personId');
           final date = _date(fields, 'date');
           if (id == null || personId == null || date == null) continue;
+
+          // AUD-004: Never restore a birthday whose person is deleted (tombstoned) or non-existent.
+          if (!activePersonIds.contains(personId)) continue;
 
           final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
           final existing = existingBirthdays[id];
@@ -786,6 +801,7 @@ class CloudSyncService {
                   updatedAt: drift.Value(remoteUpdatedAt),
                 ),
               );
+          validBirthdayIds.add(id);
           restored++;
         }
 
@@ -808,6 +824,10 @@ class CloudSyncService {
               body == null) {
             continue;
           }
+
+          // AUD-004: Never restore a draft whose person or birthday is deleted or missing.
+          if (!activePersonIds.contains(personId)) continue;
+          if (!validBirthdayIds.contains(birthdayId)) continue;
 
           final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
           final existing = existingDrafts[id];

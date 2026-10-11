@@ -69,6 +69,13 @@ class AuthController extends AsyncNotifier<AuthState> {
       );
       return refreshed.idToken;
     }
+    // AUD-008: If the gateway cleared credentials (e.g. revoked refresh token),
+    // update auth state to signedOut so listeners and UI react immediately.
+    final stored = await _gateway.getStoredIdentity();
+    if (stored == null) {
+      state = const AsyncData(AuthState(status: AuthStatus.signedOut));
+      return null;
+    }
     return current.identity?.idToken;
   }
 }

@@ -41,6 +41,7 @@ import 'package:ai_birthday/features/ai/domain/ai_provider.dart';
 import 'package:ai_birthday/features/ai/data/gemini_nano_provider.dart';
 import 'package:ai_birthday/features/subscription/application/subscription_service.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
+import 'package:ai_birthday/features/auth/domain/auth_state.dart';
 
 /// App-wide logger provider. Keep one logger instance across app and core layers.
 final loggerProvider = core.loggerProvider;
@@ -68,7 +69,7 @@ final subscriptionNotifierProvider =
         const FlutterSecureStorage(),
         logger,
       );
-      return SubscriptionNotifier(
+      final notifier = SubscriptionNotifier(
         initial: UserEntitlement.free,
         store: secureStore,
         logger: logger,
@@ -90,6 +91,24 @@ final subscriptionNotifierProvider =
           );
         },
       );
+
+      // AUD-003: reset entitlement state whenever the user signs out or changes accounts.
+      ref.listen<AsyncValue<AuthState>>(authControllerProvider, (prev, next) {
+        final prevAuth = prev?.valueOrNull;
+        final nextAuth = next.valueOrNull;
+        if (nextAuth == null) return;
+        if (nextAuth.status == AuthStatus.signedOut) {
+          notifier.resetToFreeTier();
+        } else if (prevAuth != null &&
+            prevAuth.identity?.googleSubject != null &&
+            nextAuth.identity?.googleSubject != null &&
+            prevAuth.identity!.googleSubject !=
+                nextAuth.identity!.googleSubject) {
+          notifier.resetToFreeTier();
+        }
+      });
+
+      return notifier;
     });
 
 /// Application Entitlement state provider (Free vs Pro). Defaults safely to Free (SSOT §11).

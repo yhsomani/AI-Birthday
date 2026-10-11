@@ -383,6 +383,65 @@ void main() {
     );
 
     test(
+      'refreshSession clears stored session keys and returns null when refresh token is revoked (HTTP 400/401) (AUD-008)',
+      () async {
+        store.data['auth_session_subject'] = 'sub-revoked';
+        store.data['auth_session_email'] = 'revoked@example.com';
+        store.data['auth_session_id_token'] = 'old-id-token';
+        store.data['auth_session_refresh_token'] = 'revoked-refresh-token';
+
+        final mockClient = MockClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'error': {
+                'code': 400,
+                'message': 'INVALID_REFRESH_TOKEN',
+                'status': 'INVALID_ARGUMENT',
+              },
+            }),
+            400,
+          );
+        });
+
+        final gateway = LiveGoogleAuthGateway(
+          store: store,
+          httpClient: mockClient,
+          firebaseApiKey: 'test-api-key',
+        );
+
+        final result = await gateway.refreshSession();
+        expect(result, isNull);
+        expect(store.data, isEmpty);
+      },
+    );
+
+    test(
+      'refreshSession preserves stored session on transient 5xx server failure',
+      () async {
+        store.data['auth_session_subject'] = 'sub-transient';
+        store.data['auth_session_email'] = 'transient@example.com';
+        store.data['auth_session_name'] = 'Transient User';
+        store.data['auth_session_id_token'] = 'cached-id-token';
+        store.data['auth_session_refresh_token'] = 'valid-refresh-token';
+
+        final mockClient = MockClient((request) async {
+          return http.Response('Internal Server Error', 503);
+        });
+
+        final gateway = LiveGoogleAuthGateway(
+          store: store,
+          httpClient: mockClient,
+          firebaseApiKey: 'test-api-key',
+        );
+
+        final result = await gateway.refreshSession();
+        expect(result, isNotNull);
+        expect(result!.idToken, 'cached-id-token');
+        expect(store.data['auth_session_id_token'], 'cached-id-token');
+      },
+    );
+
+    test(
       'signOut removes auth_session_refresh_token from secure store',
       () async {
         store.data['auth_session_subject'] = 'sub-1';

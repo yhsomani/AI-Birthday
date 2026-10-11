@@ -53,6 +53,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     AppLogger? logger,
     Future<String?> Function()? authTokenProvider,
     Future<String?> Function()? accountBindingProvider,
+    Future<String?> Function()? appCheckTokenProvider,
     DateTime Function()? now,
     String? verificationEndpoint,
   }) : _store = store,
@@ -61,6 +62,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
        _logger = logger ?? ConsoleAppLogger(),
        _authTokenProvider = authTokenProvider,
        _accountBindingProvider = accountBindingProvider,
+       _appCheckTokenProvider = appCheckTokenProvider,
        _now = now ?? clock.clock.now,
        _verificationEndpoint =
            verificationEndpoint ?? FirebaseConfig.functionUrl('verifyPurchase'),
@@ -74,6 +76,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   final AppLogger _logger;
   final Future<String?> Function()? _authTokenProvider;
   final Future<String?> Function()? _accountBindingProvider;
+  final Future<String?> Function()? _appCheckTokenProvider;
   final DateTime Function() _now;
   final String _verificationEndpoint;
 
@@ -230,13 +233,17 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     };
 
     try {
+      final appCheckToken = await _appCheckTokenProvider?.call();
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+        if (appCheckToken != null && appCheckToken.isNotEmpty)
+          'X-Firebase-AppCheck': appCheckToken,
+      };
       final response = await _http
           .post(
             Uri.parse(_verificationEndpoint),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $authToken',
-            },
+            headers: headers,
             body: jsonEncode(payload),
           )
           .timeout(_kVerifyTimeout);
@@ -365,21 +372,27 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     return false;
   }
 
-  /// True when the verification callable is deployed and answering. A 404
-  /// means it is not deployed; 5xx or no answer means it cannot grant access.
+  /// True when the verification callable is deployed, reachable, and authenticated.
+  /// 401/403 means auth or App Check failed; 404 means undeployed; 5xx means server error.
+  /// Only 200 (success) or 400 (schema validation of empty probe payload) indicates
+  /// the endpoint is reachable and accepting requests from this client.
   Future<bool> _verificationEndpointReachable(String authToken) async {
     try {
+      final appCheckToken = await _appCheckTokenProvider?.call();
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+        if (appCheckToken != null && appCheckToken.isNotEmpty)
+          'X-Firebase-AppCheck': appCheckToken,
+      };
       final response = await _http
           .post(
             Uri.parse(_verificationEndpoint),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $authToken',
-            },
+            headers: headers,
             body: jsonEncode({'data': <String, dynamic>{}}),
           )
           .timeout(_kVerifyTimeout);
-      return response.statusCode != 404 && response.statusCode < 500;
+      return response.statusCode == 200 || response.statusCode == 400;
     } catch (error, stackTrace) {
       _logger.warning(
         'Subscription',
