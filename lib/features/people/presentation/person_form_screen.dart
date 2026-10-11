@@ -280,7 +280,11 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
   Future<void> _save() async {
     HapticFeedback.lightImpact();
     final draft = _draft();
-    final validation = const PersonInputValidator().validate(draft);
+    final requireBirthday = _isEditing ? (_loaded?.hasBirthday ?? true) : true;
+    final validation = const PersonInputValidator().validate(
+      draft,
+      requireBirthday: requireBirthday,
+    );
     if (!validation.isValid) {
       setState(() => _validation = validation);
       return;
@@ -294,43 +298,52 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
           : await service.create(draft);
 
       if (saved.hasBirthday) {
-        final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
-        final now = DateTime.now();
-        final nextDate = b_models.Birthday.nextBirthdayDate(
-          month: saved.birthdayMonth!,
-          day: saved.birthdayDay!,
-          from: now,
-        );
-        final existingBirthday = await birthdaysRepo.getBirthdayForPerson(
-          saved.id,
-        );
-        final isToday =
-            nextDate.year == now.year &&
-            nextDate.month == now.month &&
-            nextDate.day == now.day;
-        final birthdayChanged =
-            existingBirthday != null &&
-            (existingBirthday.date.month != nextDate.month ||
-                existingBirthday.date.day != nextDate.day);
+        try {
+          final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
+          final now = DateTime.now();
+          final nextDate = b_models.Birthday.nextBirthdayDate(
+            month: saved.birthdayMonth!,
+            day: saved.birthdayDay!,
+            from: now,
+          );
+          final existingBirthday = await birthdaysRepo.getBirthdayForPerson(
+            saved.id,
+          );
+          final isToday =
+              nextDate.year == now.year &&
+              nextDate.month == now.month &&
+              nextDate.day == now.day;
+          final birthdayChanged =
+              existingBirthday != null &&
+              (existingBirthday.date.month != nextDate.month ||
+                  existingBirthday.date.day != nextDate.day);
 
-        final birthdayModel = b_models.Birthday(
-          id: existingBirthday?.id ?? 'birthday-${saved.id}',
-          personId: saved.id,
-          cycleYear: nextDate.year,
-          date: nextDate,
-          status: birthdayChanged
-              ? (isToday
-                    ? b_models.BirthdayStatus.reminderDue
-                    : b_models.BirthdayStatus.upcoming)
-              : existingBirthday?.status ??
-                    (isToday
-                        ? b_models.BirthdayStatus.reminderDue
-                        : b_models.BirthdayStatus.upcoming),
-          draftId: birthdayChanged ? null : existingBirthday?.draftId,
-          createdAt: existingBirthday?.createdAt ?? now,
-          updatedAt: now,
-        );
-        await birthdaysRepo.saveBirthday(birthdayModel);
+          final birthdayModel = b_models.Birthday(
+            id: existingBirthday?.id ?? 'birthday-${saved.id}',
+            personId: saved.id,
+            cycleYear: nextDate.year,
+            date: nextDate,
+            status: birthdayChanged
+                ? (isToday
+                      ? b_models.BirthdayStatus.reminderDue
+                      : b_models.BirthdayStatus.upcoming)
+                : existingBirthday?.status ??
+                      (isToday
+                          ? b_models.BirthdayStatus.reminderDue
+                          : b_models.BirthdayStatus.upcoming),
+            draftId: birthdayChanged ? null : existingBirthday?.draftId,
+            createdAt: existingBirthday?.createdAt ?? now,
+            updatedAt: now,
+          );
+          await birthdaysRepo.saveBirthday(birthdayModel);
+        } catch (e) {
+          if (!_isEditing) {
+            try {
+              await service.remove(saved.id);
+            } catch (_) {}
+          }
+          rethrow;
+        }
       }
 
       if (!mounted) return;

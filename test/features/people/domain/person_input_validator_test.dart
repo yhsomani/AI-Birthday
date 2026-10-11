@@ -134,4 +134,19 @@ void main() {
     check(2, 30, false);
     check(12, 31, true);
   });
+
+  test('allows missing birthday when requireBirthday is false (AUD-010)', () {
+    final noBday = validator.validate(
+      const PersonDraft(name: 'Contact Without Birthday'),
+      requireBirthday: false,
+    );
+    expect(noBday.isValid, isTrue);
+
+    final partial = validator.validate(
+      const PersonDraft(name: 'Partial', birthdayMonth: 5),
+      requireBirthday: false,
+    );
+    expect(partial.isValid, isFalse);
+    expect(partial.errorFor(PersonField.birthday), InputError.invalidBirthday);
+  });
 }

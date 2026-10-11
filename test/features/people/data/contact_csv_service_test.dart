@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/people/data/contact_csv_service.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
@@ -208,5 +209,67 @@ Dr. Brown,1955-11-05
         );
       },
     );
+
+    test('lossless export and import roundtrip of all domain fields (AUD-001)', () {
+      final fullPerson = Person(
+        id: 'full-1',
+        name: 'Full Contact',
+        birthdayMonth: 7,
+        birthdayDay: 21,
+        birthYear: 1995,
+        phoneNumber: '+15551234567',
+        email: 'full@example.com',
+        relationship: RelationshipCategory.mentor,
+        relationshipCloseness: RelationshipCloseness.close,
+        preferredLanguage: 'es',
+        preferredTone: MessageTone.emotional,
+        importantFacts: const ['Has 2 cats', 'Architect'],
+        notes: 'Met at conference',
+        preferredDeliveryChannel: DeliveryChannel.sms,
+        timezone: 'America/New_York',
+        autoPrepare: false,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final csv = service.exportToCsv([fullPerson]);
+      final result = service.parseCsvWithResult(csv);
+
+      expect(result.invalidRows, isEmpty);
+      expect(result.candidates, hasLength(1));
+
+      final restored = result.candidates.single.toPerson(id: fullPerson.id);
+      expect(restored.name, fullPerson.name);
+      expect(restored.birthdayMonth, fullPerson.birthdayMonth);
+      expect(restored.birthdayDay, fullPerson.birthdayDay);
+      expect(restored.birthYear, fullPerson.birthYear);
+      expect(restored.phoneNumber, fullPerson.phoneNumber);
+      expect(restored.email, fullPerson.email);
+      expect(restored.relationship, fullPerson.relationship);
+      expect(restored.relationshipCloseness, fullPerson.relationshipCloseness);
+      expect(restored.preferredLanguage, fullPerson.preferredLanguage);
+      expect(restored.preferredTone, fullPerson.preferredTone);
+      expect(restored.importantFacts, fullPerson.importantFacts);
+      expect(restored.notes, fullPerson.notes);
+      expect(restored.preferredDeliveryChannel, fullPerson.preferredDeliveryChannel);
+      expect(restored.timezone, fullPerson.timezone);
+      expect(restored.autoPrepare, fullPerson.autoPrepare);
+    });
+
+    test('detects intra-batch duplicate candidates within the same CSV (AUD-011)', () {
+      const csv = '''Name,Birthday Month,Birthday Day,Birth Year,Phone Number
+Row One,5,10,1990,+14150001111
+Row One,5,10,1990,+14150001111
+Row Three,8,12,1988,+14150001111
+''';
+
+      final result = service.parseCsvWithResult(csv, existingPeople: []);
+      expect(result.candidates, hasLength(3));
+      expect(result.candidates[0].isPotentialDuplicate, isFalse);
+      expect(result.candidates[1].isPotentialDuplicate, isTrue);
+      expect(result.candidates[1].duplicateWarning, contains('Duplicate in CSV: exact name and phone match'));
+      expect(result.candidates[2].isPotentialDuplicate, isTrue);
+      expect(result.candidates[2].duplicateWarning, contains('Duplicate in CSV: phone matches'));
+    });
   });
 }

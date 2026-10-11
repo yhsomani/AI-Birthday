@@ -75,7 +75,7 @@ class PersonInputValidator {
     caseSensitive: false,
   );
 
-  PersonValidation validate(PersonDraft d) {
+  PersonValidation validate(PersonDraft d, {bool requireBirthday = true}) {
     final errors = <PersonField, InputError>{};
 
     final name = d.name.trim();
@@ -88,7 +88,11 @@ class PersonInputValidator {
     final month = d.birthdayMonth;
     final day = d.birthdayDay;
     if (month == null || day == null) {
-      errors[PersonField.birthday] = InputError.birthdayRequired;
+      if (requireBirthday) {
+        errors[PersonField.birthday] = InputError.birthdayRequired;
+      } else if (month != null || day != null) {
+        errors[PersonField.birthday] = InputError.invalidBirthday;
+      }
     } else if (!engine.isValidMonthDay(month, day, year: d.birthYear)) {
       errors[PersonField.birthday] = InputError.invalidBirthday;
     }

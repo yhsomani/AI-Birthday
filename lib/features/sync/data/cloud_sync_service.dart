@@ -161,7 +161,9 @@ class CloudSyncService {
     Map<String, String> headers,
   ) async {
     final uri = Uri.parse(url).replace(queryParameters: {'key': _apiKey});
-    final response = await _http.get(uri, headers: headers);
+    final response = await _http
+        .get(uri, headers: headers)
+        .timeout(const Duration(seconds: 30));
     if (response.statusCode == 404) return null;
     if (response.statusCode != 200) {
       throw const FormatException('CLOUD_GET_FAILED');
@@ -185,11 +187,13 @@ class CloudSyncService {
     Map<String, String> headers,
   ) async {
     if (writes.isEmpty) return 0;
-    final response = await _http.post(
-      Uri.parse(_commitUrl()),
-      headers: headers,
-      body: jsonEncode({'writes': writes}),
-    );
+    final response = await _http
+        .post(
+          Uri.parse(_commitUrl()),
+          headers: headers,
+          body: jsonEncode({'writes': writes}),
+        )
+        .timeout(const Duration(seconds: 30));
     if (response.statusCode != 200) return 0;
     final Object? decoded;
     try {
@@ -297,7 +301,9 @@ class CloudSyncService {
       }
 
       final uri = Uri.parse(collectionUrl).replace(queryParameters: params);
-      final response = await _http.get(uri, headers: headers);
+      final response = await _http
+          .get(uri, headers: headers)
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) {
         throw const FormatException('CLOUD_LIST_FAILED');
@@ -390,10 +396,14 @@ class CloudSyncService {
       // The `backup/current` pointer only moves after the whole generation and
       // its manifest are stored, so a failed run leaves the last backup intact.
       final generationId = _newGenerationId(now);
-      final allPersonRows = await _db.select(_db.persons).get();
-      final allBirthdayRows = await _db.select(_db.birthdays).get();
-      final allDraftRows = await _db.select(_db.messageDrafts).get();
-      final reminderRows = await _db.select(_db.reminderSettingsEntries).get();
+      final (allPersonRows, allBirthdayRows, allDraftRows, reminderRows) =
+          await _db.transaction(() async {
+        final p = await _db.select(_db.persons).get();
+        final b = await _db.select(_db.birthdays).get();
+        final d = await _db.select(_db.messageDrafts).get();
+        final r = await _db.select(_db.reminderSettingsEntries).get();
+        return (p, b, d, r);
+      });
       // Resolve person names for birthday docs from the full set (tombstoned
       // people included).
       final peopleMap = {for (final p in allPersonRows) p.id: p};
@@ -618,6 +628,41 @@ class CloudSyncService {
       for (final entry in downloaded.entries) {
         if (entry.value.length != _integer(manifest, entry.key)) {
           throw FormatException('CLOUD_SNAPSHOT_INCOMPLETE:${entry.key}');
+        }
+      }
+
+      // Pre-validate all downloaded records before mutating local database (AUD-002).
+      for (final doc in peopleDocs) {
+        final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
+        if (_string(fields, 'id') == null || _string(fields, 'name') == null) {
+          throw const FormatException('CLOUD_RESTORE_MALFORMED_RECORD:people');
+        }
+      }
+      for (final doc in birthdayDocs) {
+        final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
+        if (_string(fields, 'id') == null ||
+            _string(fields, 'personId') == null ||
+            _date(fields, 'date') == null) {
+          throw const FormatException(
+            'CLOUD_RESTORE_MALFORMED_RECORD:birthdays',
+          );
+        }
+      }
+      for (final doc in draftDocs) {
+        final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
+        if (_string(fields, 'id') == null ||
+            _string(fields, 'birthdayId') == null ||
+            _string(fields, 'personId') == null ||
+            _string(fields, 'body') == null) {
+          throw const FormatException('CLOUD_RESTORE_MALFORMED_RECORD:drafts');
+        }
+      }
+      for (final doc in reminderDocs) {
+        final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
+        if (_string(fields, 'key') == null) {
+          throw const FormatException(
+            'CLOUD_RESTORE_MALFORMED_RECORD:reminderSettings',
+          );
         }
       }
 
@@ -851,10 +896,11 @@ class CloudSyncService {
       );
       return CloudSyncResult(
         success: false,
-        error:
-            'Cloud restore could not be completed. Check your connection and try again.',
-        errorCode: 'network',
-        retryable: true,
+        error: error is FormatException
+            ? 'Cloud restore could not be completed because the backup data is malformed.'
+            : 'Cloud restore could not be completed. Check your connection and try again.',
+        errorCode: error is FormatException ? 'sync' : 'network',
+        retryable: error is! FormatException,
         timestamp: now,
       );
     }

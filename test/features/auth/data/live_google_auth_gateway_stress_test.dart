@@ -253,7 +253,10 @@ void main() {
           );
 
           final outcome = await gateway.signIn();
-          expect(outcome, isA<SignInSuccess>());
+          expect(outcome, isA<SignInFailed>());
+          final failed = outcome as SignInFailed;
+          expect(failed.message, contains('Authentication server unavailable'));
+          expect(store.data.isEmpty, isTrue);
         },
       );
 
@@ -288,12 +291,10 @@ void main() {
           );
 
           final outcome = await gateway.signIn();
-          expect(outcome, isA<SignInSuccess>());
-          // Verify logger caught the warning
-          final warning = logMessages.any(
-            (m) => m.contains('Firebase IdP exchange warning'),
-          );
-          expect(warning, isTrue);
+          expect(outcome, isA<SignInFailed>());
+          final failed = outcome as SignInFailed;
+          expect(failed.message, contains('Invalid authentication response'));
+          expect(store.data.isEmpty, isTrue);
         },
       );
     });

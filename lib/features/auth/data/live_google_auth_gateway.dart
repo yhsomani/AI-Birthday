@@ -135,66 +135,98 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
       }
 
       final idToken = account.authentication.idToken;
-      String? firebaseUid = account.id;
-      String? verifiedIdToken = idToken;
+      if (idToken == null || idToken.isEmpty) {
+        _logger?.warning(
+          'AuthGateway',
+          'Google authentication returned no ID token',
+        );
+        return const SignInFailed(
+          'Google Sign-In failed: missing authentication token.',
+        );
+      }
+      if (_firebaseApiKey.isEmpty) {
+        _logger?.error('AuthGateway', 'Firebase API key is not configured');
+        return const SignInFailed(
+          'Authentication service configuration error.',
+        );
+      }
+
+      final String firebaseUid;
+      final String verifiedIdToken;
       String? refreshToken;
 
-      if (_firebaseApiKey.isNotEmpty && idToken != null && idToken.isNotEmpty) {
+      final http.Response res;
+      try {
+        res = await _http.post(
+          Uri.parse(
+            'https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=$_firebaseApiKey',
+          ),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'postBody': 'id_token=$idToken&providerId=google.com',
+            'requestUri': 'http://localhost',
+            'returnSecureToken': true,
+          }),
+        );
+      } catch (e) {
+        _logger?.warning('AuthGateway', 'Firebase IdP exchange failed: $e');
+        return const SignInFailed(
+          'Network error during authentication. Please check your connection and try again.',
+        );
+      }
+
+      if (res.statusCode >= 400 && res.statusCode < 500) {
+        _logger?.warning(
+          'AuthGateway',
+          'Firebase IdP rejected token: HTTP ${res.statusCode} '
+              '${_idpErrorDetail(res.body)}',
+        );
+        return const SignInFailed(
+          'Could not complete sign-in: the account server rejected this '
+          'app build.',
+        );
+      }
+
+      if (res.statusCode == 200) {
         try {
-          final res = await _http.post(
-            Uri.parse(
-              'https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=$_firebaseApiKey',
-            ),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'postBody': 'id_token=$idToken&providerId=google.com',
-              'requestUri': 'http://localhost',
-              'returnSecureToken': true,
-            }),
-          );
-
-          if (res.statusCode >= 400 && res.statusCode < 500) {
-            _logger?.warning(
-              'AuthGateway',
-              'Firebase IdP rejected token: HTTP ${res.statusCode} '
-                  '${_idpErrorDetail(res.body)}',
-            );
-            return const SignInFailed(
-              'Could not complete sign-in: the account server rejected this '
-              'app build.',
-            );
-          }
-
-          if (res.statusCode == 200) {
-            final data = jsonDecode(res.body) as Map<String, dynamic>;
-            final localId = data['localId'] as String?;
-            final returnedToken = data['idToken'] as String?;
-            final returnedRefreshToken = data['refreshToken'] as String?;
-            if (localId != null &&
-                localId.isNotEmpty &&
-                returnedToken != null &&
-                returnedToken.isNotEmpty) {
-              firebaseUid = localId;
-              verifiedIdToken = returnedToken;
-              refreshToken = returnedRefreshToken;
-            } else {
-              _logger?.warning(
-                'AuthGateway',
-                'Firebase IdP 200 response missing localId or idToken',
-              );
-              return const SignInFailed(
-                'Invalid authentication response from Identity Provider',
-              );
-            }
+          final dynamic decoded = jsonDecode(res.body);
+          final data = decoded is Map<String, dynamic> ? decoded : null;
+          final localId = data?['localId'] as String?;
+          final returnedToken = data?['idToken'] as String?;
+          final returnedRefreshToken = data?['refreshToken'] as String?;
+          if (localId != null &&
+              localId.isNotEmpty &&
+              returnedToken != null &&
+              returnedToken.isNotEmpty) {
+            firebaseUid = localId;
+            verifiedIdToken = returnedToken;
+            refreshToken = returnedRefreshToken;
           } else {
             _logger?.warning(
               'AuthGateway',
-              'Firebase IdP non-200 status: ${res.statusCode}',
+              'Firebase IdP 200 response missing localId or idToken',
+            );
+            return const SignInFailed(
+              'Invalid authentication response from Identity Provider',
             );
           }
         } catch (e) {
-          _logger?.warning('AuthGateway', 'Firebase IdP exchange warning: $e');
+          _logger?.warning(
+            'AuthGateway',
+            'Firebase IdP 200 response JSON parsing failed: $e',
+          );
+          return const SignInFailed(
+            'Invalid authentication response from Identity Provider',
+          );
         }
+      } else {
+        _logger?.warning(
+          'AuthGateway',
+          'Firebase IdP non-200 status: ${res.statusCode}',
+        );
+        return const SignInFailed(
+          'Authentication server unavailable. Please try again later.',
+        );
       }
 
       final identity = GoogleIdentity(

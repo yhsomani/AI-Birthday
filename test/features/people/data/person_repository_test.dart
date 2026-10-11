@@ -73,6 +73,26 @@ void main() {
     expect(deleted.version, 2);
   });
 
+  test('getAll and watchAll sort case-insensitively with id tie-breaker', () async {
+    await store.save(person(id: 'p-3', name: 'bob'));
+    await store.save(person(id: 'p-2', name: 'Alice'));
+    await store.save(person(id: 'p-1', name: 'alice'));
+
+    final all = await store.getAll();
+    expect(all.map((p) => '${p.name}:${p.id}').toList(), [
+      'alice:p-1',
+      'Alice:p-2',
+      'bob:p-3',
+    ]);
+
+    final streamed = await store.watchAll().first;
+    expect(streamed.map((p) => '${p.name}:${p.id}').toList(), [
+      'alice:p-1',
+      'Alice:p-2',
+      'bob:p-3',
+    ]);
+  });
+
   test('watchAll emits updates', () async {
     final emissions = <List<Person>>[];
     final sub = store.watchAll().listen(emissions.add);

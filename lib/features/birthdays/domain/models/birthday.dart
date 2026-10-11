@@ -80,14 +80,11 @@ class Birthday {
   /// Days remaining until the birthday from [referenceDate].
   /// Returns 0 if today, positive if in future, negative if passed.
   int daysUntil(DateTime referenceDate) {
-    final ref = DateTime(
-      referenceDate.year,
-      referenceDate.month,
-      referenceDate.day,
-    );
+    final ref = referenceDate.isUtc ? referenceDate : referenceDate.toLocal();
     final normalized = referenceDate.isUtc ? date.toUtc() : date.toLocal();
-    final target = DateTime(normalized.year, normalized.month, normalized.day);
-    return target.difference(ref).inDays;
+    final targetUtc = DateTime.utc(normalized.year, normalized.month, normalized.day);
+    final refUtc = DateTime.utc(ref.year, ref.month, ref.day);
+    return targetUtc.difference(refUtc).inDays;
   }
 
   /// Whether the birthday is today relative to [referenceDate].

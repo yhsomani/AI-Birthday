@@ -3,6 +3,7 @@ library;
 
 import 'package:uuid/uuid.dart';
 
+import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
@@ -17,9 +18,14 @@ class ParsedContactCandidate {
     this.phoneNumber,
     this.email,
     this.relationship = RelationshipCategory.friend,
+    this.relationshipCloseness = RelationshipCloseness.casual,
+    this.preferredLanguage = 'en',
     this.preferredTone = MessageTone.warm,
     this.importantFacts = const [],
     this.notes,
+    this.preferredDeliveryChannel = DeliveryChannel.whatsapp,
+    this.timezone,
+    this.autoPrepare = true,
     this.duplicateWarning,
   });
 
@@ -30,9 +36,14 @@ class ParsedContactCandidate {
   final String? phoneNumber;
   final String? email;
   final RelationshipCategory relationship;
+  final RelationshipCloseness relationshipCloseness;
+  final String preferredLanguage;
   final MessageTone preferredTone;
   final List<String> importantFacts;
   final String? notes;
+  final DeliveryChannel preferredDeliveryChannel;
+  final String? timezone;
+  final bool autoPrepare;
 
   /// Human-readable explanation if this candidate looks like a duplicate (SSOT §18).
   final String? duplicateWarning;
@@ -53,9 +64,14 @@ class ParsedContactCandidate {
       phoneNumber: phoneNumber,
       email: email,
       relationship: relationship,
+      relationshipCloseness: relationshipCloseness,
+      preferredLanguage: preferredLanguage,
       preferredTone: preferredTone,
       importantFacts: importantFacts,
       notes: notes,
+      preferredDeliveryChannel: preferredDeliveryChannel,
+      timezone: timezone,
+      autoPrepare: autoPrepare,
       createdAt: now,
       updatedAt: now,
     );
@@ -73,12 +89,12 @@ class CsvParseResult {
 class ContactCsvService {
   const ContactCsvService();
 
-  /// Exports [people] to RFC-4180 compliant CSV format.
+  /// Exports [people] to RFC-4180 compliant CSV format (AUD-001: complete, lossless contact backup).
   String exportToCsv(List<Person> people) {
     final buffer = StringBuffer();
     // CSV Header
     buffer.writeln(
-      'Name,Birthday Month,Birthday Day,Birth Year,Phone Number,Relationship,Preferred Tone,Facts,Notes',
+      'Name,Birthday Month,Birthday Day,Birth Year,Phone Number,Email,Relationship,Relationship Closeness,Preferred Language,Preferred Tone,Facts,Notes,Preferred Delivery Channel,Timezone,Auto Prepare',
     );
 
     for (final person in people) {
@@ -88,10 +104,16 @@ class ContactCsvService {
         person.hasBirthday ? person.birthdayDay.toString() : '',
         person.birthYear?.toString() ?? '',
         _escapeCsv(person.phoneNumber ?? '', guardFormulas: false),
+        _escapeCsv(person.email ?? ''),
         _escapeCsv(person.relationship.displayName),
+        _escapeCsv(person.relationshipCloseness.name),
+        _escapeCsv(person.preferredLanguage),
         _escapeCsv(person.preferredTone.displayName),
         _escapeCsv(person.importantFacts.join('; ')),
         _escapeCsv(person.notes ?? ''),
+        _escapeCsv(person.preferredDeliveryChannel.name),
+        _escapeCsv(person.timezone ?? ''),
+        person.autoPrepare ? 'true' : 'false',
       ];
       buffer.writeln(fields.join(','));
     }
@@ -122,6 +144,7 @@ class ContactCsvService {
     final invalidRows = <String>[];
     bool isFirstLine = true;
     int rowNumber = 0;
+    final headerMap = <String, int>{};
 
     for (final record in records) {
       rowNumber++;
@@ -132,38 +155,88 @@ class ContactCsvService {
       final fields = _parseCsvLine(record);
       if (fields.isEmpty) continue;
 
-      // Skip header row if detected
+      // Skip header row if detected and build column map
       if (isFirstLine) {
         isFirstLine = false;
         final firstField = fields.first.toLowerCase();
         if (firstField == 'name' || firstField.contains('recipient')) {
+          for (var i = 0; i < fields.length; i++) {
+            final col = fields[i].trim().toLowerCase();
+            if (col == 'name' || col == 'recipient') {
+              headerMap['name'] = i;
+            } else if (col.contains('month')) {
+              headerMap['month'] = i;
+            } else if (col.contains('day')) {
+              headerMap['day'] = i;
+            } else if (col.contains('year')) {
+              headerMap['year'] = i;
+            } else if (col.contains('phone')) {
+              headerMap['phone'] = i;
+            } else if (col.contains('email')) {
+              headerMap['email'] = i;
+            } else if (col.contains('closeness')) {
+              headerMap['closeness'] = i;
+            } else if (col.contains('relationship')) {
+              headerMap['relationship'] = i;
+            } else if (col.contains('language')) {
+              headerMap['language'] = i;
+            } else if (col.contains('tone')) {
+              headerMap['tone'] = i;
+            } else if (col.contains('fact')) {
+              headerMap['facts'] = i;
+            } else if (col.contains('note')) {
+              headerMap['notes'] = i;
+            } else if (col.contains('channel') || col.contains('delivery')) {
+              headerMap['channel'] = i;
+            } else if (col.contains('timezone') || col == 'tz') {
+              headerMap['timezone'] = i;
+            } else if (col.contains('prepare')) {
+              headerMap['autoprepare'] = i;
+            }
+          }
           continue;
         }
       }
 
-      final name = fields.isNotEmpty ? fields[0].trim() : '';
+      String? getCol(String key, int legacyPos, int? extendedPos) {
+        if (headerMap.containsKey(key)) {
+          final idx = headerMap[key]!;
+          if (idx < fields.length) {
+            final v = fields[idx].trim();
+            return v.isNotEmpty ? v : null;
+          }
+          return null;
+        }
+        final pos =
+            (fields.length >= 10 && extendedPos != null)
+                ? extendedPos
+                : legacyPos;
+        if (pos >= 0 && pos < fields.length) {
+          final v = fields[pos].trim();
+          return v.isNotEmpty ? v : null;
+        }
+        return null;
+      }
+
+      final name = getCol('name', 0, 0) ?? '';
       if (name.isEmpty) {
         invalidRows.add('Row $rowNumber: Name is missing');
         continue;
       }
 
-      int? month;
-      int? day;
-      int? year;
-
-      if (fields.length >= 3) {
-        month = int.tryParse(fields[1].trim());
-        day = int.tryParse(fields[2].trim());
-      }
+      int? month = int.tryParse(getCol('month', 1, 1) ?? '');
+      int? day = int.tryParse(getCol('day', 2, 2) ?? '');
+      int? year = int.tryParse(getCol('year', 3, 3) ?? '');
 
       // If month/day are null or impossible, try parsing as a unified date string (e.g. "1990-05-12" or "05/12")
       if (!_isValidMonthDay(month, day)) {
-        if (fields.length >= 2) {
-          final parsed = _parseDateString(fields[1].trim());
+        final rawDate = getCol('month', 1, 1);
+        if (rawDate != null) {
+          final parsed = _parseDateString(rawDate);
           if (parsed != null) {
             month = parsed['month'];
             day = parsed['day'];
-            year = parsed['year'];
+            year ??= parsed['year'];
           }
         }
       }
@@ -176,29 +249,37 @@ class ContactCsvService {
         continue;
       }
 
-      if (year == null && fields.length >= 4) {
-        year = int.tryParse(fields[3].trim());
-      }
-
-      final phone = fields.length >= 5 && fields[4].trim().isNotEmpty
-          ? fields[4].trim()
-          : null;
-      final relStr = fields.length >= 6 ? fields[5].trim() : null;
-      final toneStr = fields.length >= 7 ? fields[6].trim() : null;
-      final factsStr = fields.length >= 8 ? fields[7].trim() : null;
-      final notesStr = fields.length >= 9 ? fields[8].trim() : null;
+      final phone = getCol('phone', 4, 4);
+      final email = getCol('email', -1, 5);
+      final relStr = getCol('relationship', 5, 6);
+      final closenessStr = getCol('closeness', -1, 7);
+      final languageStr = getCol('language', -1, 8);
+      final toneStr = getCol('tone', 6, 9);
+      final factsStr = getCol('facts', 7, 10);
+      final notesStr = getCol('notes', 8, 11);
+      final channelStr = getCol('channel', -1, 12);
+      final tzStr = getCol('timezone', -1, 13);
+      final autoPrepareStr = getCol('autoprepare', -1, 14);
 
       final relationship = RelationshipCategory.fromString(relStr);
+      final relationshipCloseness = RelationshipCloseness.fromString(
+        closenessStr,
+      );
       final preferredTone = MessageTone.fromString(toneStr);
-      final facts = factsStr != null && factsStr.isNotEmpty
-          ? factsStr
-                .split(';')
-                .map((s) => s.trim())
-                .where((s) => s.isNotEmpty)
-                .toList()
-          : <String>[];
+      final preferredDeliveryChannel = DeliveryChannel.fromString(channelStr);
+      final preferredLanguage = languageStr ?? 'en';
+      final autoPrepare = (autoPrepareStr ?? 'true').toLowerCase() != 'false';
 
-      // Duplicate candidate check (SSOT §18: Detect duplicate candidates, never auto-merge on name alone)
+      final facts =
+          factsStr != null && factsStr.isNotEmpty
+              ? factsStr
+                  .split(';')
+                  .map((s) => s.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList()
+              : <String>[];
+
+      // Duplicate candidate check (SSOT §18 & AUD-011)
       String? duplicateWarning;
       for (final existing in existingPeople) {
         final sameName =
@@ -227,6 +308,38 @@ class ContactCsvService {
         }
       }
 
+      // Check intra-batch duplicates (AUD-011)
+      if (duplicateWarning == null) {
+        for (final prev in candidates) {
+          final sameName =
+              prev.name.trim().toLowerCase() == name.toLowerCase();
+          final samePhone =
+              phone != null &&
+              prev.phoneNumber != null &&
+              _cleanPhone(phone) == _cleanPhone(prev.phoneNumber!);
+
+          if (samePhone && sameName) {
+            duplicateWarning =
+                'Duplicate in CSV: exact name and phone match earlier row ("${prev.name}")';
+            break;
+          } else if (samePhone) {
+            duplicateWarning =
+                'Duplicate in CSV: phone matches earlier row ("${prev.name}")';
+            break;
+          } else if (sameName &&
+              prev.hasBirthday &&
+              prev.birthdayMonth == month &&
+              prev.birthdayDay == day) {
+            duplicateWarning =
+                'Duplicate in CSV: name & birthday match earlier row ("${prev.name}")';
+            break;
+          } else if (sameName) {
+            duplicateWarning =
+                'Duplicate in CSV: name matches earlier row ("${prev.name}")';
+          }
+        }
+      }
+
       candidates.add(
         ParsedContactCandidate(
           name: name,
@@ -234,10 +347,16 @@ class ContactCsvService {
           birthdayDay: day,
           birthYear: year,
           phoneNumber: phone,
+          email: email,
           relationship: relationship,
+          relationshipCloseness: relationshipCloseness,
+          preferredLanguage: preferredLanguage,
           preferredTone: preferredTone,
           importantFacts: facts,
           notes: notesStr,
+          preferredDeliveryChannel: preferredDeliveryChannel,
+          timezone: tzStr,
+          autoPrepare: autoPrepare,
           duplicateWarning: duplicateWarning,
         ),
       );

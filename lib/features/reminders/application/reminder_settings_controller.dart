@@ -47,10 +47,17 @@ class ReminderSettings {
 }
 
 class ReminderSettingsController extends Notifier<ReminderSettings> {
+  ReminderSettings _lastCommitted = const ReminderSettings();
+  int _revision = 0;
+  Future<void> _persistChain = Future.value();
+
   @override
   ReminderSettings build() {
+    _lastCommitted = const ReminderSettings();
+    _revision = 0;
+    _persistChain = Future.value();
     _loadFromDatabase();
-    return const ReminderSettings();
+    return _lastCommitted;
   }
 
   Future<void> _loadFromDatabase() async {
@@ -70,7 +77,7 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
               ),
             )
             .toSet();
-        state = ReminderSettings(
+        final loaded = ReminderSettings(
           enabled: row.enabled,
           // A stored empty string is a deliberate "no milestones" choice, not
           // missing data, so it must not fall back to the default set.
@@ -81,7 +88,11 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
           ),
           syncError: null,
         );
-        await _syncService();
+        if (_revision == 0) {
+          _lastCommitted = loaded;
+          state = loaded;
+          await _syncService();
+        }
       }
     } catch (_) {
       state = state.copyWith(
@@ -139,21 +150,30 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
     }
   }
 
-  Future<void> _persistAndSync(ReminderSettings previous) async {
-    final saved = await _saveToDatabase(state);
-    if (!saved) {
-      // Persistence failed: never keep a toggle the store rejected. Restore
-      // the pre-change value (UI back to truth) and keep the error visible.
-      state = previous.copyWith(syncError: state.syncError);
-      return;
-    }
-    await _syncService();
+  void _schedulePersistAndSync() {
+    _revision++;
+    final rev = _revision;
+    _persistChain = _persistChain.then((_) async {
+      final target = state;
+      final saved = await _saveToDatabase(target);
+      if (!saved) {
+        if (rev == _revision) {
+          // Persistence failed: never keep a toggle the store rejected. Restore
+          // the pre-change value (UI back to truth) and keep the error visible.
+          state = _lastCommitted.copyWith(syncError: state.syncError);
+        }
+        return;
+      }
+      _lastCommitted = target;
+      if (rev == _revision) {
+        await _syncService();
+      }
+    }).catchError((_) {});
   }
 
   void setEnabled(bool enabled) {
-    final previous = state;
     state = state.copyWith(enabled: enabled, syncError: null);
-    unawaited(_persistAndSync(previous));
+    _schedulePersistAndSync();
   }
 
   void setKind(ReminderKind kind, bool on) {
@@ -163,15 +183,13 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
     } else {
       kinds.remove(kind);
     }
-    final previous = state;
     state = state.copyWith(kinds: kinds, syncError: null);
-    unawaited(_persistAndSync(previous));
+    _schedulePersistAndSync();
   }
 
   void setQuietHours(QuietHours quietHours) {
-    final previous = state;
     state = state.copyWith(quietHours: quietHours, syncError: null);
-    unawaited(_persistAndSync(previous));
+    _schedulePersistAndSync();
   }
 }
 

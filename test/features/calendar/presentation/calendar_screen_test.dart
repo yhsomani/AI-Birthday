@@ -2,6 +2,7 @@ import 'package:ai_birthday/features/calendar/presentation/calendar_screen.dart'
 import 'package:ai_birthday/features/people/data/person_providers.dart';
 import 'package:ai_birthday/features/people/domain/person.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -121,5 +122,38 @@ void main() {
     await tester.tap(find.byTooltip('Previous month'));
     await tester.pumpAndSettle();
     expect(find.text('February 2026'), findsOneWidget);
+  });
+
+  testWidgets('month navigation buttons trigger haptic feedback', (
+    tester,
+  ) async {
+    final hapticCalls = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (MethodCall methodCall) async {
+        if (methodCall.method == 'HapticFeedback.vibrate') {
+          hapticCalls.add(methodCall.arguments as String);
+        }
+        return null;
+      },
+    );
+
+    final store = FakePeopleStore();
+    addTearDown(store.close);
+    await store.save(person(id: 'a', name: 'Ana', month: 2, day: 5));
+    await pumpHarness(tester, store);
+
+    expect(hapticCalls, isEmpty);
+
+    await tester.tap(find.byTooltip('Next month'));
+    await tester.pumpAndSettle();
+    expect(hapticCalls, ['HapticFeedbackType.lightImpact']);
+
+    await tester.tap(find.byTooltip('Previous month'));
+    await tester.pumpAndSettle();
+    expect(hapticCalls, [
+      'HapticFeedbackType.lightImpact',
+      'HapticFeedbackType.lightImpact',
+    ]);
   });
 }

@@ -195,12 +195,6 @@ class AppDatabase extends _$AppDatabase {
       }
     },
     beforeOpen: (details) async {
-      await customStatement(
-        "UPDATE persons SET birthday_month = NULL, birthday_day = NULL, notes = 'Imported from phone contacts' WHERE notes LIKE '%birthday default set to today%';",
-      );
-      await customStatement(
-        "DELETE FROM birthdays WHERE person_id IN (SELECT id FROM persons WHERE birthday_month IS NULL);",
-      );
       // Query audit: delivery_events is the only unbounded table and
       // birthday_id is its hot filter column (per-birthday handoff lookups).
       // IF NOT EXISTS keeps this idempotent for both fresh and existing DBs.

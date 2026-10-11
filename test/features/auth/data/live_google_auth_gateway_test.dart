@@ -224,7 +224,7 @@ void main() {
       },
     );
 
-    test('graceful fallback when IdP network exchange fails', () async {
+    test('fails closed when IdP network exchange fails', () async {
       final testPlatform = TestGoogleSignInPlatform(
         authResults: const AuthenticationResults(
           user: GoogleSignInUserData(
@@ -249,21 +249,10 @@ void main() {
       );
 
       final outcome = await gateway.signIn();
-      expect(outcome, isA<SignInSuccess>());
-      final success = outcome as SignInSuccess;
-      expect(success.identity.googleSubject, 'google-sub-fallback');
-      expect(success.identity.email, 'offline@example.com');
-      // Falls back to Google subject ID for firebaseUid and raw idToken
-      expect(success.identity.firebaseUid, 'google-sub-fallback');
-      expect(success.identity.idToken, 'raw-google-id-token-offline');
-
-      // Verify fallback session saved to store
-      expect(store.data['auth_session_subject'], 'google-sub-fallback');
-      expect(store.data['auth_session_uid'], 'google-sub-fallback');
-      expect(
-        store.data['auth_session_id_token'],
-        'raw-google-id-token-offline',
-      );
+      expect(outcome, isA<SignInFailed>());
+      final failed = outcome as SignInFailed;
+      expect(failed.message, contains('Network error during authentication'));
+      expect(store.data.isEmpty, isTrue);
     });
 
     test(

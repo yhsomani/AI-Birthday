@@ -183,7 +183,7 @@ class BirthdayEngine {
       refDate: refDate,
       adjusted: adjusted,
       isToday: sameDay,
-      daysUntil: sameDay ? 0 : occurrence.difference(refDate).inDays,
+      daysUntil: sameDay ? 0 : _calendarDaysBetween(occurrence, refDate),
     );
   }
 
@@ -240,7 +240,7 @@ class BirthdayEngine {
       refDate: refDate,
       adjusted: adjusted,
       isToday: sameDay,
-      daysUntil: sameDay ? 0 : occurrence.difference(refDate).inDays,
+      daysUntil: sameDay ? 0 : _calendarDaysBetween(occurrence, refDate),
     );
   }
 
@@ -259,10 +259,16 @@ class BirthdayEngine {
       day: day,
       year: year,
       nextDate: nextDate,
-      daysUntil: daysUntil ?? nextDate.difference(refDate).inDays,
+      daysUntil: daysUntil ?? _calendarDaysBetween(nextDate, refDate),
       isToday: isToday,
       isLeapDayAdjusted: adjusted,
     );
+  }
+
+  static int _calendarDaysBetween(DateTime a, DateTime b) {
+    final utcA = DateTime.utc(a.year, a.month, a.day);
+    final utcB = DateTime.utc(b.year, b.month, b.day);
+    return utcA.difference(utcB).inDays;
   }
 
   (DateTime, bool) _occurrenceInYear(

@@ -25,23 +25,25 @@ class DriftPeopleRepository implements PeopleRepository {
 
   @override
   Stream<List<Person>> watchPeople() {
-    return (_database.select(
-      _database.persons,
-    )..where((r) => r.deletedAt.isNull())).watch().map((rows) {
-      final list = rows.map(_personFromRow).toList();
-      list.sort(_byNameThenId);
-      return list;
-    });
+    final query = _database.select(_database.persons)
+      ..where((r) => r.deletedAt.isNull())
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.name.lower()),
+        (t) => OrderingTerm(expression: t.id),
+      ]);
+    return query.watch().map((rows) => rows.map(_personFromRow).toList());
   }
 
   @override
   Future<List<Person>> getPeople() async {
-    final rows = await (_database.select(
-      _database.persons,
-    )..where((r) => r.deletedAt.isNull())).get();
-    final list = rows.map(_personFromRow).toList();
-    list.sort(_byNameThenId);
-    return list;
+    final query = _database.select(_database.persons)
+      ..where((r) => r.deletedAt.isNull())
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.name.lower()),
+        (t) => OrderingTerm(expression: t.id),
+      ]);
+    final rows = await query.get();
+    return rows.map(_personFromRow).toList();
   }
 
   @override
@@ -113,12 +115,6 @@ class DriftPeopleRepository implements PeopleRepository {
     )..where((r) => r.id.equals(id))).getSingleOrNull();
   }
 
-  /// Deterministic total order (query audit Phase 4): name asc with the
-  /// unique id as tie-breaker — Dart's sort is unstable under equal keys.
-  static int _byNameThenId(Person a, Person b) {
-    final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    return byName != 0 ? byName : a.id.compareTo(b.id);
-  }
 
   static Person _personFromRow(db.Person row) {
     return Person(

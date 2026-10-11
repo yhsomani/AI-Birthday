@@ -65,7 +65,7 @@ export class SubscriptionVerificationService {
           error.statusCode === 404 ||
           error.statusCode === 410)
       ) {
-        return this.writeNone(uid, request.productId);
+        return this.writeNone(uid, request.productId, request.purchaseToken);
       }
 
       throw new HttpsError(
@@ -77,6 +77,15 @@ export class SubscriptionVerificationService {
     const purchaseTokenHash = createHash('sha256')
       .update(request.purchaseToken, 'utf8')
       .digest('hex');
+
+    if (
+      purchase.obfuscatedExternalAccountId !== null &&
+      purchase.obfuscatedExternalAccountId !== undefined &&
+      purchase.obfuscatedExternalAccountId.length > 0 &&
+      purchase.obfuscatedExternalAccountId !== request.accountBinding
+    ) {
+      throw new HttpsError('permission-denied', 'PURCHASE_ACCOUNT_MISMATCH');
+    }
 
     await this.claimPurchaseOwnership(uid, purchaseTokenHash);
 
@@ -98,6 +107,16 @@ export class SubscriptionVerificationService {
       Number.isFinite(expiryDateMs) &&
       expiryDateMs > nowMs &&
       ENTITLED_STATES.has(purchase.subscriptionState);
+
+    if (!canUseAi) {
+      const active = await this.preserveActiveEntitlementIfPresent(
+        uid,
+        purchaseTokenHash,
+      );
+      if (active) {
+        return active;
+      }
+    }
 
     const status: VerifyPurchaseResponse['status'] = canUseAi
       ? 'active'
@@ -171,10 +190,55 @@ export class SubscriptionVerificationService {
     }
   }
 
+  private async preserveActiveEntitlementIfPresent(
+    uid: string,
+    purchaseTokenHash?: string,
+  ): Promise<VerifyPurchaseResponse | null> {
+    const existingDoc = await this.db
+      .doc('users/' + uid + '/entitlement/status')
+      .get();
+    if (existingDoc.exists) {
+      const data = existingDoc.data() as Record<string, unknown> | undefined;
+      const currentExpiry =
+        typeof data?.expiryDateMs === 'number' ? data.expiryDateMs : 0;
+      const canUseAi = data?.canUseAi === true;
+      const existingTokenHash = data?.purchaseTokenHash;
+      if (
+        canUseAi &&
+        currentExpiry > Date.now() &&
+        (!purchaseTokenHash || existingTokenHash !== purchaseTokenHash)
+      ) {
+        return {
+          status: 'active',
+          productId:
+            typeof data?.productId === 'string'
+              ? data.productId
+              : PRO_PRODUCT_ID,
+          expiryDateMs: currentExpiry,
+          canUseAi: true,
+          isAutoRenewing: data?.isAutoRenewing === true,
+        };
+      }
+    }
+    return null;
+  }
+
   private async writeNone(
     uid: string,
     productId: string,
+    purchaseToken?: string,
   ): Promise<VerifyPurchaseResponse> {
+    const purchaseTokenHash = purchaseToken
+      ? createHash('sha256').update(purchaseToken, 'utf8').digest('hex')
+      : undefined;
+    const active = await this.preserveActiveEntitlementIfPresent(
+      uid,
+      purchaseTokenHash,
+    );
+    if (active) {
+      return active;
+    }
+
     const nowMs = Date.now();
     await this.db.doc('users/' + uid + '/entitlement/status').set(
       {

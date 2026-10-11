@@ -830,6 +830,51 @@ void main() {
         expect(authorizations, everyElement('Bearer fresh-token'));
       },
     );
+
+    test(
+      'restore fails and aborts before write when a document is malformed (AUD-002)',
+      () async {
+        final client = MockClient((request) async {
+          return servePublished(request, (subReq) async {
+            if (subReq.url.path.endsWith('/people')) {
+              // Document missing required 'name' field
+              return http.Response(
+                jsonEncode({
+                  'documents': [
+                    {
+                      'name':
+                          'users/uid-test/generations/g-test/people/p-malformed',
+                      'fields': {
+                        'id': {'stringValue': 'p-malformed'},
+                        // Missing name
+                      },
+                    },
+                  ],
+                }),
+                200,
+              );
+            }
+            return http.Response(jsonEncode({'documents': []}), 200);
+          });
+        });
+
+        final service = CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: client,
+        );
+
+        final result = await service.restore(_signedInAuth);
+        expect(result.success, isFalse);
+        expect(result.errorCode, 'sync');
+        expect(result.retryable, isFalse);
+        expect(result.error, contains('malformed'));
+
+        // Verify no rows were inserted into local DB
+        final localPeople = await db.select(db.persons).get();
+        expect(localPeople, isEmpty);
+      },
+    );
   });
 }
 

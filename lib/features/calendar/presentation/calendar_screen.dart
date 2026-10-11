@@ -45,6 +45,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 
   void _shiftMonth(int delta) {
+    HapticFeedback.lightImpact();
     setState(
       () => _visibleMonth = DateTime(
         _visibleMonth.year,

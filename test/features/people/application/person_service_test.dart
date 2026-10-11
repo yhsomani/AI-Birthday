@@ -1,8 +1,9 @@
-import 'package:ai_birthday/core/database/app_database.dart';
+import 'package:ai_birthday/core/database/app_database.dart' hide Person;
 import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/features/people/application/person_service.dart';
 import 'package:ai_birthday/features/people/data/person_repository.dart';
+import 'package:ai_birthday/features/people/domain/person.dart';
 import 'package:ai_birthday/features/people/domain/person_enums.dart';
 import 'package:ai_birthday/features/people/domain/person_input.dart';
 import 'package:ai_birthday/features/people/domain/person_input_validator.dart';
@@ -113,5 +114,31 @@ void main() {
     expect(visible.map((p) => p.id), ['fixed-person-id']);
     final restored = await service.getById(created.id);
     expect(restored!.deletedAt, isNull);
+  });
+
+  test('update allows editing a contact that has no birthday (AUD-010)', () async {
+    // Contact imported without birthday
+    final noBdayPerson = Person(
+      id: 'imported-no-bday',
+      name: 'No Birthday Contact',
+      createdAt: DateTime.utc(2025, 6, 15, 9),
+      updatedAt: DateTime.utc(2025, 6, 15, 9),
+    );
+    final store = DriftPeopleStore(db, now: () => DateTime.utc(2025, 6, 15, 9));
+    await store.save(noBdayPerson);
+
+    // Edit notes and phone without adding birthday
+    final updated = await service.update(
+      noBdayPerson,
+      const PersonDraft(
+        name: 'No Birthday Contact',
+        phoneNumber: '+1234567890',
+        notes: 'Added some notes',
+      ),
+    );
+
+    expect(updated.phoneNumber, '+1234567890');
+    expect(updated.notes, 'Added some notes');
+    expect(updated.hasBirthday, isFalse);
   });
 }

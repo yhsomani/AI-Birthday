@@ -51,7 +51,7 @@ class PersonService {
   /// Validates [draft] and applies it to an existing recipient, bumping the
   /// sync-envelope version so updates remain deterministic.
   Future<Person> update(Person existing, PersonDraft draft) async {
-    _ensureValid(draft);
+    _ensureValid(draft, requireBirthday: existing.hasBirthday);
     final updated = draft.applyTo(existing, now: _now());
     await _store.save(updated);
     _logger.info(
@@ -76,8 +76,11 @@ class PersonService {
     await _onChanged?.call();
   }
 
-  void _ensureValid(PersonDraft draft) {
-    final validation = _validator.validate(draft);
+  void _ensureValid(PersonDraft draft, {bool requireBirthday = true}) {
+    final validation = _validator.validate(
+      draft,
+      requireBirthday: requireBirthday,
+    );
     if (!validation.isValid) {
       final labels = validation.fieldErrors.values.map((e) => e.label).toList();
       throw AppFailure.validation(
