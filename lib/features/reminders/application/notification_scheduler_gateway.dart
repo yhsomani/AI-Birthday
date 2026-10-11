@@ -21,7 +21,9 @@ abstract class NotificationSchedulerGateway {
   Future<bool> requestPermission();
 
   /// Replace outstanding reminders with [plan]'s active triggers.
-  Future<bool> apply(ReminderPlan plan);
+  /// When [hideNames] is true, notification titles and bodies omit recipient names
+  /// for lock-screen privacy (AUD-PRIV-001).
+  Future<bool> apply(ReminderPlan plan, {bool hideNames = false});
 
   /// Clear all scheduled reminders.
   Future<bool> cancelAll();

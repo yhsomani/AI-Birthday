@@ -138,8 +138,11 @@ class ConsoleAppLogger implements AppLogger {
     final errorInfo = record.error == null
         ? ''
         : ' error=${record.error.runtimeType}';
+    final traceInfo = record.stackTrace == null
+        ? ''
+        : ' trace=${record.stackTrace.toString().split('\n').firstWhere((line) => line.trim().isNotEmpty, orElse: () => '')}';
     sink(
-      '[${record.level.name}] ${record.category}$opacity$categoryInfo: ${record.message}$durationInfo$extra$errorInfo',
+      '[${record.level.name}] ${record.category}$opacity$categoryInfo: ${record.message}$durationInfo$extra$errorInfo$traceInfo',
     );
   }
 

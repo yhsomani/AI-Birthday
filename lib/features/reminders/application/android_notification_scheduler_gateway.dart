@@ -73,7 +73,7 @@ class AndroidNotificationSchedulerGateway
   }
 
   @override
-  Future<bool> apply(ReminderPlan plan) async {
+  Future<bool> apply(ReminderPlan plan, {bool hideNames = false}) async {
     if (!_isLiveAndroid) return true;
     try {
       final triggers = plan.active.map((t) {
@@ -83,14 +83,19 @@ class AndroidNotificationSchedulerGateway
           ReminderKind.prepare => 'Birthday is in 2 days.',
           ReminderKind.approaching => 'Birthday is in 7 days.',
         };
+        final title = hideNames
+            ? (t.kind == ReminderKind.birthday
+                  ? "🎉 It's a Birthday Today!"
+                  : 'Upcoming Birthday')
+            : (t.kind == ReminderKind.birthday
+                  ? "🎉 It's ${t.personName}'s Birthday!"
+                  : "Upcoming: ${t.personName}'s Birthday");
         return {
           'id': _stableNotificationId('${t.personId}_${t.kind.name}'),
           'personId': t.personId,
-          'personName': t.personName,
+          'personName': hideNames ? '' : t.personName,
           'kind': t.kind.name,
-          'title': t.kind == ReminderKind.birthday
-              ? "🎉 It's ${t.personName}'s Birthday!"
-              : "Upcoming: ${t.personName}'s Birthday",
+          'title': title,
           'body': whenText,
           'timestampMs': t.at.millisecondsSinceEpoch,
         };

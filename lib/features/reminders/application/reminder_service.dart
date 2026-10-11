@@ -39,6 +39,7 @@ class ReminderService {
       reference: reference ?? DateTime.now(),
       enabled: settings.kinds,
       quietHours: settings.quietHours,
+      deferQuietHours: settings.deferQuietHours,
     );
     final applied = await _gateway.apply(plan);
     if (!applied) {
@@ -48,6 +49,7 @@ class ReminderService {
         params: {
           'active': '${plan.active.length}',
           'suppressed': '${plan.suppressed.length}',
+          'deferred': '${plan.deferred.length}',
         },
       );
       return false;
@@ -58,6 +60,7 @@ class ReminderService {
       params: {
         'active': '${plan.active.length}',
         'suppressed': '${plan.suppressed.length}',
+        'deferred': '${plan.deferred.length}',
       },
     );
     return true;

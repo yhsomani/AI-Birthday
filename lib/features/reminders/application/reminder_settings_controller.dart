@@ -23,24 +23,28 @@ class ReminderSettings {
       ReminderKind.birthday,
     },
     this.quietHours = const QuietHours.night(),
+    this.deferQuietHours = false,
     this.syncError,
   });
 
   final bool enabled;
   final Set<ReminderKind> kinds;
   final QuietHours quietHours;
+  final bool deferQuietHours;
   final String? syncError;
 
   ReminderSettings copyWith({
     bool? enabled,
     Set<ReminderKind>? kinds,
     QuietHours? quietHours,
+    bool? deferQuietHours,
     String? syncError,
   }) {
     return ReminderSettings(
       enabled: enabled ?? this.enabled,
       kinds: kinds ?? this.kinds,
       quietHours: quietHours ?? this.quietHours,
+      deferQuietHours: deferQuietHours ?? this.deferQuietHours,
       syncError: syncError,
     );
   }

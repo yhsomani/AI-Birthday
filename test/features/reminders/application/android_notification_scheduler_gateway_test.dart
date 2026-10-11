@@ -29,6 +29,7 @@ void main() {
         );
 
         await gateway.apply(plan);
+        await gateway.apply(plan, hideNames: true);
 
         // On non-live Android, apply, cancelAll and sendTestNotification complete safely as no-ops
         await gateway.cancelAll();

@@ -29,7 +29,7 @@ class _FakeGateway implements NotificationSchedulerGateway {
   }
 
   @override
-  Future<bool> apply(ReminderPlan plan) async => true;
+  Future<bool> apply(ReminderPlan plan, {bool hideNames = false}) async => true;
 
   @override
   Future<bool> cancelAll() async => true;

@@ -51,6 +51,20 @@ void main() {
           .info('db', 'row written', params: {'personId': 'p1'});
       expect(lines.first, contains('op-42'));
     });
+
+    test('emits top stack trace frame safely when provided', () {
+      final lines = <String>[];
+      final logger = ConsoleAppLogger(level: LogLevel.verbose, sink: lines.add);
+
+      logger.error(
+        'sync',
+        'network fault',
+        error: Exception('connection refused'),
+        stackTrace: StackTrace.current,
+      );
+      expect(lines.first, contains('error='));
+      expect(lines.first, contains('trace='));
+    });
   });
 
   group('RecordingLogger', () {

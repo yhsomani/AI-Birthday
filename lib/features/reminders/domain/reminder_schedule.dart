@@ -25,13 +25,20 @@ class ReminderTrigger {
 
 /// Result of a reminder planning pass.
 class ReminderPlan {
-  const ReminderPlan({required this.active, required this.suppressed});
+  const ReminderPlan({
+    required this.active,
+    required this.suppressed,
+    this.deferred = const [],
+  });
 
   /// Reminders to hand to the notification scheduler.
   final List<ReminderTrigger> active;
 
   /// Reminders that fell inside quiet hours and must not be delivered.
   final List<ReminderTrigger> suppressed;
+
+  /// Reminders deferred out of quiet hours to the next permissible time.
+  final List<ReminderTrigger> deferred;
 
   bool get isEmpty => active.isEmpty && suppressed.isEmpty;
 
@@ -44,8 +51,7 @@ class ReminderPlan {
 /// resolved), then places each enabled lead at [reminderHour] local time on
 /// the matching day. Naturally deduplicates by (person, kind). Triggers inside
 /// quiet hours are reported as [ReminderPlan.suppressed] rather than dropped,
-/// so a device implementation can decide whether to slide them to the next
-/// available minute.
+/// or slid to the next permissible minute when [deferQuietHours] is enabled.
 class ReminderScheduler {
   const ReminderScheduler({
     this.engine = const BirthdayEngine(),
@@ -65,10 +71,12 @@ class ReminderScheduler {
       ReminderKind.birthday,
     },
     QuietHours quietHours = const QuietHours.none(),
+    bool deferQuietHours = false,
     String? fallbackTimezone,
   }) {
     final active = <ReminderTrigger>[];
     final suppressed = <ReminderTrigger>[];
+    final deferred = <ReminderTrigger>[];
     final seen = <({String personId, ReminderKind kind})>{};
 
     for (final person in people) {
@@ -97,7 +105,42 @@ class ReminderScheduler {
         if (!trigger.at.isAfter(reference)) continue;
 
         if (quietHours.contains(trigger.at)) {
-          suppressed.add(trigger);
+          if (deferQuietHours) {
+            final deferredAt = quietHours.nextPermissible(trigger.at);
+            final birthdayEnd = frameTimezone != null
+                ? tz.TZDateTime(
+                    tz.getLocation(frameTimezone),
+                    next.nextDate.year,
+                    next.nextDate.month,
+                    next.nextDate.day,
+                    23,
+                    59,
+                    59,
+                  )
+                : DateTime(
+                    next.nextDate.year,
+                    next.nextDate.month,
+                    next.nextDate.day,
+                    23,
+                    59,
+                    59,
+                  );
+            if (deferredAt.isAfter(reference) &&
+                !deferredAt.isAfter(birthdayEnd)) {
+              final deferredTrigger = ReminderTrigger(
+                personId: trigger.personId,
+                personName: trigger.personName,
+                kind: trigger.kind,
+                at: deferredAt,
+              );
+              deferred.add(deferredTrigger);
+              active.add(deferredTrigger);
+            } else {
+              suppressed.add(trigger);
+            }
+          } else {
+            suppressed.add(trigger);
+          }
         } else {
           active.add(trigger);
         }
@@ -106,7 +149,12 @@ class ReminderScheduler {
 
     active.sort(_byTime);
     suppressed.sort(_byTime);
-    return ReminderPlan(active: active, suppressed: suppressed);
+    deferred.sort(_byTime);
+    return ReminderPlan(
+      active: active,
+      suppressed: suppressed,
+      deferred: deferred,
+    );
   }
 
   ReminderTrigger _triggerFor({

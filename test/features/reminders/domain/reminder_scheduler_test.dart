@@ -154,4 +154,30 @@ void main() {
     expect(plan.active, isEmpty);
     expect(plan.suppressed, isEmpty);
   });
+
+  test(
+    'deferQuietHours slides triggers to end of quiet window and includes in active',
+    () {
+      const scheduler = ReminderScheduler();
+      const quiet = QuietHours(
+        start: Duration(hours: 8),
+        end: Duration(hours: 10),
+      );
+      final plan = scheduler.plan(
+        people: [person()],
+        reference: DateTime.utc(2026, 3, 12),
+        enabled: ReminderKind.values.toSet(),
+        quietHours: quiet,
+        deferQuietHours: true,
+      );
+      expect(plan.suppressed, isEmpty);
+      expect(plan.deferred, hasLength(4));
+      expect(plan.active, hasLength(4));
+      // Each trigger originally at 9:00 should now be deferred to 10:00
+      for (final trigger in plan.active) {
+        expect(trigger.at.hour, 10);
+        expect(trigger.at.minute, 0);
+      }
+    },
+  );
 }
