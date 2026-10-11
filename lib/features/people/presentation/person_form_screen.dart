@@ -777,12 +777,25 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                   ),
                 ),
                 onPressed: _saving ? null : _save,
-                child: Text(
-                  _saving ? 'Saving…' : 'Save',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (_saving) ...[
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      _saving ? 'Saving…' : 'Save',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 32),
