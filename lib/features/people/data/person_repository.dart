@@ -36,8 +36,8 @@ class DriftPeopleStore implements PeopleStore {
     if (!includeDeleted) {
       query.where((row) => row.deletedAt.isNull());
     }
+    query.orderBy([(t) => drift.OrderingTerm(expression: t.name.lower())]);
     final rows = await query.get();
-    rows.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return rows.map(_toDomain).toList();
   }
 
@@ -47,8 +47,8 @@ class DriftPeopleStore implements PeopleStore {
     if (!includeDeleted) {
       query.where((row) => row.deletedAt.isNull());
     }
+    query.orderBy([(t) => drift.OrderingTerm(expression: t.name.lower())]);
     return query.watch().map((rows) {
-      rows.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       return rows.map(_toDomain).toList();
     });
   }
