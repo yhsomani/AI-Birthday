@@ -41,7 +41,7 @@ class ReminderService {
       quietHours: settings.quietHours,
       deferQuietHours: settings.deferQuietHours,
     );
-    final applied = await _gateway.apply(plan);
+    final applied = await _gateway.apply(plan, hideNames: settings.hideNames);
     if (!applied) {
       _logger.warning(
         'reminders',

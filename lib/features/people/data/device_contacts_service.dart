@@ -4,6 +4,7 @@ library;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/people/data/contact_csv_service.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
@@ -41,13 +42,15 @@ class DeviceContact {
     if (birthdayString == null || birthdayString!.trim().isEmpty) return null;
     final str = birthdayString!.trim();
 
+    const engine = BirthdayEngine();
+
     // Check --MM-DD format
     if (str.startsWith('--')) {
       final parts = str.substring(2).split('-');
       if (parts.length == 2) {
         final m = int.tryParse(parts[0]);
         final d = int.tryParse(parts[1]);
-        if (m != null && d != null && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+        if (m != null && d != null && engine.isValidMonthDay(m, d)) {
           return {'month': m, 'day': d, 'year': null};
         }
       }
@@ -61,9 +64,13 @@ class DeviceContact {
       final p2 = int.tryParse(parts[2]);
       if (p0 != null && p1 != null && p2 != null) {
         if (p0 > 1000) {
-          return {'year': p0, 'month': p1, 'day': p2};
+          if (engine.isValidMonthDay(p1, p2, year: p0)) {
+            return {'year': p0, 'month': p1, 'day': p2};
+          }
         } else if (p2 > 1000) {
-          return {'year': p2, 'month': p0, 'day': p1};
+          if (engine.isValidMonthDay(p0, p1, year: p2)) {
+            return {'year': p2, 'month': p0, 'day': p1};
+          }
         }
       }
     }

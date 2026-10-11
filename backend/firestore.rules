@@ -28,16 +28,18 @@ service cloud.firestore {
     // collections, owner-only and fenced during deletion like the other backup data.
     match /users/{userId}/generations/{generationId} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.uid == userId &&
+      allow create, delete: if request.auth != null && request.auth.uid == userId &&
         !deletionInProgress(userId);
+      allow update: if false;
     }
 
     match /users/{userId}/generations/{generationId}/{collection}/{document=**} {
       allow read: if request.auth != null && request.auth.uid == userId &&
         collection in ['people', 'birthdays', 'drafts', 'reminderSettings'];
-      allow write: if request.auth != null && request.auth.uid == userId &&
+      allow create, delete: if request.auth != null && request.auth.uid == userId &&
         collection in ['people', 'birthdays', 'drafts', 'reminderSettings'] &&
         !deletionInProgress(userId);
+      allow update: if false;
     }
 
     // The mobile app's opt-in cloud backup data is scoped to the signed-in owner.

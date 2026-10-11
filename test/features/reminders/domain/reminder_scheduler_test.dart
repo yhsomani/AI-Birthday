@@ -180,4 +180,50 @@ void main() {
       }
     },
   );
+
+  test(
+    'cross-timezone quiet hours evaluates against device owner timezone',
+    () {
+      const scheduler = ReminderScheduler();
+      // Contact in Tokyo (UTC+9). 9:00 AM Tokyo = 0:00 UTC (midnight).
+      final tokyoPerson = person(
+        id: 'p-tokyo',
+        name: 'Kenji',
+        month: 3,
+        day: 20,
+        timezone: 'Asia/Tokyo',
+      );
+      // Device owner in UTC with quiet hours 22:00 to 08:00.
+      const quiet = QuietHours.night();
+
+      final planSuppressed = scheduler.plan(
+        people: [tokyoPerson],
+        reference: DateTime.utc(2026, 3, 19),
+        enabled: const {ReminderKind.birthday},
+        quietHours: quiet,
+        deferQuietHours: false,
+        deviceTimezone: 'UTC',
+      );
+      // 0:00 UTC is inside quiet hours 22:00-08:00, so it must be suppressed!
+      expect(planSuppressed.active, isEmpty);
+      expect(planSuppressed.suppressed, hasLength(1));
+
+      final planDeferred = scheduler.plan(
+        people: [tokyoPerson],
+        reference: DateTime.utc(2026, 3, 19),
+        enabled: const {ReminderKind.birthday},
+        quietHours: quiet,
+        deferQuietHours: true,
+        deviceTimezone: 'UTC',
+      );
+      // Deferred to 08:00 UTC = 17:00 Tokyo.
+      expect(planDeferred.suppressed, isEmpty);
+      expect(planDeferred.active, hasLength(1));
+      final trigger = planDeferred.active.single;
+      expect(trigger.at, isA<tz.TZDateTime>());
+      // In Tokyo time, 08:00 UTC is 17:00.
+      expect(trigger.at.hour, 17);
+      expect(trigger.at.minute, 0);
+    },
+  );
 }

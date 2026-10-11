@@ -224,23 +224,44 @@ class UserGeminiApiProvider implements AiMessageProvider {
 
   AiGenerationResult _parseSuccess(String responseBody) {
     try {
-      final json = jsonDecode(responseBody) as Map<String, dynamic>;
-      final candidates = json['candidates'] as List<dynamic>?;
-      if (candidates == null || candidates.isEmpty) {
+      final decoded = jsonDecode(responseBody);
+      if (decoded is! Map<String, dynamic>) {
+        throw const AppFailure.providerError(
+          detail: 'Failed to parse Gemini response payload.',
+        );
+      }
+      final candidates = decoded['candidates'];
+      if (candidates is! List || candidates.isEmpty) {
         throw const AppFailure.providerError(
           detail: 'No response candidates returned by Gemini.',
         );
       }
-      final firstCandidate = candidates.first as Map<String, dynamic>;
-      final content = firstCandidate['content'] as Map<String, dynamic>?;
-      final parts = content?['parts'] as List<dynamic>?;
-      if (parts == null || parts.isEmpty) {
+      final firstCandidate = candidates.first;
+      if (firstCandidate is! Map) {
+        throw const AppFailure.providerError(
+          detail: 'Malformed candidate in Gemini response.',
+        );
+      }
+      final content = firstCandidate['content'];
+      if (content is! Map) {
         throw const AppFailure.providerError(
           detail: 'Empty response content from Gemini.',
         );
       }
-      final text = parts.first['text'] as String?;
-      if (text == null || text.trim().isEmpty) {
+      final parts = content['parts'];
+      if (parts is! List || parts.isEmpty) {
+        throw const AppFailure.providerError(
+          detail: 'Empty response content from Gemini.',
+        );
+      }
+      final firstPart = parts.first;
+      if (firstPart is! Map) {
+        throw const AppFailure.providerError(
+          detail: 'Empty response content from Gemini.',
+        );
+      }
+      final text = firstPart['text'];
+      if (text is! String || text.trim().isEmpty) {
         throw const AppFailure.providerError(
           detail: 'Empty text returned by Gemini.',
         );
@@ -258,7 +279,9 @@ class UserGeminiApiProvider implements AiMessageProvider {
         providerType: providerId,
         modelName: model,
       );
-    } on FormatException {
+    } on AppFailure {
+      rethrow;
+    } catch (_) {
       throw const AppFailure.providerError(
         detail: 'Failed to parse Gemini response payload.',
       );

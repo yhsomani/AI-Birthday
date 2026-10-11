@@ -55,7 +55,6 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
       _initialized = true;
     } catch (e) {
       _logger?.warning('AuthGateway', 'GoogleSignIn initialize note: $e');
-      _initialized = true;
     }
   }
 

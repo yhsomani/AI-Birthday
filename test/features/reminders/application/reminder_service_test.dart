@@ -29,9 +29,12 @@ class RecordingGateway implements NotificationSchedulerGateway {
   @override
   Future<bool> requestExactAlarmPermission() async => granted;
 
+  bool? lastHideNames;
+
   @override
   Future<bool> apply(ReminderPlan plan, {bool hideNames = false}) async {
     applied.add(plan);
+    lastHideNames = hideNames;
     return true;
   }
 
@@ -126,5 +129,18 @@ void main() {
     final plan = gateway.applied.single;
     expect(plan.active, isEmpty);
     expect(plan.suppressed, hasLength(1));
+  });
+
+  test('forwards hideNames setting to gateway apply', () async {
+    final gateway = RecordingGateway();
+    final service = ReminderService(gateway, const ReminderScheduler(), logger);
+
+    await service.sync(
+      people: [person()],
+      settings: const ReminderSettings(enabled: true, hideNames: true),
+      reference: DateTime.utc(2026, 3, 14),
+    );
+
+    expect(gateway.lastHideNames, isTrue);
   });
 }

@@ -73,11 +73,13 @@ class ReminderScheduler {
     QuietHours quietHours = const QuietHours.none(),
     bool deferQuietHours = false,
     String? fallbackTimezone,
+    String? deviceTimezone,
   }) {
     final active = <ReminderTrigger>[];
     final suppressed = <ReminderTrigger>[];
     final deferred = <ReminderTrigger>[];
     final seen = <({String personId, ReminderKind kind})>{};
+    final checkTimezone = deviceTimezone ?? fallbackTimezone;
 
     for (final person in people) {
       if (!person.hasBirthday) continue;
@@ -104,9 +106,21 @@ class ReminderScheduler {
         // manufacture reminders whose trigger time has already passed.
         if (!trigger.at.isAfter(reference)) continue;
 
-        if (quietHours.contains(trigger.at)) {
+        final checkAt = (checkTimezone != null && trigger.at is tz.TZDateTime)
+            ? tz.TZDateTime.from(trigger.at, tz.getLocation(checkTimezone))
+            : trigger.at;
+
+        if (quietHours.contains(checkAt)) {
           if (deferQuietHours) {
-            final deferredAt = quietHours.nextPermissible(trigger.at);
+            final deferredCheckAt = quietHours.nextPermissible(checkAt);
+            final deferredAt =
+                (checkTimezone != null && trigger.at is tz.TZDateTime)
+                ? tz.TZDateTime.from(
+                    deferredCheckAt,
+                    (trigger.at as tz.TZDateTime).location,
+                  )
+                : deferredCheckAt;
+
             final birthdayEnd = frameTimezone != null
                 ? tz.TZDateTime(
                     tz.getLocation(frameTimezone),

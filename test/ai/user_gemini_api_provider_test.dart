@@ -1,7 +1,13 @@
 import 'dart:io';
 
+import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/core/security/credential_storage.dart';
 import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
+import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
+import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
+import 'package:ai_birthday/features/people/domain/models/person.dart';
+import 'package:ai_birthday/features/people/domain/models/relationship.dart';
+import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeCredentialStorage implements CredentialStorage {
@@ -163,6 +169,91 @@ void main() {
       final result = await provider.testApiKey('AIzaSyKey');
       expect(result.status, GeminiConnectionStatus.error);
       expect(result.message, contains('Google Gemini returned error 500'));
+    });
+  });
+
+  group('UserGeminiApiProvider.generateMessage response parsing', () {
+    late FakeCredentialStorage storage;
+    final testPerson = Person(
+      id: 'p-1',
+      name: 'Alice',
+      relationship: RelationshipCategory.friend,
+      relationshipCloseness: RelationshipCloseness.close,
+      preferredLanguage: 'en',
+      preferredTone: MessageTone.warm,
+      preferredDeliveryChannel: DeliveryChannel.whatsapp,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      version: 1,
+    );
+
+    setUp(() {
+      storage = FakeCredentialStorage()..saveGeminiApiKey('AIzaValidKey');
+    });
+
+    test('throws providerError on non-object JSON response', () async {
+      final provider = UserGeminiApiProvider(
+        credentialStorage: storage,
+        httpSender: (uri, headers, body) async =>
+            const HttpResponsePayload(statusCode: 200, body: '[]'),
+      );
+
+      expect(
+        () => provider.generateMessage(AiGenerationRequest(person: testPerson)),
+        throwsA(
+          isA<AppFailure>()
+              .having((f) => f.code, 'code', AppFailureCode.aiProviderError)
+              .having(
+                (f) => f.detail,
+                'detail',
+                'Failed to parse Gemini response payload.',
+              ),
+        ),
+      );
+    });
+
+    test(
+      'throws providerError when candidates or parts contain unexpected types',
+      () async {
+        final provider = UserGeminiApiProvider(
+          credentialStorage: storage,
+          httpSender: (uri, headers, body) async => const HttpResponsePayload(
+            statusCode: 200,
+            body: '{"candidates": [123]}',
+          ),
+        );
+
+        expect(
+          () =>
+              provider.generateMessage(AiGenerationRequest(person: testPerson)),
+          throwsA(
+            isA<AppFailure>()
+                .having((f) => f.code, 'code', AppFailureCode.aiProviderError)
+                .having(
+                  (f) => f.detail,
+                  'detail',
+                  'Malformed candidate in Gemini response.',
+                ),
+          ),
+        );
+      },
+    );
+
+    test('parses clean valid candidate text properly', () async {
+      final provider = UserGeminiApiProvider(
+        credentialStorage: storage,
+        httpSender: (uri, headers, body) async => const HttpResponsePayload(
+          statusCode: 200,
+          body:
+              '{"candidates":[{"content":{"parts":[{"text":"\\"Happy Birthday!\\""}]}}]}',
+        ),
+      );
+
+      final result = await provider.generateMessage(
+        AiGenerationRequest(person: testPerson),
+      );
+      expect(result.message, 'Happy Birthday!');
+      expect(result.providerType, 'user_gemini');
     });
   });
 }

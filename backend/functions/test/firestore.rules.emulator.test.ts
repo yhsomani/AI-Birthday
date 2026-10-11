@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
 let environment: RulesTestEnvironment;
@@ -118,6 +118,14 @@ describe('Firestore authorization rules', () => {
     await assertSucceeds(
       setDoc(doc(ownerDb, 'users/uid-gen/generations/g1/people/p1'), {
         name: 'Gen',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(ownerDb, 'users/uid-gen/generations/g1'), { schemaVersion: 2 }),
+    );
+    await assertFails(
+      updateDoc(doc(ownerDb, 'users/uid-gen/generations/g1/people/p1'), {
+        name: 'Gen-Updated',
       }),
     );
     await assertFails(

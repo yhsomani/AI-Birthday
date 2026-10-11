@@ -350,7 +350,15 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
       final person = candidate.toPerson();
       await peopleRepo.savePerson(person);
 
-      if (person.hasBirthday) {
+      final hasValidBirthday =
+          person.hasBirthday &&
+          _engine.isValidMonthDay(
+            person.birthdayMonth!,
+            person.birthdayDay!,
+            year: person.birthYear,
+          );
+
+      if (hasValidBirthday) {
         final nextDate = b_models.Birthday.nextBirthdayDate(
           month: person.birthdayMonth!,
           day: person.birthdayDay!,
@@ -505,13 +513,20 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
       person.id,
     );
 
-    if (associatedBirthday != null) {
-      await birthdaysRepo.deleteBirthday(associatedBirthday.id);
-    }
-
     try {
       await ref.read(personServiceProvider).remove(person.id);
-    } catch (_) {}
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Failed to delete ${person.name}.')),
+      );
+      return;
+    }
+
+    if (associatedBirthday != null) {
+      try {
+        await birthdaysRepo.deleteBirthday(associatedBirthday.id);
+      } catch (_) {}
+    }
 
     // ponytail: show from the messenger captured above, not `context` — the
     // caller passes the list item's context, which is unmounted as soon as

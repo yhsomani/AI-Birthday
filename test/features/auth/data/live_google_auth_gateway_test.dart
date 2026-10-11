@@ -27,16 +27,24 @@ class InMemoryStoreDriver implements SecureStoreDriver {
 }
 
 class TestGoogleSignInPlatform extends GoogleSignInPlatform {
-  TestGoogleSignInPlatform({this.authResults, this.authException});
+  TestGoogleSignInPlatform({
+    this.authResults,
+    this.authException,
+    this.initException,
+  });
 
   AuthenticationResults? authResults;
   Object? authException;
+  Object? initException;
   int signOutCalls = 0;
   int initCalls = 0;
 
   @override
   Future<void> init(InitParameters params) async {
     initCalls++;
+    if (initException != null) {
+      throw initException!;
+    }
   }
 
   @override
@@ -456,5 +464,28 @@ void main() {
         expect(store.data.isEmpty, isTrue);
       },
     );
+
+    test('signIn retries initialize if previous attempt failed', () async {
+      final testPlatform = TestGoogleSignInPlatform(
+        initException: Exception('Transient platform init error'),
+      );
+      GoogleSignInPlatform.instance = testPlatform;
+
+      final gateway = LiveGoogleAuthGateway(
+        store: store,
+        firebaseApiKey: 'test-api-key',
+      );
+
+      // First attempt fails during init and authenticate cancels
+      await gateway.signIn();
+      expect(testPlatform.initCalls, 1);
+
+      // Now clear the init failure
+      testPlatform.initException = null;
+
+      // Second attempt should re-try init
+      await gateway.signIn();
+      expect(testPlatform.initCalls, 2);
+    });
   });
 }

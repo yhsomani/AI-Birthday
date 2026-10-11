@@ -496,24 +496,31 @@ class MainActivity : FlutterActivity() {
         }
 
         // Only now that the new plan is in place, drop alarms it no longer covers.
-        if (!cancelScheduledIds(previousIds - scheduledIds)) {
+        val uncancelledOldIds = cancelScheduledIds(previousIds - scheduledIds)
+        if (uncancelledOldIds.isNotEmpty()) {
             allScheduled = false
         }
 
         prefs.edit()
-            .putStringSet(BirthdayNotificationReceiver.KEY_SCHEDULED_ALARM_IDS, scheduledIds)
+            .putStringSet(
+                BirthdayNotificationReceiver.KEY_SCHEDULED_ALARM_IDS,
+                scheduledIds + uncancelledOldIds
+            )
             .putString(BirthdayNotificationReceiver.KEY_SCHEDULED_TRIGGERS_JSON, scheduledTriggers.toString())
             .apply()
 
         return allScheduled
     }
 
-    /** Cancels the pending alarms for [ids]. Returns false if any cancel failed. */
-    private fun cancelScheduledIds(ids: Set<String>): Boolean {
-        val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return false
-        var allCancelled = true
+    /** Cancels the pending alarms for [ids]. Returns set of IDs that failed to cancel. */
+    private fun cancelScheduledIds(ids: Set<String>): Set<String> {
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return ids
+        val failedIds = mutableSetOf<String>()
         for (idStr in ids) {
-            val id = idStr.toIntOrNull() ?: continue
+            val id = idStr.toIntOrNull()
+            if (id == null) {
+                continue
+            }
             val intent = Intent(this, BirthdayNotificationReceiver::class.java).apply {
                 action = BirthdayNotificationReceiver.ACTION_BIRTHDAY_REMINDER
             }
@@ -529,15 +536,14 @@ class MainActivity : FlutterActivity() {
                     pendingIntent.cancel()
                 } catch (e: Exception) {
                     Log.e("BirthdayReminder", "Failed to cancel reminder id=$id", e)
-                    allCancelled = false
+                    failedIds.add(idStr)
                 }
             }
         }
-        return allCancelled
+        return failedIds
     }
 
     private fun cancelAllReminders(): Boolean {
-        val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
         val prefs = getSharedPreferences(BirthdayNotificationReceiver.PREFS_NAME, Context.MODE_PRIVATE)
         val scheduledIds = prefs.getStringSet(
             BirthdayNotificationReceiver.KEY_SCHEDULED_ALARM_IDS,
@@ -545,13 +551,20 @@ class MainActivity : FlutterActivity() {
         ) ?: emptySet()
         var allCancelled = true
 
-        if (alarmManager != null && !cancelScheduledIds(scheduledIds)) {
+        val failedIds = cancelScheduledIds(scheduledIds)
+        if (failedIds.isNotEmpty()) {
             allCancelled = false
         }
-        prefs.edit()
-            .remove(BirthdayNotificationReceiver.KEY_SCHEDULED_ALARM_IDS)
-            .remove(BirthdayNotificationReceiver.KEY_SCHEDULED_TRIGGERS_JSON)
-            .apply()
+
+        val editor = prefs.edit()
+        if (failedIds.isEmpty()) {
+            editor.remove(BirthdayNotificationReceiver.KEY_SCHEDULED_ALARM_IDS)
+                .remove(BirthdayNotificationReceiver.KEY_SCHEDULED_TRIGGERS_JSON)
+        } else {
+            // Retain IDs for alarms that failed to cancel so they can be reconciled/retried on subsequent attempts (AUD-002).
+            editor.putStringSet(BirthdayNotificationReceiver.KEY_SCHEDULED_ALARM_IDS, failedIds)
+        }
+        editor.apply()
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         try {

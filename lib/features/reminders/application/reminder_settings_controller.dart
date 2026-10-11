@@ -24,6 +24,7 @@ class ReminderSettings {
     },
     this.quietHours = const QuietHours.night(),
     this.deferQuietHours = false,
+    this.hideNames = false,
     this.syncError,
   });
 
@@ -31,6 +32,7 @@ class ReminderSettings {
   final Set<ReminderKind> kinds;
   final QuietHours quietHours;
   final bool deferQuietHours;
+  final bool hideNames;
   final String? syncError;
 
   ReminderSettings copyWith({
@@ -38,6 +40,7 @@ class ReminderSettings {
     Set<ReminderKind>? kinds,
     QuietHours? quietHours,
     bool? deferQuietHours,
+    bool? hideNames,
     String? syncError,
   }) {
     return ReminderSettings(
@@ -45,6 +48,7 @@ class ReminderSettings {
       kinds: kinds ?? this.kinds,
       quietHours: quietHours ?? this.quietHours,
       deferQuietHours: deferQuietHours ?? this.deferQuietHours,
+      hideNames: hideNames ?? this.hideNames,
       syncError: syncError,
     );
   }
@@ -67,13 +71,24 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
   Future<void> _loadFromDatabase() async {
     try {
       final database = ref.read(databaseProvider);
-      final row = await (database.select(
-        database.reminderSettingsEntries,
-      )..where((r) => r.key.equals('default'))).getSingleOrNull();
+      final rows = await database
+          .select(database.reminderSettingsEntries)
+          .get();
+      final row = rows.where((r) => r.key == 'default').firstOrNull;
       if (row != null) {
-        final kinds = row.kinds
-            .split(',')
-            .where((k) => k.isNotEmpty)
+        final tokens = row.kinds.split(',').where((k) => k.isNotEmpty).toList();
+        final deferRow = rows
+            .where((r) => r.key == 'defer_quiet_hours')
+            .firstOrNull;
+        final hideRow = rows.where((r) => r.key == 'hide_names').firstOrNull;
+        final deferQuiet =
+            tokens.contains('opt:defer_quiet_hours') ||
+            (deferRow?.enabled ?? false);
+        final hideNames =
+            tokens.contains('opt:hide_names') || (hideRow?.enabled ?? false);
+
+        final kinds = tokens
+            .where((k) => !k.startsWith('opt:'))
             .map(
               (k) => ReminderKind.values.firstWhere(
                 (v) => v.name == k,
@@ -90,6 +105,8 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
             start: Duration(minutes: row.quietHoursStartMinutes),
             end: Duration(minutes: row.quietHoursEndMinutes),
           ),
+          deferQuietHours: deferQuiet,
+          hideNames: hideNames,
           syncError: null,
         );
         if (_revision == 0) {
@@ -109,13 +126,19 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
   Future<bool> _saveToDatabase(ReminderSettings s) async {
     try {
       final database = ref.read(databaseProvider);
+      final kindTokens = [
+        ...s.kinds.map((k) => k.name),
+        if (s.deferQuietHours) 'opt:defer_quiet_hours',
+        if (s.hideNames) 'opt:hide_names',
+      ].join(',');
+
       await database
           .into(database.reminderSettingsEntries)
           .insertOnConflictUpdate(
             db.ReminderSettingsEntriesCompanion(
               key: const Value('default'),
               enabled: Value(s.enabled),
-              kinds: Value(s.kinds.map((k) => k.name).join(',')),
+              kinds: Value(kindTokens),
               quietHoursStartMinutes: Value(s.quietHours.start.inMinutes),
               quietHoursEndMinutes: Value(s.quietHours.end.inMinutes),
             ),
@@ -195,6 +218,16 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
 
   void setQuietHours(QuietHours quietHours) {
     state = state.copyWith(quietHours: quietHours, syncError: null);
+    _schedulePersistAndSync();
+  }
+
+  void setDeferQuietHours(bool deferQuietHours) {
+    state = state.copyWith(deferQuietHours: deferQuietHours, syncError: null);
+    _schedulePersistAndSync();
+  }
+
+  void setHideNames(bool hideNames) {
+    state = state.copyWith(hideNames: hideNames, syncError: null);
     _schedulePersistAndSync();
   }
 }

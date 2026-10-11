@@ -139,5 +139,40 @@ void main() {
         );
       },
     );
+
+    testWidgets(
+      'deferQuietHours and hideNames persist across restarts (AUD-004, AUD-005)',
+      (tester) async {
+        final harness = E2ETestHarness()..setUp();
+        addTearDown(() => harness.db.close());
+
+        final first = ProviderContainer(overrides: harness.providerOverrides);
+        addTearDown(first.dispose);
+        final notifier = first.read(reminderSettingsProvider.notifier);
+        await tester.pump();
+        await tester.pump();
+
+        notifier.setDeferQuietHours(true);
+        notifier.setHideNames(true);
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
+
+        expect(first.read(reminderSettingsProvider).deferQuietHours, isTrue);
+        expect(first.read(reminderSettingsProvider).hideNames, isTrue);
+
+        // Simulated restart: a fresh container reads the same database.
+        final second = ProviderContainer(overrides: harness.providerOverrides);
+        addTearDown(second.dispose);
+        second.read(reminderSettingsProvider);
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
+
+        final restored = second.read(reminderSettingsProvider);
+        expect(restored.deferQuietHours, isTrue);
+        expect(restored.hideNames, isTrue);
+      },
+    );
   });
 }

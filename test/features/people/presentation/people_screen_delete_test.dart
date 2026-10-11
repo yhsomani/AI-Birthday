@@ -1,10 +1,15 @@
 import 'package:ai_birthday/core/core_providers.dart';
 import 'package:ai_birthday/core/database/app_database.dart';
 import 'package:ai_birthday/core/database/drift_repositories.dart';
+import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart'
     as b_models;
+import 'package:ai_birthday/features/people/application/person_service.dart';
+import 'package:ai_birthday/features/people/data/person_providers.dart';
+import 'package:ai_birthday/features/people/data/person_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart'
     as domain;
+import 'package:ai_birthday/features/people/domain/person_input_validator.dart';
 import 'package:ai_birthday/features/people/presentation/people_screen.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -121,4 +126,58 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pump(Duration.zero);
   });
+
+  testWidgets(
+    'fails safely and preserves birthday if personService.remove throws',
+    (tester) async {
+      final db = await seedDb(withBirthday: true);
+      tester.view.physicalSize = const Size(600, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            databaseProvider.overrideWithValue(db),
+            personServiceProvider.overrideWith(
+              (ref) => _FailingPersonService(
+                ref.watch(peopleStoreProvider),
+                ref.watch(loggerProvider),
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: PeopleScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ana'), findsOneWidget);
+      await deleteAna(tester);
+
+      expect(find.text('Failed to delete Ana.'), findsOneWidget);
+      expect(find.text('Ana'), findsOneWidget);
+
+      final birthdaysRepo = DriftBirthdaysRepository(db);
+      final bday = await birthdaysRepo.getBirthdayForPerson('a');
+      expect(
+        bday,
+        isNotNull,
+        reason: 'birthday must not be deleted if person removal failed',
+      );
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(Duration.zero);
+    },
+  );
+}
+
+class _FailingPersonService extends PersonService {
+  _FailingPersonService(PeopleStore store, AppLogger logger)
+    : super(store, const PersonInputValidator(), logger);
+
+  @override
+  Future<void> remove(String id) async {
+    throw Exception('Simulated database error');
+  }
 }
