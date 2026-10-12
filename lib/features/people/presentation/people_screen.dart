@@ -499,6 +499,10 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Delete'),
           ),

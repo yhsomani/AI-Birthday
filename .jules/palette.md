@@ -5,3 +5,6 @@
 ## 2024-10-03 - Eradicate UI Slop and Generic AI Templates
 **Learning:** Overusing simple gradients, "Inter-everywhere" typography, and missing cause-and-effect motion makes an application feel like a generic SaaS template rather than a thoughtful, intent-driven product.
 **Action:** Replace arbitrary default Material parameters. Introduce distinctive typography sets (e.g. `google_fonts` using Playfair Display for headers and Nunito for text) combined with solid structural cards and consistent `HapticFeedback.lightImpact()` on all data-mutating buttons to elevate the perceived product fit, clarity, and hierarchy.
+## 2024-05-30 - Standardize Destructive Actions
+**Learning:** Destructive actions like "Delete" in confirmation dialogs should be visually distinct (using error color) to help prevent accidental clicks and improve accessibility.
+**Action:** Apply `style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error, foregroundColor: Theme.of(context).colorScheme.onError)` to primary buttons performing destructive actions.
