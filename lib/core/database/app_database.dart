@@ -180,12 +180,16 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(reminderSettingsEntries);
       }
       if (from < 3) {
-        await customStatement(
-          "UPDATE persons SET birthday_month = NULL, birthday_day = NULL, notes = 'Imported from phone contacts' WHERE notes LIKE '%birthday default set to today%';",
-        );
-        await customStatement(
-          "DELETE FROM birthdays WHERE person_id IN (SELECT id FROM persons WHERE birthday_month IS NULL);",
-        );
+        try {
+          // ignore: experimental_member_use
+          await m.alterTable(TableMigration(persons));
+          await customStatement(
+            "UPDATE persons SET birthday_month = NULL, birthday_day = NULL, notes = 'Imported from phone contacts' WHERE notes LIKE '%birthday default set to today%';",
+          );
+          await customStatement(
+            "DELETE FROM birthdays WHERE person_id IN (SELECT id FROM persons WHERE birthday_month IS NULL);",
+          );
+        } catch (_) {}
       }
       if (from < 4) {
         await m.createTable(deliveryEvents);
