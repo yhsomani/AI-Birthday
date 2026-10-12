@@ -21,6 +21,7 @@ import 'package:ai_birthday/features/message_studio/domain/models/message_draft.
 import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
+import 'package:ai_birthday/features/settings/presentation/settings_screen.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
@@ -929,6 +930,15 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     context.push('/people/edit/${_person!.id}');
   }
 
+  /// Opens Settings as a modal page so the user can unlock Pro or configure
+  /// a personal Gemini API key and return directly to their message draft.
+  void _openSettings() {
+    HapticFeedback.lightImpact();
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
+  }
+
   /// Replaces the AI controls when the account is not entitled (audit H).
   Widget _buildAiLockedNotice() {
     final theme = Theme.of(context);
@@ -1118,7 +1128,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                       TextButton.icon(
                         icon: const Icon(Icons.tune, size: 16),
                         label: const Text('AI Settings'),
-                        onPressed: () => context.push('/settings'),
+                        onPressed: _openSettings,
                         style: TextButton.styleFrom(
                           visualDensity: VisualDensity.compact,
                         ),
@@ -1173,7 +1183,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                   ),
             secondary: aiLocked
                 ? FilledButton.tonalIcon(
-                    onPressed: () => context.push('/settings'),
+                    onPressed: _openSettings,
                     icon: const Icon(Icons.star_outline),
                     label: const Text('Unlock with Pro'),
                   )

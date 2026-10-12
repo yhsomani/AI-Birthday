@@ -17,10 +17,12 @@ import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 import 'package:ai_birthday/features/auth/domain/auth_state.dart';
 import 'package:ai_birthday/features/auth/presentation/auth_bottom_sheet.dart';
+import 'package:flutter/foundation.dart';
 import 'package:ai_birthday/features/jobs/application/cloud_job_handler.dart';
 import 'package:ai_birthday/features/jobs/domain/job.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_providers.dart';
 import 'package:ai_birthday/features/subscription/application/subscription_service.dart';
+import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
 import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
 import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
@@ -977,6 +979,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ],
                   ),
+                  if (kDebugMode) ...[
+                    const Divider(height: 24),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Dev Sandbox: Grant Pro Entitlement'),
+                      subtitle: const Text(
+                        'Testing toggle (debug builds only)',
+                      ),
+                      value: entitlement.status == EntitlementStatus.active,
+                      onChanged: (enabled) {
+                        ref
+                            .read(subscriptionNotifierProvider.notifier)
+                            .setDevSandboxEntitlement(
+                              enabled
+                                  ? UserEntitlement.proActive
+                                  : UserEntitlement.free,
+                            );
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),

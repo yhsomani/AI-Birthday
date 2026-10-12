@@ -11,6 +11,7 @@ import 'package:ai_birthday/features/message_studio/presentation/message_studio_
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
+import 'package:ai_birthday/features/settings/presentation/settings_screen.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 
 import '../../../e2e/harness/test_harness.dart';
@@ -186,6 +187,27 @@ void main() {
         expect(find.text('Your message'), findsOneWidget);
         expect(find.text('Send on WhatsApp'), findsOneWidget);
         expect(find.text('Share Sheet'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'tapping Unlock with Pro opens Settings as modal and pops back cleanly',
+      (tester) async {
+        await pumpStudio(tester, phone: '+14155552671', pro: false);
+
+        expect(find.text('Unlock with Pro'), findsOneWidget);
+        await tester.tap(find.text('Unlock with Pro'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SettingsScreen), findsOneWidget);
+        expect(find.text('Settings'), findsOneWidget);
+
+        // Pop back to MessageStudio
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SettingsScreen), findsNothing);
+        expect(find.byType(MessageStudioScreen), findsOneWidget);
       },
     );
 
