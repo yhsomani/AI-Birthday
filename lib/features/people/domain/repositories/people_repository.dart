@@ -50,7 +50,11 @@ class InMemoryPeopleRepository implements PeopleRepository {
 
   List<Person> _sortedPeople() {
     final list = _store.values.toList();
-    list.sort((a, b) => a.name.compareTo(b.name));
+    // Same order as the SQL queries: LOWER(name), then id.
+    list.sort((a, b) {
+      final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      return byName != 0 ? byName : a.id.compareTo(b.id);
+    });
     return list;
   }
 }
