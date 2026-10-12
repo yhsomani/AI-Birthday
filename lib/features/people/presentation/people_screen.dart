@@ -683,12 +683,12 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           final trimmed = _query.trim();
           final filtered = trimmed.isEmpty
               ? people
-              : people
-                    .where(
-                      (p) =>
-                          p.name.toLowerCase().contains(trimmed.toLowerCase()),
-                    )
-                    .toList();
+              : (() {
+                  final lowerQuery = trimmed.toLowerCase();
+                  return people
+                      .where((p) => p.name.toLowerCase().contains(lowerQuery))
+                      .toList();
+                })();
 
           return Column(
             children: [

@@ -38,3 +38,7 @@
 ## 2024-06-25 - Avoid Dart in-memory case-insensitive sorting for database results
 **Learning:** Calling `.toLowerCase()` inside a Dart `.sort()` comparator on a large list of database results causes excessive O(N log N) string allocations, significantly impacting performance and memory. In benchmark testing with 50,000 items, in-memory sorting took ~1.4 seconds with GC latency spikes compared to the stable native DB query sort.
 **Action:** Always offload sorting to the database query layer directly in Drift repositories and stores (e.g., using Drift's `..orderBy([(t) => OrderingTerm(expression: t.name.lower()), (t) => OrderingTerm(expression: t.id)])`) rather than fetching the raw list and applying `.sort()` in Dart.
+
+## 2024-10-24 - Hoist loop invariant string manipulation in UI filters
+**Learning:** Calling `.toLowerCase()` on the search query parameter inside a `.where()` predicate loop (e.g., `people.where((p) => p.name.toLowerCase().contains(trimmed.toLowerCase()))`) during a Flutter widget build causes redundant O(N) string allocations, contributing to UI jank and GC pressure on large lists.
+**Action:** Hoist the query `.toLowerCase()` computation outside the filter loop so it is executed exactly once before iterating over the list.
