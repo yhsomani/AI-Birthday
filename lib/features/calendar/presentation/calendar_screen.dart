@@ -83,6 +83,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             onTap: () {
+              HapticFeedback.lightImpact();
               Navigator.of(context).pop();
               context.push('/message-studio/person/${person.id}');
             },
@@ -290,11 +291,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         borderRadius: BorderRadius.circular(8),
         onTap: people == null
             ? null
-            : () => _showDay(
-                context,
-                DateTime(_visibleMonth.year, _visibleMonth.month, day),
-                people,
-              ),
+            : () {
+                HapticFeedback.lightImpact();
+                _showDay(
+                  context,
+                  DateTime(_visibleMonth.year, _visibleMonth.month, day),
+                  people,
+                );
+              },
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
           child: Column(
