@@ -1014,6 +1014,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: () async {
+                HapticFeedback.lightImpact();
                 Navigator.of(context).pop();
                 context.push('/message-studio/person/${person.id}');
               },
@@ -1027,6 +1028,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           width: double.infinity,
           child: OutlinedButton.icon(
             onPressed: () {
+              HapticFeedback.lightImpact();
               Navigator.of(context).pop();
               context.push('/people/edit/${person.id}');
             },
@@ -1042,6 +1044,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
             onPressed: () {
+              HapticFeedback.lightImpact();
               Navigator.of(context).pop();
               _confirmAndDelete(context, ref, person);
             },

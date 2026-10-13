@@ -6,6 +6,7 @@ import 'package:ai_birthday/features/people/domain/models/person.dart'
 import 'package:ai_birthday/features/people/presentation/people_screen.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -63,6 +64,33 @@ void main() {
 
     expect(find.text('Ana'), findsOneWidget);
     expect(find.text('Bob'), findsNothing);
+
+    // Dispose the tree inside the test so Drift's zero-delay stream-close
+    // timer fires here instead of tripping the pending-timers invariant.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(Duration.zero);
+  });
+
+  testWidgets('tapping a contact triggers haptic feedback', (tester) async {
+    final hapticCalls = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (MethodCall methodCall) async {
+        if (methodCall.method == 'HapticFeedback.vibrate') {
+          hapticCalls.add(methodCall.arguments as String);
+        }
+        return null;
+      },
+    );
+
+    await pumpScreen(tester);
+
+    expect(hapticCalls, isEmpty);
+
+    await tester.tap(find.text('Ana'));
+    await tester.pumpAndSettle();
+
+    expect(hapticCalls, ['HapticFeedbackType.lightImpact']);
 
     // Dispose the tree inside the test so Drift's zero-delay stream-close
     // timer fires here instead of tripping the pending-timers invariant.

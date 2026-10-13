@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../people/support/fake_people_store.dart';
 
@@ -35,10 +36,20 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    // A mock GoRouter wrapper is not needed if we provide mock push implementation
+    // or we can use a mock router. Since we just want to suppress GoRouter error:
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => CalendarScreen(now: () => fixedNow),
+        ),
+      ],
+    );
     await tester.pumpWidget(
       ProviderScope(
         overrides: [peopleStoreProvider.overrideWithValue(store)],
-        child: MaterialApp(home: CalendarScreen(now: () => fixedNow)),
+        child: MaterialApp.router(routerConfig: router),
       ),
     );
     await tester.pumpAndSettle();
@@ -156,4 +167,40 @@ void main() {
       'HapticFeedbackType.lightImpact',
     ]);
   });
+
+  testWidgets(
+    'tapping day cell and person in bottom sheet triggers haptic feedback',
+    (tester) async {
+      final hapticCalls = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (MethodCall methodCall) async {
+          if (methodCall.method == 'HapticFeedback.vibrate') {
+            hapticCalls.add(methodCall.arguments as String);
+          }
+          return null;
+        },
+      );
+
+      final store = FakePeopleStore();
+      addTearDown(store.close);
+      await store.save(person(id: 'a', name: 'Ana', month: 2, day: 5));
+      await pumpHarness(tester, store);
+
+      expect(hapticCalls, isEmpty);
+
+      // Tap day cell
+      await tester.tap(find.text('5'));
+      await tester.pumpAndSettle();
+      expect(hapticCalls, ['HapticFeedbackType.lightImpact']);
+
+      // Tap person in bottom sheet
+      await tester.tap(find.text('Ana'));
+      await tester.pumpAndSettle();
+      expect(hapticCalls, [
+        'HapticFeedbackType.lightImpact',
+        'HapticFeedbackType.lightImpact',
+      ]);
+    },
+  );
 }
