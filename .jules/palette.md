@@ -5,3 +5,7 @@
 ## 2024-10-03 - Eradicate UI Slop and Generic AI Templates
 **Learning:** Overusing simple gradients, "Inter-everywhere" typography, and missing cause-and-effect motion makes an application feel like a generic SaaS template rather than a thoughtful, intent-driven product.
 **Action:** Replace arbitrary default Material parameters. Introduce distinctive typography sets (e.g. `google_fonts` using Playfair Display for headers and Nunito for text) combined with solid structural cards and consistent `HapticFeedback.lightImpact()` on all data-mutating buttons to elevate the perceived product fit, clarity, and hierarchy.
+
+## 2024-10-13 - Add Haptic Feedback to Calendar and Settings
+**Learning:** Consistent haptic feedback across list items and grid items ensures the application feels responsive and intuitive.
+**Action:** Always include HapticFeedback.lightImpact() in primary list tile and grid taps.
