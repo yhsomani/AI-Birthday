@@ -9,3 +9,6 @@
 ## 2024-10-13 - Add Haptic Feedback to Calendar and Settings
 **Learning:** Consistent haptic feedback across list items and grid items ensures the application feels responsive and intuitive.
 **Action:** Always include HapticFeedback.lightImpact() in primary list tile and grid taps.
+## 2026-10-13 - Comprehensive Haptic Feedback Integration & ESM Test Fixes
+ **Learning:** Primary action buttons within bottom sheets, specifically actions that mutate state or open core workflows (like `Draft Message with AI`, `Edit Contact Details`, and `Delete Contact` in `PeopleScreen`) often lack physical confirmation natively. Furthermore, testing these physical cues is critical and can be reliably verified using the `SystemChannels.platform` mock method call handler to capture `HapticFeedback.vibrate` calls. On the backend side, webcrypto polyfill is necessary for dynamic resolution under pure ESM node environment.
+ **Action:** Proactively inspect custom modal sheets, popups, and high-frequency touch targets (like list tiles opening modals) for missing `HapticFeedback.lightImpact()`. Always mock `SystemChannels.platform` in widget tests to formally assert haptic occurrences. Use dynamic fallback logic to `node:crypto`'s `webcrypto` when `globalThis.crypto?.subtle` is unavailable to fix `node --test` failures under missing ESM support.
