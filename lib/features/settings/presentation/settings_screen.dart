@@ -834,7 +834,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       '${_formatTime(reminderSettings.quietHours.start)} and '
                       '${_formatTime(reminderSettings.quietHours.end)}',
                     ),
-                    onTap: () => _editQuietHours(reminderSettings.quietHours),
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _editQuietHours(reminderSettings.quietHours);
+                    },
                   ),
                   const Divider(height: 1),
                   ListTile(
@@ -1160,7 +1163,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 Semantics(
                   link: true,
                   child: InkWell(
-                    onTap: () => _launchExternalUrl(_geminiBillingUrl),
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _launchExternalUrl(_geminiBillingUrl);
+                    },
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(minHeight: 48),
                       child: Align(
