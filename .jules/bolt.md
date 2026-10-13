@@ -38,3 +38,6 @@
 ## 2024-06-25 - Avoid Dart in-memory case-insensitive sorting for database results
 **Learning:** Calling `.toLowerCase()` inside a Dart `.sort()` comparator on a large list of database results causes excessive O(N log N) string allocations, significantly impacting performance and memory. In benchmark testing with 50,000 items, in-memory sorting took ~1.4 seconds with GC latency spikes compared to the stable native DB query sort.
 **Action:** Always offload sorting to the database query layer directly in Drift repositories and stores (e.g., using Drift's `..orderBy([(t) => OrderingTerm(expression: t.name.lower()), (t) => OrderingTerm(expression: t.id)])`) rather than fetching the raw list and applying `.sort()` in Dart.
+## 2024-10-25 - Avoid Redundant string allocations in widget build loops
+**Learning:** Calling `.toLowerCase()` directly on a search query variable inside a `.where()` iteration loop for a list causes redundant O(N) string allocations upon every widget rebuild or text change.
+**Action:** Always hoist invariant string manipulations like `.toLowerCase()` outside the loop into a local variable before running iterations that filter lists to improve filtering and build performance.

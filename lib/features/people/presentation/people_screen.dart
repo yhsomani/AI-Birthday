@@ -681,13 +681,12 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           }
 
           final trimmed = _query.trim();
+          // Hoisting toLowerCase outside the where loop prevents redundant O(N) string allocations during filtering.
+          final lowercaseQuery = trimmed.toLowerCase();
           final filtered = trimmed.isEmpty
               ? people
               : people
-                    .where(
-                      (p) =>
-                          p.name.toLowerCase().contains(trimmed.toLowerCase()),
-                    )
+                    .where((p) => p.name.toLowerCase().contains(lowercaseQuery))
                     .toList();
 
           return Column(
