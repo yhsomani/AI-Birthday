@@ -681,13 +681,12 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           }
 
           final trimmed = _query.trim();
+          // Cache lowercased query to avoid repetitive work inside the loop
+          final trimmedLower = trimmed.toLowerCase();
           final filtered = trimmed.isEmpty
               ? people
               : people
-                    .where(
-                      (p) =>
-                          p.name.toLowerCase().contains(trimmed.toLowerCase()),
-                    )
+                    .where((p) => p.name.toLowerCase().contains(trimmedLower))
                     .toList();
 
           return Column(
