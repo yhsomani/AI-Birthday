@@ -1,0 +1,771 @@
+{
+  "schema_version": 1,
+  "repository": "yhsomani/AI-Birthday",
+  "snapshot_sha": "75b9d91aadcc1c4136fdcb2c06340d3744bc50a4",
+  "review_date": "2026-10-14",
+  "policy": {
+    "implementation": "implemented means source present, not runtime proof",
+    "verification": "all entries are source-reviewed unless specified; only CI is observed externally",
+    "scope": "static evidence sample; not exhaustive runtime assessment"
+  },
+  "features": [
+    {
+      "id": "APP",
+      "parent": null,
+      "name": "AI-Birthday Android application",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/main.dart"
+      ],
+      "tests": [
+        "test/widget_test.dart"
+      ],
+      "spec": [
+        "SSOT.md"
+      ],
+      "note": "Flutter application entry point"
+    },
+    {
+      "id": "ONB",
+      "parent": "APP",
+      "name": "Onboarding",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/onboarding/presentation/onboarding_screen.dart"
+      ],
+      "tests": [
+        "test/features/onboarding/presentation/onboarding_screen_test.dart"
+      ],
+      "spec": [
+        "SSOT.md §15"
+      ],
+      "note": ""
+    },
+    {
+      "id": "ONB-FLOW",
+      "parent": "ONB",
+      "name": "Intro, skip and start flows",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/onboarding/presentation/onboarding_screen.dart"
+      ],
+      "tests": [],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "ONB-GATE",
+      "parent": "ONB",
+      "name": "First-run persistence and routing gate",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/app/router.dart"
+      ],
+      "tests": [
+        "test/app/shell_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "NAV",
+      "parent": "APP",
+      "name": "Navigation shell",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/app/router.dart"
+      ],
+      "tests": [
+        "test/app/router_not_found_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "DASH",
+      "parent": "APP",
+      "name": "Today, upcoming and action dashboard",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/dashboard/presentation/dashboard_screen.dart"
+      ],
+      "tests": [
+        "test/features/dashboard/presentation/dashboard_visibility_test.dart"
+      ],
+      "spec": [
+        "SSOT.md §15"
+      ],
+      "note": ""
+    },
+    {
+      "id": "PEOPLE",
+      "parent": "APP",
+      "name": "People management",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/people/presentation/people_screen.dart"
+      ],
+      "tests": [],
+      "spec": [
+        "SSOT.md §7",
+        "SSOT.md §18"
+      ],
+      "note": ""
+    },
+    {
+      "id": "PEOPLE-CRUD",
+      "parent": "PEOPLE",
+      "name": "Create, edit, soft-delete, undo",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/people/application/person_service.dart"
+      ],
+      "tests": [
+        "test/features/people/application/person_service_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "PEOPLE-VALIDATE",
+      "parent": "PEOPLE",
+      "name": "Form validation and normalized fields",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/people/domain/person_input_validator.dart"
+      ],
+      "tests": [
+        "test/features/people/domain/person_input_validator_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "PEOPLE-IMPORT",
+      "parent": "PEOPLE",
+      "name": "Import review and selection",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/people/presentation/people_screen.dart"
+      ],
+      "tests": [],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "PEOPLE-CSV",
+      "parent": "PEOPLE-IMPORT",
+      "name": "CSV parse, diagnostics and duplicate hints",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/people/data/contact_csv_service.dart"
+      ],
+      "tests": [
+        "test/features/people/data/contact_csv_service_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "PEOPLE-DEVICE",
+      "parent": "PEOPLE-IMPORT",
+      "name": "Permission-gated Android contacts import",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/people/data/device_contacts_service.dart"
+      ],
+      "tests": [
+        "test/features/people/data/device_contacts_service_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "PEOPLE-EXPORT",
+      "parent": "PEOPLE",
+      "name": "CSV export and share sheet",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/people/data/contact_csv_service.dart"
+      ],
+      "tests": [
+        "test/features/people/data/contact_csv_service_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "BIRTH",
+      "parent": "APP",
+      "name": "Birthday recurrence and lifecycle",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/birthdays/domain/birthday_engine.dart"
+      ],
+      "tests": [],
+      "spec": [
+        "SSOT.md §8",
+        "SSOT.md §14"
+      ],
+      "note": ""
+    },
+    {
+      "id": "BIRTH-CALC",
+      "parent": "BIRTH",
+      "name": "Next birthday, timezone, leap-day policy",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/birthdays/domain/birthday_engine.dart"
+      ],
+      "tests": [
+        "test/features/birthdays/domain/birthday_engine_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "BIRTH-CYCLE",
+      "parent": "BIRTH",
+      "name": "Lifecycle refresh and occurrence rollover",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/birthdays/application/birthday_lifecycle_service.dart"
+      ],
+      "tests": [
+        "test/features/birthdays/application/birthday_lifecycle_service_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "CAL",
+      "parent": "APP",
+      "name": "Interactive calendar and day detail",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/calendar/presentation/calendar_screen.dart"
+      ],
+      "tests": [
+        "test/features/calendar/presentation/calendar_screen_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "REM",
+      "parent": "APP",
+      "name": "Local birthday reminders",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/reminders/application/reminder_service.dart"
+      ],
+      "tests": [],
+      "spec": [
+        "SSOT.md §17"
+      ],
+      "note": ""
+    },
+    {
+      "id": "REM-RULES",
+      "parent": "REM",
+      "name": "Offset and quiet-hour schedule planning",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/reminders/domain/reminder_schedule.dart"
+      ],
+      "tests": [
+        "test/features/reminders/domain/reminder_scheduler_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "REM-PREFS",
+      "parent": "REM",
+      "name": "Persisted reminder and privacy settings",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/reminders/application/reminder_settings_controller.dart"
+      ],
+      "tests": [
+        "test/features/reminders/application/reminder_settings_controller_persistence_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "REM-NATIVE",
+      "parent": "REM",
+      "name": "Android alarm and notification adapter",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "android/app/src/main/kotlin/com/yashsomani/ai_birthday/BirthdayNotificationReceiver.kt"
+      ],
+      "tests": [
+        "test/features/reminders/application/android_notification_scheduler_gateway_test.dart"
+      ],
+      "spec": [],
+      "note": "Device reboot and exact-alarm execution not independently exercised"
+    },
+    {
+      "id": "STUDIO",
+      "parent": "APP",
+      "name": "Message Studio",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/message_studio/presentation/message_studio_screen.dart"
+      ],
+      "tests": [],
+      "spec": [
+        "SSOT.md §16"
+      ],
+      "note": ""
+    },
+    {
+      "id": "STUDIO-DRAFT",
+      "parent": "STUDIO",
+      "name": "Manual editing and autosave",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/message_studio/presentation/message_studio_screen.dart"
+      ],
+      "tests": [
+        "test/features/message_studio/presentation/message_studio_durable_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "STUDIO-AI",
+      "parent": "STUDIO",
+      "name": "AI generation and durable request",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/jobs/application/ai_job_handler.dart"
+      ],
+      "tests": [
+        "test/features/jobs/application/ai_job_handler_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "STUDIO-EDIT",
+      "parent": "STUDIO",
+      "name": "Rewrite, translate and variations",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/message_studio/presentation/message_studio_screen.dart"
+      ],
+      "tests": [
+        "test/features/message_studio/presentation/message_studio_optimistic_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "AI",
+      "parent": "APP",
+      "name": "AI providers and routing",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/ai/domain/ai_router.dart"
+      ],
+      "tests": [
+        "test/ai/ai_router_test.dart"
+      ],
+      "spec": [
+        "SSOT.md §5"
+      ],
+      "note": ""
+    },
+    {
+      "id": "AI-BYOK",
+      "parent": "AI",
+      "name": "User Gemini API credential and provider",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/ai/data/user_gemini_api_provider.dart"
+      ],
+      "tests": [
+        "test/ai/user_gemini_api_provider_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "AI-NANO",
+      "parent": "AI",
+      "name": "Native Gemini Nano adapter",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/ai/data/gemini_nano_provider.dart"
+      ],
+      "tests": [],
+      "spec": [],
+      "note": "Runtime availability depends on supported device/AICore/model"
+    },
+    {
+      "id": "AI-PROMPT",
+      "parent": "AI",
+      "name": "User-fact-bounded prompt assembly",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/ai/domain/ai_prompt_builder.dart"
+      ],
+      "tests": [
+        "test/ai/ai_prompt_builder_test.dart"
+      ],
+      "spec": [
+        "SSOT.md §21"
+      ],
+      "note": ""
+    },
+    {
+      "id": "SEND",
+      "parent": "APP",
+      "name": "User-controlled delivery handoffs",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/delivery/data/whatsapp_handoff_builder.dart"
+      ],
+      "tests": [],
+      "spec": [
+        "SSOT.md §9",
+        "SSOT.md §10"
+      ],
+      "note": ""
+    },
+    {
+      "id": "SEND-WA",
+      "parent": "SEND",
+      "name": "WhatsApp click-to-chat URL",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/delivery/data/whatsapp_handoff_builder.dart"
+      ],
+      "tests": [
+        "test/delivery/whatsapp_handoff_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "SEND-SMS",
+      "parent": "SEND",
+      "name": "SMS delivery handoff",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/delivery/data/sms_delivery_service.dart"
+      ],
+      "tests": [],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "SEND-SHARE",
+      "parent": "SEND",
+      "name": "System share and copy",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/delivery/data/native_share_service.dart"
+      ],
+      "tests": [],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "SEND-TRUTH",
+      "parent": "SEND",
+      "name": "Handoff evidence and explicit sent confirmation",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/message_studio/presentation/message_studio_screen.dart"
+      ],
+      "tests": [
+        "test/core/database/drift_repositories_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "HISTORY",
+      "parent": "APP",
+      "name": "Draft and delivery history",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/history/presentation/history_screen.dart"
+      ],
+      "tests": [
+        "test/features/history/presentation/history_screen_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "AUTH",
+      "parent": "APP",
+      "name": "Google authentication and session renewal",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/auth/data/live_google_auth_gateway.dart"
+      ],
+      "tests": [
+        "test/features/auth/data/live_google_auth_gateway_test.dart"
+      ],
+      "spec": [
+        "SSOT.md §12"
+      ],
+      "note": ""
+    },
+    {
+      "id": "BILL",
+      "parent": "APP",
+      "name": "Google Play subscription and entitlement",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/subscription/application/subscription_service.dart"
+      ],
+      "tests": [
+        "test/features/subscription/subscription_service_test.dart"
+      ],
+      "spec": [
+        "SSOT.md §11"
+      ],
+      "note": "Provider/device/live billing outcomes not independently tested"
+    },
+    {
+      "id": "CLOUD",
+      "parent": "APP",
+      "name": "Opt-in account-scoped cloud backup",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/sync/data/cloud_sync_service.dart"
+      ],
+      "tests": [
+        "test/features/sync/data/cloud_sync_service_test.dart"
+      ],
+      "spec": [
+        "SSOT.md §19"
+      ],
+      "note": ""
+    },
+    {
+      "id": "CLOUD-UP",
+      "parent": "CLOUD",
+      "name": "Immutable snapshot-generation upload",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/sync/data/cloud_sync_service.dart"
+      ],
+      "tests": [],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "CLOUD-DOWN",
+      "parent": "CLOUD",
+      "name": "Manifest-validated restore",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/sync/data/cloud_sync_service.dart"
+      ],
+      "tests": [],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "JOBS",
+      "parent": "APP",
+      "name": "Durable background operation queue",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/jobs/application/job_worker.dart"
+      ],
+      "tests": [
+        "test/features/jobs/application/job_worker_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "SETTINGS",
+      "parent": "APP",
+      "name": "Preferences, account, backup and AI settings",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/settings/presentation/settings_screen.dart"
+      ],
+      "tests": [
+        "test/features/settings/presentation/settings_reminders_test.dart"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "THEME",
+      "parent": "APP",
+      "name": "UI theme and shared design components",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/app/theme/app_theme.dart"
+      ],
+      "tests": [
+        "test/ui/contrast_test.dart"
+      ],
+      "spec": [
+        "DESIGN.md"
+      ],
+      "note": ""
+    },
+    {
+      "id": "AUTO-PREP",
+      "parent": "APP",
+      "name": "Consent-aware scheduled AI draft preparation",
+      "implementation_status": "partially-implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "lib/features/people/presentation/person_form_screen.dart"
+      ],
+      "tests": [],
+      "spec": [
+        "SSOT.md §7",
+        "docs/audit/07-remediation-status.md"
+      ],
+      "note": "autoPrepare preference exists; end-to-end automatic trigger not verified in reviewed code"
+    },
+    {
+      "id": "WEB",
+      "parent": "APP",
+      "name": "Public support, legal and deletion site",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "backend/hosting/src/app.ts"
+      ],
+      "tests": [
+        "backend/hosting/test/static-contract.test.mjs"
+      ],
+      "spec": [],
+      "note": "Separate hosting package: release gated; deployment unverified"
+    },
+    {
+      "id": "WEB-DELETE",
+      "parent": "WEB",
+      "name": "Deletion reauthentication and receipt contract",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "backend/hosting/src/deletion-contract.ts"
+      ],
+      "tests": [
+        "backend/hosting/test/deletion-contract.test.mjs"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "CTRL",
+      "parent": "APP",
+      "name": "Isolated Firebase coordination control plane",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "backend/functions/src/functions/index.ts"
+      ],
+      "tests": [
+        "backend/functions/test/controlPlane.emulator.test.ts"
+      ],
+      "spec": [],
+      "note": "Backend README states it is not deployed; app integration unverified"
+    },
+    {
+      "id": "CTRL-CLAIM",
+      "parent": "CTRL",
+      "name": "Sender lease, claim, arm and retry fencing",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "backend/functions/src/services/controlPlane.ts"
+      ],
+      "tests": [
+        "backend/functions/test/decisions.test.ts"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "CTRL-DELETE",
+      "parent": "CTRL",
+      "name": "Deletion and repair operations",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "backend/functions/src/services/deletionOrchestrator.ts"
+      ],
+      "tests": [
+        "backend/functions/test/deletionReceipt.test.ts"
+      ],
+      "spec": [],
+      "note": ""
+    },
+    {
+      "id": "CTRL-PURCHASE",
+      "parent": "CTRL",
+      "name": "Server purchase verification",
+      "implementation_status": "implemented",
+      "verification": "source-reviewed; runtime not independently verified",
+      "source": [
+        "backend/functions/src/services/subscriptionVerification.ts"
+      ],
+      "tests": [
+        "backend/functions/test/subscriptionVerification.test.ts"
+      ],
+      "spec": [],
+      "note": ""
+    }
+  ]
+}
