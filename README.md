@@ -201,3 +201,47 @@ The repository contains unit, domain, repository, widget, integration, E2E, and 
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+## 🧭 Source-linked feature knowledge base
+
+> **[Explore the complete project knowledge portal](docs/knowledge/README.md)** — verified-source feature taxonomy, recursive micro/nano decomposition, user journeys, navigation, data flows, evidence references and improvement findings.
+
+| Explore | Documentation |
+|---|---|
+| Feature hierarchy, atomic responsibilities and code locations | [Functional tree](docs/knowledge/features/README.md) |
+| All major routes and step-by-step user journeys | [Navigation & journeys](docs/knowledge/journeys/README.md) |
+| Frontend-to-service execution, backend boundaries and data lineage | [Architecture & technical flows](docs/knowledge/architecture/README.md) |
+| Known gaps, contradictions, risk priorities and TO-BE improvements | [Gap register](docs/knowledge/gaps/README.md) |
+| Searchable machine-readable features and statuses | [Feature registry](docs/knowledge/feature-registry.json) |
+| How to maintain and validate the knowledge system | [Documentation maintenance](docs/knowledge/maintenance/README.md) |
+
+### Current structure (conceptual)
+
+```text
+AI-Birthday
+├── First-use & experience
+│   ├── Onboarding, dashboard, navigation, settings
+│   └── Calendar & history
+├── Remember
+│   ├── People (create/edit/delete/import/export)
+│   └── Birthday (recurrence/timezone/leap day/lifecycle)
+├── Prepare
+│   ├── Reminders (rules/quiet hours/native alarms)
+│   └── Durable background jobs
+├── Personalize
+│   ├── Message Studio (manual editing/autosave/rewrite)
+│   └── AI providers (user Gemini key / entitled Nano)
+├── Deliver (user-controlled)
+│   ├── WhatsApp / SMS / Share handoff
+│   └── Explicit sent confirmation
+├── Optional account services
+│   ├── Google/Firebase identity, Play billing
+│   └── Cloud backup/restore
+└── Separate backend and hosting services
+    ├── Firebase coordination control plane
+    └── Public support/legal/account-deletion site
+```
+
+**Evidence and limitations:** this map was created from the repository at [`75b9d91`](https://github.com/yhsomani/AI-Birthday/commit/75b9d91aadcc1c4136fdcb2c06340d3744bc50a4). “Implemented” means source code is present, not that real-device behavior or deployment is verified. The Firebase coordination backend is documented separately and must **not** be conflated with autonomous personal WhatsApp messaging. See the [knowledge portal](docs/knowledge/README.md) for distinctions between source, requirements, CI and runtime evidence.
