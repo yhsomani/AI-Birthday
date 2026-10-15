@@ -86,13 +86,17 @@ class DeviceContact {
 
     // Duplicate detection (SSOT §18)
     String? duplicateWarning;
+
+    // ⚡ Bolt: Hoist invariant .toLowerCase() and phone cleaning out of loop
+    final myNameLower = name.trim().toLowerCase();
+    final myPhoneClean = phoneNumber != null ? _cleanPhone(phoneNumber!) : null;
+
     for (final existing in existingPeople) {
-      final sameName =
-          existing.name.trim().toLowerCase() == name.trim().toLowerCase();
+      final sameName = existing.name.trim().toLowerCase() == myNameLower;
       final samePhone =
-          phoneNumber != null &&
+          myPhoneClean != null &&
           existing.phoneNumber != null &&
-          _cleanPhone(phoneNumber!) == _cleanPhone(existing.phoneNumber!);
+          myPhoneClean == _cleanPhone(existing.phoneNumber!);
 
       if (samePhone && sameName) {
         duplicateWarning =
@@ -127,8 +131,11 @@ class DeviceContact {
     );
   }
 
+  // ⚡ Bolt: Pre-compile RegExp for faster phone number cleaning
+  static final _nonDigitRegex = RegExp(r'\D');
+
   static String _cleanPhone(String phone) =>
-      phone.replaceAll(RegExp(r'\D'), '');
+      phone.replaceAll(_nonDigitRegex, '');
 }
 
 class DeviceContactsService {

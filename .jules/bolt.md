@@ -42,3 +42,6 @@
 ## 2024-10-25 - Avoid O(N) allocations in filter loops
 **Learning:** Calling `.toLowerCase()` on an invariant string variable inside a `.where()` filter loop on every keystroke causes redundant O(N) string allocations during Flutter widget rebuilds.
 **Action:** Always hoist invariant transformations (like `toLowerCase()` for search queries) outside the loop to execute them exactly once, significantly reducing GC pressure.
+## 2024-05-24 - Pre-computing invariants and compiling RegExps before duplicate check loops
+**Learning:** Hoisting invariant variable calculations like `toLowerCase()` and `RegExp` instantiation out of inner loops (`existingPeople` and intra-batch checks) prevents O(N*M) redundant string allocations and Regex compilations in Flutter, greatly improving perceived speed during bulk CSV parsing and device contact imports.
+**Action:** Always pre-compute and store lowercased search queries or sanitized phone numbers outside of loops when comparing against lists. Pre-compile static RegExps using `static final RegExp = ...`.
