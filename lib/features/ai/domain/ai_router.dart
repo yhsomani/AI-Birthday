@@ -10,11 +10,12 @@ import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/ai/domain/ai_provider.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 
-/// Routes AI requests strictly according to the SSOT §5 logic:
-/// 1. Entitlement check -> If not active, throw [AppFailure.lockedAi].
-/// 2. User Gemini API key -> If configured, route to [userGeminiProvider].
-/// 3. On-device Gemini Nano -> If available, route to [nanoProvider].
-/// 4. Otherwise -> throw [AppFailure.credentialMissing] or [AppFailure.nanoUnavailable].
+/// Routes AI requests according to the SSOT §5 logic:
+/// 1. A personal Gemini API key (BYOK) permits user-key generation without Pro.
+/// 2. Otherwise, Pro entitlement is required for the on-device Nano path.
+/// 3. With entitlement, use Nano only when it is available on this device.
+/// 4. Forced Nano requires both entitlement and device support; otherwise the
+///    request returns a typed locked/unavailable error.
 class AiRouter {
   AiRouter({
     required CredentialStorage credentialStorage,
