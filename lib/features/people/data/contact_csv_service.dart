@@ -279,13 +279,17 @@ class ContactCsvService {
 
       // Duplicate candidate check (SSOT §18 & AUD-011)
       String? duplicateWarning;
+
+      // ⚡ Bolt: Hoist invariant .toLowerCase() and phone cleaning out of loop
+      final currentNameLower = name.toLowerCase();
+      final currentPhoneClean = phone != null ? _cleanPhone(phone) : null;
+
       for (final existing in existingPeople) {
-        final sameName =
-            existing.name.trim().toLowerCase() == name.toLowerCase();
+        final sameName = existing.name.trim().toLowerCase() == currentNameLower;
         final samePhone =
-            phone != null &&
+            currentPhoneClean != null &&
             existing.phoneNumber != null &&
-            _cleanPhone(phone) == _cleanPhone(existing.phoneNumber!);
+            currentPhoneClean == _cleanPhone(existing.phoneNumber!);
 
         if (samePhone && sameName) {
           duplicateWarning =
@@ -309,11 +313,11 @@ class ContactCsvService {
       // Check intra-batch duplicates (AUD-011)
       if (duplicateWarning == null) {
         for (final prev in candidates) {
-          final sameName = prev.name.trim().toLowerCase() == name.toLowerCase();
+          final sameName = prev.name.trim().toLowerCase() == currentNameLower;
           final samePhone =
-              phone != null &&
+              currentPhoneClean != null &&
               prev.phoneNumber != null &&
-              _cleanPhone(phone) == _cleanPhone(prev.phoneNumber!);
+              currentPhoneClean == _cleanPhone(prev.phoneNumber!);
 
           if (samePhone && sameName) {
             duplicateWarning =
@@ -362,8 +366,11 @@ class ContactCsvService {
     return CsvParseResult(candidates: candidates, invalidRows: invalidRows);
   }
 
+  // ⚡ Bolt: Pre-compile RegExp for faster phone number cleaning
+  static final _nonDigitRegex = RegExp(r'\D');
+
   static String _cleanPhone(String phone) =>
-      phone.replaceAll(RegExp(r'\D'), '');
+      phone.replaceAll(_nonDigitRegex, '');
 
   static String _escapeCsv(String value, {bool guardFormulas = true}) {
     // Spreadsheet-safe export: a leading = + - @ or tab/CR would be evaluated as
