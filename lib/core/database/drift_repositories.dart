@@ -81,7 +81,9 @@ class DriftPeopleRepository implements PeopleRepository {
             ),
             timezone: Value(person.timezone),
             autoPrepare: Value(person.autoPrepare),
-            autoSendPolicy: const Value('manualOnly'),
+            // Preserve a stored policy when updating via this legacy model.
+            // Only newly created people receive the safe manual-only default.
+            autoSendPolicy: Value(existing?.autoSendPolicy ?? 'manualOnly'),
             createdAt: Value(person.createdAt),
             updatedAt: Value(person.updatedAt),
             version: Value(person.version),
