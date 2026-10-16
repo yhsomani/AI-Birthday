@@ -685,13 +685,13 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           }
 
           final trimmed = _query.trim();
-          // Cache lowercased query to avoid repetitive work inside the loop
-          final trimmedLower = trimmed.toLowerCase();
+          // ⚡ Bolt: Pre-compile case-insensitive RegExp to avoid O(N) .toLowerCase() string allocations
+          final searchRegex = trimmed.isEmpty
+              ? null
+              : RegExp(RegExp.escape(trimmed), caseSensitive: false);
           final filtered = trimmed.isEmpty
               ? people
-              : people
-                    .where((p) => p.name.toLowerCase().contains(trimmedLower))
-                    .toList();
+              : people.where((p) => searchRegex!.hasMatch(p.name)).toList();
 
           return Column(
             children: [
