@@ -25,3 +25,7 @@
 **Vulnerability:** Raw exceptions (`e.toString()` or string interpolated `$e`) were being caught in providers/gateways and directly passed into error domains (`AppFailure`, `SignInFailed`, `GeminiConnectionResult.error`) which propagate to the user interface.
 **Learning:** Returning exception stack traces or raw messages can expose internals (like internal network details, missing files, model path, or underlying library details).
 **Prevention:** Always log the full exception (`error: e, stackTrace: st`) internally but return a static, sanitized string to domain models.
+## 2024-10-17 - Prevent HttpException information disclosure
+**Vulnerability:** HttpException exposed its raw `.message` property to the UI via `AppFailure.providerError()`.
+**Learning:** Raw network exception strings can leak internal details like IP addresses, proxy configurations, or secret paths.
+**Prevention:** Always log raw network exceptions securely on the server/device and return generic error messages to the UI.
