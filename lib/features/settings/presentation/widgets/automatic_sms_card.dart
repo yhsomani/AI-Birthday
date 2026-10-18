@@ -196,7 +196,10 @@ class _AutomaticSmsCardState extends ConsumerState<AutomaticSmsCard> {
               ],
               if (settings.enabled) ...[
                 const Divider(height: 24),
-                Row(
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     OutlinedButton.icon(
                       onPressed: _isReconciling ? null : _reconcileAll,
@@ -209,7 +212,6 @@ class _AutomaticSmsCardState extends ConsumerState<AutomaticSmsCard> {
                           : const Icon(Icons.sync, size: 18),
                       label: const Text('Reconcile All Alarms'),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
                     TextButton.icon(
                       onPressed: _isLoadingLogs ? null : _loadLogs,
                       icon: const Icon(Icons.receipt_long, size: 18),

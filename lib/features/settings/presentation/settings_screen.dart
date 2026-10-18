@@ -597,13 +597,89 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Future<void> _handleStripePurchase() async {
+    HapticFeedback.lightImpact();
+    final auth = ref.read(authControllerProvider).valueOrNull;
+    final email = auth?.identity?.email;
+    final uid = auth?.identity?.firebaseUid ?? auth?.identity?.googleSubject;
+
+    setState(() => _isPurchasing = true);
+    try {
+      final stripeService = ref.read(stripeGatewayServiceProvider);
+      final checkoutUrl = await stripeService.createProCheckoutSession(
+        customerEmail: email,
+        clientReferenceId: uid,
+      );
+
+      if (!mounted) return;
+      setState(() => _isPurchasing = false);
+
+      if (checkoutUrl != null) {
+        await _launchExternalUrl(checkoutUrl);
+        // After returning from browser checkout, check if the customer completed payment
+        if (email != null && email.isNotEmpty) {
+          final hasActive = await stripeService.verifyCustomerActiveSubscription(email);
+          if (hasActive && mounted) {
+            ref.read(subscriptionNotifierProvider.notifier).setDevSandboxEntitlement(
+              const UserEntitlement(
+                status: EntitlementStatus.active,
+                productId: 'stripe_pro_monthly',
+                isAutoRenewing: true,
+              ),
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Payment successful! AI-Birthday Pro is now active.'),
+              ),
+            );
+          }
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to initialize Stripe checkout. Please try again.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isPurchasing = false);
+    }
+  }
+
+  Future<void> _handleManageSubscription() async {
+    HapticFeedback.lightImpact();
+    final auth = ref.read(authControllerProvider).valueOrNull;
+    final email = auth?.identity?.email;
+    if (email == null || email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sign in to manage your billing and subscription.'),
+        ),
+      );
+      return;
+    }
+
+    final stripeService = ref.read(stripeGatewayServiceProvider);
+    final portalUrl = await stripeService.createBillingPortalSession(email);
+    if (!mounted) return;
+    if (portalUrl != null) {
+      await _launchExternalUrl(portalUrl);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No active Stripe customer portal session found.'),
+        ),
+      );
+    }
+  }
+
   String _purchaseFailureMessage(PurchaseFailure reason) => switch (reason) {
     PurchaseFailure.signInRequired =>
       'Sign in with Google to subscribe to Pro.',
     PurchaseFailure.storeUnavailable =>
       'Google Play Billing is not available on this device.',
     PurchaseFailure.productUnavailable =>
-      'Pro is not available on this install. Install AI-Birthday from Google Play to subscribe.',
+      'Pro is not available on this install. Use Stripe Checkout or install from Google Play.',
     PurchaseFailure.verificationUnavailable =>
       'Pro purchases are temporarily unavailable. You have not been charged. Try again later.',
     _ => 'Purchase could not be started. Try again.',
@@ -614,11 +690,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final restored = await ref
         .read(subscriptionNotifierProvider.notifier)
         .restorePurchases();
+
+    // Check Stripe if Google Play did not return an active subscription
+    bool stripeFound = false;
+    if (!restored) {
+      final auth = ref.read(authControllerProvider).valueOrNull;
+      final email = auth?.identity?.email;
+      if (email != null && email.isNotEmpty) {
+        final stripeService = ref.read(stripeGatewayServiceProvider);
+        final hasStripeActive = await stripeService.verifyCustomerActiveSubscription(email);
+        if (hasStripeActive) {
+          ref.read(subscriptionNotifierProvider.notifier).setDevSandboxEntitlement(
+            const UserEntitlement(
+              status: EntitlementStatus.active,
+              productId: 'stripe_pro_monthly',
+              isAutoRenewing: true,
+            ),
+          );
+          stripeFound = true;
+        }
+      }
+    }
+
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          restored
+          (restored || stripeFound)
               ? 'Verified Pro subscription restored.'
               : 'No verified active subscription was found.',
         ),
@@ -956,8 +1054,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         label: Text(
                           _isPurchasing
                               ? 'Verifying Purchase...'
-                              : 'Upgrade to Pro (\$2.99/mo)',
+                              : 'Upgrade via Google Play (\$2.99/mo)',
                         ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _isPurchasing ? null : _handleStripePurchase,
+                        icon: const Icon(Icons.credit_card, size: 18),
+                        label: const Text('Pay with Card / Stripe (\$2.99/mo)'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (entitlement.canUseAi) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _handleManageSubscription,
+                        icon: const Icon(Icons.manage_accounts_outlined, size: 18),
+                        label: const Text('Manage Subscription (Stripe Portal)'),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -990,9 +1108,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(
+                      TextButton.icon(
                         onPressed: _handleRestorePurchases,
-                        child: const Text('Restore Purchases'),
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Restore Purchases'),
                       ),
                     ],
                   ),

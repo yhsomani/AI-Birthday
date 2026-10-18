@@ -42,9 +42,18 @@ import 'package:ai_birthday/features/ai/data/gemini_nano_provider.dart';
 import 'package:ai_birthday/features/subscription/application/subscription_service.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 import 'package:ai_birthday/features/auth/domain/auth_state.dart';
+import 'package:ai_birthday/features/subscription/application/stripe_gateway_service.dart';
 
 /// App-wide logger provider. Keep one logger instance across app and core layers.
 final loggerProvider = core.loggerProvider;
+
+/// Stripe Gateway Service provider for handling direct Stripe checkouts & verification.
+final stripeGatewayServiceProvider = Provider<StripeGatewayService>((ref) {
+  final logger = ref.watch(loggerProvider);
+  final service = StripeGatewayService(logger: logger);
+  ref.onDispose(service.dispose);
+  return service;
+});
 
 /// Credential Storage provider.
 final credentialStorageProvider = Provider<CredentialStorage>((ref) {
