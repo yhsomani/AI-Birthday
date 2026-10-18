@@ -94,14 +94,15 @@ AiRouter
 ```
 
 ### Delivery
-
-```text
-DeliveryService
- ├── WhatsAppHandoff
- ├── Sms
- ├── Clipboard
- └── Share
-```
+ 
+ ```text
+ DeliveryService
+  ├── WhatsAppHandoff
+  ├── Sms (Manual Composer)
+  ├── AutomaticSms (Personal flavor only via Android SmsManager & AlarmManager)
+  ├── Clipboard
+  └── Share
+ ```
 
 ## 5. Final AI routing rule
 

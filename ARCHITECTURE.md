@@ -58,6 +58,7 @@ flowchart TD
 | Subscription entitlement | `SubscriptionNotifier` + `verifyPurchase` Cloud Function |
 | Play verification | `GooglePlaySubscriptionClient` |
 | WhatsApp handoff | `WhatsAppHandoffBuilder` |
+| Native SMS automation | `BirthdaySmsService` + `AndroidNativeSmsGateway` (`BirthdaySmsReceiver`) |
 | Logging | `core/loggerProvider` and `AppLogger` |
 
 The `InMemory*Repository` implementations are test doubles. Production Riverpod providers are wired to Drift repositories.
@@ -164,10 +165,21 @@ Rules:
 The user's Gemini key is never stored in the SQLite database or sent to Firestore backup.
 
 ## 9. Delivery boundaries
-
-WhatsApp uses a user-controlled deep-link handoff. No unofficial automation or background message sending is implemented.
-
-Android alarms and notifications are handled through platform services. The Flutter UI does not directly own alarm scheduling internals.
+ 
+ WhatsApp uses a user-controlled deep-link handoff. No unofficial automation or background message sending is implemented.
+ 
+-Android alarms and notifications are handled through platform services. The Flutter UI does not directly own alarm scheduling internals.
++SMS delivery is split by Gradle product flavors:
++- **Play Store flavor (`play`)**: Omits `android.permission.SEND_SMS` entirely for store policy compliance. SMS uses manual composer handoff (`url_launcher`).
++- **Personal sideload flavor (`personal`)**: Declares `android.permission.SEND_SMS` and uses `BirthdaySmsReceiver` with `SmsManager` for native background dispatch at 00:00 midnight in recipient's timezone.
++
++Strict safeguards apply to native automated SMS:
++1. Never auto-sends unreviewed AI drafts (`DraftStatus.approvedForAutoSms` required).
++2. Draft edits immediately invalidate approval and cancel pending alarms.
++3. Exact alarms schedule for midnight with a 12-hour stale alarm guard.
++4. Pending jobs are restored after reboots (`BOOT_COMPLETED`) and updates (`MY_PACKAGE_REPLACED`).
++
++Android alarms and notifications are handled through native platform services. The Flutter UI does not directly own alarm scheduling internals.
 
 ## 10. Security invariants
 

@@ -102,6 +102,13 @@ flowchart TD
 - Night Quiet Hours window (defaults to 22:00 – 08:00) prevents notifications from disturbing sleep.
 - Android 13+ runtime notification permissions (`POST_NOTIFICATIONS`) and Android 12+ exact alarm scheduling (`SCHEDULE_EXACT_ALARM`).
 
+### 7. Native Automatic Birthday SMS (Personal / Sideload Distribution)
+- **Distribution Separation**:
+  - **Play-Safe Flavor (`play`)**: Omits `android.permission.SEND_SMS` entirely for Google Play Store policy compliance. Uses external SMS composer handoff.
+  - **Personal Flavor (`personal`)**: Declares `android.permission.SEND_SMS` and supports autonomous midnight SMS delivery via Android `SmsManager`.
+- **Pre-Approval & Strict Consent**: AI-generated drafts are never automatically sent without human review. The user must explicitly approve the draft (`DraftStatus.approvedForAutoSms`) and opt-in the recipient. Any edits to an approved draft immediately revoke approval.
+- **Midnight Scheduling & Stale Expiration**: Alarms are scheduled for 00:00 midnight in the recipient's local timezone with a 12-hour expiration guard to prevent sending stale messages. Resilient across device reboots (`BOOT_COMPLETED`) and package updates (`MY_PACKAGE_REPLACED`).
+
 ---
 
 ## 🛠️ Development Setup
@@ -136,10 +143,18 @@ flowchart TD
    flutter test
    ```
 
-5. **Deploy to connected Android device:**
-   ```bash
-   flutter run -d <device_id>
-   ```
+5. **Build and install flavors:**
+   - **Personal flavor (with automatic midnight SMS):**
+     ```bash
+     flutter build apk --flavor personal --debug
+     # Or using the root installation script:
+     build-and-install-android.bat personal
+     ```
+   - **Google Play Store flavor (strictly zero SEND_SMS):**
+     ```bash
+     flutter build apk --flavor play --release
+     build-and-install-android.bat play
+     ```
 
 ### Google Sign-In setup (SHA-1 fingerprints)
 
