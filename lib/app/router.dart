@@ -15,6 +15,7 @@ import 'package:ai_birthday/features/onboarding/presentation/onboarding_screen.d
 import 'package:ai_birthday/features/people/presentation/people_screen.dart';
 import 'package:ai_birthday/features/people/presentation/person_form_screen.dart';
 import 'package:ai_birthday/features/settings/presentation/settings_screen.dart';
+import 'package:ai_birthday/shared/design_system/design_system.dart';
 import 'app_scaffold.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
@@ -143,26 +144,18 @@ class _NotFoundScreen extends StatelessWidget {
     final location = state.uri.path == '/' ? '' : state.uri.path;
     return Scaffold(
       appBar: AppBar(title: const Text('Screen not found')),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                location.isEmpty
-                    ? 'That screen does not exist.'
-                    : 'No screen matches "$location".',
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: () => context.go('/dashboard'),
-              icon: const Icon(Icons.home_outlined),
-              label: const Text('Back to dashboard'),
-            ),
-          ],
+      body: SafeArea(
+        child: EmptyState(
+          icon: Icons.explore_off_outlined,
+          title: location.isEmpty
+              ? 'That screen does not exist.'
+              : 'No screen matches "$location".',
+          message: 'Let\'s get you back to your celebrations.',
+          action: FilledButton.icon(
+            onPressed: () => context.go('/dashboard'),
+            icon: const Icon(Icons.home_outlined),
+            label: const Text('Back to dashboard'),
+          ),
         ),
       ),
     );
