@@ -16,3 +16,7 @@
 ## 2024-10-18 - Style Destructive Action Buttons
 **Learning:** Primary action buttons for destructive actions (like Delete or Discard) should have a distinct visual style to prevent accidental clicks. Using only a red background can sometimes lead to poor contrast.
 **Action:** Always style destructive action buttons using both `backgroundColor: Theme.of(context).colorScheme.error` and `foregroundColor: Theme.of(context).colorScheme.onError` in the `styleFrom` configuration.
+
+## 2024-10-18 - Style Destructive Action Buttons Consistently
+**Learning:** The 'Sign out' button in the settings modal was missing the distinct visual style for destructive actions, which could lead to accidental clicks.
+**Action:** Always style destructive action buttons using both `backgroundColor: Theme.of(context).colorScheme.error` and `foregroundColor: Theme.of(context).colorScheme.onError` in the `styleFrom` configuration, specifically for buttons like 'Sign out' that have significant consequences.
