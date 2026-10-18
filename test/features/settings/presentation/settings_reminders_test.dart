@@ -1,3 +1,4 @@
+import 'package:ai_birthday/app/theme/theme_mode_provider.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
 import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
 import 'package:ai_birthday/features/settings/presentation/settings_screen.dart';
@@ -6,13 +7,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Future<void> pumpSettings(WidgetTester tester) async {
+  Future<void> pumpSettings(WidgetTester tester, {ProviderContainer? container}) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      const ProviderScope(child: MaterialApp(home: SettingsScreen())),
+      UncontrolledProviderScope(
+        container: container ?? ProviderContainer(),
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
     );
     await tester.pumpAndSettle();
   }
@@ -102,15 +106,61 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets(
-    'settings does not expose theme toggle and retains system theme policy',
-    (tester) async {
-      await pumpSettings(tester);
+  testWidgets('reminder cadence dropdown updates enabled leads', (tester) async {
+    await pumpSettings(tester);
+    final remindersSwitch = find.widgetWithText(
+      SwitchListTile,
+      'Birthday reminders',
+    );
+    await tester.ensureVisible(remindersSwitch);
+    await tester.pumpAndSettle();
+    await tester.tap(remindersSwitch);
+    await tester.pumpAndSettle();
 
-      expect(find.text('Dark Mode'), findsNothing);
-      expect(find.byIcon(Icons.dark_mode_outlined), findsNothing);
-      expect(find.text('HELP & GUIDE'), findsOneWidget);
-      expect(find.text('Replay App Onboarding'), findsOneWidget);
+    // Verify dropdown is present
+    expect(find.text('Reminder Cadence Preference'), findsOneWidget);
+    final dropdownFinder = find.byType(DropdownButtonFormField<String>);
+    expect(dropdownFinder, findsOneWidget);
+
+    // Open dropdown and select Day-Of Only
+    await tester.tap(dropdownFinder);
+    await tester.pumpAndSettle();
+    expect(find.text('Day-Of Only (Today at 9:00 AM)'), findsWidgets);
+
+    await tester.tap(find.text('Day-Of Only (Today at 9:00 AM)').last);
+    await tester.pumpAndSettle();
+
+    final settings = ProviderScope.containerOf(
+      tester.element(find.byType(SettingsScreen)),
+    ).read(reminderSettingsProvider);
+    expect(settings.kinds, equals({ReminderKind.birthday}));
+  });
+
+  testWidgets(
+    'settings exposes theme mode selector and toggles theme state',
+    (tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await pumpSettings(tester, container: container);
+
+      expect(find.text('APPEARANCE'), findsOneWidget);
+      expect(find.text('System'), findsOneWidget);
+      expect(find.text('Light'), findsOneWidget);
+      expect(find.text('Dark'), findsOneWidget);
+
+      final lightFinder = find.text('Light');
+      await tester.ensureVisible(lightFinder);
+      await tester.pumpAndSettle();
+      await tester.tap(lightFinder);
+      await tester.pumpAndSettle();
+
+      expect(container.read(themeModeProvider), ThemeMode.light);
+
+      final darkFinder = find.text('Dark');
+      await tester.tap(darkFinder);
+      await tester.pumpAndSettle();
+
+      expect(container.read(themeModeProvider), ThemeMode.dark);
     },
   );
 }

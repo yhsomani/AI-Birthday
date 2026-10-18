@@ -17,6 +17,8 @@ class CloudSyncResult {
     required this.success,
     this.uploadedCount = 0,
     this.downloadedCount = 0,
+    this.skippedCount = 0,
+    this.skippedRecords = const [],
     this.error,
     this.errorCode,
     this.retryable = false,
@@ -26,6 +28,8 @@ class CloudSyncResult {
   final bool success;
   final int uploadedCount;
   final int downloadedCount;
+  final int skippedCount;
+  final List<String> skippedRecords;
   final String? error;
 
   /// Stable failure classification consumed by the durable job worker:
@@ -670,6 +674,8 @@ class CloudSyncService {
         }
       }
 
+      final skippedRecords = <String>[];
+
       // Apply every local write in one transaction, so a failure part-way
       // cannot leave a mixed dataset.
       await _db.transaction(() async {
@@ -691,12 +697,16 @@ class CloudSyncService {
           final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
           final id = _string(fields, 'id');
           final name = _string(fields, 'name');
-          if (id == null || name == null) continue;
+          if (id == null || name == null) {
+            skippedRecords.add('people/${id ?? "unknown"}: missing id or name');
+            continue;
+          }
 
           final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
           final existing = existingPeople[id];
           if (existing != null &&
               !remoteUpdatedAt.isAfter(existing.updatedAt)) {
+            skippedRecords.add('people/$id: local copy is equal or newer');
             continue;
           }
 
@@ -704,7 +714,10 @@ class CloudSyncService {
           // A local tombstone outranks a live cloud copy that has no tombstone:
           // restore must never resurrect a contact the user deleted on-device
           // (audit F-2). Tombstones in the cloud still apply below.
-          if (existing?.deletedAt != null && deletedAt == null) continue;
+          if (existing?.deletedAt != null && deletedAt == null) {
+            skippedRecords.add('people/$id: local tombstone preserved');
+            continue;
+          }
 
           final createdAt = _date(fields, 'createdAt') ?? remoteUpdatedAt;
           await _db
@@ -771,15 +784,24 @@ class CloudSyncService {
           final id = _string(fields, 'id');
           final personId = _string(fields, 'personId');
           final date = _date(fields, 'date');
-          if (id == null || personId == null || date == null) continue;
+          if (id == null || personId == null || date == null) {
+            skippedRecords.add(
+              'birthdays/${id ?? "unknown"}: missing id, personId, or date',
+            );
+            continue;
+          }
 
           // AUD-004: Never restore a birthday whose person is deleted (tombstoned) or non-existent.
-          if (!activePersonIds.contains(personId)) continue;
+          if (!activePersonIds.contains(personId)) {
+            skippedRecords.add('birthdays/$id: person $personId not active');
+            continue;
+          }
 
           final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
           final existing = existingBirthdays[id];
           if (existing != null &&
               !remoteUpdatedAt.isAfter(existing.updatedAt)) {
+            skippedRecords.add('birthdays/$id: local copy is equal or newer');
             continue;
           }
 
@@ -822,17 +844,27 @@ class CloudSyncService {
               birthdayId == null ||
               personId == null ||
               body == null) {
+            skippedRecords.add(
+              'drafts/${id ?? "unknown"}: missing required fields',
+            );
             continue;
           }
 
           // AUD-004: Never restore a draft whose person or birthday is deleted or missing.
-          if (!activePersonIds.contains(personId)) continue;
-          if (!validBirthdayIds.contains(birthdayId)) continue;
+          if (!activePersonIds.contains(personId)) {
+            skippedRecords.add('drafts/$id: person $personId not active');
+            continue;
+          }
+          if (!validBirthdayIds.contains(birthdayId)) {
+            skippedRecords.add('drafts/$id: birthday $birthdayId not valid');
+            continue;
+          }
 
           final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
           final existing = existingDrafts[id];
           if (existing != null &&
               !remoteUpdatedAt.isAfter(existing.updatedAt)) {
+            skippedRecords.add('drafts/$id: local copy is equal or newer');
             continue;
           }
 
@@ -873,13 +905,21 @@ class CloudSyncService {
         for (final doc in reminderDocs) {
           final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
           final key = _string(fields, 'key');
-          if (key == null) continue;
+          if (key == null) {
+            skippedRecords.add('reminderSettings: missing key');
+            continue;
+          }
 
           // Reminder settings have no per-record sync timestamp. Preserve a
           // device-local preference rather than overwriting it with an older or
           // ambiguous cloud copy during a merge-style restore.
           final existing = existingReminders[key];
-          if (existing != null) continue;
+          if (existing != null) {
+            skippedRecords.add(
+              'reminderSettings/$key: device-local preference preserved',
+            );
+            continue;
+          }
 
           await _db
               .into(_db.reminderSettingsEntries)
@@ -903,12 +943,14 @@ class CloudSyncService {
       _logger?.info(
         'CloudRestore',
         'Restore finished successfully.',
-        params: {'restored': restored},
+        params: {'restored': restored, 'skipped': skippedRecords.length},
       );
 
       return CloudSyncResult(
         success: true,
         downloadedCount: restored,
+        skippedCount: skippedRecords.length,
+        skippedRecords: skippedRecords,
         timestamp: now,
       );
     } catch (error, stackTrace) {

@@ -6,6 +6,10 @@ import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dar
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart'
     as domain;
+import 'package:ai_birthday/features/people/domain/models/relationship.dart';
+import 'package:ai_birthday/features/people/domain/models/tone.dart';
+import 'package:ai_birthday/features/people/domain/person_enums.dart'
+    hide DeliveryChannel;
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -105,6 +109,59 @@ void main() {
 
         final firstEmission = await repo.watchPeople().first;
         expect(firstEmission.map((p) => p.name).toList(), ['Alice', 'bob']);
+      },
+    );
+
+    test(
+      'savePerson and getPerson round-trip all fields including autoSendPolicy and deletedAt',
+      () async {
+        final now = DateTime.utc(2025, 5, 20, 10, 30);
+        final p = domain.Person(
+          id: 'full-fields-1',
+          name: 'Jordan Lee',
+          birthdayMonth: 7,
+          birthdayDay: 14,
+          birthYear: 1992,
+          phoneNumber: '+15551234567',
+          email: 'jordan@example.com',
+          relationship: RelationshipCategory.mentor,
+          relationshipCloseness: RelationshipCloseness.close,
+          preferredLanguage: 'fr',
+          preferredTone: MessageTone.emotional,
+          importantFacts: const ['Plays cello', 'Has twin brother'],
+          notes: 'Met at university conference',
+          preferredDeliveryChannel: DeliveryChannel.sms,
+          timezone: 'Europe/Paris',
+          autoPrepare: true,
+          autoSendPolicy: AutoSendPolicy.manualOnly,
+          createdAt: now,
+          updatedAt: now,
+          version: 5,
+          deletedAt: null,
+        );
+
+        await repo.savePerson(p);
+        final loaded = await repo.getPerson('full-fields-1');
+        expect(loaded, isNotNull);
+        expect(loaded!.id, 'full-fields-1');
+        expect(loaded.name, 'Jordan Lee');
+        expect(loaded.birthdayMonth, 7);
+        expect(loaded.birthdayDay, 14);
+        expect(loaded.birthYear, 1992);
+        expect(loaded.phoneNumber, '+15551234567');
+        expect(loaded.email, 'jordan@example.com');
+        expect(loaded.relationship, RelationshipCategory.mentor);
+        expect(loaded.relationshipCloseness, RelationshipCloseness.close);
+        expect(loaded.preferredLanguage, 'fr');
+        expect(loaded.preferredTone, MessageTone.emotional);
+        expect(loaded.importantFacts, ['Plays cello', 'Has twin brother']);
+        expect(loaded.notes, 'Met at university conference');
+        expect(loaded.preferredDeliveryChannel, DeliveryChannel.sms);
+        expect(loaded.timezone, 'Europe/Paris');
+        expect(loaded.autoPrepare, isTrue);
+        expect(loaded.autoSendPolicy, AutoSendPolicy.manualOnly);
+        expect(loaded.version, 5);
+        expect(loaded.deletedAt, isNull);
       },
     );
   });

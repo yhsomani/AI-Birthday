@@ -23,7 +23,6 @@ import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/features/settings/presentation/settings_screen.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
-import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
 class MessageStudioScreen extends ConsumerStatefulWidget {
   const MessageStudioScreen({super.key, this.birthdayId, this.personId})

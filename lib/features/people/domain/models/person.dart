@@ -4,6 +4,8 @@ library;
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
+import 'package:ai_birthday/features/people/domain/person_enums.dart'
+    show AutoSendPolicy;
 
 /// An individual recipient whose birthday and preferences are stored.
 class Person {
@@ -24,9 +26,11 @@ class Person {
     this.preferredDeliveryChannel = DeliveryChannel.whatsapp,
     this.timezone,
     this.autoPrepare = true,
+    this.autoSendPolicy = AutoSendPolicy.manualOnly,
     required this.createdAt,
     required this.updatedAt,
     this.version = 1,
+    this.deletedAt,
   });
 
   final String id;
@@ -75,9 +79,11 @@ class Person {
   /// Whether to automatically prepare draft messages before the birthday.
   final bool autoPrepare;
 
+  final AutoSendPolicy autoSendPolicy;
   final DateTime createdAt;
   final DateTime updatedAt;
   final int version;
+  final DateTime? deletedAt;
 
   /// Returns true if this person has a valid birthday specified.
   bool get hasBirthday =>
@@ -98,6 +104,7 @@ class Person {
     int? birthdayDay,
     bool clearBirthday = false,
     int? birthYear,
+    bool clearBirthYear = false,
     String? phoneNumber,
     String? email,
     RelationshipCategory? relationship,
@@ -108,10 +115,14 @@ class Person {
     String? notes,
     DeliveryChannel? preferredDeliveryChannel,
     String? timezone,
+    bool clearTimezone = false,
     bool? autoPrepare,
+    AutoSendPolicy? autoSendPolicy,
     DateTime? createdAt,
     DateTime? updatedAt,
     int? version,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
   }) {
     return Person(
       id: id ?? this.id,
@@ -120,7 +131,7 @@ class Person {
           ? null
           : (birthdayMonth ?? this.birthdayMonth),
       birthdayDay: clearBirthday ? null : (birthdayDay ?? this.birthdayDay),
-      birthYear: birthYear ?? this.birthYear,
+      birthYear: clearBirthYear ? null : (birthYear ?? this.birthYear),
       phoneNumber: phoneNumber ?? this.phoneNumber,
       email: email ?? this.email,
       relationship: relationship ?? this.relationship,
@@ -132,11 +143,13 @@ class Person {
       notes: notes ?? this.notes,
       preferredDeliveryChannel:
           preferredDeliveryChannel ?? this.preferredDeliveryChannel,
-      timezone: timezone ?? this.timezone,
+      timezone: clearTimezone ? null : (timezone ?? this.timezone),
       autoPrepare: autoPrepare ?? this.autoPrepare,
+      autoSendPolicy: autoSendPolicy ?? this.autoSendPolicy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       version: version ?? this.version,
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
     );
   }
 
@@ -157,9 +170,11 @@ class Person {
     'preferredDeliveryChannel': preferredDeliveryChannel.name,
     if (timezone != null) 'timezone': timezone,
     'autoPrepare': autoPrepare,
+    'autoSendPolicy': autoSendPolicy.name,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'version': version,
+    if (deletedAt != null) 'deletedAt': deletedAt!.toIso8601String(),
   };
 
   factory Person.fromJson(Map<String, dynamic> json) {
@@ -190,9 +205,15 @@ class Person {
       ),
       timezone: json['timezone'] as String?,
       autoPrepare: (json['autoPrepare'] as bool?) ?? true,
+      autoSendPolicy: AutoSendPolicy.parse(
+        (json['autoSendPolicy'] as String?) ?? 'manualOnly',
+      ),
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       version: (json['version'] as int?) ?? 1,
+      deletedAt: json['deletedAt'] != null
+          ? DateTime.parse(json['deletedAt'] as String)
+          : null,
     );
   }
 }

@@ -9,7 +9,6 @@ import '../../../shared/design_system/design_system.dart';
 import '../../delivery/domain/models/delivery_channel.dart';
 import '../../delivery/domain/models/delivery_handoff.dart';
 import '../../message_studio/domain/models/message_draft.dart';
-import '../../../ui/design_system/app_tokens.dart';
 
 /// History — message and delivery activity timeline (SSOT §3, §16, §28).
 class HistoryScreen extends ConsumerWidget {

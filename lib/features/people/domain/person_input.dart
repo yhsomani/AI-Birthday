@@ -1,5 +1,8 @@
+import '../../delivery/domain/models/delivery_channel.dart';
+import 'models/relationship.dart';
+import 'models/tone.dart';
 import 'person.dart';
-import 'person_enums.dart';
+import 'person_enums.dart' show AutoSendPolicy;
 
 /// Editable recipient data captured by the add/edit forms (SSOT §7).
 ///
@@ -13,13 +16,13 @@ class PersonDraft {
     this.birthYear,
     this.phoneNumber,
     this.email,
-    this.relationship = '',
+    this.relationship = RelationshipCategory.friend,
     this.relationshipCloseness = RelationshipCloseness.casual,
     this.preferredLanguage = 'en',
-    this.preferredTone = PreferredTone.warm,
+    this.preferredTone = MessageTone.warm,
     this.importantFacts = const [],
     this.notes,
-    this.preferredDeliveryChannel = DeliveryChannel.none,
+    this.preferredDeliveryChannel = DeliveryChannel.whatsapp,
     this.timezone,
     this.autoPrepare = false,
     this.autoSendPolicy = AutoSendPolicy.manualOnly,
@@ -31,10 +34,10 @@ class PersonDraft {
   final int? birthYear;
   final String? phoneNumber;
   final String? email;
-  final String relationship;
+  final RelationshipCategory relationship;
   final RelationshipCloseness relationshipCloseness;
   final String preferredLanguage;
-  final PreferredTone preferredTone;
+  final MessageTone preferredTone;
   final List<String> importantFacts;
   final String? notes;
   final DeliveryChannel preferredDeliveryChannel;
@@ -50,10 +53,10 @@ class PersonDraft {
     bool clearBirthYear = false,
     String? phoneNumber,
     String? email,
-    String? relationship,
+    RelationshipCategory? relationship,
     RelationshipCloseness? relationshipCloseness,
     String? preferredLanguage,
-    PreferredTone? preferredTone,
+    MessageTone? preferredTone,
     List<String>? importantFacts,
     String? notes,
     DeliveryChannel? preferredDeliveryChannel,

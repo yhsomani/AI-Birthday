@@ -91,12 +91,59 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: palette.surface,
-        elevation: 0,
+        elevation: isDark ? 0 : 1,
+        shadowColor: Colors.black.withValues(alpha: 0.06),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
           side: BorderSide(color: palette.border, width: 1),
         ),
         margin: EdgeInsets.zero,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return palette.textSecondary.withValues(alpha: 0.38);
+          }
+          if (states.contains(WidgetState.selected)) {
+            return palette.primary;
+          }
+          return palette.textSecondary.withValues(alpha: 0.75);
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return palette.surfaceAlt.withValues(alpha: 0.5);
+          }
+          if (states.contains(WidgetState.selected)) {
+            return palette.primaryContainer;
+          }
+          return palette.surfaceAlt;
+        }),
+        trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return palette.primary;
+          }
+          return palette.border;
+        }),
+        trackOutlineWidth: const WidgetStatePropertyAll(1.0),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: palette.surfaceAlt,
+        selectedColor: palette.primaryContainer,
+        disabledColor: palette.surfaceAlt.withValues(alpha: 0.5),
+        labelStyle: textTheme.labelMedium?.copyWith(
+          color: palette.textPrimary,
+          fontWeight: FontWeight.w500,
+        ),
+        secondaryLabelStyle: textTheme.labelMedium?.copyWith(
+          color: palette.onPrimaryContainer,
+          fontWeight: FontWeight.w600,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          side: BorderSide(color: palette.border),
+        ),
+        side: BorderSide(color: palette.border),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

@@ -4,8 +4,11 @@ import 'package:clock/clock.dart' as clock;
 import 'package:drift/drift.dart' as drift;
 
 import '../../../core/database/app_database.dart' as db;
+import '../../delivery/domain/models/delivery_channel.dart';
+import '../domain/models/relationship.dart';
+import '../domain/models/tone.dart';
 import '../domain/person.dart';
-import '../domain/person_enums.dart';
+import '../domain/person_enums.dart' show AutoSendPolicy;
 
 /// Persistence face for recipients.
 ///
@@ -114,17 +117,17 @@ class DriftPeopleStore implements PeopleStore {
     birthYear: row.birthYear,
     phoneNumber: row.phoneNumber,
     email: row.email,
-    relationship: row.relationship,
+    relationship: RelationshipCategory.fromString(row.relationship),
     relationshipCloseness: RelationshipCloseness.fromStored(
       row.relationshipCloseness,
     ),
     preferredLanguage: row.preferredLanguage.isEmpty
         ? 'en'
         : row.preferredLanguage,
-    preferredTone: PreferredTone.parse(row.preferredTone),
+    preferredTone: MessageTone.fromString(row.preferredTone),
     importantFacts: _facts(row.importantFacts),
     notes: row.notes,
-    preferredDeliveryChannel: DeliveryChannel.parse(
+    preferredDeliveryChannel: DeliveryChannel.fromString(
       row.preferredDeliveryChannel,
     ),
     timezone: row.timezone,
@@ -144,7 +147,7 @@ class DriftPeopleStore implements PeopleStore {
     birthYear: p.birthYear,
     phoneNumber: p.phoneNumber,
     email: p.email,
-    relationship: p.relationship,
+    relationship: p.relationship.name,
     relationshipCloseness: p.relationshipCloseness.name,
     preferredLanguage: p.preferredLanguage,
     preferredTone: p.preferredTone.name,

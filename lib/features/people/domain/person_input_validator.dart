@@ -114,7 +114,7 @@ class PersonInputValidator {
       }
     }
 
-    final relationship = d.relationship.trim();
+    final relationship = d.relationship.name;
     if (relationship.length > 60) {
       errors[PersonField.relationship] = InputError.relationshipTooLong;
     }

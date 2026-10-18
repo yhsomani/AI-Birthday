@@ -31,13 +31,14 @@ AI-Birthday is a Flutter mobile application with a Firebase Cloud Functions back
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|---|---|---|---|
-| M1 | Production Google Authentication & Pseudo-Auth Purge | F1, F2, F3 (Auth & Gateway fixes, test suite update, log redaction) | none | PLANNED |
-| M2 | Server-Side Subscription Verification | F4, F5, F6 (Cloud Function, Firestore security rules, client SubscriptionService) | M1 | PLANNED |
-| M3 | End-to-End Encrypted Zero-PII Cloud Backup Envelope | F7, F8, F9, F10 (Drift schema, AES-GCM crypto, version vectors, log redaction) | M1 | PLANNED |
-| M4 | Real Android AICore Native Bridge | F11, F12, F13 (Manifest queries, Kotlin MainActivity channel, Flutter NanoState, purge mock strings) | none | PLANNED |
-| M5 | Comprehensive UI/UX, Responsive & Accessibility Remediation | F14, F15, F16 (Message Studio IME, Wrap layouts, Semantics, 360dp/1.5x scaling) | none | PLANNED |
+| M1 | Production Google Authentication & Pseudo-Auth Purge | F1, F2, F3 (Auth & Gateway fixes, test suite update, log redaction) | none | IMPLEMENTED |
+| M2 | Server-Side Subscription Verification | F4, F5, F6 (Cloud Function, Firestore security rules, client SubscriptionService) | M1 | IMPLEMENTED |
+| M3 | Owner-Scoped Snapshot Backup & Restore | F7, F9, F10 (Drift schema, snapshot generations, pre-validation, log redaction; AES-GCM deferred) | M1 | IMPLEMENTED |
+| M4 | Real Android AICore Native Bridge | F11, F12, F13 (Manifest queries, Kotlin MainActivity channel, Flutter NanoState, purge mock strings) | none | IMPLEMENTED |
+| M5 | Comprehensive UI/UX, Responsive & Accessibility Remediation | F14, F15, F16 (Message Studio IME, Wrap layouts, Semantics, 360dp/1.5x scaling) | none | IMPLEMENTED |
 | M-E2E | E2E Requirement Testing Track | F17 (Opaque-box test suite across Tiers 1-4, publish TEST_READY.md) | none (parallel) | DONE |
-| M-FINAL | Final Milestone: 100% Test Pass & Adversarial Hardening | Phase 1 (100% pass flutter analyze, flutter test, npm test) + Phase 2 (Tier 5 Adversarial Coverage Hardening) | M1, M2, M3, M4, M5, M-E2E | PLANNED |
+| M-FINAL | Final Milestone: 100% Test Pass & Adversarial Hardening | Phase 1 (100% pass flutter analyze, flutter test, npm test) + Phase 2 (Tier 5 Adversarial Coverage Hardening) | M1, M2, M3, M4, M5, M-E2E | DONE |
+
 
 ## Interface Contracts
 

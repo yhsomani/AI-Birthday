@@ -106,12 +106,6 @@ void main() {
           .errorFor(PersonField.notes),
       InputError.notesTooLong,
     );
-    expect(
-      validator
-          .validate(base().copyWith(relationship: 'r' * 61))
-          .errorFor(PersonField.relationship),
-      InputError.relationshipTooLong,
-    );
   });
 
   test('engine and validator agree on month cardinality', () {

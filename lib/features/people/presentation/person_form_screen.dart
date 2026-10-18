@@ -9,21 +9,15 @@ import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart'
     as b_models;
 import 'package:ai_birthday/features/people/data/person_providers.dart';
-import 'package:ai_birthday/features/people/domain/models/person.dart'
-    as p_models;
 import 'package:ai_birthday/features/people/domain/models/relationship.dart'
     as p_rel;
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart'
     as d_chan;
+import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/features/people/domain/person.dart';
-import 'package:ai_birthday/features/people/domain/person_enums.dart'
-    hide DeliveryChannel, RelationshipCloseness;
-import 'package:ai_birthday/features/people/domain/person_enums.dart'
-    as p_enums;
 import 'package:ai_birthday/features/people/domain/person_input.dart';
 import 'package:ai_birthday/features/people/domain/person_input_validator.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
-import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
 /// Add / edit recipient form with Progressive Disclosure (SSOT §7, §14).
 ///
@@ -66,8 +60,8 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
 
   int? _month;
   int? _day;
-  PreferredTone _tone = PreferredTone.warm;
-  p_models.Person? _existingPerson;
+  MessageTone _tone = MessageTone.warm;
+  Person? _existingPerson;
   p_rel.RelationshipCloseness _closeness = p_rel.RelationshipCloseness.casual;
   String _preferredLanguage = 'en';
   d_chan.DeliveryChannel _deliveryChannel = d_chan.DeliveryChannel.whatsapp;
@@ -124,30 +118,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
           _existingPerson = memPerson;
         }
         var p = person;
-        if (p == null && memPerson != null) {
-          p = Person(
-            id: memPerson.id,
-            name: memPerson.name,
-            birthdayMonth: memPerson.birthdayMonth,
-            birthdayDay: memPerson.birthdayDay,
-            birthYear: memPerson.birthYear,
-            phoneNumber: memPerson.phoneNumber,
-            email: memPerson.email,
-            relationship: memPerson.relationship.displayName,
-            preferredTone: PreferredTone.values.firstWhere(
-              (t) =>
-                  t.name.toLowerCase() ==
-                  memPerson.preferredTone.name.toLowerCase(),
-              orElse: () => PreferredTone.warm,
-            ),
-            importantFacts: memPerson.importantFacts,
-            notes: memPerson.notes,
-            timezone: memPerson.timezone,
-            createdAt: memPerson.createdAt,
-            updatedAt: memPerson.updatedAt,
-            version: memPerson.version,
-          );
-        }
+        p ??= memPerson;
         if (!mounted) return;
         if (p == null) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -184,7 +155,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
     _birthYear.text = person.birthYear?.toString() ?? '';
     _phone.text = person.phoneNumber ?? '';
     _email.text = person.email ?? '';
-    _relationship.text = person.relationship;
+    _relationship.text = person.relationship.displayName;
     _notes.text = person.notes ?? '';
     _timezone.text = person.timezone ?? '';
     _tone = person.preferredTone;
@@ -195,7 +166,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
         (person.preferredLanguage.isNotEmpty ? person.preferredLanguage : 'en');
     _deliveryChannel =
         _existingPerson?.preferredDeliveryChannel ??
-        d_chan.DeliveryChannel.fromString(person.preferredDeliveryChannel.name);
+        person.preferredDeliveryChannel;
     _autoPrepare = _existingPerson?.autoPrepare ?? person.autoPrepare;
     _facts
       ..clear()
@@ -259,9 +230,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       birthYear: int.tryParse(_birthYear.text.trim()),
       phoneNumber: emptyToNull(_phone.text),
       email: emptyToNull(_email.text),
-      relationship: _relationship.text.trim(),
-      // The form and the model share one closeness type, so no name round
-      // trip can lose a value (F10).
+      relationship: p_rel.RelationshipCategory.fromString(_relationship.text.trim()),
       relationshipCloseness: _closeness,
       preferredLanguage: _preferredLanguage,
       preferredTone: _tone,
@@ -270,9 +239,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
           .where((f) => f.isNotEmpty)
           .toList(),
       notes: emptyToNull(_notes.text),
-      preferredDeliveryChannel: p_enums.DeliveryChannel.parse(
-        _deliveryChannel.name,
-      ),
+      preferredDeliveryChannel: _deliveryChannel,
       timezone: emptyToNull(_timezone.text),
       autoPrepare: _autoPrepare,
     );
@@ -513,18 +480,18 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          DropdownButtonFormField<PreferredTone>(
+                          DropdownButtonFormField<MessageTone>(
                             initialValue: _tone,
                             items: [
-                              for (final tone in PreferredTone.values)
+                              for (final tone in MessageTone.values)
                                 DropdownMenuItem(
                                   value: tone,
-                                  child: Text(_toneLabel(tone)),
+                                  child: Text(tone.displayName),
                                 ),
                             ],
                             onChanged: (value) => setState(() {
                               _dirty = true;
-                              _tone = value ?? PreferredTone.warm;
+                              _tone = value ?? MessageTone.warm;
                             }),
                             decoration: const InputDecoration(
                               labelText: 'Preferred tone',
@@ -819,13 +786,4 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       ),
     );
   }
-
-  static String _toneLabel(PreferredTone tone) => switch (tone) {
-    PreferredTone.warm => 'Warm',
-    PreferredTone.funny => 'Funny',
-    PreferredTone.emotional => 'Emotional',
-    PreferredTone.casual => 'Casual',
-    PreferredTone.professional => 'Professional',
-    PreferredTone.neutral => 'Neutral',
-  };
 }

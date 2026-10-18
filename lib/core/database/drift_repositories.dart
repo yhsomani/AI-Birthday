@@ -15,6 +15,8 @@ import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_r
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
+import 'package:ai_birthday/features/people/domain/person_enums.dart'
+    show AutoSendPolicy;
 import 'package:ai_birthday/features/people/domain/repositories/people_repository.dart';
 
 /// Drift/SQLite-backed implementation of [PeopleRepository].
@@ -81,13 +83,15 @@ class DriftPeopleRepository implements PeopleRepository {
             ),
             timezone: Value(person.timezone),
             autoPrepare: Value(person.autoPrepare),
-            autoSendPolicy: const Value('manualOnly'),
+            autoSendPolicy: Value(person.autoSendPolicy.name),
             createdAt: Value(person.createdAt),
             updatedAt: Value(person.updatedAt),
             version: Value(person.version),
-            deletedAt: existing?.deletedAt == null
-                ? const Value(null)
-                : Value(existing!.deletedAt),
+            deletedAt: person.deletedAt != null
+                ? Value(person.deletedAt)
+                : (existing?.deletedAt == null
+                      ? const Value(null)
+                      : Value(existing!.deletedAt)),
           ),
         );
   }
@@ -143,9 +147,11 @@ class DriftPeopleRepository implements PeopleRepository {
       ),
       timezone: row.timezone,
       autoPrepare: row.autoPrepare,
+      autoSendPolicy: AutoSendPolicy.parse(row.autoSendPolicy),
       createdAt: row.createdAt.toUtc(),
       updatedAt: row.updatedAt.toUtc(),
       version: row.version,
+      deletedAt: row.deletedAt?.toUtc(),
     );
   }
 }

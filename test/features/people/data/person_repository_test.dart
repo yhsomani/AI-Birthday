@@ -1,7 +1,9 @@
 import 'package:ai_birthday/core/database/app_database.dart' as db;
+import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/people/data/person_repository.dart';
+import 'package:ai_birthday/features/people/domain/models/relationship.dart';
+import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/features/people/domain/person.dart';
-import 'package:ai_birthday/features/people/domain/person_enums.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,7 +32,7 @@ void main() {
       birthdayMonth: month,
       birthdayDay: day,
       relationshipCloseness: RelationshipCloseness.close,
-      preferredTone: PreferredTone.funny,
+      preferredTone: MessageTone.funny,
       importantFacts: ['loves jazz', 'allergic to peanuts'],
       preferredDeliveryChannel: DeliveryChannel.whatsapp,
       createdAt: now,
@@ -47,7 +49,7 @@ void main() {
     expect(loaded!.birthdayMonth, 2);
     expect(loaded.birthdayDay, 29);
     expect(loaded.relationshipCloseness, RelationshipCloseness.close);
-    expect(loaded.preferredTone, PreferredTone.funny);
+    expect(loaded.preferredTone, MessageTone.funny);
     expect(
       loaded.importantFacts,
       unorderedEquals(['loves jazz', 'allergic to peanuts']),

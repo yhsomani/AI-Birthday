@@ -14,7 +14,6 @@ import 'package:ai_birthday/features/people/data/person_providers.dart'
     show personServiceProvider, resyncReminderSchedule;
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
-import 'package:ai_birthday/ui/design_system/app_tokens.dart';
 
 class PeopleScreen extends ConsumerStatefulWidget {
   const PeopleScreen({super.key});
