@@ -1,477 +1,189 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
-title AI-Birthday - Complete Build and Android Installer
+title AI-Birthday - Build and Install Android APK
 
-REM ============================================================
-REM AI-Birthday - AUTOMATED WEB BUILD + ANDROID APK INSTALL
-REM Filename: build-and-install-android.bat
-REM Save this file in the repository root.
-REM IMPORTANT: Do not include Markdown code fences in this file.
-REM ============================================================
-
+REM Run this script from the Flutter project's root directory.
 cd /d "%~dp0"
-set "PROJECT_DIR=%CD%"
-set "ANDROID_DIR="
-set "FRONTEND_DIR="
-set "PACKAGE_ID="
-set "DEVICE_ID="
-set "GRADLE_FILE="
-set "APK_PATH="
-set "BUILD_PACKAGE="
-set "BUILD_COUNT=0"
 
-REM ============================================================
-REM OPTIONAL MANUAL OVERRIDES
-REM Leave blank to use automatic detection.
-REM Example: set "FRONTEND_DIR=%PROJECT_DIR%\backend\hosting"
-REM Example: set "PACKAGE_ID=com.example.aibirthday"
-REM ============================================================
-
-REM set "FRONTEND_DIR="
-REM set "PACKAGE_ID="
-
-echo.
 echo ============================================================
-echo          AI-BIRTHDAY - COMPLETE BUILD TOOL
+echo   AI-Birthday - Flutter Android Build and Install
 echo ============================================================
-echo Project: %PROJECT_DIR%
 echo.
 
-REM ------------------------------------------------------------
-REM STEP 1: CHECK TOOLS
-REM ------------------------------------------------------------
-
-echo [1/9] Checking required tools...
-
-where node >nul 2>&1
-if errorlevel 1 (
-    echo ERROR: Node.js is missing or not in PATH.
-    goto :FAIL
+if not exist "pubspec.yaml" (
+    echo [ERROR] pubspec.yaml was not found.
+    echo Place this BAT file in the AI-Birthday Flutter project root.
+    goto :fail
 )
 
-where npm >nul 2>&1
-if errorlevel 1 (
-    echo ERROR: npm is missing or not in PATH.
-    goto :FAIL
+if not exist "android\gradlew.bat" (
+    echo [ERROR] android\gradlew.bat was not found. This does not look like a Flutter Android project.
+    goto :fail
 )
 
-where adb >nul 2>&1
+where flutter >nul 2>&1
 if errorlevel 1 (
-    echo ERROR: adb is missing or not in PATH.
-    echo Install Android SDK Platform-Tools and configure PATH.
-    goto :FAIL
+    echo [ERROR] Flutter was not found in PATH. Install Flutter or add flutter\bin to PATH.
+    goto :fail
 )
 
-where powershell >nul 2>&1
-if errorlevel 1 (
-    echo ERROR: Windows PowerShell is required.
-    goto :FAIL
+REM Keep a valid JAVA_HOME; repair it if it is missing or invalid.
+if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" goto :java_ready
+
+set "ANDROID_STUDIO_JBR=%ProgramFiles%\Android\Android Studio\jbr"
+if exist "%ANDROID_STUDIO_JBR%\bin\java.exe" (
+    set "JAVA_HOME=%ANDROID_STUDIO_JBR%"
+    goto :java_ready
 )
 
-echo Node.js:
-node --version
-echo npm:
-call npm --version
+REM Fallback: look for an installed JDK under Program Files\Java.
+for /d %%J in ("%ProgramFiles%\Java\jdk*") do (
+    if exist "%%~fJ\bin\java.exe" set "JAVA_HOME=%%~fJ"
+)
+if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" goto :java_ready
+
+echo [ERROR] No valid JDK was found.
+echo Install a JDK or Android Studio, then rerun this script.
+echo Example JAVA_HOME must point to the JDK root, not its bin folder.
+goto :fail
+
+:java_ready
+set "PATH=%JAVA_HOME%\bin;%PATH%"
+echo [INFO] JAVA_HOME: %JAVA_HOME%
+java -version
+if errorlevel 1 (
+    echo [ERROR] Java could not be started.
+    goto :fail
+)
 echo.
 
-REM ------------------------------------------------------------
-REM STEP 2: DISCOVER ANDROID PROJECT
-REM ------------------------------------------------------------
-
-echo [2/9] Locating the Android Gradle project...
-
-for /r "%PROJECT_DIR%" %%F in (gradlew.bat) do (
-    if not defined ANDROID_DIR (
-        set "CANDIDATE_DIR=%%~dpF"
-        set "CANDIDATE_DIR=!CANDIDATE_DIR:~0,-1!"
-
-        if exist "!CANDIDATE_DIR!\app\build.gradle" (
-            set "ANDROID_DIR=!CANDIDATE_DIR!"
-            set "GRADLE_FILE=!CANDIDATE_DIR!\app\build.gradle"
-        ) else if exist "!CANDIDATE_DIR!\app\build.gradle.kts" (
-            set "ANDROID_DIR=!CANDIDATE_DIR!"
-            set "GRADLE_FILE=!CANDIDATE_DIR!\app\build.gradle.kts"
-        )
-    )
+REM Prefer the Android SDK's adb to avoid conflicts with other adb installations.
+set "ADB="
+if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" set "ADB=%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe"
+if not defined ADB (
+    for /f "delims=" %%A in ('where adb 2^>nul') do if not defined ADB set "ADB=%%A"
 )
-
-if not defined ANDROID_DIR (
-    echo ERROR: Could not find an Android Gradle app project.
-    echo Expected gradlew.bat and app\build.gradle or build.gradle.kts.
-    goto :FAIL
+if not defined ADB (
+    echo [ERROR] adb was not found. Install Android SDK Platform-Tools or add adb to PATH.
+    goto :fail
 )
-
-echo Android project: !ANDROID_DIR!
-echo Gradle config: !GRADLE_FILE!
+echo [INFO] Using ADB: %ADB%
 echo.
 
-REM ------------------------------------------------------------
-REM STEP 3: FIND THE FRONTEND PACKAGE
-REM ------------------------------------------------------------
+set "FLAVOR=personal"
+if /I "%~1"=="play" set "FLAVOR=play"
+if /I "%~1"=="personal" set "FLAVOR=personal"
+if /I "%~2"=="play" set "FLAVOR=play"
+if /I "%~2"=="personal" set "FLAVOR=personal"
 
-echo [3/9] Detecting the web application...
-
-if defined FRONTEND_DIR (
-    if not exist "!FRONTEND_DIR!\package.json" (
-        echo ERROR: Configured FRONTEND_DIR has no package.json:
-        echo !FRONTEND_DIR!
-        goto :FAIL
+if /I "%~1"=="--clean" (
+    echo [INFO] Clean build requested...
+    call flutter clean
+    if errorlevel 1 (
+        echo [ERROR] flutter clean failed.
+        goto :fail
     )
-    set "BUILD_PACKAGE=!FRONTEND_DIR!\package.json"
-) else (
-    REM Prefer backend\hosting when it has an npm build script.
-    if exist "%PROJECT_DIR%\backend\hosting\package.json" (
-        powershell -NoProfile -Command "$p=ConvertFrom-Json (Get-Content -Raw -LiteralPath '%PROJECT_DIR%\backend\hosting\package.json'); if ($p.scripts.build) { Write-Output YES }" > "%TEMP%\aibirthday_buildcheck.txt"
-
-        findstr /X /C:"YES" "%TEMP%\aibirthday_buildcheck.txt" >nul 2>&1
-        if not errorlevel 1 (
-            set "BUILD_PACKAGE=%PROJECT_DIR%\backend\hosting\package.json"
-        )
-    )
-
-    REM Otherwise search for packages with a build script,
-    REM excluding dependency folders and backend/functions.
-    if not defined BUILD_PACKAGE (
-        for /r "%PROJECT_DIR%" %%F in (package.json) do (
-            set "CHECK_PACKAGE=%%~fF"
-
-            echo(!CHECK_PACKAGE!| findstr /I /C:"\node_modules\" /C:"\.git\" >nul
-            if errorlevel 1 (
-                echo(!CHECK_PACKAGE!| findstr /I /C:"\backend\functions\" >nul
-                if errorlevel 1 (
-                    powershell -NoProfile -Command "$p=ConvertFrom-Json (Get-Content -Raw -LiteralPath '%%~fF'); if ($p.scripts.build) { Write-Output YES }" > "%TEMP%\aibirthday_buildcheck.txt"
-
-                    findstr /X /C:"YES" "%TEMP%\aibirthday_buildcheck.txt" >nul 2>&1
-                    if not errorlevel 1 (
-                        set /a BUILD_COUNT+=1
-                        if not defined BUILD_PACKAGE (
-                            set "BUILD_PACKAGE=%%~fF"
-                        )
-                    )
-                )
-            )
-        )
-    )
-)
-
-if not defined BUILD_PACKAGE (
-    echo ERROR: No suitable frontend npm build script was detected.
     echo.
-    echo Package files found in your repository previously included:
-    echo backend\functions\package.json
-    echo backend\hosting\package.json
+)
+if /I "%~2"=="--clean" (
+    echo [INFO] Clean build requested...
+    call flutter clean
+    if errorlevel 1 (
+        echo [ERROR] flutter clean failed.
+        goto :fail
+    )
     echo.
-    echo Check whether the actual frontend is stored in another folder.
-    echo If backend\hosting is your frontend, set FRONTEND_DIR manually
-    echo near the top of this script.
-    goto :FAIL
 )
 
-for %%F in ("!BUILD_PACKAGE!") do set "FRONTEND_DIR=%%~dpF"
-if "!FRONTEND_DIR:~-1!"=="\" set "FRONTEND_DIR=!FRONTEND_DIR:~0,-1!"
-
-echo Frontend directory: !FRONTEND_DIR!
-echo Package file: !BUILD_PACKAGE!
-
-if !BUILD_COUNT! GTR 1 (
-    echo WARNING: Multiple build packages were found.
-    echo Selected package: !BUILD_PACKAGE!
-    echo Verify this is the actual frontend before relying on the APK.
+echo [1/4] Resolving Flutter dependencies...
+call flutter pub get
+if errorlevel 1 (
+    echo [ERROR] flutter pub get failed.
+    goto :fail
 )
-
 echo.
 
-REM ------------------------------------------------------------
-REM STEP 4: VERIFY ANDROID DEVICE
-REM ------------------------------------------------------------
-
-echo [4/9] Checking Android device...
-
-adb start-server
+echo [2/4] Building Android debug APK (!FLAVOR! flavor)...
+call flutter build apk --flavor !FLAVOR! --debug -t lib/main.dart
 if errorlevel 1 (
-    echo ERROR: Failed to start ADB.
-    goto :FAIL
+    echo [ERROR] Flutter Android build failed. Review the error messages above.
+    goto :fail
 )
+echo.
 
+set "APK=%CD%\build\app\outputs\flutter-apk\app-!FLAVOR!-debug.apk"
+if not exist "%APK%" (
+    if exist "%CD%\build\app\outputs\flutter-apk\app-debug.apk" (
+        set "APK=%CD%\build\app\outputs\flutter-apk\app-debug.apk"
+    )
+)
+if not exist "%APK%" (
+    echo [ERROR] Build command finished but the APK was not found at:
+    echo %APK%
+    goto :fail
+)
+echo [SUCCESS] APK created:
+echo %APK%
+echo.
+
+echo [3/4] Detecting connected Android devices...
+"%ADB%" start-server
+"%ADB%" devices
 set "DEVICE_COUNT=0"
-
-for /f "skip=1 tokens=1,2" %%A in ('adb devices') do (
+set "DEVICE_SERIAL="
+for /f "skip=1 tokens=1,2" %%A in ('"%ADB%" devices') do (
     if "%%B"=="device" (
         set /a DEVICE_COUNT+=1
-        set "DEVICE_ID=%%A"
+        if !DEVICE_COUNT! EQU 1 set "DEVICE_SERIAL=%%A"
     )
 )
 
-if "!DEVICE_COUNT!"=="0" (
-    echo ERROR: No authorized Android device found.
-    echo Connect your phone, enable USB debugging, and authorize it.
-    adb devices
-    goto :FAIL
+if !DEVICE_COUNT! EQU 0 (
+    echo.
+    echo [WARNING] APK built successfully, but no authorized Android device is connected.
+    echo Connect your phone with USB debugging enabled, then run this script again.
+    echo APK: %APK%
+    goto :success_without_install
 )
 
-if not "!DEVICE_COUNT!"=="1" (
-    echo ERROR: Multiple authorized devices found.
-    echo Disconnect extra devices and retry.
-    adb devices
-    goto :FAIL
-)
-
-echo Device: !DEVICE_ID!
-echo.
-
-REM ------------------------------------------------------------
-REM STEP 5: CLEAN GENERATED OUTPUTS
-REM ------------------------------------------------------------
-
-echo [5/9] Cleaning generated files and npm cache...
-
-call "!ANDROID_DIR!\gradlew.bat" --stop
-
-if exist "%PROJECT_DIR%\node_modules" rmdir /s /q "%PROJECT_DIR%\node_modules"
-if exist "%PROJECT_DIR%\dist" rmdir /s /q "%PROJECT_DIR%\dist"
-if exist "%PROJECT_DIR%\build" rmdir /s /q "%PROJECT_DIR%\build"
-if exist "%PROJECT_DIR%\.next" rmdir /s /q "%PROJECT_DIR%\.next"
-if exist "%PROJECT_DIR%\.nuxt" rmdir /s /q "%PROJECT_DIR%\.nuxt"
-if exist "%PROJECT_DIR%\.output" rmdir /s /q "%PROJECT_DIR%\.output"
-if exist "%PROJECT_DIR%\.turbo" rmdir /s /q "%PROJECT_DIR%\.turbo"
-if exist "%PROJECT_DIR%\coverage" rmdir /s /q "%PROJECT_DIR%\coverage"
-
-if exist "!FRONTEND_DIR!\node_modules" rmdir /s /q "!FRONTEND_DIR!\node_modules"
-if exist "!FRONTEND_DIR!\dist" rmdir /s /q "!FRONTEND_DIR!\dist"
-if exist "!FRONTEND_DIR!\build" rmdir /s /q "!FRONTEND_DIR!\build"
-
-if exist "!ANDROID_DIR!\app\build" rmdir /s /q "!ANDROID_DIR!\app\build"
-if exist "!ANDROID_DIR!\build" rmdir /s /q "!ANDROID_DIR!\build"
-if exist "!ANDROID_DIR!\.gradle" rmdir /s /q "!ANDROID_DIR!\.gradle"
-
-call npm cache clean --force
-if errorlevel 1 echo WARNING: npm cache cleanup returned an error.
-
-echo Cleanup completed.
-echo.
-
-REM ------------------------------------------------------------
-REM STEP 6: INSTALL FRONTEND DEPENDENCIES
-REM ------------------------------------------------------------
-
-echo [6/9] Installing frontend dependencies...
-
-pushd "!FRONTEND_DIR!"
-
-if exist "package-lock.json" (
-    call npm ci
-    if errorlevel 1 (
-        popd
-        echo ERROR: npm ci failed.
-        goto :FAIL
-    )
-) else if exist "npm-shrinkwrap.json" (
-    call npm ci
-    if errorlevel 1 (
-        popd
-        echo ERROR: npm ci failed.
-        goto :FAIL
-    )
-) else if exist "pnpm-lock.yaml" (
-    popd
-    echo ERROR: This frontend uses pnpm. This script will not replace
-    echo the project's package manager automatically.
-    goto :FAIL
-) else if exist "yarn.lock" (
-    popd
-    echo ERROR: This frontend uses Yarn. This script will not replace
-    echo the project's package manager automatically.
-    goto :FAIL
-) else (
-    call npm install
-    if errorlevel 1 (
-        popd
-        echo ERROR: npm install failed.
-        goto :FAIL
+if !DEVICE_COUNT! GTR 1 (
+    echo.
+    echo Multiple devices are connected.
+    set "DEVICE_SERIAL="
+    set /p "DEVICE_SERIAL=Enter the exact device serial from the list above: "
+    if not defined DEVICE_SERIAL (
+        echo [ERROR] No device serial was entered.
+        goto :fail
     )
 )
-
-REM ------------------------------------------------------------
-REM STEP 7: BUILD WEB APP AND SYNC CAPACITOR
-REM ------------------------------------------------------------
 
 echo.
-echo Building frontend...
-
-call npm run build
+echo [4/4] Installing APK on device !DEVICE_SERIAL!...
+"%ADB%" -s "!DEVICE_SERIAL!" install -r "%APK%"
 if errorlevel 1 (
-    popd
-    echo ERROR: Frontend build failed.
-    goto :FAIL
-)
-
-popd
-
-REM Sync only when a root-level Capacitor configuration exists.
-if exist "%PROJECT_DIR%\capacitor.config.ts" (
-    echo Syncing Capacitor from repository root...
-    pushd "%PROJECT_DIR%"
-    call npx cap sync android
-    if errorlevel 1 (
-        popd
-        echo ERROR: Capacitor synchronization failed.
-        goto :FAIL
-    )
-    popd
-) else if exist "%PROJECT_DIR%\capacitor.config.json" (
-    echo Syncing Capacitor from repository root...
-    pushd "%PROJECT_DIR%"
-    call npx cap sync android
-    if errorlevel 1 (
-        popd
-        echo ERROR: Capacitor synchronization failed.
-        goto :FAIL
-    )
-    popd
-) else (
-    echo No root Capacitor config detected.
-    echo Continuing with the existing Android project configuration.
-    echo Verify that the Android web assets are generated from the latest
-    echo frontend build if this project uses Capacitor.
-)
-
-REM ------------------------------------------------------------
-REM BUILD ANDROID APK
-REM ------------------------------------------------------------
-
-echo.
-echo Building Android debug APK...
-
-call "!ANDROID_DIR!\gradlew.bat" -p "!ANDROID_DIR!" clean
-if errorlevel 1 (
-    echo ERROR: Gradle clean failed.
-    goto :FAIL
-)
-
-call "!ANDROID_DIR!\gradlew.bat" -p "!ANDROID_DIR!" assembleDebug
-if errorlevel 1 (
-    echo ERROR: assembleDebug failed.
-    goto :FAIL
-)
-
-REM Prefer the standard debug APK location.
-set "APK_PATH=!ANDROID_DIR!\app\build\outputs\apk\debug\app-debug.apk"
-
-if not exist "!APK_PATH!" (
-    for /r "!ANDROID_DIR!\app\build\outputs\apk" %%F in (*.apk) do (
-        if not defined FOUND_APK set "FOUND_APK=%%~fF"
-    )
-    if defined FOUND_APK set "APK_PATH=!FOUND_APK!"
-)
-
-if not exist "!APK_PATH!" (
-    echo ERROR: No APK was found after the Gradle build.
-    goto :FAIL
-)
-
-echo.
-echo APK ready: !APK_PATH!
-echo.
-
-REM ------------------------------------------------------------
-REM STEP 8: DETECT APPLICATION ID
-REM ------------------------------------------------------------
-
-echo [8/9] Detecting application ID...
-
-if not defined PACKAGE_ID (
-    for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "$c=Get-Content -Raw -LiteralPath '!GRADLE_FILE!'; if ($c -match 'applicationId\s*(?:=|\s)\s*[''\"\"]([^''\"\"]+)[''\"\"]') { $Matches[1] }"`) do (
-        set "PACKAGE_ID=%%A"
-    )
-)
-
-if not defined PACKAGE_ID (
-    echo Could not automatically detect the final application ID.
-    set /p "PACKAGE_ID=Enter the app application ID from Gradle: "
-)
-
-if not defined PACKAGE_ID (
-    echo ERROR: Application ID is required.
-    goto :FAIL
-)
-
-echo Application ID: !PACKAGE_ID!
-echo.
-
-REM ------------------------------------------------------------
-REM STEP 9: UNINSTALL, INSTALL, VERIFY, LAUNCH
-REM ------------------------------------------------------------
-
-echo [9/9] Installing APK...
-
-echo Checking for existing app...
-adb -s "!DEVICE_ID!" shell pm list packages | findstr /I /X /C:"package:!PACKAGE_ID!" >nul 2>&1
-
-if not errorlevel 1 (
-    echo Existing app detected.
-    echo Uninstalling it. Existing local app data may be lost.
-    adb -s "!DEVICE_ID!" uninstall "!PACKAGE_ID!"
-    if errorlevel 1 (
-        echo ERROR: Could not uninstall the existing application.
-        goto :FAIL
-    )
-) else (
-    echo Existing app not detected.
-)
-
-echo Installing new APK...
-adb -s "!DEVICE_ID!" install "!APK_PATH!"
-if errorlevel 1 (
-    echo ERROR: APK installation failed.
-    goto :FAIL
-)
-
-adb -s "!DEVICE_ID!" shell pm list packages | findstr /I /X /C:"package:!PACKAGE_ID!" >nul 2>&1
-if errorlevel 1 (
-    echo ERROR: Installation verification failed.
-    goto :FAIL
-)
-
-echo Installation verified.
-echo Launching app...
-
-adb -s "!DEVICE_ID!" shell monkey -p "!PACKAGE_ID!" -c android.intent.category.LAUNCHER 1
-
-if errorlevel 1 (
-    echo WARNING: Automatic launch failed.
-    echo Check the launcher activity and Android manifest.
-    goto :FAIL
+    echo [ERROR] Installation failed. Check the device connection, authorization, and app-signature compatibility.
+    goto :fail
 )
 
 echo.
 echo ============================================================
-echo                   BUILD COMPLETED
-echo ============================================================
-echo Frontend:       Built successfully
-echo Android APK:    !APK_PATH!
-echo Application ID: !PACKAGE_ID!
-echo Device:         !DEVICE_ID!
-echo Install:        Verified
-echo Launch:         Requested
-echo.
-echo IMPORTANT:
-echo A successful build and launch request do not prove that every
-echo screen, API, or interactive feature works correctly.
-echo Test the app on your device.
+echo [SUCCESS] Build and installation completed.
+echo APK: %APK%
+echo Device: !DEVICE_SERIAL!
 echo ============================================================
 echo.
-if exist "%TEMP%\aibirthday_buildcheck.txt" del "%TEMP%\aibirthday_buildcheck.txt" >nul 2>&1
 pause
 exit /b 0
 
-:FAIL
+:success_without_install
 echo.
-echo ============================================================
-echo                       BUILD FAILED
-echo ============================================================
-echo Fix the reported error before retrying.
-echo No successful installation is claimed.
-echo ============================================================
-if exist "%TEMP%\aibirthday_buildcheck.txt" del "%TEMP%\aibirthday_buildcheck.txt" >nul 2>&1
+pause
+exit /b 0
+
+:fail
+echo.
+echo [FAILED] The script did not complete successfully.
+echo Check the error messages above and fix the reported issue.
+echo.
 pause
 exit /b 1

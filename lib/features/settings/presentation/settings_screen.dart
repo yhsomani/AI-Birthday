@@ -28,6 +28,7 @@ import 'package:ai_birthday/features/reminders/application/reminder_settings_con
 import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
 import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
 import 'package:ai_birthday/features/settings/presentation/widgets/cloud_backup_card.dart';
+import 'package:ai_birthday/features/settings/presentation/widgets/automatic_sms_card.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -819,7 +820,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       initialValue: () {
                         final kinds = reminderSettings.kinds;
                         if (kinds.length == 4) return 'all';
-                        if (kinds.length == 1 && kinds.contains(ReminderKind.birthday)) {
+                        if (kinds.length == 1 &&
+                            kinds.contains(ReminderKind.birthday)) {
                           return 'day_of';
                         }
                         if (kinds.contains(ReminderKind.ready) &&
@@ -831,8 +833,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       }(),
                       decoration: const InputDecoration(
                         labelText: 'Reminder Cadence Preference',
-                        helperText: 'Select default reminder schedule or customize below',
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        helperText:
+                            'Select default reminder schedule or customize below',
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                       ),
                       items: const [
                         DropdownMenuItem(
@@ -856,18 +862,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         HapticFeedback.lightImpact();
                         if (value == 'all') {
                           for (final k in ReminderKind.values) {
-                            ref.read(reminderSettingsProvider.notifier).setKind(k, true);
+                            ref
+                                .read(reminderSettingsProvider.notifier)
+                                .setKind(k, true);
                           }
                         } else if (value == 'short_notice') {
-                          ref.read(reminderSettingsProvider.notifier).setKind(ReminderKind.approaching, false);
-                          ref.read(reminderSettingsProvider.notifier).setKind(ReminderKind.prepare, false);
-                          ref.read(reminderSettingsProvider.notifier).setKind(ReminderKind.ready, true);
-                          ref.read(reminderSettingsProvider.notifier).setKind(ReminderKind.birthday, true);
+                          ref
+                              .read(reminderSettingsProvider.notifier)
+                              .setKind(ReminderKind.approaching, false);
+                          ref
+                              .read(reminderSettingsProvider.notifier)
+                              .setKind(ReminderKind.prepare, false);
+                          ref
+                              .read(reminderSettingsProvider.notifier)
+                              .setKind(ReminderKind.ready, true);
+                          ref
+                              .read(reminderSettingsProvider.notifier)
+                              .setKind(ReminderKind.birthday, true);
                         } else if (value == 'day_of') {
-                          ref.read(reminderSettingsProvider.notifier).setKind(ReminderKind.approaching, false);
-                          ref.read(reminderSettingsProvider.notifier).setKind(ReminderKind.prepare, false);
-                          ref.read(reminderSettingsProvider.notifier).setKind(ReminderKind.ready, false);
-                          ref.read(reminderSettingsProvider.notifier).setKind(ReminderKind.birthday, true);
+                          ref
+                              .read(reminderSettingsProvider.notifier)
+                              .setKind(ReminderKind.approaching, false);
+                          ref
+                              .read(reminderSettingsProvider.notifier)
+                              .setKind(ReminderKind.prepare, false);
+                          ref
+                              .read(reminderSettingsProvider.notifier)
+                              .setKind(ReminderKind.ready, false);
+                          ref
+                              .read(reminderSettingsProvider.notifier)
+                              .setKind(ReminderKind.birthday, true);
                         }
                       },
                     ),
@@ -932,6 +956,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 20),
+
+          // Section 1.4: Automatic Birthday SMS (Personal Sideload feature)
+          AppSectionHeader(title: 'Automatic Birthday SMS', isAccent: true),
+          const AutomaticSmsCard(),
           const SizedBox(height: 20),
 
           // Section 1.5: Cloud Backup (SSOT §13)
@@ -1373,7 +1402,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       onSelectionChanged: (selected) {
                         HapticFeedback.lightImpact();
                         if (selected.isNotEmpty) {
-                          ref.read(themeModeProvider.notifier).set(selected.first);
+                          ref
+                              .read(themeModeProvider.notifier)
+                              .set(selected.first);
                         }
                       },
                     ),

@@ -14,13 +14,14 @@ import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/delivery/data/whatsapp_handoff_builder.dart';
-import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/jobs/application/ai_job_handler.dart';
 import 'package:ai_birthday/features/jobs/domain/job.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
+import 'package:ai_birthday/features/people/domain/person_enums.dart';
+import 'package:ai_birthday/features/delivery/application/birthday_sms_service.dart';
 import 'package:ai_birthday/features/settings/presentation/settings_screen.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 
@@ -118,6 +119,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
 
   void _onMessageChanged(String text) {
     _editRevision++;
+    if (_draft?.status == DraftStatus.approvedForAutoSms) {
+      _draft = _draft?.copyWith(status: DraftStatus.draft);
+      _reconcileAutoSms();
+    }
     setState(() {});
     _autosaveTimer?.cancel();
     _autosaveTimer = Timer(const Duration(milliseconds: 750), () {
@@ -938,6 +943,87 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
   }
 
+  Future<void> _approveForAutoSms() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter or generate a message first.'),
+        ),
+      );
+      return;
+    }
+
+    final smsSettings = ref.read(automaticSmsSettingsProvider);
+    if (!smsSettings.enabled) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Enable Automatic SMS?'),
+          content: Text(
+            !smsSettings.isSupported
+                ? 'Automatic SMS requires the personal sideload distribution of AI-Birthday.'
+                : 'Automatic SMS is currently disabled in Settings. Would you like to enable it now?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            if (smsSettings.isSupported)
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Open Settings'),
+              ),
+          ],
+        ),
+      );
+      if (proceed == true) {
+        _openSettings();
+      }
+      return;
+    }
+
+    HapticFeedback.lightImpact();
+    await _saveDraft(status: DraftStatus.approvedForAutoSms);
+    await _reconcileAutoSms();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Message approved! Automatic SMS scheduled for midnight 00:00.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _revokeAutoSmsApproval() async {
+    HapticFeedback.lightImpact();
+    await _saveDraft(status: DraftStatus.draft);
+    await _reconcileAutoSms();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Automatic SMS approval revoked.')),
+      );
+    }
+  }
+
+  Future<void> _reconcileAutoSms() async {
+    if (_person == null) return;
+    try {
+      final smsService = ref.read(birthdaySmsServiceProvider);
+      final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
+      final birthday = await birthdaysRepo.getBirthday(_activeBirthdayId);
+      await smsService.reconcileRecipientSms(
+        person: _person!,
+        birthday: birthday,
+        draft: _draft,
+      );
+    } catch (_) {}
+  }
+
   /// Replaces the AI controls when the account is not entitled (audit H).
   Widget _buildAiLockedNotice() {
     final theme = Theme.of(context);
@@ -1227,6 +1313,27 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               ),
             ],
           ),
+          if (_person?.autoSendPolicy == AutoSendPolicy.automaticSmsApproved &&
+              hasUsablePhone &&
+              !isCompleted) ...[
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              width: double.infinity,
+              child: _draft?.status == DraftStatus.approvedForAutoSms
+                  ? FilledButton.tonalIcon(
+                      onPressed: _revokeAutoSmsApproval,
+                      icon: const Icon(Icons.check_circle, color: Colors.green),
+                      label: const Text(
+                        'Approved for Auto-SMS (Tap to Revoke)',
+                      ),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: _approveForAutoSms,
+                      icon: const Icon(Icons.alarm_on),
+                      label: const Text('Approve for Midnight Auto-SMS'),
+                    ),
+            ),
+          ],
         ],
       ),
     );
@@ -1295,6 +1402,25 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                             fontSize: 12,
                             color: Colors.green[800],
                             fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      if (person.autoSendPolicy ==
+                          AutoSendPolicy.automaticSmsApproved)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            _draft?.status == DraftStatus.approvedForAutoSms
+                                ? '✓ Approved for midnight automatic SMS'
+                                : '⚠️ Auto-SMS opted in: requires message approval below',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color:
+                                  _draft?.status ==
+                                      DraftStatus.approvedForAutoSms
+                                  ? Colors.green[700]
+                                  : theme.colorScheme.tertiary,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                     ],

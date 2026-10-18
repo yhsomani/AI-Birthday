@@ -1,6 +1,8 @@
 // The closeness set has one definition (models/relationship.dart). It is
 // re-exported here so existing imports keep resolving to the same type (F10).
 export 'models/relationship.dart' show RelationshipCloseness;
+export '../../delivery/domain/models/delivery_channel.dart'
+    show DeliveryChannel;
 
 /// Preferred message tone for a recipient.
 enum PreferredTone {
@@ -17,26 +19,18 @@ enum PreferredTone {
   );
 }
 
-/// Preferred personal delivery channel.
-enum DeliveryChannel {
-  whatsapp,
-  sms,
-  none;
-
-  static DeliveryChannel parse(String value) => DeliveryChannel.values
-      .firstWhere((v) => v.name == value, orElse: () => DeliveryChannel.none);
-}
-
 /// Policy governing sending.
 ///
-/// AI-Birthday never automates personal-account sending: automatic personal
-/// WhatsApp sending is not part of the product (SSOT §9). The only supported
-/// policy is manual confirmation before delivery.
+/// Existing recipients default to [AutoSendPolicy.manualOnly].
+/// In the personal sideload distribution, users can explicitly opt in to
+/// [AutoSendPolicy.automaticSmsApproved] for a specific recipient whose message
+/// has been reviewed and approved.
 enum AutoSendPolicy {
-  manualOnly;
+  manualOnly,
+  automaticSmsApproved;
 
   static AutoSendPolicy parse(String value) => AutoSendPolicy.values.firstWhere(
-    (v) => v.name == value,
+    (v) => v.name.toLowerCase() == value.toLowerCase(),
     orElse: () => AutoSendPolicy.manualOnly,
   );
 }

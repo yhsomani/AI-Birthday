@@ -17,6 +17,8 @@ import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/features/people/domain/person.dart';
 import 'package:ai_birthday/features/people/domain/person_input.dart';
 import 'package:ai_birthday/features/people/domain/person_input_validator.dart';
+import 'package:ai_birthday/features/people/domain/person_enums.dart';
+import 'package:ai_birthday/features/delivery/application/birthday_sms_service.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 /// Add / edit recipient form with Progressive Disclosure (SSOT §7, §14).
@@ -66,6 +68,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
   String _preferredLanguage = 'en';
   d_chan.DeliveryChannel _deliveryChannel = d_chan.DeliveryChannel.whatsapp;
   bool _autoPrepare = true;
+  AutoSendPolicy _autoSendPolicy = AutoSendPolicy.manualOnly;
   Person? _loaded;
   PersonValidation? _validation;
   bool _saving = false;
@@ -168,6 +171,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
         _existingPerson?.preferredDeliveryChannel ??
         person.preferredDeliveryChannel;
     _autoPrepare = _existingPerson?.autoPrepare ?? person.autoPrepare;
+    _autoSendPolicy = _existingPerson?.autoSendPolicy ?? person.autoSendPolicy;
     _facts
       ..clear()
       ..addAll(
@@ -230,7 +234,9 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       birthYear: int.tryParse(_birthYear.text.trim()),
       phoneNumber: emptyToNull(_phone.text),
       email: emptyToNull(_email.text),
-      relationship: p_rel.RelationshipCategory.fromString(_relationship.text.trim()),
+      relationship: p_rel.RelationshipCategory.fromString(
+        _relationship.text.trim(),
+      ),
       relationshipCloseness: _closeness,
       preferredLanguage: _preferredLanguage,
       preferredTone: _tone,
@@ -242,6 +248,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       preferredDeliveryChannel: _deliveryChannel,
       timezone: emptyToNull(_timezone.text),
       autoPrepare: _autoPrepare,
+      autoSendPolicy: _autoSendPolicy,
     );
   }
 
@@ -313,6 +320,22 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
           rethrow;
         }
       }
+
+      try {
+        final smsService = ref.read(birthdaySmsServiceProvider);
+        final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
+        final birthday = await birthdaysRepo.getBirthdayForPerson(saved.id);
+        final draft = birthday?.draftId != null
+            ? await ref
+                  .read(draftsRepositoryProvider)
+                  .getDraft(birthday!.draftId!)
+            : null;
+        await smsService.reconcileRecipientSms(
+          person: saved,
+          birthday: birthday,
+          draft: draft,
+        );
+      } catch (_) {}
 
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -631,6 +654,23 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                             onChanged: (v) => setState(() {
                               _dirty = true;
                               _autoPrepare = v;
+                            }),
+                          ),
+                          const SizedBox(height: 12),
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Automatic SMS at midnight'),
+                            subtitle: const Text(
+                              'Requires phone number, pre-approved draft, and personal sideload SMS build',
+                            ),
+                            value:
+                                _autoSendPolicy ==
+                                AutoSendPolicy.automaticSmsApproved,
+                            onChanged: (v) => setState(() {
+                              _dirty = true;
+                              _autoSendPolicy = v
+                                  ? AutoSendPolicy.automaticSmsApproved
+                                  : AutoSendPolicy.manualOnly;
                             }),
                           ),
                           const SizedBox(height: 12),

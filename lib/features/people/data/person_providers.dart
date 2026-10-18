@@ -8,6 +8,9 @@ import '../application/person_service.dart';
 import '../domain/person.dart';
 import '../domain/person_input_validator.dart';
 import 'person_repository.dart';
+import '../../../app/providers.dart'
+    show birthdaysRepositoryProvider, draftsRepositoryProvider;
+import '../../delivery/application/birthday_sms_service.dart';
 
 final peopleStoreProvider = Provider<PeopleStore>(
   (ref) => DriftPeopleStore(ref.watch(databaseProvider)),
@@ -35,6 +38,27 @@ Future<void> resyncReminderSchedule(ProviderContainer container) async {
     final settings = container.read(reminderSettingsProvider);
     final people = await container.read(peopleStoreProvider).getAll();
     await reminderService.sync(people: people, settings: settings);
+
+    // Reconcile automated SMS jobs if supported & enabled
+    try {
+      final smsSettings = container.read(automaticSmsSettingsProvider);
+      if (smsSettings.enabled) {
+        final smsService = container.read(birthdaySmsServiceProvider);
+        final birthdaysRepo = container.read(birthdaysRepositoryProvider);
+        final draftsRepo = container.read(draftsRepositoryProvider);
+        for (final p in people) {
+          final birthday = await birthdaysRepo.getBirthdayForPerson(p.id);
+          final draft = birthday?.draftId != null
+              ? await draftsRepo.getDraft(birthday!.draftId!)
+              : null;
+          await smsService.reconcileRecipientSms(
+            person: p,
+            birthday: birthday,
+            draft: draft,
+          );
+        }
+      }
+    } catch (_) {}
   } catch (error, stackTrace) {
     container
         .read(loggerProvider)

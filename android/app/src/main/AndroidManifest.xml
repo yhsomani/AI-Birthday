@@ -20,6 +20,17 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+        <receiver
+            android:name=".BirthdaySmsReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.yashsomani.ai_birthday.SEND_BIRTHDAY_SMS" />
+                <action android:name="com.yashsomani.ai_birthday.SMS_SENT_ACTION" />
+                <action android:name="com.yashsomani.ai_birthday.SMS_DELIVERED_ACTION" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <activity
             android:name=".MainActivity"
             android:exported="true"

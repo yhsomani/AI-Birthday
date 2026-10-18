@@ -7,7 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Future<void> pumpSettings(WidgetTester tester, {ProviderContainer? container}) async {
+  Future<void> pumpSettings(
+    WidgetTester tester, {
+    ProviderContainer? container,
+  }) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -106,7 +109,9 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('reminder cadence dropdown updates enabled leads', (tester) async {
+  testWidgets('reminder cadence dropdown updates enabled leads', (
+    tester,
+  ) async {
     await pumpSettings(tester);
     final remindersSwitch = find.widgetWithText(
       SwitchListTile,
@@ -136,31 +141,30 @@ void main() {
     expect(settings.kinds, equals({ReminderKind.birthday}));
   });
 
-  testWidgets(
-    'settings exposes theme mode selector and toggles theme state',
-    (tester) async {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-      await pumpSettings(tester, container: container);
+  testWidgets('settings exposes theme mode selector and toggles theme state', (
+    tester,
+  ) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await pumpSettings(tester, container: container);
 
-      expect(find.text('APPEARANCE'), findsOneWidget);
-      expect(find.text('System'), findsOneWidget);
-      expect(find.text('Light'), findsOneWidget);
-      expect(find.text('Dark'), findsOneWidget);
+    expect(find.text('APPEARANCE'), findsOneWidget);
+    expect(find.text('System'), findsOneWidget);
+    expect(find.text('Light'), findsOneWidget);
+    expect(find.text('Dark'), findsOneWidget);
 
-      final lightFinder = find.text('Light');
-      await tester.ensureVisible(lightFinder);
-      await tester.pumpAndSettle();
-      await tester.tap(lightFinder);
-      await tester.pumpAndSettle();
+    final lightFinder = find.text('Light');
+    await tester.ensureVisible(lightFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(lightFinder);
+    await tester.pumpAndSettle();
 
-      expect(container.read(themeModeProvider), ThemeMode.light);
+    expect(container.read(themeModeProvider), ThemeMode.light);
 
-      final darkFinder = find.text('Dark');
-      await tester.tap(darkFinder);
-      await tester.pumpAndSettle();
+    final darkFinder = find.text('Dark');
+    await tester.tap(darkFinder);
+    await tester.pumpAndSettle();
 
-      expect(container.read(themeModeProvider), ThemeMode.dark);
-    },
-  );
+    expect(container.read(themeModeProvider), ThemeMode.dark);
+  });
 }

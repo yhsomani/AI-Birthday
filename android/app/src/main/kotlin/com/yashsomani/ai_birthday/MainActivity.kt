@@ -33,9 +33,11 @@ class MainActivity : FlutterActivity() {
     private val NANO_CHANNEL = "com.yashsomani.ai_birthday/nano"
     private val SHARE_CHANNEL = "com.yashsomani.ai_birthday/share"
     private val CONTACTS_CHANNEL = "com.yashsomani.ai_birthday/contacts"
+    private val SMS_AUTOMATION_CHANNEL = "com.yashsomani.ai_birthday/sms_automation"
 
     private var pendingNotificationResult: MethodChannel.Result? = null
     private var pendingContactsResult: MethodChannel.Result? = null
+    private var pendingSmsResult: MethodChannel.Result? = null
     private var initialPersonId: String? = null
     private var notificationsChannel: MethodChannel? = null
     private val nativeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -293,6 +295,127 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // Setup SMS Automation MethodChannel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SMS_AUTOMATION_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "isSupported" -> {
+                        // Returns true only if SEND_SMS is declared in the merged manifest of this flavor
+                        val hasDeclaredPermission = try {
+                            val info = packageManager.getPackageInfo(
+                                packageName,
+                                PackageManager.GET_PERMISSIONS
+                            )
+                            info.requestedPermissions?.contains(Manifest.permission.SEND_SMS) == true
+                        } catch (_: Exception) {
+                            false
+                        }
+                        result.success(hasDeclaredPermission)
+                    }
+                    "hasSmsPermission" -> {
+                        val granted = ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission.SEND_SMS
+                        ) == PackageManager.PERMISSION_GRANTED
+                        result.success(granted)
+                    }
+                    "requestSmsPermission" -> {
+                        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
+                            == PackageManager.PERMISSION_GRANTED) {
+                            result.success(true)
+                        } else {
+                            pendingSmsResult = result
+                            ActivityCompat.requestPermissions(
+                                this,
+                                arrayOf(Manifest.permission.SEND_SMS),
+                                1003
+                            )
+                        }
+                    }
+                    "scheduleSmsJob" -> {
+                        val jobMap = call.argument<Map<String, Any>>("job")
+                        if (jobMap == null) {
+                            result.error("INVALID_ARGS", "Missing job payload", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val jobId = jobMap["jobId"] as? String ?: ""
+                            val timestampMs = (jobMap["timestampMs"] as? Number)?.toLong() ?: 0L
+                            val prefs = getSharedPreferences(BirthdaySmsReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+                            val raw = prefs.getString(BirthdaySmsReceiver.KEY_SCHEDULED_SMS_JOBS_JSON, "[]") ?: "[]"
+                            val array = try { org.json.JSONArray(raw) } catch (_: Exception) { org.json.JSONArray() }
+
+                            // Update or append
+                            val newArray = org.json.JSONArray()
+                            var replaced = false
+                            for (i in 0 until array.length()) {
+                                val item = array.optJSONObject(i) ?: continue
+                                if (item.optString("jobId") == jobId) {
+                                    newArray.put(org.json.JSONObject(jobMap))
+                                    replaced = true
+                                } else {
+                                    newArray.put(item)
+                                }
+                            }
+                            if (!replaced) {
+                                newArray.put(org.json.JSONObject(jobMap))
+                            }
+                            prefs.edit().putString(BirthdaySmsReceiver.KEY_SCHEDULED_SMS_JOBS_JSON, newArray.toString()).apply()
+
+                            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                            if (alarmManager != null && timestampMs > System.currentTimeMillis()) {
+                                BirthdaySmsReceiver.scheduleAlarm(this, alarmManager, jobId, timestampMs)
+                            }
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("SCHEDULE_FAILED", e.message, null)
+                        }
+                    }
+                    "cancelSmsJob" -> {
+                        val jobId = call.argument<String>("jobId") ?: ""
+                        if (jobId.isNotEmpty()) {
+                            BirthdaySmsReceiver.cancelAlarm(this, jobId)
+                            val prefs = getSharedPreferences(BirthdaySmsReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+                            val raw = prefs.getString(BirthdaySmsReceiver.KEY_SCHEDULED_SMS_JOBS_JSON, "[]") ?: "[]"
+                            val array = try { org.json.JSONArray(raw) } catch (_: Exception) { org.json.JSONArray() }
+                            val newArray = org.json.JSONArray()
+                            for (i in 0 until array.length()) {
+                                val item = array.optJSONObject(i) ?: continue
+                                if (item.optString("jobId") == jobId) {
+                                    item.put("status", "cancelled")
+                                }
+                                newArray.put(item)
+                            }
+                            prefs.edit().putString(BirthdaySmsReceiver.KEY_SCHEDULED_SMS_JOBS_JSON, newArray.toString()).apply()
+                        }
+                        result.success(true)
+                    }
+                    "cancelAllSmsJobs" -> {
+                        val prefs = getSharedPreferences(BirthdaySmsReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+                        val raw = prefs.getString(BirthdaySmsReceiver.KEY_SCHEDULED_SMS_JOBS_JSON, "[]") ?: "[]"
+                        val array = try { org.json.JSONArray(raw) } catch (_: Exception) { org.json.JSONArray() }
+                        val newArray = org.json.JSONArray()
+                        for (i in 0 until array.length()) {
+                            val item = array.optJSONObject(i) ?: continue
+                            val jobId = item.optString("jobId")
+                            if (jobId.isNotEmpty()) {
+                                BirthdaySmsReceiver.cancelAlarm(this, jobId)
+                            }
+                            item.put("status", "cancelled")
+                            newArray.put(item)
+                        }
+                        prefs.edit().putString(BirthdaySmsReceiver.KEY_SCHEDULED_SMS_JOBS_JSON, newArray.toString()).apply()
+                        result.success(true)
+                    }
+                    "getSmsAttemptsLog" -> {
+                        val prefs = getSharedPreferences(BirthdaySmsReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+                        val raw = prefs.getString(BirthdaySmsReceiver.KEY_SMS_ATTEMPTS_LOG_JSON, "[]") ?: "[]"
+                        result.success(raw)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
     }
 
     override fun onRequestPermissionsResult(
@@ -309,6 +432,10 @@ class MainActivity : FlutterActivity() {
             val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
             pendingContactsResult?.success(granted)
             pendingContactsResult = null
+        } else if (requestCode == 1003) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            pendingSmsResult?.success(granted)
+            pendingSmsResult = null
         }
     }
 

@@ -103,6 +103,7 @@ class HistoryScreen extends ConsumerWidget {
                   : handoff != null
                   ? AppTone.warning
                   : switch (draft.status) {
+                      DraftStatus.approvedForAutoSms => AppTone.info,
                       DraftStatus.ready => AppTone.primary,
                       DraftStatus.draft => AppTone.neutral,
                       // confirmedSent is handled above via [sent].
@@ -114,6 +115,10 @@ class HistoryScreen extends ConsumerWidget {
                   : handoff != null
                   ? (Icons.open_in_new, _handoffLabel(handoff))
                   : switch (draft.status) {
+                      DraftStatus.approvedForAutoSms => (
+                        Icons.alarm_on_outlined,
+                        'Auto-SMS Scheduled',
+                      ),
                       DraftStatus.ready => (
                         Icons.send_outlined,
                         'Ready to Send',

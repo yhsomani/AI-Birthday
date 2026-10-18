@@ -10,11 +10,13 @@ import 'package:ai_birthday/features/people/domain/models/tone.dart';
 enum DraftStatus {
   draft,
   ready,
+  approvedForAutoSms,
   confirmedSent;
 
   String get displayName => switch (this) {
     DraftStatus.draft => 'Draft',
     DraftStatus.ready => 'Ready to Send',
+    DraftStatus.approvedForAutoSms => 'Approved for Auto-SMS',
     DraftStatus.confirmedSent => 'Sent & Confirmed',
   };
 

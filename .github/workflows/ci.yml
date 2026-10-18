@@ -41,16 +41,36 @@ jobs:
         # `flutter test --update-goldens test/ui/goldens` and review the PNGs.
         run: flutter test --coverage --exclude-tags golden
 
-      - name: Build Android Release APK (unsigned CI artifact)
+      - name: Build Play Store Android Release APK (unsigned CI artifact)
         env:
           FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
-        run: flutter build apk --release --dart-define=FIREBASE_WEB_API_KEY="$FIREBASE_WEB_API_KEY"
+        run: flutter build apk --flavor play --release --dart-define=FIREBASE_WEB_API_KEY="$FIREBASE_WEB_API_KEY"
 
-      - name: Upload unsigned APK Artifact
+      - name: Verify Play Store Manifest Excludes SEND_SMS
+        run: |
+          if grep -q "android.permission.SEND_SMS" build/app/intermediates/merged_manifests/playRelease/processPlayReleaseManifest/AndroidManifest.xml 2>/dev/null || grep -q "android.permission.SEND_SMS" build/app/intermediates/merged_manifests/playRelease/AndroidManifest.xml 2>/dev/null; then
+            echo "ERROR: SEND_SMS permission was found in the Play Store release manifest!"
+            exit 1
+          fi
+          echo "Play Store manifest verified: no SEND_SMS permission."
+
+      - name: Build Personal Sideload Android Release APK
+        env:
+          FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+        run: flutter build apk --flavor personal --release --dart-define=FIREBASE_WEB_API_KEY="$FIREBASE_WEB_API_KEY"
+
+      - name: Upload Play Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-unsigned-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: app-play-release-apk
+          path: build/app/outputs/flutter-apk/app-play-release.apk
+          if-no-files-found: error
+
+      - name: Upload Personal Sideload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-personal-release-apk
+          path: build/app/outputs/flutter-apk/app-personal-release.apk
           if-no-files-found: error
 
 

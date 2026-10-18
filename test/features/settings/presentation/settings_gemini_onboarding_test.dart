@@ -49,6 +49,15 @@ class InMemoryCredentialStorage implements CredentialStorage {
 
   @override
   Future<void> setCompletedOnboarding(bool completed) async {}
+
+  @override
+  Future<String?> readString(String key) async => null;
+
+  @override
+  Future<void> writeString(String key, String value) async {}
+
+  @override
+  Future<void> deleteString(String key) async {}
 }
 
 void main() {

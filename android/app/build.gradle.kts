@@ -39,6 +39,19 @@ android {
         versionName = flutter.versionName
     }
 
+    flavorDimensions += "distribution"
+
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+            // Standard Play-safe distribution with no SEND_SMS permission
+        }
+        create("personal") {
+            dimension = "distribution"
+            // Sideloaded / personal distribution with optional native automatic SMS
+        }
+    }
+
     signingConfigs {
         create("release") {
             val keyAliasProp = keystoreProperties["keyAlias"] as String?

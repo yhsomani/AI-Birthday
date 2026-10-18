@@ -31,6 +31,10 @@ abstract interface class CredentialStorage {
 
   Future<bool> hasCompletedOnboarding();
   Future<void> setCompletedOnboarding(bool completed);
+
+  Future<String?> readString(String key);
+  Future<void> writeString(String key, String value);
+  Future<void> deleteString(String key);
 }
 
 /// Implementation using a [SecureStoreDriver].
@@ -110,6 +114,16 @@ class SecureCredentialStorage implements CredentialStorage {
       await _driver.delete(_onboardingKey);
     }
   }
+
+  @override
+  Future<String?> readString(String key) => _driver.read(key);
+
+  @override
+  Future<void> writeString(String key, String value) =>
+      _driver.write(key, value);
+
+  @override
+  Future<void> deleteString(String key) => _driver.delete(key);
 }
 
 /// In-memory storage for unit and widget testing.
@@ -123,6 +137,7 @@ class InMemoryCredentialStorage implements CredentialStorage {
   String? _key;
   bool _onboardingCompleted;
   DateTime? _verifiedAt;
+  final Map<String, String> _strings = {};
 
   @override
   Future<String?> getGeminiApiKey() async => _key;
@@ -161,5 +176,18 @@ class InMemoryCredentialStorage implements CredentialStorage {
   @override
   Future<void> setCompletedOnboarding(bool completed) async {
     _onboardingCompleted = completed;
+  }
+
+  @override
+  Future<String?> readString(String key) async => _strings[key];
+
+  @override
+  Future<void> writeString(String key, String value) async {
+    _strings[key] = value;
+  }
+
+  @override
+  Future<void> deleteString(String key) async {
+    _strings.remove(key);
   }
 }
