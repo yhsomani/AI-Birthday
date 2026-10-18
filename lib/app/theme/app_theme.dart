@@ -7,7 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 
-import 'package:ai_birthday/ui/design_system/app_tokens.dart';
+import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 class AppTheme {
   const AppTheme._();

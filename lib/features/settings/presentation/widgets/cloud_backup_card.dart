@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import 'package:ai_birthday/ui/design_system/app_tokens.dart';
+import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 /// Cloud backup card on the Settings screen: the last successful backup, the
 /// backup and restore actions, and the durable failure status (audit F22).
