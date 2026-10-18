@@ -20,3 +20,7 @@
 ## 2024-10-18 - Style Destructive Action Buttons Consistently
 **Learning:** The 'Sign out' button in the settings modal was missing the distinct visual style for destructive actions, which could lead to accidental clicks.
 **Action:** Always style destructive action buttons using both `backgroundColor: Theme.of(context).colorScheme.error` and `foregroundColor: Theme.of(context).colorScheme.onError` in the `styleFrom` configuration, specifically for buttons like 'Sign out' that have significant consequences.
+
+## 2024-10-18 - Add Haptic Feedback to PopupMenuButton Actions
+**Learning:** PopupMenuButton options are primary interactive elements, and adding subtle physical feedback when they are selected (via `onSelected`) makes the interface feel much more responsive and satisfying.
+**Action:** Implement `HapticFeedback.lightImpact()` inside the `onSelected` handlers of `PopupMenuButton` widgets to consistently provide physical acknowledgement of user interaction.

@@ -576,6 +576,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           PopupMenuButton<String>(
             tooltip: 'More actions',
             onSelected: (val) {
+              HapticFeedback.lightImpact();
               if (val == 'sync_phone') {
                 _syncDeviceContacts(context, ref, currentPeople);
               } else if (val == 'import') {
@@ -814,6 +815,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                               trailing: PopupMenuButton<String>(
                                 tooltip: 'Person actions',
                                 onSelected: (action) async {
+                                  HapticFeedback.lightImpact();
                                   if (action == 'message') {
                                     // Person-scoped Studio route: no birthday lookup, so
                                     // the action can never silently no-op on a missing row
