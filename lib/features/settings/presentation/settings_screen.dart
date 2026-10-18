@@ -12,7 +12,6 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:ai_birthday/app/providers.dart';
-import 'package:ai_birthday/app/theme/theme_mode_provider.dart';
 import 'package:ai_birthday/core/platform/gemini_nano_platform.dart';
 import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
@@ -652,7 +651,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // Section 5: Reminders & Quiet Hours (SSOT §17)
           AppSectionHeader(title: 'Reminders', isAccent: true),
           Card(
-            child: Column(
+            clipBehavior: Clip.antiAlias,
+            child: ExpansionTile(
+              initiallyExpanded: !reminderSettings.enabled,
+              leading: Icon(
+                Icons.notifications_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: const Text('Reminders'),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              expandedCrossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SwitchListTile(
                   secondary: const Icon(Icons.notifications_outlined),
@@ -813,89 +821,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   },
                 ),
                 if (reminderSettings.enabled) ...[
-                  const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: DropdownButtonFormField<String>(
-                      initialValue: () {
-                        final kinds = reminderSettings.kinds;
-                        if (kinds.length == 4) return 'all';
-                        if (kinds.length == 1 &&
-                            kinds.contains(ReminderKind.birthday)) {
-                          return 'day_of';
-                        }
-                        if (kinds.contains(ReminderKind.ready) &&
-                            kinds.contains(ReminderKind.birthday) &&
-                            !kinds.contains(ReminderKind.approaching)) {
-                          return 'short_notice';
-                        }
-                        return 'custom';
-                      }(),
-                      decoration: const InputDecoration(
-                        labelText: 'Reminder Cadence Preference',
-                        helperText:
-                            'Select default reminder schedule or customize below',
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'all',
-                          child: Text('Standard (7d, 2d, 1d & Day-of)'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'short_notice',
-                          child: Text('Short Notice (1d & Day-of)'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'day_of',
-                          child: Text('Day-Of Only (Today at 9:00 AM)'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'custom',
-                          child: Text('Custom Selection'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        HapticFeedback.lightImpact();
-                        if (value == 'all') {
-                          for (final k in ReminderKind.values) {
-                            ref
-                                .read(reminderSettingsProvider.notifier)
-                                .setKind(k, true);
-                          }
-                        } else if (value == 'short_notice') {
-                          ref
-                              .read(reminderSettingsProvider.notifier)
-                              .setKind(ReminderKind.approaching, false);
-                          ref
-                              .read(reminderSettingsProvider.notifier)
-                              .setKind(ReminderKind.prepare, false);
-                          ref
-                              .read(reminderSettingsProvider.notifier)
-                              .setKind(ReminderKind.ready, true);
-                          ref
-                              .read(reminderSettingsProvider.notifier)
-                              .setKind(ReminderKind.birthday, true);
-                        } else if (value == 'day_of') {
-                          ref
-                              .read(reminderSettingsProvider.notifier)
-                              .setKind(ReminderKind.approaching, false);
-                          ref
-                              .read(reminderSettingsProvider.notifier)
-                              .setKind(ReminderKind.prepare, false);
-                          ref
-                              .read(reminderSettingsProvider.notifier)
-                              .setKind(ReminderKind.ready, false);
-                          ref
-                              .read(reminderSettingsProvider.notifier)
-                              .setKind(ReminderKind.birthday, true);
-                        }
-                      },
-                    ),
-                  ),
+                  const Divider(height: 16),
                   for (final kind in ReminderKind.values)
                     SwitchListTile(
                       title: Text(kind.title),
@@ -1338,82 +1264,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 20),
           ],
-
-          // Section 5.5: Appearance (Theme Mode)
-          AppSectionHeader(title: 'Appearance', isAccent: true),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.palette_outlined,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Theme',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                              ),
-                            ),
-                            Text(
-                              'Choose light, dark, or follow system theme',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: context.colors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: SegmentedButton<ThemeMode>(
-                      segments: const [
-                        ButtonSegment(
-                          value: ThemeMode.system,
-                          label: Text('System'),
-                          icon: Icon(Icons.brightness_auto, size: 16),
-                        ),
-                        ButtonSegment(
-                          value: ThemeMode.light,
-                          label: Text('Light'),
-                          icon: Icon(Icons.light_mode, size: 16),
-                        ),
-                        ButtonSegment(
-                          value: ThemeMode.dark,
-                          label: Text('Dark'),
-                          icon: Icon(Icons.dark_mode, size: 16),
-                        ),
-                      ],
-                      selected: {ref.watch(themeModeProvider)},
-                      onSelectionChanged: (selected) {
-                        HapticFeedback.lightImpact();
-                        if (selected.isNotEmpty) {
-                          ref
-                              .read(themeModeProvider.notifier)
-                              .set(selected.first);
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
 
           // Section 6: Help & Guide
           AppSectionHeader(title: 'Help & Guide', isAccent: true),

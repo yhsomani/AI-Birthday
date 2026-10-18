@@ -49,11 +49,8 @@ class AiRouter {
   }) async {
     final hasUserKey = await _credentialStorage.hasGeminiApiKey();
 
-    // A personal Gemini key is the user's own access, so it unlocks drafting
-    // without the app subscription (product decision, BYOK). Routes that use
-    // the app's own access (on-device Nano) still need an active entitlement.
-    final usesOwnKey = hasUserKey && !forceNano;
-    if (!usesOwnKey && !entitlement.canUseAi) {
+    // AI features strictly require an active subscription entitlement.
+    if (!entitlement.canUseAi) {
       _logger.info('AiRouter', 'AI request blocked: no active entitlement');
       throw const AppFailure.lockedAi(
         action: 'Subscribe to AI-Birthday Pro to use AI-powered drafting.',

@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/app/router.dart';
 import 'package:ai_birthday/app/theme/app_theme.dart';
-import 'package:ai_birthday/app/theme/theme_mode_provider.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 import 'package:ai_birthday/features/auth/domain/auth_state.dart';
 import 'package:ai_birthday/l10n/app_localizations.dart';
@@ -50,7 +49,7 @@ class AiBirthdayApp extends ConsumerWidget {
       routerConfig: router,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ref.watch(themeModeProvider),
+      themeMode: ThemeMode.system,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
     );

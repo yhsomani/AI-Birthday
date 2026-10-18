@@ -66,7 +66,7 @@ void main() {
     });
 
     test(
-      'a personal key unlocks drafting without an app subscription',
+      'AI drafting requires an active subscription entitlement even with personal key',
       () async {
         await credentialStorage.saveGeminiApiKey('AIzaSyDummyKey');
 
@@ -76,9 +76,25 @@ void main() {
           nanoProvider: mockNanoProvider,
         );
 
+        // Free tier is locked
+        expect(
+          () => router.generate(
+            request: AiGenerationRequest(person: testPerson),
+            entitlement: UserEntitlement.free,
+          ),
+          throwsA(
+            isA<AppFailure>().having(
+              (e) => e.code,
+              'code',
+              AppFailureCode.aiLocked,
+            ),
+          ),
+        );
+
+        // Pro tier with user key routes to user_gemini
         final result = await router.generate(
           request: AiGenerationRequest(person: testPerson),
-          entitlement: UserEntitlement.free,
+          entitlement: UserEntitlement.proActive,
         );
 
         expect(result.providerType, 'user_gemini');

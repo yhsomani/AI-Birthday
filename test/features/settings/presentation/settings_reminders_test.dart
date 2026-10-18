@@ -1,4 +1,3 @@
-import 'package:ai_birthday/app/theme/theme_mode_provider.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
 import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
 import 'package:ai_birthday/features/settings/presentation/settings_screen.dart';
@@ -23,6 +22,46 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('reminders card is expandable and collapsible like Gemini card', (
+    tester,
+  ) async {
+    await pumpSettings(tester);
+
+    // Header is rendered
+    expect(find.text('REMINDERS'), findsOneWidget);
+    expect(find.text('Reminders'), findsOneWidget);
+    expect(find.byIcon(Icons.notifications_outlined), findsWidgets);
+
+    // Initial state: starts expanded when reminders are not configured yet,
+    // matching Gemini API key card behavior (!hasKey -> initiallyExpanded: true).
+    final remindersSwitch = find.widgetWithText(
+      SwitchListTile,
+      'Birthday reminders',
+    );
+    expect(remindersSwitch, findsOneWidget);
+
+    // Tapping the ExpansionTile header toggles to collapsed
+    final headerFinder = find.text('Reminders');
+    await tester.tap(headerFinder);
+    await tester.pumpAndSettle();
+
+    // In collapsed state, the inner switch and controls are hidden
+    expect(
+      find.widgetWithText(SwitchListTile, 'Birthday reminders'),
+      findsNothing,
+    );
+    expect(find.text('7 days before'), findsNothing);
+
+    // Tapping header again expands the card back
+    await tester.tap(headerFinder);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.widgetWithText(SwitchListTile, 'Birthday reminders'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('reminders section defaults to off with leads hidden', (
     tester,
@@ -109,62 +148,19 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('reminder cadence dropdown updates enabled leads', (
-    tester,
-  ) async {
-    await pumpSettings(tester);
-    final remindersSwitch = find.widgetWithText(
-      SwitchListTile,
-      'Birthday reminders',
-    );
-    await tester.ensureVisible(remindersSwitch);
-    await tester.pumpAndSettle();
-    await tester.tap(remindersSwitch);
-    await tester.pumpAndSettle();
+  testWidgets(
+    'no nested dropdowns in reminders and no theme selector in settings',
+    (tester) async {
+      await pumpSettings(tester);
 
-    // Verify dropdown is present
-    expect(find.text('Reminder Cadence Preference'), findsOneWidget);
-    final dropdownFinder = find.byType(DropdownButtonFormField<String>);
-    expect(dropdownFinder, findsOneWidget);
+      // Verify reminder cadence dropdown is removed
+      expect(find.text('Reminder Cadence Preference'), findsNothing);
+      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
 
-    // Open dropdown and select Day-Of Only
-    await tester.tap(dropdownFinder);
-    await tester.pumpAndSettle();
-    expect(find.text('Day-Of Only (Today at 9:00 AM)'), findsWidgets);
-
-    await tester.tap(find.text('Day-Of Only (Today at 9:00 AM)').last);
-    await tester.pumpAndSettle();
-
-    final settings = ProviderScope.containerOf(
-      tester.element(find.byType(SettingsScreen)),
-    ).read(reminderSettingsProvider);
-    expect(settings.kinds, equals({ReminderKind.birthday}));
-  });
-
-  testWidgets('settings exposes theme mode selector and toggles theme state', (
-    tester,
-  ) async {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    await pumpSettings(tester, container: container);
-
-    expect(find.text('APPEARANCE'), findsOneWidget);
-    expect(find.text('System'), findsOneWidget);
-    expect(find.text('Light'), findsOneWidget);
-    expect(find.text('Dark'), findsOneWidget);
-
-    final lightFinder = find.text('Light');
-    await tester.ensureVisible(lightFinder);
-    await tester.pumpAndSettle();
-    await tester.tap(lightFinder);
-    await tester.pumpAndSettle();
-
-    expect(container.read(themeModeProvider), ThemeMode.light);
-
-    final darkFinder = find.text('Dark');
-    await tester.tap(darkFinder);
-    await tester.pumpAndSettle();
-
-    expect(container.read(themeModeProvider), ThemeMode.dark);
-  });
+      // Verify Appearance and Theme controls are removed
+      expect(find.text('APPEARANCE'), findsNothing);
+      expect(find.text('Theme'), findsNothing);
+      expect(find.byType(SegmentedButton<ThemeMode>), findsNothing);
+    },
+  );
 }
