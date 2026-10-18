@@ -104,11 +104,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _buildWelcomePage(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
           Container(
             width: 80,
             height: 80,
@@ -164,140 +165,145 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildAddBirthdaysPage(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.accentForestContainer,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.people_alt_rounded,
-              size: 40,
-              color: AppColors.accentForest,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Bring in your birthdays',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Add your first birthday now or explore the command center.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 32),
-          Card(
-            child: ListTile(
-              leading: const Icon(
-                Icons.person_add_rounded,
-                color: AppColors.primaryTerracotta,
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.accentForestContainer,
+                shape: BoxShape.circle,
               ),
-              title: const Text(
-                'Add Birthday Manually',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: const Text('Enter name, date, relationship, and tone.'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () => _finishTo('/people/add'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: ListTile(
-              leading: const Icon(
-                Icons.contact_phone_rounded,
+              child: const Icon(
+                Icons.people_alt_rounded,
+                size: 40,
                 color: AppColors.accentForest,
               ),
-              title: const Text(
-                'Import from Phone Contacts',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: const Text(
-                'Quickly scan phone contacts to import existing birthdays.',
-              ),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () => _finishTo('/people'),
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            Text(
+              'Bring in your birthdays',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Add your first birthday now or explore the command center.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 32),
+            Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.person_add_rounded,
+                  color: AppColors.primaryTerracotta,
+                ),
+                title: const Text(
+                  'Add Birthday Manually',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text('Enter name, date, relationship, and tone.'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () => _finishTo('/people/add'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.contact_phone_rounded,
+                  color: AppColors.accentForest,
+                ),
+                title: const Text(
+                  'Import from Phone Contacts',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'Quickly scan phone contacts to import existing birthdays.',
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () => _finishTo('/people'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildRemindersPage(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.accentAmberContainer,
-              shape: BoxShape.circle,
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.accentAmberContainer,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.notifications_active_rounded,
+                size: 40,
+                color: AppColors.accentAmber,
+              ),
             ),
-            child: const Icon(
-              Icons.notifications_active_rounded,
-              size: 40,
-              color: AppColors.accentAmber,
+            const SizedBox(height: 24),
+            Text(
+              'Prepared ahead of time',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Prepared ahead of time',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              letterSpacing: -0.5,
+            const SizedBox(height: 12),
+            Text(
+              'AI-Birthday schedules gentle leads so greetings can be reviewed without stress.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'AI-Birthday schedules gentle leads so greetings can be reviewed without stress.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: theme.colorScheme.onSurfaceVariant,
+            const SizedBox(height: 32),
+            _buildReminderTimelineStep(
+              days: '7 Days',
+              label: 'Upcoming reminder: Plan gifts or special messages.',
             ),
-          ),
-          const SizedBox(height: 32),
-          _buildReminderTimelineStep(
-            days: '7 Days',
-            label: 'Upcoming reminder: Plan gifts or special messages.',
-          ),
-          const SizedBox(height: 14),
-          _buildReminderTimelineStep(
-            days: '2 Days',
-            label:
-                'Draft ready: Personalized message is prepared for your review.',
-          ),
-          const SizedBox(height: 14),
-          _buildReminderTimelineStep(
-            days: 'Today',
-            label:
-                'Send day: One tap handoff to WhatsApp with your confirmed greeting.',
-          ),
-        ],
+            const SizedBox(height: 14),
+            _buildReminderTimelineStep(
+              days: '2 Days',
+              label:
+                  'Draft ready: Personalized message is prepared for your review.',
+            ),
+            const SizedBox(height: 14),
+            _buildReminderTimelineStep(
+              days: 'Today',
+              label:
+                  'Send day: One tap handoff to WhatsApp with your confirmed greeting.',
+            ),
+          ],
+        ),
       ),
     );
   }

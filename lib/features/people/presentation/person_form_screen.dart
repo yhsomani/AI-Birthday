@@ -419,6 +419,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<int>(
+                              isExpanded: true,
                               initialValue: _month,
                               items: [
                                 for (var m = 1; m <= 12; m++)
@@ -437,6 +438,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<int>(
+                              isExpanded: true,
                               initialValue: _day,
                               items: [
                                 for (final d in _dayOptions)
