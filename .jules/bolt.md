@@ -46,6 +46,6 @@
 **Learning:** Hoisting invariant variable calculations like `toLowerCase()` and `RegExp` instantiation out of inner loops (`existingPeople` and intra-batch checks) prevents O(N*M) redundant string allocations and Regex compilations in Flutter, greatly improving perceived speed during bulk CSV parsing and device contact imports.
 **Action:** Always pre-compute and store lowercased search queries or sanitized phone numbers outside of loops when comparing against lists. Pre-compile static RegExps using `static final RegExp = ...`.
 
-## 2024-10-25 - Avoid O(N) allocations in filter loops
-**Learning:** Calling `.toLowerCase()` on an invariant string variable inside a `.where()` filter loop on every keystroke causes redundant O(N) string allocations during Flutter widget rebuilds.
-**Action:** Always hoist invariant transformations (like `toLowerCase()` for search queries) outside the loop to execute them exactly once, or better yet, use a pre-compiled, case-insensitive `RegExp` for matching, which avoids string allocations entirely during the loop and reduces matching latency dramatically.
+## 2024-10-25 - Avoid O(N) string allocations in search filters
+**Learning:** Using `.where((item) => item.toLowerCase().contains(queryLower))` causes O(N) string allocations because `.toLowerCase()` creates a new string for every item.
+**Action:** Pre-compile a `RegExp(RegExp.escape(query), caseSensitive: false)` outside the loop and use `regex.hasMatch(item)` instead to significantly improve matching performance and reduce GC pressure.

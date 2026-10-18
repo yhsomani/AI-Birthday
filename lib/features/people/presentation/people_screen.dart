@@ -685,14 +685,13 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           }
 
           final trimmed = _query.trim();
-          // ⚡ Bolt: Pre-compile case-insensitive RegExp to avoid O(N) .toLowerCase() allocations in loop
-          final searchRegex = RegExp(
-            RegExp.escape(trimmed),
-            caseSensitive: false,
-          );
+          // ⚡ Bolt: Pre-compile case-insensitive RegExp to avoid O(N) .toLowerCase() string allocations
+          final searchRegex = trimmed.isEmpty
+              ? null
+              : RegExp(RegExp.escape(trimmed), caseSensitive: false);
           final filtered = trimmed.isEmpty
               ? people
-              : people.where((p) => searchRegex.hasMatch(p.name)).toList();
+              : people.where((p) => searchRegex!.hasMatch(p.name)).toList();
 
           return Column(
             children: [

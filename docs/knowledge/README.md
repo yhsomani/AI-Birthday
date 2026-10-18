@@ -15,6 +15,13 @@
 | What is not done, contradictory, or unverified? | [Gap and improvement register](gaps/README.md) |
 | How are findings linked to source and tests? | [Machine-readable registry](feature-registry.json) |
 | How do we update this documentation? | [Maintenance guide](maintenance/README.md) |
+| Which exact validations and business rules apply? | [Business rules](business-rules/README.md) |
+| How do requirements map to functions and tests? | [Requirement traceability](traceability/README.md) |
+| Which APIs and external systems interact? | [Integrations and callable APIs](integrations/README.md) |
+| Who owns local/cloud data and how does it flow? | [Data model and lineage](data-model/README.md) |
+| What are the atomic responsibilities of complex areas? | [Deep feature contracts](features/deep-dives/README.md) |
+| Where are all declared routes and deep links? | [Navigation architecture](navigation/README.md) |
+| What has CI actually verified, and what is blocked? | [Verification and coverage](verification/README.md) |
 
 ## Product boundary: important distinction
 
