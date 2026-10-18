@@ -135,8 +135,17 @@ class UserGeminiApiProvider implements AiMessageProvider {
       }, requestBody);
     } on SocketException {
       throw const AppFailure.networkUnavailable();
-    } on HttpException catch (e) {
-      throw AppFailure.providerError(detail: e.message);
+    } on HttpException catch (e, st) {
+      _logger.error(
+        'UserGeminiApiProvider',
+        'HTTP exception during message generation',
+        error: e,
+        stackTrace: st,
+      );
+      // 🛡️ SECURITY: Prevent internal exception strings from leaking into the UI.
+      throw const AppFailure.providerError(
+        detail: 'A connection error occurred.',
+      );
     } catch (e, st) {
       if (e is AppFailure) rethrow;
       _logger.error(
