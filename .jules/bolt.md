@@ -49,3 +49,7 @@
 ## 2024-10-25 - Avoid O(N) string allocations in search filters
 **Learning:** Using `.where((item) => item.toLowerCase().contains(queryLower))` causes O(N) string allocations because `.toLowerCase()` creates a new string for every item.
 **Action:** Pre-compile a `RegExp(RegExp.escape(query), caseSensitive: false)` outside the loop and use `regex.hasMatch(item)` instead to significantly improve matching performance and reduce GC pressure.
+
+## 2024-10-25 - O(M*N) to O(N) array partition dashboard filter
+**Learning:** Calling `.where((b) => !list.contains(b)).toList()` on a list causes redundant O(M*N) checks inside Flutter widget builds.
+**Action:** Evaluate properties and partition directly within the initial single `for` loop pass over the original array to avoid the nested iteration and redundant list allocations entirely.
