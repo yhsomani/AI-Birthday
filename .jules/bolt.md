@@ -49,3 +49,7 @@
 ## 2024-10-25 - Avoid O(N) string allocations in search filters
 **Learning:** Using `.where((item) => item.toLowerCase().contains(queryLower))` causes O(N) string allocations because `.toLowerCase()` creates a new string for every item.
 **Action:** Pre-compile a `RegExp(RegExp.escape(query), caseSensitive: false)` outside the loop and use `regex.hasMatch(item)` instead to significantly improve matching performance and reduce GC pressure.
+
+## 2024-10-25 - Avoid O(M*N) iterations in list filtering
+**Learning:** Using `.where((item) => !anotherList.contains(item))` creates an O(M*N) nested iteration pattern, which can cause frame drops when rendering lists in Flutter.
+**Action:** Partition data directly within a single initial `for` loop pass instead of chaining `.where()` and `.contains()` filters later.

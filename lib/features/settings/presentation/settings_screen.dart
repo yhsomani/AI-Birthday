@@ -618,18 +618,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         await _launchExternalUrl(checkoutUrl);
         // After returning from browser checkout, check if the customer completed payment
         if (email != null && email.isNotEmpty) {
-          final hasActive = await stripeService.verifyCustomerActiveSubscription(email);
+          final hasActive = await stripeService
+              .verifyCustomerActiveSubscription(email);
           if (hasActive && mounted) {
-            ref.read(subscriptionNotifierProvider.notifier).setDevSandboxEntitlement(
-              const UserEntitlement(
-                status: EntitlementStatus.active,
-                productId: 'stripe_pro_monthly',
-                isAutoRenewing: true,
-              ),
-            );
+            ref
+                .read(subscriptionNotifierProvider.notifier)
+                .setDevSandboxEntitlement(
+                  const UserEntitlement(
+                    status: EntitlementStatus.active,
+                    productId: 'stripe_pro_monthly',
+                    isAutoRenewing: true,
+                  ),
+                );
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Payment successful! AI-Birthday Pro is now active.'),
+                content: Text(
+                  'Payment successful! AI-Birthday Pro is now active.',
+                ),
               ),
             );
           }
@@ -637,7 +642,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to initialize Stripe checkout. Please try again.'),
+            content: Text(
+              'Failed to initialize Stripe checkout. Please try again.',
+            ),
           ),
         );
       }
@@ -698,15 +705,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final email = auth?.identity?.email;
       if (email != null && email.isNotEmpty) {
         final stripeService = ref.read(stripeGatewayServiceProvider);
-        final hasStripeActive = await stripeService.verifyCustomerActiveSubscription(email);
+        final hasStripeActive = await stripeService
+            .verifyCustomerActiveSubscription(email);
         if (hasStripeActive) {
-          ref.read(subscriptionNotifierProvider.notifier).setDevSandboxEntitlement(
-            const UserEntitlement(
-              status: EntitlementStatus.active,
-              productId: 'stripe_pro_monthly',
-              isAutoRenewing: true,
-            ),
-          );
+          ref
+              .read(subscriptionNotifierProvider.notifier)
+              .setDevSandboxEntitlement(
+                const UserEntitlement(
+                  status: EntitlementStatus.active,
+                  productId: 'stripe_pro_monthly',
+                  isAutoRenewing: true,
+                ),
+              );
           stripeFound = true;
         }
       }
@@ -1074,8 +1084,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: _handleManageSubscription,
-                        icon: const Icon(Icons.manage_accounts_outlined, size: 18),
-                        label: const Text('Manage Subscription (Stripe Portal)'),
+                        icon: const Icon(
+                          Icons.manage_accounts_outlined,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          'Manage Subscription (Stripe Portal)',
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),

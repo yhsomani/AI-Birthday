@@ -9,9 +9,9 @@ class StripeGatewayService {
     http.Client? httpClient,
     AppLogger? logger,
     String? secretKey,
-  })  : _http = httpClient ?? http.Client(),
-        _logger = logger ?? ConsoleAppLogger(),
-        _secretKey = secretKey ?? StripeConfig.secretKey;
+  }) : _http = httpClient ?? http.Client(),
+       _logger = logger ?? ConsoleAppLogger(),
+       _secretKey = secretKey ?? StripeConfig.secretKey;
 
   final http.Client _http;
   final AppLogger _logger;
@@ -20,9 +20,9 @@ class StripeGatewayService {
   static const String _stripeApiBase = 'https://api.stripe.com/v1';
 
   Map<String, String> get _authHeaders => {
-        'Authorization': 'Bearer $_secretKey',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      };
+    'Authorization': 'Bearer $_secretKey',
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
 
   /// Creates a hosted Stripe Checkout Session for Pro Monthly subscription.
   ///
@@ -46,11 +46,7 @@ class StripeGatewayService {
           'client_reference_id': clientReferenceId,
       };
 
-      final response = await _http.post(
-        uri,
-        headers: _authHeaders,
-        body: body,
-      );
+      final response = await _http.post(uri, headers: _authHeaders, body: body);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -77,10 +73,15 @@ class StripeGatewayService {
 
   /// Verifies if a customer has an active subscription in Stripe by email or customer ID.
   Future<bool> verifyCustomerActiveSubscription(String customerEmail) async {
-    _logger.info('StripeGateway', 'Checking active Stripe subscriptions for email');
+    _logger.info(
+      'StripeGateway',
+      'Checking active Stripe subscriptions for email',
+    );
     try {
       // 1. Search for customer by email
-      final customerUri = Uri.parse('$_stripeApiBase/customers?email=${Uri.encodeComponent(customerEmail)}');
+      final customerUri = Uri.parse(
+        '$_stripeApiBase/customers?email=${Uri.encodeComponent(customerEmail)}',
+      );
       final custResp = await _http.get(customerUri, headers: _authHeaders);
       if (custResp.statusCode != 200) return false;
 
@@ -93,14 +94,19 @@ class StripeGatewayService {
         if (custId == null) continue;
 
         // 2. Fetch active subscriptions for customer
-        final subUri = Uri.parse('$_stripeApiBase/subscriptions?customer=$custId&status=active');
+        final subUri = Uri.parse(
+          '$_stripeApiBase/subscriptions?customer=$custId&status=active',
+        );
         final subResp = await _http.get(subUri, headers: _authHeaders);
         if (subResp.statusCode != 200) continue;
 
         final subData = jsonDecode(subResp.body) as Map<String, dynamic>;
         final subs = subData['data'] as List<dynamic>?;
         if (subs != null && subs.isNotEmpty) {
-          _logger.info('StripeGateway', 'Found active Stripe subscription for customer $custId');
+          _logger.info(
+            'StripeGateway',
+            'Found active Stripe subscription for customer $custId',
+          );
           return true;
         }
       }
@@ -121,7 +127,9 @@ class StripeGatewayService {
   Future<String?> createBillingPortalSession(String customerEmail) async {
     _logger.info('StripeGateway', 'Creating Billing Portal session');
     try {
-      final customerUri = Uri.parse('$_stripeApiBase/customers?email=${Uri.encodeComponent(customerEmail)}');
+      final customerUri = Uri.parse(
+        '$_stripeApiBase/customers?email=${Uri.encodeComponent(customerEmail)}',
+      );
       final custResp = await _http.get(customerUri, headers: _authHeaders);
       if (custResp.statusCode != 200) return null;
 
