@@ -1,0 +1,14 @@
+# Complete Application Screen & Component Inventory
+
+| Screen / Component | Route / Path | Current Purpose | Key Sub-components & Dialogs | State Providers | Stitch Status | Verification Status |
+|---|---|---|---|---|---|---|
+| **Dashboard** | `/dashboard` | Command Center Overview | `_buildCommandHeader`, `_buildActionCard`, `CountdownChip`, `CelebrationCard`, `_buildQuickActions` | `birthdaysStreamProvider`, `peopleStreamProvider` | **Generated** (`cb005062b975471bb4cc88f5481086cd`) | Implemented & 100% Tested |
+| **People Directory** | `/people` | CRM & Contact Directory | Search bar, Filter chips, `_buildContactCard`, CSV Import Modal, CSV Export Share Sheet | `peopleStreamProvider`, `contactCsvServiceProvider` | **Generated** (`525c0907753b4e3d93c1eec1204312af`) | Implemented & 100% Tested |
+| **Calendar View** | `/calendar` | Monthly Celebrations Timeline | Month selector, 7-column calendar grid, day dot markers, Day agenda sheet, Event cards | `birthdaysStreamProvider`, `peopleStreamProvider` | **Generated** (`588f956965e540f6bdb5874e9680c069`) | Implemented & 100% Tested |
+| **Message Studio** | `/message-studio/:birthdayId` | AI Greeting Composer & Review | Recipient profile card, Tone picker chips, Prompt memory text field, Live draft editor, Sticky action bar | `birthdayDetailProvider`, `aiRouterProvider`, `deliveryServiceProvider` | **Generated** (`046c743452ff42059394159ad546ceb9`) | Implemented & 100% Tested |
+| **Celebration History** | `/history` | Delivery Audit Log | Metric tiles (Sent, On-time %, Failed), Timeline log items, Channel badge, Status receipt | `historyStreamProvider`, `deliveryLogProvider` | **Generated** (`2836aa89169c44b9887eef3e5a51f829`) | Implemented & 100% Tested |
+| **Settings & Automation** | `/settings` | Configuration & Controls | Gemini API Key dialog, Nano toggle, Exact alarm prompt, Quiet hours picker, SMS consent card, Cloud backup | `settingsProvider`, `credentialStorageProvider`, `cloudSyncServiceProvider` | **Generated** (`fa1e610719684d68ac9ce6321418293c`) | Implemented & 100% Tested |
+| **Contact Form** | `/people/add`, `/people/edit/:id` | Add/Edit Recipient | Text fields, Date picker, Dropdown relationship selector, Validation feedback | `personFormProvider`, `peopleRepositoryProvider` | Documented Spec | Implemented & 100% Tested |
+| **Onboarding Walkthrough** | `/onboarding` | First-run setup | PageView slides, Feature cards, Permission explanation, Get Started button | `credentialStorageProvider` | Documented Spec | Implemented & 100% Tested |
+| **App Shell** | Nav Scaffolding | Global navigation | `AppScaffold`, `NavigationBar`, Theme provider wrapper | `routerProvider` | **Active in All Designs** | Implemented & 100% Tested |
+| **Error Screen** | `_NotFoundScreen` | Route fallback | `EmptyState`, Return home action | None | Documented Spec | Implemented & 100% Tested |

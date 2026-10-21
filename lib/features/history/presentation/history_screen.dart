@@ -223,8 +223,10 @@ class HistoryScreen extends ConsumerWidget {
                       ),
 
                       const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
                           TextButton.icon(
                             onPressed: () {
@@ -242,7 +244,6 @@ class HistoryScreen extends ConsumerWidget {
                             icon: const Icon(Icons.copy, size: 16),
                             label: const Text('Copy'),
                           ),
-                          const SizedBox(width: 8),
                           FilledButton.tonalIcon(
                             onPressed: () {
                               context.push(
