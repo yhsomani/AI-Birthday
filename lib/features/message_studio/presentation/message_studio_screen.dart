@@ -1580,24 +1580,40 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                 label: const Text('Shorten'),
                 onPressed: _isGenerating
                     ? null
-                    : () => _rewriteMessage(length: MessageLength.short),
+                    : () {
+                        HapticFeedback.lightImpact();
+                        _rewriteMessage(length: MessageLength.short);
+                      },
               ),
               ActionChip(
                 avatar: const Icon(Icons.expand, size: 16),
                 label: const Text('Expand'),
                 onPressed: _isGenerating
                     ? null
-                    : () => _rewriteMessage(length: MessageLength.expanded),
+                    : () {
+                        HapticFeedback.lightImpact();
+                        _rewriteMessage(length: MessageLength.expanded);
+                      },
               ),
               ActionChip(
                 avatar: const Icon(Icons.translate, size: 16),
                 label: const Text('Translate'),
-                onPressed: _isGenerating ? null : _showTranslateDialog,
+                onPressed: _isGenerating
+                    ? null
+                    : () {
+                        HapticFeedback.lightImpact();
+                        _showTranslateDialog();
+                      },
               ),
               ActionChip(
                 avatar: const Icon(Icons.casino_outlined, size: 16),
                 label: const Text('Variations'),
-                onPressed: _isGenerating ? null : _generateVariations,
+                onPressed: _isGenerating
+                    ? null
+                    : () {
+                        HapticFeedback.lightImpact();
+                        _generateVariations();
+                      },
               ),
             ],
           ),

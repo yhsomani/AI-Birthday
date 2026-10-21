@@ -81,7 +81,6 @@ class DashboardScreen extends ConsumerWidget {
                   final todayBirthdays = <Birthday>[];
                   final upcomingBirthdays = <Birthday>[];
                   final actionNeededBirthdays = <Birthday>[];
-                  final celebrateToday = <Birthday>[];
 
                   // ⚡ Bolt: Partition celebrateToday during the single pass to avoid O(M*N) nested .where() and .contains() iterations later
                   final celebrateToday = <Birthday>[];

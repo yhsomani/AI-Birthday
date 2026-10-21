@@ -24,3 +24,6 @@
 ## 2024-10-18 - Add Haptic Feedback to PopupMenuButton Actions
 **Learning:** PopupMenuButton options are primary interactive elements, and adding subtle physical feedback when they are selected (via `onSelected`) makes the interface feel much more responsive and satisfying.
 **Action:** Implement `HapticFeedback.lightImpact()` inside the `onSelected` handlers of `PopupMenuButton` widgets to consistently provide physical acknowledgement of user interaction.
+## 2024-10-21 - Add Haptic Feedback to AI ActionChips in Message Studio
+**Learning:** High-frequency primary tools inside a functional screen (like AI ActionChips for Shorten, Expand, Translate, and Variations in Message Studio) benefit greatly from subtle physical feedback. This reinforces the interactive nature of the controls, particularly when triggering asynchronous generative tasks.
+**Action:** Always include HapticFeedback.lightImpact() in the onPressed handlers for AI-driven or other high-use functional ActionChips to consistently provide physical acknowledgement of user interaction.
