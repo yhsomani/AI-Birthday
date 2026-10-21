@@ -110,64 +110,64 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.primaryTerracottaContainer,
-              shape: BoxShape.circle,
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.primaryTerracottaContainer,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.cake_rounded,
+                size: 40,
+                color: AppColors.primaryTerracotta,
+              ),
             ),
-            child: const Icon(
-              Icons.cake_rounded,
-              size: 40,
-              color: AppColors.primaryTerracotta,
+            const SizedBox(height: 24),
+            Text(
+              'Never miss a birthday that matters.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Never miss a birthday that matters.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              letterSpacing: -0.5,
+            const SizedBox(height: 12),
+            Text(
+              'Remember → Prepare → Personalize → Review → Send',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primaryTerracotta,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Remember → Prepare → Personalize → Review → Send',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primaryTerracotta,
+            const SizedBox(height: 32),
+            _buildFeatureRow(
+              icon: Icons.timer_outlined,
+              title: 'Always Prepared Ahead',
+              description:
+                  'Get smart reminders days in advance so you can craft thoughtful messages without rushing.',
             ),
-          ),
-          const SizedBox(height: 32),
-          _buildFeatureRow(
-            icon: Icons.timer_outlined,
-            title: 'Always Prepared Ahead',
-            description:
-                'Get smart reminders days in advance so you can craft thoughtful messages without rushing.',
-          ),
-          const SizedBox(height: 16),
-          _buildFeatureRow(
-            icon: Icons.edit_note_rounded,
-            title: 'Thoughtful, Personal Greetings',
-            description:
-                'Generate warm drafts tailored to your shared memories and preferred tone.',
-          ),
-          const SizedBox(height: 16),
-          _buildFeatureRow(
-            icon: Icons.shield_outlined,
-            title: 'Local by Default',
-            description:
-                'Your birthday data stays on this device unless you explicitly choose cloud backup or an external service.',
-          ),
-        ],
+            const SizedBox(height: 16),
+            _buildFeatureRow(
+              icon: Icons.edit_note_rounded,
+              title: 'Thoughtful, Personal Greetings',
+              description:
+                  'Generate warm drafts tailored to your shared memories and preferred tone.',
+            ),
+            const SizedBox(height: 16),
+            _buildFeatureRow(
+              icon: Icons.shield_outlined,
+              title: 'Local by Default',
+              description:
+                  'Your birthday data stays on this device unless you explicitly choose cloud backup or an external service.',
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildAddBirthdaysPage(ThemeData theme) {
     return Center(
@@ -218,7 +218,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   'Add Birthday Manually',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
-                subtitle: const Text('Enter name, date, relationship, and tone.'),
+                subtitle: const Text(
+                  'Enter name, date, relationship, and tone.',
+                ),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () => _finishTo('/people/add'),
               ),
