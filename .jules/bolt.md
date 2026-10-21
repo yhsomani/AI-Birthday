@@ -56,3 +56,6 @@
 ## 2024-10-25 - O(M*N) to O(N) array partition dashboard filter
 **Learning:** Calling `.where((b) => !list.contains(b)).toList()` on a list causes redundant O(M*N) checks inside Flutter widget builds.
 **Action:** Evaluate properties and partition directly within the initial single `for` loop pass over the original array to avoid the nested iteration and redundant list allocations entirely.
+## 2024-05-23 - Avoid O(N log N) allocations in sorting
+**Learning:** Calling `.toLowerCase()` inside a `.sort()` comparator is an anti-pattern that causes excessive O(N log N) string allocations.
+**Action:** Optimize by pre-computing lowercased comparison keys outside of the sort function and caching them (e.g. in a Map) to reduce the allocations to O(N).
