@@ -53,3 +53,6 @@
 ## 2024-10-25 - Avoid O(M*N) iterations in list filtering
 **Learning:** Using `.where((item) => !anotherList.contains(item))` creates an O(M*N) nested iteration pattern, which can cause frame drops when rendering lists in Flutter.
 **Action:** Partition data directly within a single initial `for` loop pass instead of chaining `.where()` and `.contains()` filters later.
+## 2024-10-25 - O(M*N) to O(N) array partition dashboard filter
+**Learning:** Calling `.where((b) => !list.contains(b)).toList()` on a list causes redundant O(M*N) checks inside Flutter widget builds.
+**Action:** Evaluate properties and partition directly within the initial single `for` loop pass over the original array to avoid the nested iteration and redundant list allocations entirely.
