@@ -71,14 +71,22 @@ void main() {
         addTearDown(tester.view.resetDevicePixelRatio);
 
         final person = buildPerson();
-        final birthday = buildBirthday('b-1', person.id, BirthdayStatus.messageDrafted);
+        final birthday = buildBirthday(
+          'b-1',
+          person.id,
+          BirthdayStatus.messageDrafted,
+        );
 
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
               ...harness.providerOverrides,
-              peopleStreamProvider.overrideWith((ref) => Stream.value([person])),
-              birthdaysStreamProvider.overrideWith((ref) => Stream.value([birthday])),
+              peopleStreamProvider.overrideWith(
+                (ref) => Stream.value([person]),
+              ),
+              birthdaysStreamProvider.overrideWith(
+                (ref) => Stream.value([birthday]),
+              ),
             ],
             child: const MaterialApp(home: DashboardScreen()),
           ),
@@ -99,14 +107,22 @@ void main() {
         addTearDown(tester.view.resetDevicePixelRatio);
 
         final person = buildPerson(name: 'David Kim');
-        final birthday = buildBirthday('b-2', person.id, BirthdayStatus.readyForDelivery);
+        final birthday = buildBirthday(
+          'b-2',
+          person.id,
+          BirthdayStatus.readyForDelivery,
+        );
 
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
               ...harness.providerOverrides,
-              peopleStreamProvider.overrideWith((ref) => Stream.value([person])),
-              birthdaysStreamProvider.overrideWith((ref) => Stream.value([birthday])),
+              peopleStreamProvider.overrideWith(
+                (ref) => Stream.value([person]),
+              ),
+              birthdaysStreamProvider.overrideWith(
+                (ref) => Stream.value([birthday]),
+              ),
             ],
             child: MediaQuery(
               data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
@@ -136,7 +152,9 @@ void main() {
           ProviderScope(
             overrides: [
               ...harness.providerOverrides,
-              peopleStreamProvider.overrideWith((ref) => Stream.value([person])),
+              peopleStreamProvider.overrideWith(
+                (ref) => Stream.value([person]),
+              ),
               personListProvider.overrideWith((ref) => Stream.value([person])),
             ],
             child: const MaterialApp(home: PeopleScreen()),
@@ -184,7 +202,11 @@ void main() {
         addTearDown(tester.view.resetDevicePixelRatio);
 
         final person = buildPerson();
-        final birthday = buildBirthday('b-studio', person.id, BirthdayStatus.messageNotPrepared);
+        final birthday = buildBirthday(
+          'b-studio',
+          person.id,
+          BirthdayStatus.messageNotPrepared,
+        );
         await harness.peopleRepo.savePerson(person);
         await harness.birthdaysRepo.saveBirthday(birthday);
 
@@ -193,7 +215,9 @@ void main() {
             overrides: harness.providerOverrides,
             child: MediaQuery(
               data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
-              child: MaterialApp(home: MessageStudioScreen(birthdayId: birthday.id)),
+              child: MaterialApp(
+                home: MessageStudioScreen(birthdayId: birthday.id),
+              ),
             ),
           ),
         );
@@ -230,9 +254,13 @@ void main() {
           ProviderScope(
             overrides: [
               ...harness.providerOverrides,
-              peopleStreamProvider.overrideWith((ref) => Stream.value([person])),
+              peopleStreamProvider.overrideWith(
+                (ref) => Stream.value([person]),
+              ),
               draftsStreamProvider.overrideWith((ref) => Stream.value([draft])),
-              latestHandoffsForDraftsProvider.overrideWith((ref) => Stream.value(<DeliveryHandoff>[])),
+              latestHandoffsForDraftsProvider.overrideWith(
+                (ref) => Stream.value(<DeliveryHandoff>[]),
+              ),
             ],
             child: const MaterialApp(home: HistoryScreen()),
           ),
