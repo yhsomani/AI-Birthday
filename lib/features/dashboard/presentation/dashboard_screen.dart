@@ -83,6 +83,9 @@ class DashboardScreen extends ConsumerWidget {
                   final actionNeededBirthdays = <Birthday>[];
                   final celebrateToday = <Birthday>[];
 
+                  // ⚡ Bolt: Partition celebrateToday during the single pass to avoid O(M*N) nested .where() and .contains() iterations later
+                  final celebrateToday = <Birthday>[];
+
                   for (final b in birthdays) {
                     final days = b.daysUntil(now);
                     if (days == 0) {
@@ -90,6 +93,8 @@ class DashboardScreen extends ConsumerWidget {
                       if (b.status != BirthdayStatus.completed) {
                         actionNeededBirthdays.add(b);
                       } else {
+                        // A person who needs action appears once, under Action Needed,
+                        // not again in Today's Birthdays (dashboard duplicate fix).
                         // ⚡ Bolt: Partition completed todays directly to avoid O(M*N) .contains filter
                         celebrateToday.add(b);
                       }
