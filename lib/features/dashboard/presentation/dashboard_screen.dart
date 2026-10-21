@@ -81,6 +81,7 @@ class DashboardScreen extends ConsumerWidget {
                   final todayBirthdays = <Birthday>[];
                   final upcomingBirthdays = <Birthday>[];
                   final actionNeededBirthdays = <Birthday>[];
+                  final celebrateToday = <Birthday>[];
 
                   for (final b in birthdays) {
                     final days = b.daysUntil(now);
@@ -88,6 +89,9 @@ class DashboardScreen extends ConsumerWidget {
                       todayBirthdays.add(b);
                       if (b.status != BirthdayStatus.completed) {
                         actionNeededBirthdays.add(b);
+                      } else {
+                        // ⚡ Bolt: Partition completed todays directly to avoid O(M*N) .contains filter
+                        celebrateToday.add(b);
                       }
                     } else if (days > 0 && days <= 7) {
                       upcomingBirthdays.add(b);
@@ -104,12 +108,6 @@ class DashboardScreen extends ConsumerWidget {
                       upcomingBirthdays.add(b);
                     }
                   }
-
-                  // A person who needs action appears once, under Action Needed,
-                  // not again in Today's Birthdays (dashboard duplicate fix).
-                  final celebrateToday = todayBirthdays
-                      .where((b) => !actionNeededBirthdays.contains(b))
-                      .toList();
 
                   return SliverPadding(
                     padding: const EdgeInsets.fromLTRB(

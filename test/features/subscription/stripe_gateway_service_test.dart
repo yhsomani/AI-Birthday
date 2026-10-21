@@ -36,7 +36,9 @@ void main() {
     test('createProCheckoutSession returns null on API error', () async {
       final mockClient = MockClient((request) async {
         return http.Response(
-          jsonEncode({'error': {'message': 'Invalid key'}}),
+          jsonEncode({
+            'error': {'message': 'Invalid key'},
+          }),
           401,
         );
       });
@@ -50,67 +52,74 @@ void main() {
       expect(url, isNull);
     });
 
-    test('verifyCustomerActiveSubscription returns true when active subscription found', () async {
-      final mockClient = MockClient((request) async {
-        if (request.url.path == '/v1/customers') {
-          return http.Response(
-            jsonEncode({
-              'data': [
-                {'id': 'cus_mock123', 'email': 'test@example.com'}
-              ]
-            }),
-            200,
-          );
-        } else if (request.url.path == '/v1/subscriptions') {
-          return http.Response(
-            jsonEncode({
-              'data': [
-                {'id': 'sub_mock123', 'status': 'active'}
-              ]
-            }),
-            200,
-          );
-        }
-        return http.Response('Not Found', 404);
-      });
+    test(
+      'verifyCustomerActiveSubscription returns true when active subscription found',
+      () async {
+        final mockClient = MockClient((request) async {
+          if (request.url.path == '/v1/customers') {
+            return http.Response(
+              jsonEncode({
+                'data': [
+                  {'id': 'cus_mock123', 'email': 'test@example.com'},
+                ],
+              }),
+              200,
+            );
+          } else if (request.url.path == '/v1/subscriptions') {
+            return http.Response(
+              jsonEncode({
+                'data': [
+                  {'id': 'sub_mock123', 'status': 'active'},
+                ],
+              }),
+              200,
+            );
+          }
+          return http.Response('Not Found', 404);
+        });
 
-      final service = StripeGatewayService(
-        httpClient: mockClient,
-        secretKey: 'sk_test_mock_key',
-      );
+        final service = StripeGatewayService(
+          httpClient: mockClient,
+          secretKey: 'sk_test_mock_key',
+        );
 
-      final active = await service.verifyCustomerActiveSubscription('test@example.com');
-      expect(active, isTrue);
-    });
+        final active = await service.verifyCustomerActiveSubscription(
+          'test@example.com',
+        );
+        expect(active, isTrue);
+      },
+    );
 
-    test('verifyCustomerActiveSubscription returns false when no subscriptions', () async {
-      final mockClient = MockClient((request) async {
-        if (request.url.path == '/v1/customers') {
-          return http.Response(
-            jsonEncode({
-              'data': [
-                {'id': 'cus_mock123', 'email': 'test@example.com'}
-              ]
-            }),
-            200,
-          );
-        } else if (request.url.path == '/v1/subscriptions') {
-          return http.Response(
-            jsonEncode({'data': []}),
-            200,
-          );
-        }
-        return http.Response('Not Found', 404);
-      });
+    test(
+      'verifyCustomerActiveSubscription returns false when no subscriptions',
+      () async {
+        final mockClient = MockClient((request) async {
+          if (request.url.path == '/v1/customers') {
+            return http.Response(
+              jsonEncode({
+                'data': [
+                  {'id': 'cus_mock123', 'email': 'test@example.com'},
+                ],
+              }),
+              200,
+            );
+          } else if (request.url.path == '/v1/subscriptions') {
+            return http.Response(jsonEncode({'data': []}), 200);
+          }
+          return http.Response('Not Found', 404);
+        });
 
-      final service = StripeGatewayService(
-        httpClient: mockClient,
-        secretKey: 'sk_test_mock_key',
-      );
+        final service = StripeGatewayService(
+          httpClient: mockClient,
+          secretKey: 'sk_test_mock_key',
+        );
 
-      final active = await service.verifyCustomerActiveSubscription('test@example.com');
-      expect(active, isFalse);
-    });
+        final active = await service.verifyCustomerActiveSubscription(
+          'test@example.com',
+        );
+        expect(active, isFalse);
+      },
+    );
 
     test('createBillingPortalSession returns portal url', () async {
       final mockClient = MockClient((request) async {
@@ -118,8 +127,8 @@ void main() {
           return http.Response(
             jsonEncode({
               'data': [
-                {'id': 'cus_mock123'}
-              ]
+                {'id': 'cus_mock123'},
+              ],
             }),
             200,
           );
