@@ -54,7 +54,11 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
       await GoogleSignIn.instance.initialize(serverClientId: _serverClientId);
       _initialized = true;
     } catch (e) {
-      _logger?.warning('AuthGateway', 'GoogleSignIn initialize note: $e');
+      _logger?.warning(
+        'AuthGateway',
+        'GoogleSignIn initialize failed',
+        error: e,
+      );
     }
   }
 
@@ -114,7 +118,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
       try {
         account = await GoogleSignIn.instance.authenticate();
       } catch (e) {
-        _logger?.warning('AuthGateway', 'Native GoogleSignIn failed: $e');
+        _logger?.warning('AuthGateway', 'Native GoogleSignIn failed', error: e);
         // 🛡️ SECURITY: Prevent internal exception strings from leaking into the UI.
         if (e.toString().contains('reauth')) {
           // google_sign_in surfaces `[16] Account reauth failed.` when this
@@ -168,7 +172,11 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
           }),
         );
       } catch (e) {
-        _logger?.warning('AuthGateway', 'Firebase IdP exchange failed: $e');
+        _logger?.warning(
+          'AuthGateway',
+          'Firebase IdP exchange failed',
+          error: e,
+        );
         return const SignInFailed(
           'Network error during authentication. Please check your connection and try again.',
         );
@@ -212,7 +220,8 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
         } catch (e) {
           _logger?.warning(
             'AuthGateway',
-            'Firebase IdP 200 response JSON parsing failed: $e',
+            'Firebase IdP 200 response JSON parsing failed',
+            error: e,
           );
           return const SignInFailed(
             'Invalid authentication response from Identity Provider',
@@ -243,7 +252,7 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
     } catch (e, st) {
       _logger?.error(
         'AuthGateway',
-        'Google sign in error: $e',
+        'Google sign in error',
         error: e,
         stackTrace: st,
       );
