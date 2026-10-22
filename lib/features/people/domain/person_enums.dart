@@ -29,8 +29,12 @@ enum AutoSendPolicy {
   manualOnly,
   automaticSmsApproved;
 
-  static AutoSendPolicy parse(String value) => AutoSendPolicy.values.firstWhere(
-    (v) => v.name.toLowerCase() == value.toLowerCase(),
-    orElse: () => AutoSendPolicy.manualOnly,
-  );
+  static AutoSendPolicy parse(String value) {
+    // ⚡ Bolt: Hoist invariant .toLowerCase() out of loop to avoid O(N) redundant string allocations
+    final target = value.toLowerCase();
+    return AutoSendPolicy.values.firstWhere(
+      (v) => v.name.toLowerCase() == target,
+      orElse: () => AutoSendPolicy.manualOnly,
+    );
+  }
 }

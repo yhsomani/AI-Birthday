@@ -22,8 +22,10 @@ enum DraftStatus {
 
   static DraftStatus fromString(String? value) {
     if (value == null) return DraftStatus.draft;
+    // ⚡ Bolt: Hoist invariant .toLowerCase() out of loop to avoid O(N) redundant string allocations
+    final target = value.toLowerCase();
     return DraftStatus.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
+      (e) => e.name.toLowerCase() == target,
       orElse: () => DraftStatus.draft,
     );
   }
