@@ -143,9 +143,8 @@ class MethodChannelGeminiNanoPlatform implements GeminiNanoPlatform {
       });
       return NanoGenerationResult(text: res ?? '');
     } on PlatformException catch (e) {
-      throw AppFailure.providerError(
-        detail: e.message ?? 'Nano platform error',
-      );
+      // 🛡️ SECURITY: Prevent internal exception strings from leaking into the UI.
+      throw AppFailure.providerError(detail: 'Nano platform error');
     }
   }
 
