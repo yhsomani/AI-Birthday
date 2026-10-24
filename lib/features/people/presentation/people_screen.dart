@@ -709,6 +709,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                             icon: const Icon(Icons.close),
                             tooltip: 'Clear search',
                             onPressed: () {
+                              HapticFeedback.lightImpact();
                               _searchController.clear();
                               setState(() => _query = '');
                             },
