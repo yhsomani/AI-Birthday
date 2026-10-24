@@ -7,3 +7,8 @@
 **Vulnerability:** Outdated NPM packages in backend cloud functions introduced high-severity vulnerabilities (e.g. body-parser DoS, zod memory exhaustion, protobuf.js arbitrary code execution/prototype pollution) blocking CI audits.
 **Learning:** Firebase functions dependencies, especially transitive ones (`firebase-admin`, `firebase-functions`, `zod`), require careful version bumping (`npm update`, `npm audit fix --force`, explicitly installing updated versions) to maintain a zero high-severity CVE footprint for production without breaking compatibility constraints (like `firebase-functions` peer dependency on `firebase-admin`).
 **Prevention:** Regularly audit (`npm audit`) and explicitly upgrade backend control plane dependencies, ensuring peer-dependency compatibility when relying on `--force` fixes.
+
+## 2025-02-25 - Firebase Rules Unit Testing Types Vulnerability / ESLint Errors
+**Vulnerability:** Upgrading backend dependencies in the previous step caused ESLint to flag unsafe typing assignment of errors from `@firebase/rules-unit-testing` because it fell out of sync with `firebase` core types.
+**Learning:** `firebase` core, `firebase-admin`, and `@firebase/rules-unit-testing` versions are tightly coupled in the types they export (especially around `FirebaseFirestore`). Desynchronized package version updates in one area can trigger TypeScript `no-unsafe-argument` or `no-unsafe-assignment` lint errors that break the CI pipeline.
+**Prevention:** Always bump `@firebase/rules-unit-testing` and `firebase` symmetrically with `firebase-admin` and `firebase-functions` when running `npm audit fix --force` or upgrading major dependencies, and always verify with `npm run lint`.
