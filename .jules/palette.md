@@ -27,3 +27,6 @@
 ## 2024-10-21 - Add Haptic Feedback to AI ActionChips in Message Studio
 **Learning:** High-frequency primary tools inside a functional screen (like AI ActionChips for Shorten, Expand, Translate, and Variations in Message Studio) benefit greatly from subtle physical feedback. This reinforces the interactive nature of the controls, particularly when triggering asynchronous generative tasks.
 **Action:** Always include HapticFeedback.lightImpact() in the onPressed handlers for AI-driven or other high-use functional ActionChips to consistently provide physical acknowledgement of user interaction.
+## 2024-10-24 - Add Haptic Feedback to Copy and Clear Search Actions
+**Learning:** Adding haptic feedback to common utility actions, such as copying text to the clipboard and clearing search inputs, reinforces the completion of these micro-interactions and makes the application feel more tactile and responsive.
+**Action:** Consistently apply `HapticFeedback.lightImpact()` to `_copyToClipboard` methods and clear search `IconButton` handlers.
