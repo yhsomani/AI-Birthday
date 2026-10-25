@@ -29,3 +29,8 @@
 **Vulnerability:** HttpException exposed its raw `.message` property to the UI via `AppFailure.providerError()`.
 **Learning:** Raw network exception strings can leak internal details like IP addresses, proxy configurations, or secret paths.
 **Prevention:** Always log raw network exceptions securely on the server/device and return generic error messages to the UI.
+## 2024-10-31 - Native Platform Exception Leakage
+
+**Vulnerability:** PlatformException exposed its raw `.message` property to user-facing error models via `AppFailure.providerError`.
+**Learning:** Native exception strings can leak internal system paths, underlying native library details, or configuration specifics that should not be visible to users.
+**Prevention:** Always log the exception securely (if a logger is available) and return a static, generic error message to domain models and the UI when catching `PlatformException`.
