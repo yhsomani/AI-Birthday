@@ -22,10 +22,14 @@ enum DraftStatus {
 
   static DraftStatus fromString(String? value) {
     if (value == null) return DraftStatus.draft;
-    return DraftStatus.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
-      orElse: () => DraftStatus.draft,
-    );
+    for (final e in DraftStatus.values) {
+      if (e.name == value) return e;
+    }
+    final lowerValue = value.toLowerCase();
+    for (final e in DraftStatus.values) {
+      if (e.name.toLowerCase() == lowerValue) return e;
+    }
+    return DraftStatus.draft;
   }
 }
 
