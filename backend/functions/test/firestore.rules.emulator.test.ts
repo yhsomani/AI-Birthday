@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, type Firestore } from 'firebase/firestore';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
 let environment: RulesTestEnvironment;
@@ -29,7 +29,7 @@ afterAll(async () => {
 
 describe('Firestore authorization rules', () => {
   it('denies unauthenticated direct reads and writes', async () => {
-    const db = environment.unauthenticatedContext().firestore();
+    const db = environment.unauthenticatedContext().firestore() as unknown as Firestore;
     await assertFails(getDoc(doc(db, 'globalControl/current')));
     await assertFails(
       setDoc(doc(db, 'accounts/uid-one'), { mode: 'TEST_ONLY' }),
@@ -39,10 +39,10 @@ describe('Firestore authorization rules', () => {
   it('allows authenticated owners to access only their own opt-in backup collections', async () => {
     const ownerDb = environment
       .authenticatedContext('uid-one', { email_verified: true })
-      .firestore();
+      .firestore() as unknown as Firestore;
     const otherDb = environment
       .authenticatedContext('uid-two', { email_verified: true })
-      .firestore();
+      .firestore() as unknown as Firestore;
 
     await setDoc(doc(ownerDb, 'users/uid-one/people/person-1'), {
       name: 'Test',
@@ -57,7 +57,7 @@ describe('Firestore authorization rules', () => {
   it('denies authenticated direct reads and writes at every ledger depth', async () => {
     const db = environment
       .authenticatedContext('uid-one', { email_verified: true })
-      .firestore();
+      .firestore() as unknown as Firestore;
     await assertFails(getDoc(doc(db, 'accounts/uid-one')));
     await assertFails(
       getDoc(doc(db, 'accounts/uid-one/occurrenceClaims/opaque-claim')),
@@ -70,7 +70,7 @@ describe('Firestore authorization rules', () => {
   it('fences owner backup writes while the account is being deleted (F03)', async () => {
     const ownerDb = environment
       .authenticatedContext('uid-fence', { email_verified: true })
-      .firestore();
+      .firestore() as unknown as Firestore;
 
     // Before deletion starts, the owner can write.
     await assertSucceeds(
@@ -79,7 +79,8 @@ describe('Firestore authorization rules', () => {
 
     // The server marks the account DELETING; the owner's backup writes must stop.
     await environment.withSecurityRulesDisabled(async (context) => {
-      await setDoc(doc(context.firestore(), 'coordinationPresence/uid-fence'), {
+      const firestoreDb = context.firestore() as unknown as Firestore;
+      await setDoc(doc(firestoreDb, 'coordinationPresence/uid-fence'), {
         state: 'DELETING',
       });
     });
@@ -95,7 +96,8 @@ describe('Firestore authorization rules', () => {
 
     // Once the fence is lifted, writes resume.
     await environment.withSecurityRulesDisabled(async (context) => {
-      await setDoc(doc(context.firestore(), 'coordinationPresence/uid-fence'), {
+      const firestoreDb = context.firestore() as unknown as Firestore;
+      await setDoc(doc(firestoreDb, 'coordinationPresence/uid-fence'), {
         state: 'ANDROID_STATE',
       });
     });
@@ -107,10 +109,10 @@ describe('Firestore authorization rules', () => {
   it('lets owners write immutable backup generations and fences them during deletion (F05)', async () => {
     const ownerDb = environment
       .authenticatedContext('uid-gen', { email_verified: true })
-      .firestore();
+      .firestore() as unknown as Firestore;
     const otherDb = environment
       .authenticatedContext('uid-other', { email_verified: true })
-      .firestore();
+      .firestore() as unknown as Firestore;
 
     await assertSucceeds(
       setDoc(doc(ownerDb, 'users/uid-gen/generations/g1'), { schemaVersion: 1 }),
@@ -136,7 +138,8 @@ describe('Firestore authorization rules', () => {
     );
 
     await environment.withSecurityRulesDisabled(async (context) => {
-      await setDoc(doc(context.firestore(), 'coordinationPresence/uid-gen'), {
+      const firestoreDb = context.firestore() as unknown as Firestore;
+      await setDoc(doc(firestoreDb, 'coordinationPresence/uid-gen'), {
         state: 'DELETING',
       });
     });
