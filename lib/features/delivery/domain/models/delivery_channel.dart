@@ -17,10 +17,14 @@ enum DeliveryChannel {
 
   static DeliveryChannel fromString(String? value) {
     if (value == null) return DeliveryChannel.whatsapp;
-    return DeliveryChannel.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
-      orElse: () => DeliveryChannel.whatsapp,
-    );
+    for (final e in DeliveryChannel.values) {
+      if (e.name == value) return e;
+    }
+    final lowerValue = value.toLowerCase();
+    for (final e in DeliveryChannel.values) {
+      if (e.name.toLowerCase() == lowerValue) return e;
+    }
+    return DeliveryChannel.whatsapp;
   }
 }
 
