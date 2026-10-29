@@ -142,7 +142,7 @@ class MethodChannelGeminiNanoPlatform implements GeminiNanoPlatform {
         'prompt': prompt,
       });
       return NanoGenerationResult(text: res ?? '');
-    } on PlatformException catch (e) {
+    } on PlatformException {
       // 🛡️ SECURITY: Do not expose PlatformException.message to domain failure models.
       // Native exception strings can leak internal paths or library implementation details.
       // We return a static generic error string instead to prevent information disclosure.
