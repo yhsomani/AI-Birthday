@@ -21,8 +21,10 @@ enum RelationshipCategory {
 
   static RelationshipCategory fromString(String? value) {
     if (value == null) return RelationshipCategory.other;
+    // ⚡ Bolt: Hoist invariant .toLowerCase() outside the loop to avoid redundant string allocations
+    final lowerValue = value.toLowerCase();
     return RelationshipCategory.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
+      (e) => e.name.toLowerCase() == lowerValue,
       orElse: () => RelationshipCategory.other,
     );
   }

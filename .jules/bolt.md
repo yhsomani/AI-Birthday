@@ -59,3 +59,7 @@
 ## 2024-05-23 - Avoid O(N log N) allocations in sorting
 **Learning:** Calling `.toLowerCase()` inside a `.sort()` comparator is an anti-pattern that causes excessive O(N log N) string allocations.
 **Action:** Optimize by pre-computing lowercased comparison keys outside of the sort function and caching them (e.g. in a Map) to reduce the allocations to O(N).
+
+## 2026-10-30 - Hoist Invariant .toLowerCase() in Enum Parsers
+**Learning:** Calling .toLowerCase() on an invariant string inside an enum parsing loop (e.g., .firstWhere) causes redundant O(N) string allocations.
+**Action:** Hoist the .toLowerCase() computation outside the loop into a local variable to execute it only once.

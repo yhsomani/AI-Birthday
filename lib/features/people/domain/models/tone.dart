@@ -28,8 +28,10 @@ enum MessageTone {
 
   static MessageTone fromString(String? value) {
     if (value == null) return MessageTone.warm;
+    // ⚡ Bolt: Hoist invariant .toLowerCase() outside the loop to avoid redundant string allocations
+    final lowerValue = value.toLowerCase();
     return MessageTone.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
+      (e) => e.name.toLowerCase() == lowerValue,
       orElse: () => MessageTone.warm,
     );
   }
@@ -57,8 +59,10 @@ enum MessageLength {
 
   static MessageLength fromString(String? value) {
     if (value == null) return MessageLength.standard;
+    // ⚡ Bolt: Hoist invariant .toLowerCase() outside the loop to avoid redundant string allocations
+    final lowerValue = value.toLowerCase();
     return MessageLength.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
+      (e) => e.name.toLowerCase() == lowerValue,
       orElse: () => MessageLength.standard,
     );
   }
