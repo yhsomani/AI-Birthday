@@ -34,8 +34,8 @@
     "@vitest/coverage-v8": "4.1.10",
     "eslint": "10.7.0",
     "fast-check": "4.9.0",
-    "firebase": "^9.14.0",
-    "firebase-tools": "^15.34.2",
+    "firebase": "^13.1.0",
+    "firebase-tools": "^14.23.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.63.0",
     "vitest": "^4.1.12"
