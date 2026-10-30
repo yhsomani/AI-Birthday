@@ -17,8 +17,10 @@ enum DeliveryChannel {
 
   static DeliveryChannel fromString(String? value) {
     if (value == null) return DeliveryChannel.whatsapp;
+    // ⚡ Bolt: Hoist invariant .toLowerCase() outside the loop to avoid redundant string allocations
+    final lowerValue = value.toLowerCase();
     return DeliveryChannel.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
+      (e) => e.name.toLowerCase() == lowerValue,
       orElse: () => DeliveryChannel.whatsapp,
     );
   }
