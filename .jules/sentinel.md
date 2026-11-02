@@ -29,3 +29,9 @@
 **Vulnerability:** HttpException exposed its raw `.message` property to the UI via `AppFailure.providerError()`.
 **Learning:** Raw network exception strings can leak internal details like IP addresses, proxy configurations, or secret paths.
 **Prevention:** Always log raw network exceptions securely on the server/device and return generic error messages to the UI.
+
+## 2024-10-28 - PlatformException String Leakage via Provider Error
+
+**Vulnerability:** `PlatformException` in the Gemini Nano native bridge exposed its raw `.message` property to the domain error layer (`AppFailure.providerError()`).
+**Learning:** Native platform exception strings can expose underlying library details, system paths, or unhandled errors. These should not be presented directly to the user in a domain error context.
+**Prevention:** Catch `PlatformException` specifically, do not expose its `.message`, and substitute it with a safe, generic static error message (e.g., 'An error occurred communicating with the Nano platform.')
