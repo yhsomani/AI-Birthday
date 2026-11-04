@@ -29,3 +29,7 @@
 **Vulnerability:** HttpException exposed its raw `.message` property to the UI via `AppFailure.providerError()`.
 **Learning:** Raw network exception strings can leak internal details like IP addresses, proxy configurations, or secret paths.
 **Prevention:** Always log raw network exceptions securely on the server/device and return generic error messages to the UI.
+## 2024-05-31 - Fix exception detail leakage
+**Vulnerability:** The raw string `.message` of `PlatformException` was directly passed to `AppFailure.providerError()`, potentially exposing internal native system paths or strings to the user interface.
+**Learning:** In Flutter apps, exceptions originating from platform native code can contain sensitive internal state details. They should always be caught, logged internally, and mapped to safe, generic strings before crossing the domain boundary.
+**Prevention:** Catch `PlatformException` specifically, log the full error stack internally, and throw a standardized failure with a static detail string like `'Nano platform error'`.
