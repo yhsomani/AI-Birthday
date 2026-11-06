@@ -333,9 +333,9 @@ void main() {
         final identity = await gateway.getStoredIdentity();
         expect(identity, isNull);
 
-        // The partial corrupted keys are left in secure storage forever
-        expect(store.data['auth_session_subject'], 'sub-partial');
-        expect(store.data['auth_session_uid'], 'uid-partial');
+        // The partial corrupted keys should now be cleaned up
+        expect(store.data['auth_session_subject'], isNull);
+        expect(store.data['auth_session_uid'], isNull);
       },
     );
   });
