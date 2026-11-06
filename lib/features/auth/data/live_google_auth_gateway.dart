@@ -93,17 +93,6 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
               : null,
         );
       }
-
-      // 🛡️ SECURITY: Purge dangling or corrupted session keys to prevent
-      // cross-user session contamination and state bugs.
-      if (subject != null ||
-          email != null ||
-          name != null ||
-          photo != null ||
-          uid != null ||
-          idToken != null) {
-        await _clearSessionKeys();
-      }
     } catch (e, st) {
       _logger?.error(
         'AuthGateway',
