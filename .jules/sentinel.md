@@ -29,3 +29,7 @@
 **Vulnerability:** HttpException exposed its raw `.message` property to the UI via `AppFailure.providerError()`.
 **Learning:** Raw network exception strings can leak internal details like IP addresses, proxy configurations, or secret paths.
 **Prevention:** Always log raw network exceptions securely on the server/device and return generic error messages to the UI.
+## 2025-05-15 - Dangling Credentials Cleanup on Corrupted Session Rejection
+**Vulnerability:** Corrupted or partial sessions in local secure storage were rejected during read but never cleaned up, leaving partial keys persisting on the device permanently.
+**Learning:** Returning `null` early upon encountering invalid data in a secure storage read operation leaves behind state that could be read again, lead to cross-session contamination, or leak partial user information.
+**Prevention:** Always invoke cleanup logic (`_clearSessionKeys()`) if parsing a session from secure storage fails validation checks to maintain a clean security state and ensure idempotency.
