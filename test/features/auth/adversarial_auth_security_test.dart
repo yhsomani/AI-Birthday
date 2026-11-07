@@ -323,7 +323,7 @@ void main() {
     );
 
     test(
-      'FINDING 4: Dangling corrupted/partial keys are never cleaned up on rejection',
+      'FINDING 4: Dangling corrupted/partial keys are cleaned up on rejection',
       () async {
         // If store contains only subject and uid (corrupted/partial session)
         store.data['auth_session_subject'] = 'sub-partial';
@@ -333,9 +333,9 @@ void main() {
         final identity = await gateway.getStoredIdentity();
         expect(identity, isNull);
 
-        // The partial corrupted keys are left in secure storage forever
-        expect(store.data['auth_session_subject'], 'sub-partial');
-        expect(store.data['auth_session_uid'], 'uid-partial');
+        // 🛡️ SECURITY: The partial corrupted keys are cleaned up
+        expect(store.data['auth_session_subject'], isNull);
+        expect(store.data['auth_session_uid'], isNull);
       },
     );
   });
