@@ -19,12 +19,13 @@ enum RelationshipCategory {
     RelationshipCategory.other => 'Other',
   };
 
+  static final _byName = {
+    for (var e in RelationshipCategory.values) e.name.toLowerCase(): e,
+  };
+
   static RelationshipCategory fromString(String? value) {
     if (value == null) return RelationshipCategory.other;
-    return RelationshipCategory.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
-      orElse: () => RelationshipCategory.other,
-    );
+    return _byName[value.toLowerCase()] ?? RelationshipCategory.other;
   }
 }
 

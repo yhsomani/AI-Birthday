@@ -15,12 +15,13 @@ enum DeliveryChannel {
     DeliveryChannel.share => 'Share Sheet',
   };
 
+  static final _byName = {
+    for (var e in DeliveryChannel.values) e.name.toLowerCase(): e,
+  };
+
   static DeliveryChannel fromString(String? value) {
     if (value == null) return DeliveryChannel.whatsapp;
-    return DeliveryChannel.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
-      orElse: () => DeliveryChannel.whatsapp,
-    );
+    return _byName[value.toLowerCase()] ?? DeliveryChannel.whatsapp;
   }
 }
 

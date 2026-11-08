@@ -20,12 +20,13 @@ enum DraftStatus {
     DraftStatus.confirmedSent => 'Sent & Confirmed',
   };
 
+  static final _byName = {
+    for (var e in DraftStatus.values) e.name.toLowerCase(): e,
+  };
+
   static DraftStatus fromString(String? value) {
     if (value == null) return DraftStatus.draft;
-    return DraftStatus.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
-      orElse: () => DraftStatus.draft,
-    );
+    return _byName[value.toLowerCase()] ?? DraftStatus.draft;
   }
 }
 
