@@ -37,12 +37,13 @@ enum BirthdayStatus {
     _ => false,
   };
 
+  static final _byName = {
+    for (var e in BirthdayStatus.values) e.name.toLowerCase(): e,
+  };
+
   static BirthdayStatus fromString(String? value) {
     if (value == null) return BirthdayStatus.upcoming;
-    return BirthdayStatus.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
-      orElse: () => BirthdayStatus.upcoming,
-    );
+    return _byName[value.toLowerCase()] ?? BirthdayStatus.upcoming;
   }
 }
 

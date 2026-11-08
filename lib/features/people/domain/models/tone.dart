@@ -26,12 +26,13 @@ enum MessageTone {
     MessageTone.professional => 'Polite, respectful, and cordial.',
   };
 
+  static final _byName = {
+    for (var e in MessageTone.values) e.name.toLowerCase(): e,
+  };
+
   static MessageTone fromString(String? value) {
     if (value == null) return MessageTone.warm;
-    return MessageTone.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
-      orElse: () => MessageTone.warm,
-    );
+    return _byName[value.toLowerCase()] ?? MessageTone.warm;
   }
 }
 
@@ -55,11 +56,12 @@ enum MessageLength {
       'Write an expanded message, 3 to 5 sentences with rich detail.',
   };
 
+  static final _byName = {
+    for (var e in MessageLength.values) e.name.toLowerCase(): e,
+  };
+
   static MessageLength fromString(String? value) {
     if (value == null) return MessageLength.standard;
-    return MessageLength.values.firstWhere(
-      (e) => e.name.toLowerCase() == value.toLowerCase(),
-      orElse: () => MessageLength.standard,
-    );
+    return _byName[value.toLowerCase()] ?? MessageLength.standard;
   }
 }

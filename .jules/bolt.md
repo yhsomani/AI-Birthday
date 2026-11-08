@@ -59,3 +59,7 @@
 ## 2024-05-23 - Avoid O(N log N) allocations in sorting
 **Learning:** Calling `.toLowerCase()` inside a `.sort()` comparator is an anti-pattern that causes excessive O(N log N) string allocations.
 **Action:** Optimize by pre-computing lowercased comparison keys outside of the sort function and caching them (e.g. in a Map) to reduce the allocations to O(N).
+
+## 2024-11-08 - Enum Parsing Optimization
+**Learning:** Using `.firstWhere((e) => e.name.toLowerCase() == value.toLowerCase())` for enum parsing creates redundant O(N) string allocations per call, which is expensive in Flutter hot paths.
+**Action:** Pre-compute a static lowercase map (`static final _byName = {for (var e in values) e.name.toLowerCase(): e};`) to achieve O(1) lookups and eliminate per-call string allocations.
