@@ -142,9 +142,10 @@ class MethodChannelGeminiNanoPlatform implements GeminiNanoPlatform {
         'prompt': prompt,
       });
       return NanoGenerationResult(text: res ?? '');
-    } on PlatformException catch (e) {
-      throw AppFailure.providerError(
-        detail: e.message ?? 'Nano platform error',
+    } on PlatformException catch (_) {
+      // 🛡️ SECURITY: Prevent internal native exception strings/paths from leaking to the UI.
+      throw const AppFailure.providerError(
+        detail: 'An error occurred with the on-device model.',
       );
     }
   }
