@@ -502,7 +502,10 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
               backgroundColor: Theme.of(dialogContext).colorScheme.error,
               foregroundColor: Theme.of(dialogContext).colorScheme.onError,
             ),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              Navigator.of(dialogContext).pop(true);
+            },
             child: const Text('Delete'),
           ),
         ],
@@ -709,6 +712,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                             icon: const Icon(Icons.close),
                             tooltip: 'Clear search',
                             onPressed: () {
+                              HapticFeedback.lightImpact();
                               _searchController.clear();
                               setState(() => _query = '');
                             },

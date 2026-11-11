@@ -919,6 +919,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   }
 
   void _copyToClipboard() {
+    HapticFeedback.lightImpact();
     final text = _messageController.text.trim();
     if (text.isNotEmpty) {
       Clipboard.setData(ClipboardData(text: text));
