@@ -39,14 +39,12 @@ enum BirthdayStatus {
 
   static BirthdayStatus fromString(String? value) {
     if (value == null) return BirthdayStatus.upcoming;
-    for (final e in BirthdayStatus.values) {
-      if (e.name == value) return e;
-    }
-    final lowerValue = value.toLowerCase();
-    for (final e in BirthdayStatus.values) {
-      if (e.name.toLowerCase() == lowerValue) return e;
-    }
-    return BirthdayStatus.upcoming;
+    // ⚡ Bolt: Hoist invariant .toLowerCase() out of loop to avoid O(N) redundant string allocations
+    final target = value.toLowerCase();
+    return BirthdayStatus.values.firstWhere(
+      (e) => e.name.toLowerCase() == target,
+      orElse: () => BirthdayStatus.upcoming,
+    );
   }
 }
 

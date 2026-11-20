@@ -60,6 +60,6 @@
 **Learning:** Calling `.toLowerCase()` inside a `.sort()` comparator is an anti-pattern that causes excessive O(N log N) string allocations.
 **Action:** Optimize by pre-computing lowercased comparison keys outside of the sort function and caching them (e.g. in a Map) to reduce the allocations to O(N).
 
-## 2024-10-25 - Avoid O(N) string allocations in enum parsing
-**Learning:** Using `value.toLowerCase()` inside a `.firstWhere((e) => e.name.toLowerCase() == value.toLowerCase())` closure on Enums creates multiple O(N) string allocations during database hydration and JSON parsing.
-**Action:** Hoist the `value.toLowerCase()` computation outside of the loop and implement a manual `for` loop instead of `firstWhere` for fast enum string parsing.
+## 2024-05-24 - Hoist toLowerCase in Enum Parsers
+**Learning:** Calling `.toLowerCase()` inside a loop or `firstWhere` closure on an invariant search value causes O(N) redundant string allocations, which degrades performance especially on hot paths like enum deserialization.
+**Action:** Hoist the `.toLowerCase()` call outside the iteration closure into a local variable so it executes exactly once.
