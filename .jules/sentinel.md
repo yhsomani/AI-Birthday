@@ -29,7 +29,8 @@
 **Vulnerability:** HttpException exposed its raw `.message` property to the UI via `AppFailure.providerError()`.
 **Learning:** Raw network exception strings can leak internal details like IP addresses, proxy configurations, or secret paths.
 **Prevention:** Always log raw network exceptions securely on the server/device and return generic error messages to the UI.
-## 2024-11-20 - Raw PlatformException Leakage
-**Vulnerability:** PlatformException exposed its raw `.message` property to the UI via `AppFailure.providerError()`.
-**Learning:** Native platform exceptions can contain sensitive internal state, paths, or execution strings that should not be visible to users.
-**Prevention:** When catching `PlatformException`, do not expose its `.message` property to user-facing models. Sanitize it by returning a static, generic error message instead.
+
+## 2024-10-28 - Raw Exception Leakage to Logger via String Interpolation
+**Vulnerability:** Raw exceptions (`$e`) were being directly interpolated into logger message strings in `live_google_auth_gateway.dart` instead of being passed as discrete error arguments.
+**Learning:** String interpolation circumvents structured logger redaction rules and potentially exposes raw error details inside generic message arguments.
+**Prevention:** Never use string interpolation (`$e`) for exceptions in logger messages. Always use the logger's designated `error: e` argument to ensure exceptions are securely handled and formatted.
