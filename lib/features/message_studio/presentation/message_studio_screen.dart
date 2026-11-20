@@ -922,6 +922,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     final text = _messageController.text.trim();
     if (text.isNotEmpty) {
       Clipboard.setData(ClipboardData(text: text));
+      HapticFeedback.lightImpact();
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Copied to clipboard 📋')));
