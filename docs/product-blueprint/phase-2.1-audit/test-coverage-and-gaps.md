@@ -113,3 +113,27 @@ Hosting `check` passed, which runs typecheck, node tests and production build pe
 5. Unblock backend install, then run lint, typecheck, Vitest and Firestore emulator suites.
 6. Fix and rerun the compact Calendar test; then allow Android APK and manifest checks to execute.
 7. Add device and deployment evidence separately from unit/widget CI.
+
+
+## Phase 2.1.1 Flutter inventory update
+
+The source tree at `85795e845a945ac3442405ed843b4f12c6983249` contains 65 feature Dart files across 15 domains and 72 `_test.dart` files (47 feature-domain files, 25 cross-cutting/AI/app/core/E2E/security/UI files). See [Flutter Test Inventory](flutter-test-inventory.md) and [Flutter Feature Audit](flutter-feature-audit.md).
+
+Latest run for this exact commit: [45231730459](https://github.com/yhsomani/AI-Birthday/actions/runs/45231730459).
+- Flutter: format and analyze pass; 459 passed, 1 failed.
+- Failure: Calendar at 320px, bottom RenderFlex overflow 0.667px.
+- Backend: `npm ci` fails with missing lockfile entries; downstream audit/lint/build/Vitest/emulator tests do not run.
+- Hosting: pass.
+
+### Test evidence classification
+
+The E2E-labelled tier tests use fake Firebase Auth, fake subscription server/store and fake AICore platform. The auth gateway tests use fake Google Sign-In platform and mocked HTTP; Play verification uses a fake store and mocked HTTP; sync uses injected HTTP; Stripe tests use `MockClient`. These prove behavior against deterministic test doubles, not live provider integration.
+
+### Flutter coverage gaps now explicit
+
+- No dedicated direct Dart test file for `NativeShareService`, `NativeSmsGateway` or `SmsDeliveryService`.
+- No dedicated unit test file for `GeminiNanoProvider`; its class is exercised in fake-AICore E2E cases.
+- Notification gateway test covers non-live Android no-op behavior, not actual alarm delivery.
+- Settings tests cover multiple settings flows, but CloudBackupCard lacks an identified dedicated widget test.
+- Device contacts, native SMS, exact alarms, real Google OAuth, live Play Billing, real Stripe and deployed Firestore remain unverified.
+- Stripe is not just a test gap: see F-SEC-001 in [Flutter Feature Audit](flutter-feature-audit.md). Do not ship a real Stripe secret in a Dart define.
