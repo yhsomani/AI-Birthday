@@ -93,7 +93,7 @@ The tree contains 72 Dart test files: 47 under `test/features/` and 25 cross-cut
 - `test/app/shell_goldens_test.dart`
 - `test/app/shell_test.dart`
 
-## Core / database / error / logging tests — 4
+## Core / database / error / logging tests — 5
 - `test/core/database/app_database_migration_test.dart`
 - `test/core/database/app_database_test.dart`
 - `test/core/database/drift_repositories_test.dart`
@@ -111,7 +111,7 @@ The tree contains 72 Dart test files: 47 under `test/features/` and 25 cross-cut
 - `test/e2e/tier3_cross_feature_test.dart`
 - `test/e2e/tier4_user_journeys_test.dart`
 
-## Security, UI and root widget tests — 5
+## Security, UI and root widget tests — 6
 - `test/security/credential_storage_test.dart`
 - `test/ui/contrast_test.dart`
 - `test/ui/countdown_chip_test.dart`
