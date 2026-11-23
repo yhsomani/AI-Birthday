@@ -81,3 +81,28 @@
 - **Open:** evidence missing, conflicting or not yet inspected.
 
 Do not convert legacy `implemented` to “complete” without those dimensions.
+
+
+## Phase 2.1.1 — Current Flutter feature source inventory
+
+The latest reviewed source baseline is `85795e845a945ac3442405ed843b4f12c6983249`. The recursive tree contains 65 Dart feature files across 15 domains. The complete file-by-file inventory is in [Flutter Source Inventory](flutter-source-inventory.md); the behavior assessment is in [Flutter Feature Audit](flutter-feature-audit.md).
+
+| Domain | Source files | Direct feature test files | Current assessment |
+|---|---:|---:|---|
+| AI | 5 | 3 under `test/ai` | Implemented/test-backed; BYOK comment conflict; Nano direct unit coverage gap |
+| Auth | 6 | 4 | Implemented/test-backed with mocked OAuth/HTTP; real device auth unverified |
+| Birthdays | 4 | 2 plus domain calculation test | Implemented/test-backed |
+| Calendar | 1 | 3 plus responsive test | **Broken in CI:** 320px overflow 0.667px |
+| Dashboard | 1 | 1 | Implemented/test-backed; journey edge coverage open |
+| Delivery | 8 | 1 plus WhatsApp builder test | Partial; native adapters lack direct Dart tests/device evidence |
+| History | 1 | 1 | Implemented/test-backed; handoff vs confirmed-sent semantics asserted |
+| Jobs | 5 | 4 | Implemented/test-backed; retry/cancel/crash recovery assertions |
+| Message Studio | 3 | 4 | Implemented/test-backed; real provider/device journey open |
+| Onboarding | 1 | 1 | Implemented/test-backed with fake storage |
+| People | 15 | 11 | Strong source/test coverage; device contact runtime open |
+| Reminders | 8 | 5 | Logic/persistence test-backed; live Android scheduling open |
+| Settings | 3 | 6 | Partial; cloud backup widget coverage and Stripe architecture gaps |
+| Subscription | 3 | 3 | Play client path fake-backed; Stripe client-side secret/entitlement path is a P0 architecture blocker |
+| Sync | 1 | 1 | Mocked REST/service coverage; live Firestore/rules unverified |
+
+**Important correction:** `lib/features/people/domain/person.dart` is a re-export of `models/person.dart`, not a second Person class. The full source inventory identifies the canonical model.
