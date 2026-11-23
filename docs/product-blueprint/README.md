@@ -1,12 +1,12 @@
 # AI-Birthday — Product Blueprint
 
-**Blueprint version:** 0.1.0  
-**Status:** Discovery baseline — not yet stakeholder-approved or implementation-ready  
+**Blueprint version:** 0.1.1  
+**Status:** Discovery baseline with Phase 2 evidence audit in progress — not stakeholder-approved or implementation-ready  
 **Review date:** 2026-11-23  
-**Repository baseline:** `main` at `0116e1e2c6d63ac04351fc6be44f8291cb98d00c`  
-**Scope:** Product discovery, product definition, requirements, architecture, UX, governance and planning. No application implementation is authorized by this blueprint.
+**Repository baseline:** `main` at `ea475e0135a99d5dbae9891340c4a554f2e5fe15`  
+**Scope:** Product discovery, product definition, requirements, architecture, UX, governance, planning and evidence-based implementation audit. No application implementation is authorized by this blueprint.
 
-> This directory is the proposed product-definition source of truth. It deliberately separates intended product behavior from source-code evidence and historical documentation. It does not claim that every product decision has been validated or that every feature has been fully specified.
+> This directory separates intended product behavior from source-code evidence and historical documentation. The initial blueprint is not a claim that every product decision, feature, integration or runtime behavior has been validated.
 
 ## Start here
 
@@ -24,14 +24,15 @@
 | Decisions, assumptions, risks and traceability | [10 — Governance registers](10-governance-registers.md) |
 | Product ecosystem mind map | [Master product map](diagrams/master-product-map.mmd) |
 | Target architecture map | [Architecture map](diagrams/target-architecture.mmd) |
+| Phase 2 audit index | [Phase 2 — Evidence-based repository audit](phase-2-audit/README.md) |
 
 ## Authority model
 
-1. **Approved product decisions** in this directory govern intended behavior once explicitly approved.
-2. **Current source code** is evidence of what is implemented, not proof that it is correct or intended.
-3. **Tests and CI** are evidence only for the assertions and environments actually exercised.
-4. **Deployment evidence** is required before describing a backend or public surface as live.
-5. **Legacy documents** remain historical evidence until their claims are revalidated and migrated.
+1. Approved product decisions govern intended behavior once explicitly approved.
+2. Current source code is evidence of implementation, not proof that behavior is correct or intended.
+3. Tests and CI are evidence only for the assertions and environments actually exercised.
+4. Deployment evidence is required before describing a backend or public surface as live.
+5. Legacy documents remain historical evidence until their claims are revalidated and migrated.
 
 ## Evidence labels
 
@@ -45,12 +46,14 @@
 
 ## Baseline findings
 
-- The repository is a public Flutter/Dart application with a native Android Kotlin layer, Firebase Functions and a Firebase Hosting package.
-- The root includes README, PROJECT, SSOT, ARCHITECTURE and DESIGN documents; `docs/` includes knowledge, audit, archive, UI/UX and purchase-setup material.
-- The repository's knowledge portal declares a 50-node feature registry last reviewed 2026-10-14. It is a source-review snapshot, not runtime proof and must be refreshed against this baseline.
-- The backend README explicitly says the Birthday Autopilot coordination control plane is not deployed. Hosting also has external release gates and no evidenced production deployment.
-- The repository contains conflicting AI entitlement statements. The project decision carried forward here is that an active application subscription is required before **any** AI provider is used, including BYOK and on-device Nano. The current SSOT/router documentation must be reconciled against this decision.
-- The existing data architecture describes local-first SQLite and opt-in Firestore backup. The backup must not be described as end-to-end encrypted unless that property is implemented and independently verified.
+- The repository tree at the reviewed commit contains 425 files and 198 directories (623 tree entries). It includes Flutter/Dart, Android/Kotlin, Firebase Functions, a Hosting web package, tests and 89 files under `docs/`.
+- The Flutter application has 96 files under `lib/`; Android has 27 files; backend has 76 files; tests contain 84 Dart files, including 72 files named `*_test.dart`, plus 20 image artifacts.
+- The knowledge portal contains a 50-node feature registry last reviewed 2026-10-14 against an older source snapshot. It is a source-review baseline, not runtime proof.
+- The latest observed CI run for the reviewed main commit failed: 459 Flutter tests passed and one responsive calendar test failed; backend `npm ci` failed because the lockfile is out of sync; Hosting checks passed. Formatting and static analysis passed. Android release builds were skipped.
+- The source-level AI router requires an active app entitlement before provider selection, and tests assert that a free entitlement is blocked even when a user Gemini key exists. Root `SSOT.md` and a router comment still describe BYOK as an entitlement bypass. The documented prior product decision is that entitlement gates every AI provider; reconcile the SSOT and stale comments.
+- The local database declares six Drift tables at schema version 5. Only `Persons` has both `version` and `deletedAt`; other tables have different sync metadata. Documentation that describes a full version/tombstone envelope on all entities is inaccurate.
+- The backend includes purchase verification and a distinct Birthday Autopilot coordination surface. The existence of functions does not prove deployment or mobile integration.
+- Cloud backup is owner-scoped Firestore data. Do not describe it as end-to-end encrypted or zero-PII without implementation evidence.
 
 ## Completion policy
 
@@ -58,16 +61,11 @@ This blueprint is not complete merely because the index exists. Each requirement
 
 ## Change control
 
-Every approved change must update:
-- the relevant domain specification;
-- requirement and business-rule registers;
-- dependency and decision registers;
-- traceability and test mapping;
-- relevant Mermaid maps;
-- this index and revision history.
+Every approved change must update the relevant domain specification, requirement and business-rule registers, dependency and decision registers, traceability and test mapping, relevant diagrams, this index and revision history.
 
 ## Revision history
 
 | Version | Date | Change |
 |---|---|---|
-| 0.1.0 | 2026-11-23 | Initial discovery baseline created from repository and prior explicit product decisions. Specialist source review, domain validation, competitor research and full requirement decomposition remain in progress. |
+| 0.1.0 | 2026-11-23 | Initial discovery baseline created from repository and prior explicit product decisions. |
+| 0.1.1 | 2026-11-23 | Added Phase 2 repository inventory, CI evidence, implementation map, discrepancy register and audit limitations. No application source/configuration changed. |
