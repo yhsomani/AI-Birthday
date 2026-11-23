@@ -169,7 +169,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final totalCells = lead + daysInMonth;
 
     return Padding(
-      padding: const EdgeInsets.all(12),
+      // Keep a one-pixel bottom reserve for fractional flex-row allocation on
+      // compact viewports. Without it, the six-row month grid can exceed the
+      // available height by a fraction of a logical pixel at 320px width.
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 13),
       child: Column(
         children: [
           Row(
