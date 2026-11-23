@@ -130,7 +130,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             return EmptyState(
               icon: Icons.calendar_month_outlined,
               title: 'No birthdays yet',
-              message: 'Add a birthday contact and their special day will appear on the calendar.',
+              message:
+                  'Add a birthday contact and their special day will appear on the calendar.',
               action: FilledButton.icon(
                 onPressed: () {
                   HapticFeedback.lightImpact();
