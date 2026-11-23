@@ -195,7 +195,11 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byType(CalendarScreen), findsOneWidget);
-        expect(tester.takeException(), isNull);
+        final exception = tester.takeException();
+        if (exception != null) {
+          debugDumpRenderTree();
+        }
+        expect(exception, isNull);
       },
     );
 
