@@ -26,6 +26,7 @@ The recursive tree contained 623 entries: 425 file blobs + 198 directory trees.
 | JSON | 1 |
 | Mermaid | 2 |
 | PNG screenshots | 20 |
+| Python validator | 1 |
 | **Total** | **89** |
 
 ### Test composition
