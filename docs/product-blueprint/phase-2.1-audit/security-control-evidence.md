@@ -21,3 +21,22 @@
 - “Account deletion is complete” based only on callable source or a Hosting build.
 - “SMS automation is safe/restricted to a particular flavor” without built artifact manifest inspection.
 - “All Functions enforce App Check” until each export's effective options and guards are traced.
+
+
+## Phase 2.1.1 Flutter finding — Stripe secret and entitlement authority
+
+<badge color="danger">P0 architecture blocker</badge>
+
+**Source files:** `lib/core/config/stripe_config.dart`, `lib/features/subscription/application/stripe_gateway_service.dart`, `lib/features/settings/presentation/settings_screen.dart`, `lib/features/subscription/application/subscription_service.dart`.
+
+Observed source behavior:
+1. `StripeConfig.secretKey` reads `STRIPE_SECRET_KEY` with `String.fromEnvironment`.
+2. `StripeGatewayService` puts that value into `Authorization: Bearer ...` and calls Stripe Checkout, customer search, subscription lookup and billing portal APIs directly from Flutter.
+3. Settings performs an email-based active-subscription lookup after browser checkout and then calls `setDevSandboxEntitlement`.
+4. `setDevSandboxEntitlement` is documented in `SubscriptionNotifier` as a test hook and directly assigns local entitlement state.
+5. No Stripe-specific backend source or Function exists in the repository tree.
+6. The checked-in default secret is empty. CI's Play and Personal APK build commands only pass `FIREBASE_WEB_API_KEY`; `build-and-install-android.bat` passes no Stripe define. This means known build scripts do not configure a working secret-key path. Passing a real secret through a Dart define would expose it in the client artifact.
+
+**Security conclusion:** A production Stripe integration must not put a Stripe secret in a Flutter app or grant paid entitlement through a client-side test hook. Move secret operations to a trusted backend; verify checkout ownership and subscription state server-side; use signed webhooks; return a server-verified entitlement. Rotate any secret that may already have been included in a shipped artifact. This is an audit finding only; no source code was changed.
+
+**Related tests:** `test/features/subscription/stripe_gateway_service_test.dart` uses `MockClient` and an injected test secret. It verifies request construction and mocked responses, not live Stripe security or entitlement authority.
