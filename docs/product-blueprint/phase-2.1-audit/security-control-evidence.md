@@ -25,7 +25,7 @@
 
 ## Phase 2.1.1 Flutter finding — Stripe secret and entitlement authority
 
-<badge color="danger">P0 architecture blocker</badge>
+**P0 architecture blocker.**
 
 **Source files:** `lib/core/config/stripe_config.dart`, `lib/features/subscription/application/stripe_gateway_service.dart`, `lib/features/settings/presentation/settings_screen.dart`, `lib/features/subscription/application/subscription_service.dart`.
 
