@@ -52,3 +52,49 @@ Latest backend workflow run failed during `npm ci`. Backend dependency audit, li
 ## Required per-endpoint fields for completion
 
 For each export, capture: request schema, required fields, authentication guard, App Check guard, region, secrets, Firestore paths, transaction boundaries, response schema, error codes, idempotency key, rate/abuse controls, caller(s), direct tests, emulator tests and deployment evidence.
+
+## Per-export dispatch evidence
+
+The current index body was inspected. This table records the request schema and authorization path at the exported handler boundary. It is not a substitute for validating the imported schema definition, service transaction and response contract.
+
+| Export | Request schema | Handler guard / extra condition |
+|---|---|---|
+| `registerAndroidInstallation` | `registrationSchema` | `requireAuthenticated`; `commonOptions` |
+| `renewSenderLease` | `leaseSchema` | `requireAuthenticated`; `commonOptions` |
+| `changeAccountMode` | `accountModeSchema` | `requireAuthenticated`; `commonOptions` |
+| `claimOccurrence` | `birthdayClaimSchema` | `requireAuthenticated`; `secretOptions` |
+| `claimTest` | `testClaimSchema` | `requireAuthenticated`; `secretOptions` |
+| `armAttempt` | `armSchema` | `requireAuthenticated`; `commonOptions` |
+| `getArmStatus` | `armSchema` | `requireAuthenticated`; `commonOptions` |
+| `reportTestOutcome` | `testReportSchema` | `requireAuthenticated`; `commonOptions` |
+| `authorizeSafeRetry` | `retrySchema` | `requireAuthenticated`; `commonOptions` |
+| `beginSenderTransfer` | `transferSchema` | `requireAuthenticated` + recent Google authentication |
+| `completeSenderTransfer` | `transferSchema` | `requireAuthenticated` + recent Google authentication |
+| `requestAccountDeletion` | `deletionSchema` | `requireAuthenticated` + recent Google authentication |
+| `accountDeletionReceipt` | `deletionReceiptSchema` | `requireSignedOutAppChecked` |
+| `resetContactDerivedState` | `contactDerivedResetSchema` | `requireAuthenticated` + recent Google authentication |
+| `releaseAndroidSender` | `senderReleaseSchema` | `requireAuthenticated` + recent Google authentication |
+| `coordinationLifecycleStatus` | `coordinationLifecycleStatusSchema` | `requireAuthenticated`; `commonOptions` |
+| `companionStatus` | `companionStatusSchema` | `requireAuthenticated`; `commonOptions` |
+| `verifyPurchase` | `verifyPurchaseSchema` | Firebase Auth required; App Check conditional on `ENFORCE_APP_CHECK_ON_PURCHASE=true` |
+| `sweepDeletionDrains` | No request payload | Scheduled every 1 minute; region `asia-south1`; maxInstances 1 |
+| `sweepCoordinationOperations` | No request payload | Scheduled every 1 minute; region `asia-south1`; maxInstances 1 |
+
+## Shared transport validation
+
+`backend/functions/src/transport/schemas.ts` uses Zod and strict object schemas. Shared bindings include contract version, ledger generation, installation ID, build/policy versions, distribution channel, sender epoch and reset generation. Request-specific schemas include UUID/request IDs, bounded alias arrays and SHA-256 prehashes. The purchase schema requires contractVersion, purchaseToken, productId, packageName and accountBinding.
+
+The exported purchase response type is `{ status: 'active' | 'expired' | 'none'; productId; expiryDateMs; canUseAi; isAutoRenewing }`.
+
+## Security nuance
+
+The shared `commonOptions` object enables App Check, but `verifyPurchase` deliberately overrides App Check enforcement based on `ENFORCE_APP_CHECK_ON_PURCHASE`. Therefore “all exports always enforce App Check” is not an accurate blanket statement. The deletion receipt endpoint uses a signed-out App Check path. These exceptions must remain explicit in threat modelling.
+
+## Test mappings from the registry
+
+- `CTRL`: `backend/functions/test/controlPlane.emulator.test.ts`
+- `CTRL-CLAIM`: `backend/functions/test/decisions.test.ts`
+- `CTRL-DELETE`: `backend/functions/test/deletionReceipt.test.ts`
+- `CTRL-PURCHASE`: `backend/functions/test/subscriptionVerification.test.ts`
+
+These tests were not run in the latest CI workflow because dependency installation failed.
