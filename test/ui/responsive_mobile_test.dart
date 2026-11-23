@@ -32,11 +32,13 @@ void main() {
       String id = 'p-sarah',
       String name = 'Sarah Jenkins With A Very Long Professional Name',
       String? phone = '+14155552671',
+      int? birthdayMonth,
+      int? birthdayDay,
     }) => Person(
       id: id,
       name: name,
-      birthdayMonth: DateTime.now().month,
-      birthdayDay: DateTime.now().day,
+      birthdayMonth: birthdayMonth ?? DateTime.now().month,
+      birthdayDay: birthdayDay ?? DateTime.now().day,
       birthYear: 1992,
       phoneNumber: phone,
       relationship: RelationshipCategory.colleague,
@@ -175,7 +177,9 @@ void main() {
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
 
-        final person = buildPerson();
+        // November 2026 starts on Sunday and needs six calendar rows. Keep
+        // this fixture fixed so compact-height flex rounding stays reproducible.
+        final person = buildPerson(birthdayMonth: 11, birthdayDay: 23);
 
         await tester.pumpWidget(
           ProviderScope(
@@ -183,7 +187,9 @@ void main() {
               ...harness.providerOverrides,
               personListProvider.overrideWith((ref) => Stream.value([person])),
             ],
-            child: MaterialApp(home: CalendarScreen(now: () => DateTime.now())),
+            child: MaterialApp(
+              home: CalendarScreen(now: () => DateTime(2026, 11, 23)),
+            ),
           ),
         );
         await tester.pumpAndSettle();
