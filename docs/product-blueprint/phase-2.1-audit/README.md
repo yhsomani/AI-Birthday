@@ -46,3 +46,14 @@ Build a reliable map from product capabilities to current implementation files, 
 ## Limitations
 
 This deliverable records the verified baseline and mappings. It does not claim every feature source file, every assertion, every backend API implementation, every native manifest/receiver, or every historical document has been exhaustively inspected. The next pass must close those gaps before Phase 2.1 can be marked complete.
+
+
+## Phase 2.1.1 — Flutter feature audit
+
+The immediate Flutter feature pass has inventoried all 15 domains, 65 feature source files and 72 Dart test files at source commit `85795e845a945ac3442405ed843b4f12c6983249`.
+
+- [Flutter Feature Audit](flutter-feature-audit.md)
+- [Flutter Source Inventory](flutter-source-inventory.md)
+- [Flutter Test Inventory](flutter-test-inventory.md)
+
+**Status:** PASS for source/test inventory and first-pass feature assessment; PARTIAL for complete Phase 2.1. Critical open findings include the 320px Calendar CI failure, fake-backed external integration tests, missing native delivery adapter tests, stale AI routing comments and P0 Stripe secret/entitlement architecture. Backend/data/platform and full acceptance-criterion traceability remain open.
