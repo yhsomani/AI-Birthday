@@ -1,9 +1,9 @@
 # AI-Birthday — Product Blueprint
 
 **Blueprint version:** 0.1.1  
-**Status:** Discovery baseline with Phase 2 evidence audit in progress — not stakeholder-approved or implementation-ready  
+**Status:** Discovery baseline; Phase 2.1 source-to-test audit in progress — not stakeholder-approved or implementation-ready  
 **Review date:** 2026-11-23  
-**Repository baseline:** `main` at `ea475e0135a99d5dbae9891340c4a554f2e5fe15`  
+**Repository baseline:** `main` at `4380220014d88a6b05f61466043bc7e319c8dbef` for Phase 2 entry; Phase 2.1 documents record their own commit history  
 **Scope:** Product discovery, product definition, requirements, architecture, UX, governance, planning and evidence-based implementation audit. No application implementation is authorized by this blueprint.
 
 > This directory separates intended product behavior from source-code evidence and historical documentation. The initial blueprint is not a claim that every product decision, feature, integration or runtime behavior has been validated.
@@ -25,6 +25,7 @@
 | Product ecosystem mind map | [Master product map](diagrams/master-product-map.mmd) |
 | Target architecture map | [Architecture map](diagrams/target-architecture.mmd) |
 | Phase 2 audit index | [Phase 2 — Evidence-based repository audit](phase-2-audit/README.md) |
+| Phase 2.1 source-to-test audit | [Phase 2.1 — Source-to-test audit](phase-2.1-audit/README.md) |
 
 ## Authority model
 
@@ -69,3 +70,4 @@ Every approved change must update the relevant domain specification, requirement
 |---|---|---|
 | 0.1.0 | 2026-11-23 | Initial discovery baseline created from repository and prior explicit product decisions. |
 | 0.1.1 | 2026-11-23 | Added Phase 2 repository inventory, CI evidence, implementation map, discrepancy register and audit limitations. No application source/configuration changed. |
+| 0.1.2 | 2026-11-23 | Added Phase 2.1 evidence baseline, feature/test mapping, database dictionary, API and platform inventories, security evidence and coverage gaps. Exhaustive source audit remains in progress. |
