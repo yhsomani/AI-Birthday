@@ -1,0 +1,123 @@
+# 10 — Governance registers
+
+## 1. Decision register
+
+| ID | Decision / question | Current position | Status | Owner / next action |
+|---|---|---|---|---|
+| DEC-001 | Product is a personal birthday assistant, not a general AI chatbot | Adopt as working definition | Proposed | Product owner approval |
+| DEC-002 | Local-first is the default for core personal data | Existing direction | Proposed | Privacy review |
+| DEC-003 | User reviews and initiates all WhatsApp messages | Adopt | Existing product boundary | Preserve and test |
+| DEC-004 | Active app subscription gates all AI providers, including BYOK and Nano | Prior explicit user decision; current repo SSOT and source need reconciliation | Confirmed prior decision; verify current implementation | Product + AI owner |
+| DEC-005 | Invalid configured key is an error, not missing configuration | Adopt | Proposed | AI owner |
+| DEC-006 | Cloud backup is opt-in | Existing direction | Proposed | Product/privacy approval |
+| DEC-007 | Backup is not described as end-to-end encrypted without evidence | Required claim boundary | Confirmed by current architecture docs | Security owner |
+| DEC-008 | Personal automated SMS is a separate distribution capability | Existing source flavor split | Proposed | Product/legal/store review |
+| DEC-009 | Birthday Autopilot is a separate product surface from core WhatsApp handoff | Existing backend docs | Proposed boundary | Stakeholder decision |
+| DEC-010 | Public Hosting is not production until external gates are evidenced | Backend/hosting READMEs | Current evidence | Release owner |
+| DEC-011 | Supported platform scope | Android evidenced; broader scope not approved | Open | Product owner |
+| DEC-012 | Leap-day occurrence policy | Not resolved in this baseline | Open | Product owner |
+| DEC-013 | Analytics/telemetry policy | No user-data collection assumed | Open | Privacy owner |
+| DEC-014 | Subscription packaging, price and trial | Purchase code exists; commercial strategy unvalidated | Open | Business owner |
+| DEC-015 | Backup semantics: one-way backup/restore vs multi-device sync | Existing docs describe snapshot backup | Open | Product/data owner |
+
+## 2. Assumptions register
+
+| ID | Assumption | Risk if false | Validation |
+|---|---|---|---|
+| ASM-001 | Primary user is an individual managing personal relationships | Wrong product positioning | Customer interviews |
+| ASM-002 | Manual drafting is sufficient fallback when AI unavailable | Reduced product value if false | Usability testing |
+| ASM-003 | Local-first is a differentiator users understand and value | Messaging may be unclear | Onboarding comprehension test |
+| ASM-004 | Android is the first supported platform | Scope and roadmap rework | Stakeholder approval |
+| ASM-005 | Current local SQLite data remains canonical for core workflows | Multi-device expectations may conflict | Product decision on sync |
+| ASM-006 | Google Play subscription is the intended entitlement channel for Android | Commercial/platform constraints | Billing and legal review |
+| ASM-007 | No analytics containing personal birthday or message content is required | Product measurement limits | Privacy and product review |
+
+## 3. Risk register
+
+| ID | Risk | Likelihood / impact | Mitigation | Owner |
+|---|---|---|---|---|
+| RSK-001 | Conflicting AI entitlement behavior between user decision, SSOT and implementation | High / High | Reconcile requirement, router, UI, tests and docs as one controlled change | Product/AI |
+| RSK-002 | Data integrity issues across parallel repositories, tombstones and undo | Medium / High | Full source trace, aggregate transaction model, property/integration tests | Data |
+| RSK-003 | Birthday cycle/reminder mismatch after timezone or restore changes | Medium / High | Central date policy and reconciliation test matrix | Birthday/Reminders |
+| RSK-004 | Handoff/history states are inconsistent or misleading | Medium / High | Canonical delivery event model and cross-screen contract tests | Delivery |
+| RSK-005 | Cloud backup misunderstood as encrypted or fully synchronized | Medium / High | Explicit disclosure and approved sync semantics | Privacy/Data |
+| RSK-006 | Backend control plane assumed deployed or integrated | High / High | Separate product boundary and deployment evidence gate | Platform |
+| RSK-007 | Hosting deletion surface launched without legal/support identity gates | Medium / High | Block release until every external gate is evidenced | Release |
+| RSK-008 | Device-dependent Nano and exact alarms fail on supported devices | Medium / Medium | Publish support matrix and physical-device tests | Android |
+| RSK-009 | Subscription conversion assumptions lack user evidence | Unknown / High | Customer research and pricing validation | Business |
+| RSK-010 | Scope expands into unrelated social/messaging features | Medium / Medium | Product boundary and approval gate | Product |
+
+## 4. Dependency register
+
+| ID | Depends on | Enables | Constraint |
+|---|---|---|---|
+| DEP-001 | Person model and validation | Birthday occurrence | Stable person ID and valid birthday |
+| DEP-002 | Birthday occurrence policy | Dashboard, calendar, reminders, studio, history | One canonical date/timezone policy |
+| DEP-003 | Draft persistence/revision | AI generation and delivery | Preserve last valid revision |
+| DEP-004 | Subscription verification | All AI providers | Server-authoritative entitlement |
+| DEP-005 | Provider capability discovery | AI generation | Entitlement must pass first |
+| DEP-006 | Delivery event model | History and dashboard state | Handoff and confirmation distinct |
+| DEP-007 | Local schema and versioning | Cloud backup/restore | Conflict and deletion semantics |
+| DEP-008 | Auth and UID authorization | Cloud backup and deletion | Owner-scoped access |
+| DEP-009 | Consent and flavor config | Automatic SMS | Separate approval and distribution gates |
+| DEP-010 | Deployment config and legal approval | Public Hosting | No production deployment before gates |
+| DEP-011 | Separate control-plane integration contract | Autopilot mobile capability | No assumed integration from callable existence |
+
+## 5. Traceability index
+
+| Requirement range | Domain spec | Journey | Rules | Test suite |
+|---|---|---|---|---|
+| FR-001–005 | DOM-02 | JRN-002 | BR-001, BR-005, BR-006 | TST-PEOPLE |
+| FR-006–010 | DOM-03/04/06 | JRN-003 | BR-002–008, BR-034 | TST-BIRTHDAY / TST-REMINDER |
+| FR-011–016 | DOM-07/08 | JRN-004/005 | BR-009–016 | TST-DRAFT / TST-AI |
+| FR-017–021 | DOM-09/10 | JRN-006 | BR-017–023 | TST-DELIVERY |
+| FR-022–023 | DOM-11 | JRN-008 | BR-029 | TST-AUTH / TST-BILLING |
+| FR-024–025 | DOM-12 | JRN-007 | BR-024–028 | TST-BACKUP |
+| FR-026 | DOM-13 | JRN-005/007 | BR-033 | TST-JOBS |
+| FR-027–028 | DOM-15/16/17 | JRN-009 | BR-030–032 | TST-DELETION / TST-CONTROL |
+
+## 6. Coverage status
+
+| Area | Current status | Reason |
+|---|---|---|
+| Product definition | Baseline drafted | Customer and commercial validation pending |
+| Domain decomposition | Baseline drafted | Full code/source mapping pending |
+| Feature contracts | Partial | Atomic 20-field feature contracts not yet completed for every registry node |
+| User journeys | Core journeys drafted | Edge-case and device validation pending |
+| Business rules | Initial register | Leap-day, timezone, SMS and sync policies require approval |
+| Technical architecture | Logical target drafted | Physical schema/API/source review pending |
+| Security/privacy | Threat baseline drafted | Full data-flow and deployment review pending |
+| Testing | Strategy drafted | Exact test IDs, source assertions and CI evidence pending |
+| Roadmap | Dependency sequence drafted | Stakeholder priorities pending |
+| Mind maps | Master and architecture diagrams created | Domain-level maps remain to be expanded |
+| Legacy migration | Not started | Preserve all existing documents until cross-reference review |
+| Git verification | Pending after documentation review | Do not claim complete until final diff and branch state checked |
+
+## 7. Glossary
+
+| Term | Definition |
+|---|---|
+| Person | A recipient record maintained by the user |
+| Birthday occurrence | A specific year's occurrence of a person's birthday |
+| Cycle | The occurrence period associated with a birthday year |
+| Draft | Editable message content not yet handed off |
+| Handoff | User-initiated launch/copy/share action to an external channel |
+| User-confirmed sent | User explicitly states that they sent the message; not provider delivery receipt |
+| Entitlement | Server-verified application permission to use paid AI capabilities |
+| BYOK | Bring Your Own Key; a provider credential supplied by the user |
+| Nano | On-device Gemini capability through Android AICore/ML Kit |
+| Backup generation | A versioned snapshot of explicitly selected user data |
+| Tombstone | Durable deletion marker used to prevent deleted data from reappearing |
+| Control plane | Separate backend system that coordinates sender authorization and lifecycle operations |
+| Source-reviewed | Code was inspected; runtime behavior not necessarily executed |
+| Verified | Specific behavior was tested in a named environment and tied to a commit |
+
+## 8. Change process
+
+1. Propose change with rationale and affected IDs.
+2. Review product, UX, data, security and QA impact.
+3. Update canonical requirements and rules.
+4. Update journey, architecture and diagrams.
+5. Add/adjust acceptance criteria and tests.
+6. Record approval and revision history.
+7. Retire superseded requirements with replacement references.
