@@ -159,3 +159,38 @@ Priority for the next pass:
 3. Record source-to-test line or test-name references for every acceptance criterion.
 4. Add negative, retry, cancellation, permission-denial, process-death and account-switch cases where relevant.
 5. Keep backend test status as NOT RUN until dependency installation succeeds and CI executes the backend suite.
+
+
+## Phase 2.1.1 — Flutter domain-to-test mapping
+
+The complete file list is in [Flutter Test Inventory](flutter-test-inventory.md); source paths are in [Flutter Source Inventory](flutter-source-inventory.md). The following table records direct feature mapping and meaningful coverage limits.
+
+| Domain | Direct tests | Behavior assertions sampled | Uncovered / weakly covered behavior |
+|---|---|---|---|
+| AI | `test/ai/ai_prompt_builder_test.dart`, `ai_router_test.dart`, `user_gemini_api_provider_test.dart` | Prompt constraints/untrusted user facts; free entitlement blocks even with key; Pro routes to Gemini/Nano; provider timeout and HTTP response parsing | Nano provider has no dedicated unit test; fake AICore only; stale router comments contradict code |
+| Auth | `test/features/auth/application/auth_controller_test.dart`, `data/live_google_auth_gateway_test.dart`, `data/live_google_auth_gateway_stress_test.dart`, `adversarial_auth_security_test.dart` | Session restore, sign-in/out, refresh-token behavior, malformed/partial session rejection, PII redaction | Native Google account chooser, real Firebase project and physical secure storage |
+| Birthdays | `test/features/birthdays/domain/birthday_engine_test.dart`, `application/birthday_lifecycle_service_test.dart`, `test/domain/birthday_calculation_test.dart` | Leap day, timezone calendar frames, next occurrence, cycle rollover, duplicate records and batched reads | Device timezone changes and live notification consequences |
+| Calendar | `calendar_empty_state_test.dart`, `calendar_error_state_test.dart`, `calendar_screen_test.dart`, `test/ui/responsive_mobile_test.dart` | Empty/error retry, date markers, day sheet, month navigation, compact layout | 320px responsive test fails by 0.667px |
+| Dashboard | `dashboard_visibility_test.dart` | Completed vs handed-off vs draft-needed states, missing phone hints | Full matrix of combinations and live data refresh |
+| Delivery | `birthday_sms_service_test.dart`, `test/delivery/whatsapp_handoff_test.dart`; delivery repository in `drift_repositories_test.dart` | SMS opt-in/approved-draft eligibility, midnight scheduling, Play flavor unsupported behavior, WhatsApp number/URL validation, atomic handoff event | Direct tests absent for NativeShareService, NativeSmsGateway and SmsDeliveryService; actual Android scheduling/send |
+| History | `history_screen_test.dart` | Persisted handoff displays “Opened in WhatsApp”; only explicit confirmedSent displays “Sent”; no record remains neutral | Additional channels, duplicate events and larger history pagination |
+| Jobs | `jobs_repository_test.dart`, `job_worker_test.dart`, `ai_job_handler_test.dart`, `cloud_job_handler_test.dart` | Deduplication, due ordering, retries, permanent failures, cancellation, stale recovery, stale draft guard, account ownership | OS process kill and real background execution |
+| Message Studio | `message_studio_durable_test.dart`, `not_found_test.dart`, `optimistic_test.dart`, `visibility_test.dart` | Draft survives route leave, autosave/generate converge, stale result cannot overwrite edits, handoff/confirmation visibility, paywall/manual path | Live Gemini provider, Android handoff and process-death on device |
+| Onboarding | `onboarding_screen_test.dart` | Page flow, skip, manual add and contacts-import navigation | Real device contacts and restart persistence |
+| People | 11 files under `test/features/people/` | Validation, birthday rules, CSV round-trip/formula escaping/duplicates, repository tombstones, delete undo, search and visibility | OS contact permissions, large import performance and full data migration |
+| Reminders | `reminder_scheduler_test.dart`, `quiet_hours_test.dart`, `reminder_service_test.dart`, `reminder_settings_controller_persistence_test.dart`, `android_notification_scheduler_gateway_test.dart` | Lead planning, timezone, quiet hours, deferral, persistence, optimistic rollback and non-live no-op | Actual AlarmManager delivery, reboot, exact-alarm grant/revocation and OEM restrictions |
+| Settings | Six files under `test/features/settings/presentation/` | Auth sheet with fake gateway, Gemini key setup, cloud job status, notification recovery, reminders accordion, SMS flavor UI | CloudBackupCard-specific widget coverage and live billing/backup integrations |
+| Subscription | `subscription_service_test.dart`, `subscription_verification_test.dart`, `stripe_gateway_service_test.dart` | Fake Play store events, backend response contract, purchase acknowledgement/retry, stale grant TTL; Stripe MockClient request/response | Real Play Store sandbox, Stripe webhook/server verification; client-side Stripe secret architecture is unsafe |
+| Sync | `cloud_sync_service_test.dart` | 500-write chunking, complete generation, no pointer after failed row, malformed restore abort, tombstone-safe restore | Real Firestore authentication/rules and deployed project behavior |
+
+## Fake-backed test classification
+
+- `test/e2e/tier1_features_test.dart` uses `FakeFirebaseAuthClient`, test storage and fake AICore. Its R1.1 case simulates an Identity Platform response and writes the test session; it does not invoke the production Google sign-in gateway.
+- Tier 2 uses fake subscription server and fake platform clients.
+- Tier 3/4 use the E2E harness and fake AI Core/store components.
+- Live Google Auth gateway tests inject HTTP and platform doubles.
+- Subscription verification tests inject fake store and HTTP responses.
+- Cloud sync tests inject HTTP senders.
+- Stripe tests use `MockClient`.
+
+These tests are still useful and should be retained. Their evidence label must be “fake-backed integration/contract test”, not “live external integration verified”.
