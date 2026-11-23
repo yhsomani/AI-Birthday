@@ -169,10 +169,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final totalCells = lead + daysInMonth;
 
     return Padding(
-      // Keep a one-pixel bottom reserve for fractional flex-row allocation on
-      // compact viewports. Without it, the six-row month grid can exceed the
-      // available height by a fraction of a logical pixel at 320px width.
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 13),
+      padding: const EdgeInsets.all(12),
       child: Column(
         children: [
           Row(
@@ -308,21 +305,24 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (isToday)
-                Container(
-                  constraints: const BoxConstraints(
-                    minWidth: 28,
-                    minHeight: 28,
-                  ),
-                  padding: const EdgeInsets.all(2),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: theme.colorScheme.primary,
-                      width: 2,
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: theme.colorScheme.primary,
+                        width: 2,
+                      ),
+                    ),
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: dayNumber,
+                      ),
                     ),
                   ),
-                  child: dayNumber,
                 )
               else
                 dayNumber,
