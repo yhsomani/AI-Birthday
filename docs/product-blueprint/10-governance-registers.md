@@ -15,17 +15,31 @@
 | DEC-009 | Birthday Autopilot is a separate product surface from core WhatsApp handoff | Existing backend docs | Proposed boundary | Stakeholder decision |
 | DEC-010 | Public Hosting is not production until external gates are evidenced | Backend/hosting READMEs | Current evidence | Release owner |
 | DEC-011 | Supported platform scope | Android evidenced; broader scope not approved | Open | Product owner |
-| DEC-012 | Leap-day occurrence policy | BirthdayEngine defaults Feb 29 to Feb 28 in non-leap years and supports Mar 1 as an alternate calculation parameter; no per-Person setting exists | Open: Product owner must approve fixed default vs user preference | Product owner |
+| DEC-012 | Leap-day occurrence policy | Approved: each Feb 29 Person has a user-selected policy of Feb 28 or Mar 1 in non-leap years; leap years remain Feb 29 | Approved product decision; preference field, UX and legacy backfill remain design work | Product / Birthday |
 | DEC-013 | Analytics/telemetry policy | No user-data collection assumed | Open | Privacy owner |
 | DEC-014 | Subscription packaging, price and trial | Purchase code exists; commercial strategy unvalidated | Open | Business owner |
 | DEC-015 | Backup semantics: one-way backup/restore vs multi-device sync | Existing docs describe snapshot backup | Open | Product/data owner |
-| DEC-016 | Person birthday optionality across create/import | Device-contact intake permits no birthday; manual create and CSV parser require one | Open: define one consistent create/import contract | Product owner |
-| DEC-017 | Canonical autoPrepare default | Person, PersonDraft, SQL, form and import candidate currently differ | Open: approve one default and migration behavior | Product / Data |
+| DEC-016 | Person birthday optionality across create/import | Approved: every newly persisted Person must have valid birthday month/day across manual, CSV and device intake; source still permits legacy no-birthday rows | Approved product rule; legacy remediation and read compatibility remain open | Product / Data |
+| DEC-017 | Canonical autoPrepare default | Approved: false for every new Person and intake path; explicit user opt-in may set true | Approved product rule; alignment and treatment of existing stored values remain open | Product / Data |
 | DEC-018 | Person phone normalization | Form validates shape; save path does not guarantee E.164 canonicalization | Open: define country context and normalization standard | Product / Data |
 | DEC-019 | Person/Birthday aggregate transaction boundary | Form and delete paths write Person and Birthday separately | Open: approve atomicity and recovery behavior | Data / Architecture |
 | DEC-020 | Canonical Person persistence adapter | Two adapters write the same Persons table | Open: consolidate or explicitly separate ownership | Architecture / Data |
-| DEC-021 | Birthday timezone precedence and refresh trigger | Recipient timezone supported; user timezone helper is not wired at inspected call sites; provider timer uses device-local midnight | Open: approve precedence and boundary refresh design | Product / Birthday / Android |
+| DEC-021 | Birthday timezone precedence and refresh trigger | Approved: valid recipient IANA timezone when present; device-local timezone when recipient timezone is absent; no user-profile timezone fallback | Approved product rule; refresh triggers and invalid/unavailable timezone recovery remain open | Product / Birthday / Android |
 | DEC-022 | Prior-cycle draft retention | Birthday rollover clears draftId but retains the old draft record | Open: define archive/history policy | Product / Message Studio |
+| DEC-023 | Existing Persons without birthdays | Some source/import paths and existing data permit null month/day | Open: migration, remediation UX, visibility and backup/export behavior; never fabricate a date or silently delete | Product / Data |
+| DEC-024 | Existing Feb 29 Persons without a saved preference | Source has no per-Person leap-day preference | Open: backfill choice and prompt timing | Product / Birthday |
+| DEC-025 | Canonical Person persistence boundary | Two adapters write Persons with different query/tombstone semantics | Open: approve cutover and compatibility plan; one write owner is recommended | Architecture / Data |
+| DEC-026 | Birthday occurrence persistence model | Current source stores one mutable Birthday row per Person; history semantics undefined | Open: mutable current row vs immutable per-cycle records | Product / Data |
+| DEC-027 | Delete/Undo aggregate scope | Person tombstone, Birthday deletion and draft/history behavior are split | Open: exact linked-data retention/restoration semantics; atomicity is a target invariant | Product / Data |
+| DEC-028 | Phone normalization and country context | Save path does not guarantee E.164 normalization | Open: country selection, accepted formats and migration | Product / Data |
+| DEC-029 | Invalid recipient timezone handling | Invalid legacy/imported values may exist | Open: reject, quarantine or safely fall back; device timezone unavailable policy | Birthday / Android |
+| DEC-030 | Import UX for invalid birthday candidates | Required birthday is approved; exact preview handling is not | Open: show invalid candidate or exclude before preview; persistence remains blocked | People / UX |
+| DEC-031 | Existing autoPrepare values | Current stored values may reflect explicit choice or inconsistent defaults | Open: preserve, normalize or prompt; new/missing defaults resolve false | Product / Data |
+| DEC-032 | Database constraints and repair ordering | Birthday lacks declared Person FK/unique constraint; duplicate/orphan rows possible | Open: constraints, duplicate repair, FK behavior and ordering | Data / Architecture |
+| DEC-033 | Refresh across multiple recipient timezones | Device-local timer alone is insufficient | Open: scheduler strategy and lifecycle ownership | Birthday / Android |
+| DEC-034 | Birthday occurrence durability | Persisted Birthday row has no version/tombstone | Open: derived cache vs durable/syncable record | Data / Sync |
+| DEC-035 | Legacy edit/export behavior | Old no-birthday/invalid data may be opened or exported | Open: mutation, portability and recovery contract | People / Product |
+
 
 ## 2. Assumptions register
 
@@ -97,8 +111,8 @@
 | Domain decomposition | Baseline drafted | Full code/source mapping pending |
 | Feature contracts | Partial; scoped People/Birthday contracts added in Phase 2.3 | Two domain contracts and source/test traceability exist; stakeholder approvals, several P0 acceptance tests and all other domain contracts remain open |
 | User journeys | Core journeys drafted | Edge-case and device validation pending |
-| Business rules | Initial register; People/Birthday findings added | Leap-day, timezone precedence, no-birthday import, autoPrepare default, phone normalization and aggregate delete semantics require approval |
-| Technical architecture | Logical target drafted | Physical schema/API/source review pending |
+| Business rules | Phase 2.3.1 approved birthday requiredness, autoPrepare=false, per-Person leap-day choice and recipient-to-device timezone fallback | Phone normalization, legacy-data handling, import-preview behavior, aggregate deletion and occurrence persistence remain open |
+| Technical architecture | Phase 2.4 People/Birthday target architecture drafted (documentation only) | Physical schema, migration, transaction implementation and source verification remain pending |
 | Security/privacy | Threat baseline drafted | Full data-flow and deployment review pending |
 | Testing | Scoped People/Birthday test mapping added | Existing test names are mapped; aggregate transaction, import validation and device/timezone cases remain open |
 | Roadmap | Dependency sequence drafted | Stakeholder priorities pending |

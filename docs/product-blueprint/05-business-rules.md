@@ -7,8 +7,8 @@
 | ID | Rule | Owner | Priority | Dependencies | Acceptance evidence |
 |---|---|---|---:|---|---|
 | BR-001 | Person name is required; trim and validate length using one canonical validator | People | P0 | FR-001 | Valid/invalid boundary tests |
-| BR-002 | Birthday month/day must be a valid Gregorian date; birth year is optional | Birthday | P0 | FR-001, FR-006 | Date boundary and leap-year tests |
-| BR-003 | Leap-day occurrence policy must be explicit (Feb 28 vs Mar 1 in non-leap years) and consistent across all surfaces | Product/Birthday | P0 | BR-002 | Approved policy + test vectors; currently OPEN |
+| BR-002 | Every newly persisted Person must have a valid Gregorian birthday month/day; birth year is optional | Birthday / People | P0 | FR-001, FR-006 | Manual, CSV and device-intake validation tests; legacy null rows handled separately |
+| BR-003 | For a Feb 29 Person, the user selects Feb 28 or Mar 1 for non-leap-year occurrence; leap years use Feb 29 | Product/Birthday | P0 | BR-002 | Persisted per-Person choice, onboarding/edit validation and table-driven recurrence tests |
 | BR-004 | Birthday cycle identity must be deterministic and unique per person/year under the approved timezone policy | Birthday | P0 | BR-002 | Idempotent refresh tests |
 | BR-005 | Person edit must not silently mutate unrelated relationship, delivery, consent, tombstone or sync fields | People/Data | P0 | FR-002 | Full round-trip tests |
 | BR-006 | Delete/undo must restore the complete declared aggregate or explicitly disclose what cannot be restored | People/Data | P0 | FR-003 | Person + birthday + draft lifecycle tests |
@@ -41,6 +41,9 @@
 | BR-033 | A job must be idempotent, bounded in retries and cancellable where its side effect has not started | Jobs | P1 | FR-026 | Duplicate delivery and cancellation tests |
 | BR-034 | Notification permission denial must not block manual access to birthday information | Reminders | P0 | FR-009 | Permission-denied journey |
 | BR-035 | Product status labels must reflect canonical state and cannot be inferred from UI navigation alone | Experience | P0 | FR-020 | Cross-screen status consistency tests |
+| BR-036 | New Persons default autoPrepare to false across model, form, database and all import paths; only explicit user choice enables it | People / Product | P0 | FR-001, FR-004 | Cross-path default tests and explicit-opt-in preservation |
+| BR-037 | Birthday calculations use a valid recipient IANA timezone when present; when absent, they use device-local time | Birthday / Android | P0 | FR-006, FR-010 | Recipient-zone, missing-zone, midnight, DST, app-resume and device-timezone-change tests |
+
 
 ## 2. State models
 

@@ -39,16 +39,16 @@ Priority: `P0` required for safe core use; `P1` important supporting capability;
 ### People and relationships
 | ID | Requirement | Priority | Acceptance criteria |
 |---|---|---:|---|
-| FR-001 | Create a person with a required display name and valid month/day; optional birth year and personalization context | P0 | Invalid values are rejected with field-level explanations; save failure preserves input |
+| FR-001 | Create a Person with required display name and valid birthday month/day; birth year and personalization context remain optional | P0 | Every persisted new Person from manual entry or any import path has a valid month/day; invalid/missing birthday is rejected before persistence; save failure preserves input |
 | FR-002 | Edit a person without silently changing unrelated enum, preference, consent or sync fields | P0 | Round-trip tests preserve every field and unknown legacy values are handled explicitly |
 | FR-003 | Soft-delete a person with a clear undo window and consistent occurrence/draft cleanup | P0 | Undo restores all required linked data; deletion is propagated correctly to backup |
-| FR-004 | Import CSV and device contacts through a preview-and-select flow | P1 | Permission denial, malformed rows and duplicates are reported before writes |
+| FR-004 | Import CSV and device contacts through a preview-and-select flow | P1 | Missing/invalid birthday candidates cannot be persisted; malformed rows and duplicates are reported before writes; permission denial remains a valid exit path |
 | FR-005 | Export user-owned people data in a documented portable format | P1 | Export is user initiated, complete for declared fields and excludes secrets |
 
 ### Birthday lifecycle and reminders
 | ID | Requirement | Priority | Acceptance criteria |
 |---|---|---:|---|
-| FR-006 | Resolve the next birthday occurrence using one centralized calendar policy | P0 | Leap-day, year boundary, timezone and daylight-saving test vectors pass |
+| FR-006 | Resolve next birthday occurrence through one centralized calendar policy using the Person's selected Feb 29 resolution and recipient-timezone-then-device-local precedence | P0 | Leap-day, year-boundary, recipient/device timezone and daylight-saving test vectors pass across all consumers |
 | FR-007 | Maintain one canonical occurrence identity per person and cycle | P0 | Repeated refresh is idempotent and cannot create duplicate occurrences |
 | FR-008 | Transition occurrence status only through documented legal transitions | P0 | Invalid transitions are rejected or mapped through an explicit recovery path |
 | FR-009 | Schedule configured reminder offsets and quiet hours | P0 | Recompute/cancel is deterministic after preference, permission, timezone and reboot changes |
@@ -85,6 +85,15 @@ Priority: `P0` required for safe core use; `P1` important supporting capability;
 | FR-028 | Keep separate control-plane operations isolated from core mobile messaging | Conditional | No mobile workflow assumes control-plane deployment or capability without verified integration |
 
 ## 4. Non-functional requirements
+### Phase 2.3.1 approved People/Birthday constraints
+
+- A newly persisted Person cannot omit birthday month/day, including CSV and Android contact imports. The exact invalid-candidate presentation and remediation of existing null-birthday rows remain open.
+- For Feb 29 birthdays, the user chooses Feb 28 or Mar 1 in non-leap years; leap years remain Feb 29. Existing Feb 29 records need an explicit preference migration decision.
+- New Person records use autoPrepare=false unless the user explicitly opts in. Treatment of existing stored true values is open.
+- Date calculation uses a valid recipient IANA timezone when present and device-local timezone when absent. Invalid legacy timezone and device-timezone-unavailable recovery remain open.
+- These constraints are approved product intent; Phase 2.4 describes target architecture only and does not change application behavior or schema.
+
+
 
 Numeric service levels are intentionally not invented. Targets must be approved after baseline measurement.
 
