@@ -1,5 +1,7 @@
 # AI-Birthday — Product Blueprint
 
+> **Consolidated product baseline:** Start with the [Definitive Product Blueprint](definitive/README.md) for the complete product ecosystem, atomic feature contracts, technical/data/API architecture, user journeys, quality plan, roadmap, governance registers and mind maps. Earlier files below remain evidence and phase history.
+
 **Blueprint version:** 0.1.9  
 **Status:** Discovery baseline, Phase 2.1.1 Flutter audit, Phase 2.2 CI/documentation revalidation, Phase 2.3 People/Birthday contracts, Phase 2.3.1 approved product decisions, Phase 2.4 architecture, Phase 2.4.1 decision recommendations and Phase 2.4.2 repository/data-inventory evidence; Phase 2.4.3 documentation consistency corrections completed; owner approvals, actual local-database inventory and remaining domain-contract work remain pending — not implementation-ready  
 **Review date:** 2026-11-24  

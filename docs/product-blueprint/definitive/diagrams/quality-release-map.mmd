@@ -1,0 +1,30 @@
+flowchart TD
+  R[Requirement and feature] --> AC[Acceptance criteria and rules]
+  AC --> U[Unit and domain tests]
+  AC --> D[Database repository migration]
+  AC --> C[Component responsive accessibility]
+  AC --> I[Integration API exact contract]
+  AC --> P[Platform and physical device]
+  AC --> E[End-to-end journeys]
+  AC --> S[Security privacy adversarial]
+  AC --> PR[Performance reliability baseline]
+  U --> G1[Gate 1 feature complete]
+  D --> G1
+  C --> G1
+  I --> G1
+  P --> G1
+  E --> G1
+  S --> G1
+  PR --> G1
+  G1 --> CI[CI exact commit artifact provenance]
+  CI --> LIVE[Sandbox and staging integrations]
+  LIVE --> LEGAL[Privacy legal support release config]
+  LEGAL --> DEV[Supported device matrix]
+  DEV --> G2[Gate 2 release candidate]
+  G2 --> STAGE[Staged rollout health criteria pause disable]
+  STAGE --> G3[Gate 3 operational release]
+  G3 --> OPS[Monitor incidents support deletion recovery]
+  OPS --> LEARN[Postmortem research roadmap register update]
+  LEARN --> R
+  click R "../12-governance-registers.md" "Traceability"
+  click G1 "../07-quality-testing.md" "Quality gates"
