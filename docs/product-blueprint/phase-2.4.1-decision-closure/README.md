@@ -4,7 +4,7 @@
 **Base commit:** 2b1839f685fa14f922eb21417935cb7dae1e16df  
 **Scope:** People and Birthday architecture  
 **Change boundary:** Documentation only  
-**Status:** Recommended resolutions prepared; final owner sign-off and aggregate-only legacy-data inventory remain pending.
+**Status:** Recommendations documented; Phase 2.4.2 approval matrix and repository-level inventory completed. Formal owner approval and actual local-database inventory remain pending.
 
 ## 1. Purpose
 
@@ -79,6 +79,7 @@ Do not infer these from code defaults, test fixtures or an old computed Birthday
 |---|---|
 | [Decision register and option analysis](decision-register-and-option-analysis.md) | Per-decision recommendation, alternatives, impacts, acceptance tests and status |
 | [Legacy data inventory and migration gates](legacy-data-inventory-and-migration-gates.md) | PII-safe inventory, migration ordering, safeguards and go/no-go checks |
+| Phase 2.4.2 approval and inventory | [Decision approval and data inventory](../phase-2.4.2-decision-approval-and-data-inventory/README.md) |
 
 ## 7. Entry to Phase 2.5
 
@@ -90,4 +91,4 @@ Implementation planning should begin only after:
 4. The migration is rehearsed against schema-v5 fixtures for every legacy condition.
 5. A separate application-code change authorization is recorded.
 
-**Result: PARTIAL.** Recommended architecture decisions are narrowed to one coherent target, but approvals and actual-record inventory are outstanding. No application code, schema, data, tests, dependencies or infrastructure changed.
+**Result: PARTIAL.** Recommendations are carried into Phase 2.4.2. Formal product/technical sign-off and actual-record inventory remain outstanding. No application code, schema, data, tests, dependencies or infrastructure changed.
