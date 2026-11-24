@@ -142,4 +142,33 @@ void main() {
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'production settings contain no Stripe or sandbox entitlement UI',
+    (tester) async {
+      await pumpSettings(
+        tester,
+        overrides: [
+          googleAuthGatewayProvider.overrideWithValue(
+            FakeAuthGateway(configured: false),
+          ),
+        ],
+      );
+
+      expect(find.textContaining('Stripe'), findsNothing);
+      expect(find.textContaining('Dev Sandbox'), findsNothing);
+      final privacyCopy = find.textContaining('not end-to-end encrypted');
+      await tester.ensureVisible(privacyCopy);
+      await tester.pumpAndSettle();
+      expect(privacyCopy, findsOneWidget);
+      await tester.ensureVisible(
+        find.textContaining('support and deletion pages are unavailable'),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('support and deletion pages are unavailable'),
+        findsOneWidget,
+      );
+    },
+  );
 }

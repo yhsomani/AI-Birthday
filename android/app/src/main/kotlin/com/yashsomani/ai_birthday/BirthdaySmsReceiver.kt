@@ -46,11 +46,17 @@ class BirthdaySmsReceiver : BroadcastReceiver() {
 
         // Max validity window for a late-firing alarm: 12 hours
         const val MAX_STALE_WINDOW_MS = 12 * 60 * 60 * 1000L
+        private const val AUTOMATIC_SMS_ENABLED = false
 
         /**
          * Reschedule all active pending SMS jobs after reboot or package update.
          */
         fun reschedulePersisted(context: Context) {
+            if (!AUTOMATIC_SMS_ENABLED) {
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                prefs.edit().putString(KEY_SCHEDULED_SMS_JOBS_JSON, "[]").apply()
+                return
+            }
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val raw = prefs.getString(KEY_SCHEDULED_SMS_JOBS_JSON, null) ?: return
             val jobsArray = try {
@@ -144,6 +150,11 @@ class BirthdaySmsReceiver : BroadcastReceiver() {
         }
 
         private fun executeSmsSend(context: Context, jobJson: JSONObject) {
+            if (!AUTOMATIC_SMS_ENABLED) {
+                val jobId = jobJson.optString("jobId")
+                updateJobStatus(context, jobId, "cancelled", "Automatic SMS is disabled")
+                return
+            }
             val jobId = jobJson.optString("jobId")
             val phoneNumber = jobJson.optString("phoneNumber")
             val message = jobJson.optString("message")

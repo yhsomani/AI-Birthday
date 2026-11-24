@@ -204,7 +204,7 @@ class Person {
         json['preferredDeliveryChannel'] as String?,
       ),
       timezone: json['timezone'] as String?,
-      autoPrepare: (json['autoPrepare'] as bool?) ?? true,
+      autoPrepare: (json['autoPrepare'] as bool?) ?? false,
       autoSendPolicy: AutoSendPolicy.parse(
         (json['autoSendPolicy'] as String?) ?? 'manualOnly',
       ),

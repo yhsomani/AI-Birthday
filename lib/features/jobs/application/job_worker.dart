@@ -76,6 +76,7 @@ class JobWorker {
   Timer? _retryTimer;
   bool _draining = false;
   bool _disposed = false;
+  bool _startupRecoveryDone = false;
 
   /// Emits every job-state transition the worker performs (queued/running/
   /// retrying/succeeded/failed/canceled). Widgets subscribe to this instead
@@ -144,7 +145,19 @@ class JobWorker {
     if (_draining || _disposed) return;
     _draining = true;
     try {
-      final recovered = await _repository.resetStale(DateTime.now());
+      final now = DateTime.now();
+      final startupRecovered = !_startupRecoveryDone
+          ? await _repository.resetRunningAtStartup(now)
+          : 0;
+      _startupRecoveryDone = true;
+      if (startupRecovered > 0) {
+        _logger.warning(
+          'JobWorker',
+          'Process recovery: rolled orphaned running jobs back to queued',
+          params: {'count': startupRecovered},
+        );
+      }
+      final recovered = await _repository.resetStale(now);
       if (recovered > 0) {
         _logger.warning(
           'JobWorker',

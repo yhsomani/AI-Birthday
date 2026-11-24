@@ -4,6 +4,7 @@ library;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'package:ai_birthday/core/config/product_capabilities.dart';
 import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/people/data/contact_csv_service.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
@@ -127,6 +128,7 @@ class DeviceContact {
       preferredTone: MessageTone.warm,
       importantFacts: const [],
       notes: 'Imported from phone contacts',
+      autoPrepare: ProductCapabilities.autoPrepare,
       duplicateWarning: duplicateWarning,
     );
   }

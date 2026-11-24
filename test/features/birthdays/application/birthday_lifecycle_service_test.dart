@@ -244,6 +244,10 @@ class _RecordingBirthdaysRepository implements BirthdaysRepository {
   Future<void> saveBirthday(Birthday birthday) => _inner.saveBirthday(birthday);
 
   @override
+  Future<void> rolloverBirthday(Birthday birthday) =>
+      _inner.rolloverBirthday(birthday);
+
+  @override
   Future<void> updateBirthdayStatus(
     String id,
     BirthdayStatus status, {

@@ -31,6 +31,13 @@ class _FakeDeliveryEventsRepository implements DeliveryEventsRepository {
   }) async {}
 
   @override
+  Future<void> confirmHandoff({
+    required String birthdayId,
+    required String draftId,
+    required DateTime at,
+  }) async {}
+
+  @override
   Future<DeliveryHandoff?> latestHandoffForBirthday(String birthdayId) async {
     for (final h in handoffs.reversed) {
       if (h.birthdayId == birthdayId) return h;
@@ -114,7 +121,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Opened in WhatsApp'), findsOneWidget);
-        expect(find.text('Sent'), findsOneWidget);
+        expect(find.text('User Confirmed Sent'), findsOneWidget);
         // No evidence → honest neutral label, never an "Opened" claim.
         expect(find.text('Ready to Send'), findsOneWidget);
       },

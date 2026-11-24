@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/product_capabilities.dart';
 import '../../../core/core_providers.dart';
 import '../../reminders/application/reminder_providers.dart';
 import '../../reminders/application/reminder_settings_controller.dart';
@@ -39,26 +40,28 @@ Future<void> resyncReminderSchedule(ProviderContainer container) async {
     final people = await container.read(peopleStoreProvider).getAll();
     await reminderService.sync(people: people, settings: settings);
 
-    // Reconcile automated SMS jobs if supported & enabled
-    try {
-      final smsSettings = container.read(automaticSmsSettingsProvider);
-      if (smsSettings.enabled) {
-        final smsService = container.read(birthdaySmsServiceProvider);
-        final birthdaysRepo = container.read(birthdaysRepositoryProvider);
-        final draftsRepo = container.read(draftsRepositoryProvider);
-        for (final p in people) {
-          final birthday = await birthdaysRepo.getBirthdayForPerson(p.id);
-          final draft = birthday?.draftId != null
-              ? await draftsRepo.getDraft(birthday!.draftId!)
-              : null;
-          await smsService.reconcileRecipientSms(
-            person: p,
-            birthday: birthday,
-            draft: draft,
-          );
+    // Reconcile automated SMS jobs only for a separately approved build.
+    if (ProductCapabilities.automaticSms) {
+      try {
+        final smsSettings = container.read(automaticSmsSettingsProvider);
+        if (smsSettings.enabled) {
+          final smsService = container.read(birthdaySmsServiceProvider);
+          final birthdaysRepo = container.read(birthdaysRepositoryProvider);
+          final draftsRepo = container.read(draftsRepositoryProvider);
+          for (final p in people) {
+            final birthday = await birthdaysRepo.getBirthdayForPerson(p.id);
+            final draft = birthday?.draftId != null
+                ? await draftsRepo.getDraft(birthday!.draftId!)
+                : null;
+            await smsService.reconcileRecipientSms(
+              person: p,
+              birthday: birthday,
+              draft: draft,
+            );
+          }
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
   } catch (error, stackTrace) {
     container
         .read(loggerProvider)

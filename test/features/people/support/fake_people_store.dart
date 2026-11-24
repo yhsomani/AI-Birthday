@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ai_birthday/features/people/data/person_repository.dart';
+import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/people/domain/person.dart';
 
 /// In-memory [PeopleStore] for widget tests. Mirrors the Drift store's
@@ -63,12 +64,19 @@ class FakePeopleStore implements PeopleStore {
   }
 
   @override
+  Future<void> softDeleteAggregate(String id) => softDelete(id);
+
+  @override
   Future<void> restore(String id) async {
     final existing = _people[id];
     if (existing == null) return;
     _people[id] = _clone(existing, deletedAt: null);
     _emit();
   }
+
+  @override
+  Future<void> restoreAggregate(String id, {Birthday? restoredBirthday}) =>
+      restore(id);
 
   static Person _clone(Person p, {DateTime? deletedAt}) => Person(
     id: p.id,

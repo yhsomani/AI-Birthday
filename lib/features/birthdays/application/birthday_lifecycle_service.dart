@@ -91,7 +91,7 @@ class BirthdayLifecycleService {
       }
 
       final now = _now();
-      await birthdaysRepository.saveBirthday(
+      await birthdaysRepository.rolloverBirthday(
         existing.copyWith(
           cycleYear: next.year,
           date: next.nextDate,

@@ -188,14 +188,9 @@ void main() {
           reference: now,
         );
 
-        expect(scheduled, isTrue);
-        expect(gateway.scheduledJobs.length, 1);
-        final job = gateway.scheduledJobs.first;
-        expect(job.jobId, 'sms_b-100');
-        expect(job.personId, 'p-eligible');
-        expect(job.phoneNumber, '+15551234567');
-        expect(job.message, draftApproved.body);
-        expect(job.isApproved, isTrue);
+        expect(scheduled, isFalse);
+        expect(gateway.scheduledJobs, isEmpty);
+        expect(gateway.cancelledJobs, contains('sms_b-100'));
       },
     );
 
@@ -281,6 +276,23 @@ void main() {
       () async {
         gateway.supported = false;
 
+        final scheduled = await service.reconcileRecipientSms(
+          person: personEligible,
+          birthday: birthday,
+          draft: draftApproved,
+          globalSmsEnabled: true,
+          reference: now,
+        );
+
+        expect(scheduled, isFalse);
+        expect(gateway.scheduledJobs, isEmpty);
+        expect(gateway.cancelledJobs, contains('sms_b-100'));
+      },
+    );
+
+    test(
+      'v1 cancels direct SMS when legacy opt-in and approval are present',
+      () async {
         final scheduled = await service.reconcileRecipientSms(
           person: personEligible,
           birthday: birthday,

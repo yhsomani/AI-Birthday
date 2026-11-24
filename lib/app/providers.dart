@@ -3,6 +3,7 @@ library;
 
 import 'dart:async';
 
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ai_birthday/core/security/credential_storage.dart';
@@ -42,18 +43,9 @@ import 'package:ai_birthday/features/ai/data/gemini_nano_provider.dart';
 import 'package:ai_birthday/features/subscription/application/subscription_service.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 import 'package:ai_birthday/features/auth/domain/auth_state.dart';
-import 'package:ai_birthday/features/subscription/application/stripe_gateway_service.dart';
 
 /// App-wide logger provider. Keep one logger instance across app and core layers.
 final loggerProvider = core.loggerProvider;
-
-/// Stripe Gateway Service provider for handling direct Stripe checkouts & verification.
-final stripeGatewayServiceProvider = Provider<StripeGatewayService>((ref) {
-  final logger = ref.watch(loggerProvider);
-  final service = StripeGatewayService(logger: logger);
-  ref.onDispose(service.dispose);
-  return service;
-});
 
 /// Credential Storage provider.
 final credentialStorageProvider = Provider<CredentialStorage>((ref) {
@@ -63,8 +55,8 @@ final credentialStorageProvider = Provider<CredentialStorage>((ref) {
   );
 });
 
-/// Whether the user saved their own Gemini key. Such a key unlocks AI drafting
-/// without the app subscription, so the studio must not show the Pro lock.
+/// Whether the user saved their own Gemini key. A personal key selects the AI
+/// provider only after the active application entitlement has been verified.
 /// Re-read each time the studio opens, so a newly saved key takes effect.
 final hasOwnGeminiKeyProvider = FutureProvider.autoDispose<bool>(
   (ref) => ref.watch(credentialStorageProvider).hasGeminiApiKey(),
@@ -99,12 +91,23 @@ final subscriptionNotifierProvider =
             subject,
           );
         },
+        appCheckTokenProvider: () async {
+          try {
+            return await FirebaseAppCheck.instance.getLimitedUseToken();
+          } catch (_) {
+            return null;
+          }
+        },
       );
 
       // AUD-003: reset entitlement state whenever the user signs out or changes accounts.
       ref.listen<AsyncValue<AuthState>>(authControllerProvider, (prev, next) {
         final prevAuth = prev?.valueOrNull;
         final nextAuth = next.valueOrNull;
+        if (next.hasError) {
+          notifier.resetToFreeTier();
+          return;
+        }
         if (nextAuth == null) return;
         if (nextAuth.status == AuthStatus.signedOut) {
           notifier.resetToFreeTier();

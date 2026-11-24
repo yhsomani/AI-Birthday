@@ -254,10 +254,10 @@ void main() {
               type: JobTypes.aiGenerate,
               status: JobStatus.running.name,
               subjectId: 'b1',
-              startedAt: Value(now.subtract(const Duration(minutes: 9))),
+              startedAt: Value(now.subtract(const Duration(seconds: 30))),
               attempts: const Value(1),
               maxAttempts: const Value(1),
-              createdAt: now.subtract(const Duration(minutes: 10)),
+              createdAt: now.subtract(const Duration(seconds: 40)),
             ),
           );
 

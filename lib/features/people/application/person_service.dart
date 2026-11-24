@@ -4,9 +4,12 @@ import 'package:uuid/uuid.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/logging/app_logger.dart';
 import '../data/person_repository.dart';
+import '../../birthdays/domain/models/birthday.dart';
 import '../domain/person.dart';
 import '../domain/person_input.dart';
 import '../domain/person_input_validator.dart';
+import '../domain/person_enums.dart' show AutoSendPolicy;
+import 'package:ai_birthday/core/config/product_capabilities.dart';
 
 /// Application service for recipient lifecycle (SSOT §7).
 ///
@@ -42,10 +45,20 @@ class PersonService {
   Future<Person> create(PersonDraft draft) async {
     _ensureValid(draft);
     final person = draft.toPerson(id: _newId(), now: _now());
-    await _store.save(person);
-    _logger.info('people', 'created person', params: {'personId': person.id});
+    final safePerson = person.copyWith(
+      autoPrepare: ProductCapabilities.autoPrepare && person.autoPrepare,
+      autoSendPolicy: ProductCapabilities.automaticSms
+          ? person.autoSendPolicy
+          : AutoSendPolicy.manualOnly,
+    );
+    await _store.save(safePerson);
+    _logger.info(
+      'people',
+      'created person',
+      params: {'personId': safePerson.id},
+    );
     await _onChanged?.call();
-    return person;
+    return safePerson;
   }
 
   /// Validates [draft] and applies it to an existing recipient, bumping the
@@ -53,26 +66,32 @@ class PersonService {
   Future<Person> update(Person existing, PersonDraft draft) async {
     _ensureValid(draft, requireBirthday: existing.hasBirthday);
     final updated = draft.applyTo(existing, now: _now());
-    await _store.save(updated);
+    final safeUpdated = updated.copyWith(
+      autoPrepare: ProductCapabilities.autoPrepare && updated.autoPrepare,
+      autoSendPolicy: ProductCapabilities.automaticSms
+          ? updated.autoSendPolicy
+          : AutoSendPolicy.manualOnly,
+    );
+    await _store.save(safeUpdated);
     _logger.info(
       'people',
       'updated person',
-      params: {'personId': updated.id, 'version': updated.version},
+      params: {'personId': safeUpdated.id, 'version': safeUpdated.version},
     );
     await _onChanged?.call();
-    return updated;
+    return safeUpdated;
   }
 
   Future<void> remove(String id) async {
     _logger.info('people', 'removed person', params: {'personId': id});
-    await _store.softDelete(id);
+    await _store.softDeleteAggregate(id);
     await _onChanged?.call();
   }
 
   /// Restores a soft-deleted recipient, clearing its tombstone (undo).
-  Future<void> restore(String id) async {
+  Future<void> restore(String id, {Birthday? birthday}) async {
     _logger.info('people', 'restored person', params: {'personId': id});
-    await _store.restore(id);
+    await _store.restoreAggregate(id, restoredBirthday: birthday);
     await _onChanged?.call();
   }
 

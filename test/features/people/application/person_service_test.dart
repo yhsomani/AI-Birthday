@@ -147,4 +147,19 @@ void main() {
       expect(updated.hasBirthday, isFalse);
     },
   );
+
+  test(
+    'create forces conditional automation off in the v1 capability set',
+    () async {
+      final person = await service.create(
+        validDraft().copyWith(
+          autoPrepare: true,
+          autoSendPolicy: AutoSendPolicy.automaticSmsApproved,
+        ),
+      );
+
+      expect(person.autoPrepare, isFalse);
+      expect(person.autoSendPolicy, AutoSendPolicy.manualOnly);
+    },
+  );
 }

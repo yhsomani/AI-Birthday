@@ -175,7 +175,8 @@ void main() {
         for (
           var i = 0;
           i < 40 &&
-              await harness.draftsRepo.getDraftForBirthday('b-test') == null;
+              (await harness.draftsRepo.getDraftForBirthday('b-test'))?.body !=
+                  'AI drafted message';
           i++
         ) {
           await tester.pump(const Duration(milliseconds: 50));

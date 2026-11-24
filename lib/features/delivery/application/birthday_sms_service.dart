@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../app/providers.dart' show credentialStorageProvider;
+import 'package:ai_birthday/app/providers.dart' show credentialStorageProvider;
+import 'package:ai_birthday/core/config/product_capabilities.dart';
+
 import '../../../core/core_providers.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../birthdays/domain/birthday_engine.dart';
@@ -47,12 +49,24 @@ class AutomaticSmsSettingsController extends Notifier<AutomaticSmsSettings> {
 
   Future<void> _init() async {
     final gateway = ref.read(nativeSmsGatewayProvider);
-    final isSupported = await gateway.isSupported();
+    final isSupported =
+        ProductCapabilities.automaticSms && await gateway.isSupported();
     final hasPerm = isSupported ? await gateway.hasSmsPermission() : false;
 
     // Read stored preference
     final storage = ref.read(credentialStorageProvider);
     final rawPref = await storage.readString(_storageKey);
+    if (!isSupported) {
+      await gateway.cancelAllSmsJobs();
+      await storage.writeString(_storageKey, 'false');
+      state = AutomaticSmsSettings(
+        enabled: false,
+        isSupported: false,
+        hasSmsPermission: false,
+      );
+      return;
+    }
+
     final enabled = (rawPref == 'true') && isSupported && hasPerm;
 
     state = AutomaticSmsSettings(
@@ -67,8 +81,10 @@ class AutomaticSmsSettingsController extends Notifier<AutomaticSmsSettings> {
     final storage = ref.read(credentialStorageProvider);
 
     if (enabled) {
-      if (!state.isSupported) {
+      if (!ProductCapabilities.automaticSms || !state.isSupported) {
         state = state.copyWith(enabled: false);
+        await storage.writeString(_storageKey, 'false');
+        await gateway.cancelAllSmsJobs();
         return;
       }
       bool hasPerm = await gateway.hasSmsPermission();
@@ -91,8 +107,10 @@ class AutomaticSmsSettingsController extends Notifier<AutomaticSmsSettings> {
 
   Future<void> refreshPermissions() async {
     final gateway = ref.read(nativeSmsGatewayProvider);
-    final isSupported = await gateway.isSupported();
+    final isSupported =
+        ProductCapabilities.automaticSms && await gateway.isSupported();
     final hasPerm = isSupported ? await gateway.hasSmsPermission() : false;
+    if (!isSupported) await gateway.cancelAllSmsJobs();
     state = state.copyWith(isSupported: isSupported, hasSmsPermission: hasPerm);
   }
 }
@@ -154,7 +172,8 @@ class BirthdaySmsService {
     String? fallbackTimezone,
   }) async {
     final refDate = reference ?? DateTime.now();
-    final isSupported = await gateway.isSupported();
+    final isSupported =
+        ProductCapabilities.automaticSms && await gateway.isSupported();
     if (!isSupported || !globalSmsEnabled) {
       if (birthday != null) {
         await gateway.cancelSmsJob('sms_${birthday.id}');

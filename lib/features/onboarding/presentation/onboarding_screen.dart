@@ -296,13 +296,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             _buildReminderTimelineStep(
               days: '2 Days',
               label:
-                  'Draft ready: Personalized message is prepared for your review.',
+                  'Prepare: Open Message Studio and create or review your greeting.',
             ),
             const SizedBox(height: 14),
             _buildReminderTimelineStep(
               days: 'Today',
               label:
-                  'Send day: One tap handoff to WhatsApp with your confirmed greeting.',
+                  'Send day: Review your greeting, then hand it to WhatsApp and confirm if you sent it.',
             ),
           ],
         ),

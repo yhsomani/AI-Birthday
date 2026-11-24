@@ -289,5 +289,15 @@ Row Three,8,12,1988,+14150001111
         );
       },
     );
+
+    test('CSV rows default autoPrepare to false when column is absent', () {
+      final result = service.parseCsvWithResult(
+        'Name,Month,Day\nManual Contact,5,15',
+      );
+
+      expect(result.invalidRows, isEmpty);
+      expect(result.candidates.single.autoPrepare, isFalse);
+      expect(result.candidates.single.toPerson().autoPrepare, isFalse);
+    });
   });
 }

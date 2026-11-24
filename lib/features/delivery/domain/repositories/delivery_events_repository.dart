@@ -20,6 +20,13 @@ abstract interface class DeliveryEventsRepository {
     required DateTime at,
   });
 
+  /// Atomically marks the birthday completed and the exact draft confirmed.
+  Future<void> confirmHandoff({
+    required String birthdayId,
+    required String draftId,
+    required DateTime at,
+  });
+
   /// The most recent known handoff for a birthday, or null if none.
   Future<DeliveryHandoff?> latestHandoffForBirthday(String birthdayId);
 

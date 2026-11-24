@@ -113,7 +113,7 @@ void main() {
         required http.Client client,
         required iap.InAppPurchase iapFake,
         String? token = 'id-token',
-        String? appCheckToken,
+        String? appCheckToken = 'test-app-check-token',
       }) {
         return SubscriptionNotifier(
           inAppPurchase: iapFake,
@@ -245,6 +245,30 @@ void main() {
         expect(requests, 0);
         notifier.dispose();
       });
+
+      test(
+        'missing App Check token blocks billing before store billing',
+        () async {
+          final iapFake = CountingIap();
+          final notifier = build(
+            client: MockClient((_) async {
+              fail('HTTP request must not occur without App Check');
+            }),
+            iapFake: iapFake,
+            appCheckToken: null,
+          );
+
+          await Future<void>.delayed(Duration.zero);
+          iapFake.availabilityChecks = 0;
+          expect(await notifier.purchaseProMonthly(), isFalse);
+          expect(
+            notifier.lastPurchaseFailure,
+            PurchaseFailure.verificationUnavailable,
+          );
+          expect(iapFake.availabilityChecks, 0);
+          notifier.dispose();
+        },
+      );
     });
   });
 }

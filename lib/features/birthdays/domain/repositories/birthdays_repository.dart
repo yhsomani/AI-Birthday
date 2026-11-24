@@ -8,6 +8,7 @@ abstract interface class BirthdaysRepository {
   Future<Birthday?> getBirthday(String id);
   Future<Birthday?> getBirthdayForPerson(String personId);
   Future<void> saveBirthday(Birthday birthday);
+  Future<void> rolloverBirthday(Birthday birthday);
   Future<void> updateBirthdayStatus(
     String id,
     BirthdayStatus status, {
@@ -55,6 +56,9 @@ class InMemoryBirthdaysRepository implements BirthdaysRepository {
     _store[birthday.id] = birthday;
     _controller.add(_sortedBirthdays());
   }
+
+  @override
+  Future<void> rolloverBirthday(Birthday birthday) => saveBirthday(birthday);
 
   @override
   Future<void> updateBirthdayStatus(

@@ -111,7 +111,7 @@ class HistoryScreen extends ConsumerWidget {
                     };
 
               final (statusIcon, statusLabel) = sent
-                  ? (Icons.check_circle_outline, 'Sent')
+                  ? (Icons.check_circle_outline, 'User Confirmed Sent')
                   : handoff != null
                   ? (Icons.open_in_new, _handoffLabel(handoff))
                   : switch (draft.status) {
@@ -174,36 +174,38 @@ class HistoryScreen extends ConsumerWidget {
                               ],
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusTone.fill(colors),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  statusIcon,
-                                  size: 14,
-                                  color: statusTone.label(colors),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  statusLabel,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: statusTone.label(colors),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusTone.fill(colors),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 4,
+                          runSpacing: 2,
+                          children: [
+                            Icon(
+                              statusIcon,
+                              size: 14,
+                              color: statusTone.label(colors),
+                            ),
+                            Text(
+                              statusLabel,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: statusTone.label(colors),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Container(

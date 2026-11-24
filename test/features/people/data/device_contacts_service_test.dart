@@ -82,5 +82,15 @@ void main() {
       );
       expect(c3.parseBirthday(), isNull);
     });
+
+    test('candidate conversion defaults autoPrepare to false', () {
+      const contact = DeviceContact(
+        id: '1',
+        name: 'John',
+        birthdayString: '--10-07',
+      );
+
+      expect(contact.toCandidate().autoPrepare, isFalse);
+    });
   });
 }

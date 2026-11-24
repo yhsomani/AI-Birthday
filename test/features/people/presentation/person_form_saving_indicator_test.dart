@@ -57,12 +57,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // New people must default to manual preparation; opt-in is explicit.
-      final autoPrepareSwitch = tester.widget<SwitchListTile>(
-        find.widgetWithText(SwitchListTile, 'Prepare drafts automatically'),
-      );
-      expect(autoPrepareSwitch.value, isFalse);
-
       // Before saving: "Save" label is visible, no spinner
       expect(find.text('Save'), findsOneWidget);
       expect(find.text('Saving…'), findsNothing);
@@ -111,6 +105,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      // Conditional automation controls are absent from the v1 product.
+      expect(find.text('Prepare drafts automatically'), findsNothing);
+      expect(find.text('Automatic SMS at midnight'), findsNothing);
     },
   );
 }

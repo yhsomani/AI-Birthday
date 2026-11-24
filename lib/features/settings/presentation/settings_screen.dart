@@ -12,17 +12,16 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:ai_birthday/app/providers.dart';
+import 'package:ai_birthday/core/config/product_capabilities.dart';
 import 'package:ai_birthday/core/platform/gemini_nano_platform.dart';
 import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 import 'package:ai_birthday/features/auth/domain/auth_state.dart';
 import 'package:ai_birthday/features/auth/presentation/auth_bottom_sheet.dart';
-import 'package:flutter/foundation.dart';
 import 'package:ai_birthday/features/jobs/application/cloud_job_handler.dart';
 import 'package:ai_birthday/features/jobs/domain/job.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_providers.dart';
 import 'package:ai_birthday/features/subscription/application/subscription_service.dart';
-import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
 import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
 import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
@@ -597,87 +596,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Future<void> _handleStripePurchase() async {
-    HapticFeedback.lightImpact();
-    final auth = ref.read(authControllerProvider).valueOrNull;
-    final email = auth?.identity?.email;
-    final uid = auth?.identity?.firebaseUid ?? auth?.identity?.googleSubject;
-
-    setState(() => _isPurchasing = true);
-    try {
-      final stripeService = ref.read(stripeGatewayServiceProvider);
-      final checkoutUrl = await stripeService.createProCheckoutSession(
-        customerEmail: email,
-        clientReferenceId: uid,
-      );
-
-      if (!mounted) return;
-      setState(() => _isPurchasing = false);
-
-      if (checkoutUrl != null) {
-        await _launchExternalUrl(checkoutUrl);
-        // After returning from browser checkout, check if the customer completed payment
-        if (email != null && email.isNotEmpty) {
-          final hasActive = await stripeService
-              .verifyCustomerActiveSubscription(email);
-          if (hasActive && mounted) {
-            ref
-                .read(subscriptionNotifierProvider.notifier)
-                .setDevSandboxEntitlement(
-                  const UserEntitlement(
-                    status: EntitlementStatus.active,
-                    productId: 'stripe_pro_monthly',
-                    isAutoRenewing: true,
-                  ),
-                );
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Payment successful! AI-Birthday Pro is now active.',
-                ),
-              ),
-            );
-          }
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Failed to initialize Stripe checkout. Please try again.',
-            ),
-          ),
-        );
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isPurchasing = false);
-    }
-  }
-
   Future<void> _handleManageSubscription() async {
     HapticFeedback.lightImpact();
-    final auth = ref.read(authControllerProvider).valueOrNull;
-    final email = auth?.identity?.email;
-    if (email == null || email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sign in to manage your billing and subscription.'),
-        ),
-      );
-      return;
-    }
-
-    final stripeService = ref.read(stripeGatewayServiceProvider);
-    final portalUrl = await stripeService.createBillingPortalSession(email);
-    if (!mounted) return;
-    if (portalUrl != null) {
-      await _launchExternalUrl(portalUrl);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No active Stripe customer portal session found.'),
-        ),
-      );
-    }
+    await _launchExternalUrl(
+      'https://play.google.com/store/account/subscriptions',
+    );
   }
 
   String _purchaseFailureMessage(PurchaseFailure reason) => switch (reason) {
@@ -686,7 +609,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     PurchaseFailure.storeUnavailable =>
       'Google Play Billing is not available on this device.',
     PurchaseFailure.productUnavailable =>
-      'Pro is not available on this install. Use Stripe Checkout or install from Google Play.',
+      'Pro is not available on this install. Install the Google Play version.',
     PurchaseFailure.verificationUnavailable =>
       'Pro purchases are temporarily unavailable. You have not been charged. Try again later.',
     _ => 'Purchase could not be started. Try again.',
@@ -698,35 +621,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         .read(subscriptionNotifierProvider.notifier)
         .restorePurchases();
 
-    // Check Stripe if Google Play did not return an active subscription
-    bool stripeFound = false;
-    if (!restored) {
-      final auth = ref.read(authControllerProvider).valueOrNull;
-      final email = auth?.identity?.email;
-      if (email != null && email.isNotEmpty) {
-        final stripeService = ref.read(stripeGatewayServiceProvider);
-        final hasStripeActive = await stripeService
-            .verifyCustomerActiveSubscription(email);
-        if (hasStripeActive) {
-          ref
-              .read(subscriptionNotifierProvider.notifier)
-              .setDevSandboxEntitlement(
-                const UserEntitlement(
-                  status: EntitlementStatus.active,
-                  productId: 'stripe_pro_monthly',
-                  isAutoRenewing: true,
-                ),
-              );
-          stripeFound = true;
-        }
-      }
-    }
-
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          (restored || stripeFound)
+          restored
               ? 'Verified Pro subscription restored.'
               : 'No verified active subscription was found.',
         ),
@@ -992,10 +891,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Section 1.4: Automatic Birthday SMS (Personal Sideload feature)
-          AppSectionHeader(title: 'Automatic Birthday SMS', isAccent: true),
-          const AutomaticSmsCard(),
-          const SizedBox(height: 20),
+          // Section 1.4: Conditional personal-distribution automatic SMS.
+          if (ProductCapabilities.automaticSms) ...[
+            AppSectionHeader(title: 'Automatic Birthday SMS', isAccent: true),
+            const AutomaticSmsCard(),
+            const SizedBox(height: 20),
+          ],
 
           // Section 1.5: Cloud Backup (SSOT §13)
           AppSectionHeader(title: 'Cloud Backup', isAccent: true),
@@ -1069,15 +970,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _isPurchasing ? null : _handleStripePurchase,
-                        icon: const Icon(Icons.credit_card, size: 18),
-                        label: const Text('Pay with Card / Stripe (\$2.99/mo)'),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                   ],
                   if (entitlement.canUseAi) ...[
                     SizedBox(
@@ -1088,9 +980,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           Icons.manage_accounts_outlined,
                           size: 18,
                         ),
-                        label: const Text(
-                          'Manage Subscription (Stripe Portal)',
-                        ),
+                        label: const Text('Manage Subscription in Google Play'),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1130,26 +1020,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ],
                   ),
-                  if (kDebugMode) ...[
-                    const Divider(height: 24),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Dev Sandbox: Grant Pro Entitlement'),
-                      subtitle: const Text(
-                        'Testing toggle (debug builds only)',
-                      ),
-                      value: entitlement.status == EntitlementStatus.active,
-                      onChanged: (enabled) {
-                        ref
-                            .read(subscriptionNotifierProvider.notifier)
-                            .setDevSandboxEntitlement(
-                              enabled
-                                  ? UserEntitlement.proActive
-                                  : UserEntitlement.free,
-                            );
-                      },
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -1169,8 +1039,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: const Text('Gemini API key'),
               subtitle: Text(
                 _hasKey
-                    ? 'Saved on this device'
-                    : 'Add a key to unlock personalized AI drafts',
+                    ? 'Saved securely; Pro entitlement is still required'
+                    : 'Add your own provider key after subscribing to Pro',
               ),
               childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               expandedCrossAxisAlignment: CrossAxisAlignment.start,
@@ -1402,15 +1272,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // Section 6: Help & Guide
           AppSectionHeader(title: 'Help & Guide', isAccent: true),
           Card(
-            child: ListTile(
-              leading: const Icon(Icons.explore_outlined),
-              title: const Text('Replay App Onboarding'),
-              subtitle: const Text('View the 5-step loop and feature guide'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-              onTap: () {
-                HapticFeedback.lightImpact();
-                context.push('/onboarding');
-              },
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.explore_outlined),
+                  title: const Text('Replay app onboarding'),
+                  subtitle: const Text(
+                    'Review the remember → prepare → review loop',
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    context.push('/onboarding');
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.privacy_tip_outlined),
+                  title: const Text('Privacy and local data'),
+                  subtitle: const Text(
+                    'People stay on this device unless you use an optional cloud or external AI/delivery feature.',
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.support_agent_outlined),
+                  title: const Text('Verified support'),
+                  subtitle: const Text(
+                    'Public support and deletion pages are unavailable until their release configuration is deployed.',
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),

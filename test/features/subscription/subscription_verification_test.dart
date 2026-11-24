@@ -92,6 +92,7 @@ SubscriptionNotifier buildNotifier(
     httpClient: client,
     authTokenProvider: () async => 'id-token',
     accountBindingProvider: () async => 'binding-1234567890abcdef',
+    appCheckTokenProvider: () async => 'test-app-check-token',
     now: now,
   );
 }
@@ -109,6 +110,7 @@ void main() {
         calls++;
         expect(request.url.toString(), contains('verifyPurchase'));
         expect(request.headers['Authorization'], 'Bearer id-token');
+        expect(request.headers['X-Firebase-AppCheck'], 'test-app-check-token');
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         final data = body['data'] as Map<String, dynamic>;
         expect(data['purchaseToken'], 'server-token');

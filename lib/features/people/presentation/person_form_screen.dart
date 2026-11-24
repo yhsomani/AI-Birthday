@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:ai_birthday/app/providers.dart';
+import 'package:ai_birthday/core/config/product_capabilities.dart';
 import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart'
@@ -247,8 +248,10 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       notes: emptyToNull(_notes.text),
       preferredDeliveryChannel: _deliveryChannel,
       timezone: emptyToNull(_timezone.text),
-      autoPrepare: _autoPrepare,
-      autoSendPolicy: _autoSendPolicy,
+      autoPrepare: ProductCapabilities.autoPrepare && _autoPrepare,
+      autoSendPolicy: ProductCapabilities.automaticSms
+          ? _autoSendPolicy
+          : AutoSendPolicy.manualOnly,
     );
   }
 
@@ -645,36 +648,40 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                               labelText: 'Preferred delivery channel',
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          SwitchListTile.adaptive(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Prepare drafts automatically'),
-                            subtitle: const Text(
-                              'Drafts will be generated ahead of birthday for your review',
+                          if (ProductCapabilities.autoPrepare)
+                            const SizedBox(height: 12),
+                          if (ProductCapabilities.autoPrepare)
+                            SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Prepare drafts automatically'),
+                              subtitle: const Text(
+                                'Drafts will be generated ahead of the birthday for your review',
+                              ),
+                              value: _autoPrepare,
+                              onChanged: (v) => setState(() {
+                                _dirty = true;
+                                _autoPrepare = v;
+                              }),
                             ),
-                            value: _autoPrepare,
-                            onChanged: (v) => setState(() {
-                              _dirty = true;
-                              _autoPrepare = v;
-                            }),
-                          ),
-                          const SizedBox(height: 12),
-                          SwitchListTile.adaptive(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Automatic SMS at midnight'),
-                            subtitle: const Text(
-                              'Requires phone number, pre-approved draft, and personal sideload SMS build',
+                          if (ProductCapabilities.automaticSms) ...[
+                            const SizedBox(height: 12),
+                            SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Automatic SMS at midnight'),
+                              subtitle: const Text(
+                                'Requires phone number, pre-approved draft, and personal sideload SMS build',
+                              ),
+                              value:
+                                  _autoSendPolicy ==
+                                  AutoSendPolicy.automaticSmsApproved,
+                              onChanged: (v) => setState(() {
+                                _dirty = true;
+                                _autoSendPolicy = v
+                                    ? AutoSendPolicy.automaticSmsApproved
+                                    : AutoSendPolicy.manualOnly;
+                              }),
                             ),
-                            value:
-                                _autoSendPolicy ==
-                                AutoSendPolicy.automaticSmsApproved,
-                            onChanged: (v) => setState(() {
-                              _dirty = true;
-                              _autoSendPolicy = v
-                                  ? AutoSendPolicy.automaticSmsApproved
-                                  : AutoSendPolicy.manualOnly;
-                            }),
-                          ),
+                          ],
                           const SizedBox(height: 12),
                           TextField(
                             controller: _timezone,

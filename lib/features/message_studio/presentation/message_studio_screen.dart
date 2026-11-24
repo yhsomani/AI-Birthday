@@ -10,9 +10,11 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:ai_birthday/app/providers.dart';
+import 'package:ai_birthday/core/config/product_capabilities.dart';
 import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
+import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_repository.dart';
 import 'package:ai_birthday/features/delivery/data/whatsapp_handoff_builder.dart';
 import 'package:ai_birthday/features/jobs/application/ai_job_handler.dart';
 import 'package:ai_birthday/features/jobs/domain/job.dart';
@@ -70,10 +72,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   String? _pendingJobLabel;
   String? _pendingStaleLabel;
 
-  // Captured at load: dispose() runs after ref becomes unusable, but the
-  // final draft save still needs the repository.
-  // ponytail: captured repo instead of ProviderContainer access; revisit if more providers are needed in dispose
+  // Captured at load: dispose() runs after ref becomes unusable.
   DraftsRepository? _draftsRepo;
+  BirthdaysRepository? _birthdaysRepo;
 
   Timer? _autosaveTimer;
   bool _isSaving = false;
@@ -119,7 +120,8 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
 
   void _onMessageChanged(String text) {
     _editRevision++;
-    if (_draft?.status == DraftStatus.approvedForAutoSms) {
+    if (ProductCapabilities.automaticSms &&
+        _draft?.status == DraftStatus.approvedForAutoSms) {
       _draft = _draft?.copyWith(status: DraftStatus.draft);
       _reconcileAutoSms();
     }
@@ -133,12 +135,23 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   Future<void> _performAutosave() async {
     if (_person == null || !mounted) return;
     setState(() => _isSaving = true);
-    await _saveDraft(status: _draft?.status ?? DraftStatus.draft);
-    if (mounted) {
-      setState(() {
-        _isSaving = false;
-        _lastSavedTime = DateTime.now();
-      });
+    try {
+      await _saveDraft(status: _draft?.status ?? DraftStatus.draft);
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _lastSavedTime = DateTime.now();
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _lastSavedTime = null;
+          _errorMessage =
+              'Your latest message could not be saved. It is still in the editor; check storage and try again.';
+        });
+      }
     }
   }
 
@@ -151,6 +164,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     final pRepo = ref.read(peopleRepositoryProvider);
     final dRepo = ref.read(draftsRepositoryProvider);
     _draftsRepo = dRepo;
+    _birthdaysRepo = bRepo;
 
     Birthday? birthday;
     if (widget.birthdayId != null && widget.birthdayId!.isNotEmpty) {
@@ -243,6 +257,19 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     String? staleLabel,
   }) async {
     if (_person == null || _birthday == null) return;
+    if (_messageController.text.isNotEmpty || _draft != null) {
+      try {
+        await _saveDraft(status: DraftStatus.draft);
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _errorMessage =
+                'Save this draft before asking AI to generate. Your text has been kept in the editor.';
+          });
+        }
+        return;
+      }
+    }
     final birthdayId = _activeBirthdayId;
 
     // Snapshot the persisted draft so the worker can tell "user edited while
@@ -390,6 +417,26 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     );
 
     await repo.saveDraft(updatedDraft);
+    final birthdayRepo = _birthdaysRepo;
+    final birthday = _birthday;
+    if (birthdayRepo != null && birthday != null) {
+      final nextStatus =
+          status == DraftStatus.confirmedSent ||
+              birthday.status == BirthdayStatus.completed
+          ? BirthdayStatus.completed
+          : birthday.status == BirthdayStatus.handedOff
+          ? BirthdayStatus.handedOff
+          : BirthdayStatus.messageDrafted;
+      await birthdayRepo.updateBirthdayStatus(
+        birthday.id,
+        nextStatus,
+        draftId: updatedDraft.id,
+      );
+      _birthday = birthday.copyWith(
+        draftId: updatedDraft.id,
+        status: nextStatus,
+      );
+    }
     if (mounted) {
       setState(() {
         _draft = updatedDraft;
@@ -876,26 +923,43 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               child: const Text('Not Sent Yet'),
             ),
             FilledButton(
-              onPressed: () async {
-                HapticFeedback.lightImpact();
-                await ref
-                    .read(birthdaysRepositoryProvider)
-                    .updateBirthdayStatus(
-                      _activeBirthdayId,
-                      BirthdayStatus.completed,
-                    );
-                await _saveDraft(status: DraftStatus.confirmedSent);
-                if (context.mounted) {
-                  Navigator.of(context).pop();
-                  context.pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Celebration confirmed as sent! 🎉'),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Yes, Message Sent!'),
+              onPressed: wasLaunched
+                  ? () async {
+                      HapticFeedback.lightImpact();
+                      try {
+                        await ref
+                            .read(deliveryEventsRepositoryProvider)
+                            .confirmHandoff(
+                              birthdayId: _activeBirthdayId,
+                              draftId: _draft?.id ?? _activeBirthdayId,
+                              at: DateTime.now(),
+                            );
+                        await _loadData();
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                          context.pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Celebration confirmed as sent by you.',
+                              ),
+                            ),
+                          );
+                        }
+                      } catch (_) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'No successful handoff was recorded, so this message was not marked sent.',
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  : null,
+              child: const Text('Yes, I Sent It'),
             ),
           ],
         );
@@ -1311,7 +1375,8 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               ),
             ],
           ),
-          if (_person?.autoSendPolicy == AutoSendPolicy.automaticSmsApproved &&
+          if (ProductCapabilities.automaticSms &&
+              _person?.autoSendPolicy == AutoSendPolicy.automaticSmsApproved &&
               hasUsablePhone &&
               !isCompleted) ...[
             const SizedBox(height: AppSpacing.sm),
@@ -1402,8 +1467,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                      if (person.autoSendPolicy ==
-                          AutoSendPolicy.automaticSmsApproved)
+                      if (ProductCapabilities.automaticSms &&
+                          person.autoSendPolicy ==
+                              AutoSendPolicy.automaticSmsApproved)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(

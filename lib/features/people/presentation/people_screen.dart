@@ -525,12 +525,6 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
       return;
     }
 
-    if (associatedBirthday != null) {
-      try {
-        await birthdaysRepo.deleteBirthday(associatedBirthday.id);
-      } catch (_) {}
-    }
-
     // ponytail: show from the messenger captured above, not `context` — the
     // caller passes the list item's context, which is unmounted as soon as
     // the person is deleted, so a context.mounted guard drops the Undo bar.
@@ -545,11 +539,10 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
             // through the new repository, which would resurrect the tombstone
             // and rewrite enum values through a second model stack.
             try {
-              await ref.read(personServiceProvider).restore(person.id);
+              await ref
+                  .read(personServiceProvider)
+                  .restore(person.id, birthday: associatedBirthday);
             } catch (_) {}
-            if (associatedBirthday != null) {
-              await birthdaysRepo.saveBirthday(associatedBirthday);
-            }
           },
         ),
       ),

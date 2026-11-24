@@ -8,6 +8,7 @@ import {
   type CallableRequest,
 } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { logger } from 'firebase-functions/logger';
 import type { z } from 'zod';
 
 import { parseKeyRing } from '../domain/opaque.js';
@@ -63,13 +64,6 @@ const secretOptions = {
 
 function requireAuthenticated(request: CallableRequest<unknown>): string {
   if (request.auth === undefined || request.app === undefined) {
-    throw new HttpsError('unauthenticated', 'AUTHENTICATION_REQUIRED');
-  }
-  return request.auth.uid;
-}
-
-function requireAuthOnly(request: CallableRequest<unknown>): string {
-  if (request.auth === undefined) {
     throw new HttpsError('unauthenticated', 'AUTHENTICATION_REQUIRED');
   }
   return request.auth.uid;
@@ -304,22 +298,16 @@ export const companionStatus = onCall(commonOptions, async request => {
   return safeCall(() => withoutSecret().companionStatus(uid, input));
 });
 
-const enforceAppCheckOnPurchase =
-  process.env.ENFORCE_APP_CHECK_ON_PURCHASE === 'true';
-
-// Purchase verification uses Firebase Auth plus a cryptographically verified
-// Google Play purchase token. App Check is enforced when configured via
-// ENFORCE_APP_CHECK_ON_PURCHASE=true.
+// Purchase verification requires Firebase Auth plus consumed App Check before
+// any Google Play purchase token is evaluated. There is no production bypass.
 export const verifyPurchase = onCall(
   {
     ...commonOptions,
-    enforceAppCheck: enforceAppCheckOnPurchase,
-    consumeAppCheckToken: enforceAppCheckOnPurchase,
+    enforceAppCheck: true,
+    consumeAppCheckToken: true,
   },
   async request => {
-    const uid = enforceAppCheckOnPurchase
-      ? requireAuthenticated(request)
-      : requireAuthOnly(request);
+    const uid = requireAuthenticated(request);
     const input = parseRequest(verifyPurchaseSchema, request.data);
     return safeCall(() =>
       new SubscriptionVerificationService(db).verifyPurchase(uid, input),
@@ -341,7 +329,8 @@ export const sweepDeletionDrains = onSchedule(
     const orchestrator = new DeletionOrchestrator(db, getAuth(), () =>
       Timestamp.now().toMillis(),
     );
-    await orchestrator.sweep();
+    const result = await orchestrator.sweep();
+    logger.info('deletion_sweep_completed', result);
   },
 );
 
@@ -359,6 +348,7 @@ export const sweepCoordinationOperations = onSchedule(
     const orchestrator = new CoordinationOperationOrchestrator(db, () =>
       Timestamp.now().toMillis(),
     );
-    await orchestrator.sweep();
+    const result = await orchestrator.sweep();
+    logger.info('coordination_operation_sweep_completed', result);
   },
 );

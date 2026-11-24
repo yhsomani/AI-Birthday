@@ -509,4 +509,83 @@ void main() {
       },
     );
   });
+
+  group('DriftDeliveryEventsRepository confirmation tests', () {
+    late AppDatabase db;
+    late DriftDeliveryEventsRepository repo;
+
+    setUp(() {
+      db = AppDatabase(NativeDatabase.memory());
+      repo = DriftDeliveryEventsRepository(db);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    test(
+      'confirmation requires evidence and atomically completes draft + birthday',
+      () async {
+        final now = DateTime.utc(2026, 1, 1, 9);
+        await db
+            .into(db.birthdays)
+            .insert(
+              BirthdaysCompanion.insert(
+                id: 'b-confirm',
+                personId: 'p-confirm',
+                cycleYear: 2026,
+                date: DateTime.utc(2026, 1, 1),
+                status: 'handedOff',
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+        await db
+            .into(db.messageDrafts)
+            .insert(
+              MessageDraftsCompanion.insert(
+                id: 'draft-confirm',
+                birthdayId: 'b-confirm',
+                personId: 'p-confirm',
+                body: 'Happy birthday',
+                tone: 'warm',
+                length: 'standard',
+                status: 'ready',
+                providerType: 'manual',
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+
+        await expectLater(
+          repo.confirmHandoff(
+            birthdayId: 'b-confirm',
+            draftId: 'draft-confirm',
+            at: now,
+          ),
+          throwsStateError,
+        );
+
+        await repo.recordHandoffAndMarkHandedOff(
+          birthdayId: 'b-confirm',
+          channel: DeliveryChannel.whatsapp,
+          at: now,
+        );
+        await repo.confirmHandoff(
+          birthdayId: 'b-confirm',
+          draftId: 'draft-confirm',
+          at: now.add(const Duration(minutes: 1)),
+        );
+
+        final birthday = await (db.select(
+          db.birthdays,
+        )..where((row) => row.id.equals('b-confirm'))).getSingle();
+        final draft = await (db.select(
+          db.messageDrafts,
+        )..where((row) => row.id.equals('draft-confirm'))).getSingle();
+        expect(birthday.status, 'completed');
+        expect(draft.status, 'confirmedSent');
+      },
+    );
+  });
 }

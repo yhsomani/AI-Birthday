@@ -20,6 +20,11 @@ class FirebaseConfig {
     defaultValue: '492062763032',
   );
 
+  static const String androidAppId = String.fromEnvironment(
+    'FIREBASE_ANDROID_APP_ID',
+    defaultValue: '1:492062763032:android:82c79bfa02b99255c67b6d',
+  );
+
   /// Region of the callable Cloud Functions.
   static const String functionsRegion = String.fromEnvironment(
     'FIREBASE_FUNCTIONS_REGION',

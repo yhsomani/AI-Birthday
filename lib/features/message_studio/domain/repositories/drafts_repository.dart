@@ -8,6 +8,7 @@ abstract interface class DraftsRepository {
   Future<MessageDraft?> getDraft(String id);
   Future<MessageDraft?> getDraftForBirthday(String birthdayId);
   Future<void> saveDraft(MessageDraft draft);
+  Future<int> deleteDraftsForBirthday(String birthdayId);
 
   /// Removes unreachable draft rows and returns how many were deleted: drafts
   /// whose birthday no longer exists, plus legacy rows keyed by their own id
@@ -55,6 +56,19 @@ class InMemoryDraftsRepository implements DraftsRepository {
   Future<void> saveDraft(MessageDraft draft) async {
     _store[draft.id] = draft;
     _controller.add(_sortedDrafts());
+  }
+
+  @override
+  Future<int> deleteDraftsForBirthday(String birthdayId) async {
+    final ids = _store.values
+        .where((draft) => draft.birthdayId == birthdayId)
+        .map((draft) => draft.id)
+        .toList();
+    for (final id in ids) {
+      _store.remove(id);
+    }
+    if (ids.isNotEmpty) _controller.add(_sortedDrafts());
+    return ids.length;
   }
 
   @override

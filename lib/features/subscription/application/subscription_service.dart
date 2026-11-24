@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:clock/clock.dart' as clock;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:in_app_purchase/in_app_purchase.dart' as iap;
@@ -234,11 +235,17 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
 
     try {
       final appCheckToken = await _appCheckTokenProvider?.call();
+      if (appCheckToken == null || appCheckToken.isEmpty) {
+        _logger.warning(
+          'Subscription',
+          'Billing probe blocked because App Check attestation is unavailable.',
+        );
+        return null;
+      }
       final headers = <String, String>{
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $authToken',
-        if (appCheckToken != null && appCheckToken.isNotEmpty)
-          'X-Firebase-AppCheck': appCheckToken,
+        'X-Firebase-AppCheck': appCheckToken,
       };
       final response = await _http
           .post(
@@ -279,7 +286,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
 
       final expiry = expiryDateMs.toInt();
       final isActive =
-          status == 'active' && expiry > DateTime.now().millisecondsSinceEpoch;
+          status == 'active' && expiry > _now().millisecondsSinceEpoch;
       if (isActive) {
         return _VerifiedEntitlement(
           status: EntitlementStatus.active,
@@ -468,7 +475,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   }
 
   /// Test-only hook. Production entitlement still originates from verified
-  /// purchase callbacks; no UI should expose this method.
+  /// purchase callbacks; this method is unavailable outside debug builds.
   void resetToFreeTier() {
     _logger.info('Subscription', 'Resetting entitlement to Free tier');
     state = UserEntitlement.free;
@@ -478,13 +485,12 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     }
   }
 
-  /// Test hook for deterministic provider tests.
-  void updateEntitlement(UserEntitlement entitlement) {
-    state = entitlement;
-  }
-
-  /// Test hook for deterministic sandbox tests.
+  /// Test hook for deterministic sandbox state. The assertion is paired with
+  /// the runtime guard so release/profile builds cannot grant entitlement even
+  /// if someone accidentally calls this method from product code.
   void setDevSandboxEntitlement(UserEntitlement entitlement) {
+    assert(kDebugMode, 'Test-only entitlement mutation is unavailable');
+    if (!kDebugMode) return;
     state = entitlement;
   }
 

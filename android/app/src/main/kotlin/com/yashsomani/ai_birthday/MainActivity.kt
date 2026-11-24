@@ -34,6 +34,7 @@ class MainActivity : FlutterActivity() {
     private val SHARE_CHANNEL = "com.yashsomani.ai_birthday/share"
     private val CONTACTS_CHANNEL = "com.yashsomani.ai_birthday/contacts"
     private val SMS_AUTOMATION_CHANNEL = "com.yashsomani.ai_birthday/sms_automation"
+    private val AUTOMATIC_SMS_ENABLED = false
 
     private var pendingNotificationResult: MethodChannel.Result? = null
     private var pendingContactsResult: MethodChannel.Result? = null
@@ -307,13 +308,18 @@ class MainActivity : FlutterActivity() {
                                 packageName,
                                 PackageManager.GET_PERMISSIONS
                             )
-                            info.requestedPermissions?.contains(Manifest.permission.SEND_SMS) == true
+                            AUTOMATIC_SMS_ENABLED &&
+                                info.requestedPermissions?.contains(Manifest.permission.SEND_SMS) == true
                         } catch (_: Exception) {
                             false
                         }
                         result.success(hasDeclaredPermission)
                     }
                     "hasSmsPermission" -> {
+                        if (!AUTOMATIC_SMS_ENABLED) {
+                            result.success(false)
+                            return@setMethodCallHandler
+                        }
                         val granted = ContextCompat.checkSelfPermission(
                             this,
                             Manifest.permission.SEND_SMS
@@ -321,6 +327,10 @@ class MainActivity : FlutterActivity() {
                         result.success(granted)
                     }
                     "requestSmsPermission" -> {
+                        if (!AUTOMATIC_SMS_ENABLED) {
+                            result.success(false)
+                            return@setMethodCallHandler
+                        }
                         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
                             == PackageManager.PERMISSION_GRANTED) {
                             result.success(true)
@@ -334,6 +344,10 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                     "scheduleSmsJob" -> {
+                        if (!AUTOMATIC_SMS_ENABLED) {
+                            result.success(false)
+                            return@setMethodCallHandler
+                        }
                         val jobMap = call.argument<Map<String, Any>>("job")
                         if (jobMap == null) {
                             result.error("INVALID_ARGS", "Missing job payload", null)

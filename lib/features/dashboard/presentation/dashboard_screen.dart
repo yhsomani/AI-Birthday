@@ -86,6 +86,7 @@ class DashboardScreen extends ConsumerWidget {
                   final celebrateToday = <Birthday>[];
 
                   for (final b in birthdays) {
+                    if (!peopleMap.containsKey(b.personId)) continue;
                     final days = b.daysUntil(now);
                     if (days == 0) {
                       todayBirthdays.add(b);
@@ -473,6 +474,7 @@ class DashboardScreen extends ConsumerWidget {
       BirthdayStatus.messageDrafted => Icons.rate_review_outlined,
       BirthdayStatus.messageReviewed ||
       BirthdayStatus.readyForDelivery => Icons.send_rounded,
+      BirthdayStatus.completed => Icons.verified_outlined,
       BirthdayStatus.handedOff => Icons.check_circle_outline,
       _ => Icons.arrow_forward,
     };
@@ -484,6 +486,7 @@ class DashboardScreen extends ConsumerWidget {
       BirthdayStatus.messageDrafted => 'Review Draft',
       BirthdayStatus.messageReviewed || BirthdayStatus.readyForDelivery =>
         'Send via ${person?.preferredDeliveryChannel.displayName ?? 'WhatsApp'}',
+      BirthdayStatus.completed => 'User Confirmed Sent',
       BirthdayStatus.handedOff => 'Confirm Sent',
       _ => 'Review & Send',
     };

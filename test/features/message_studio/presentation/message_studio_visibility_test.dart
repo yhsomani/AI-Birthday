@@ -292,7 +292,7 @@ void main() {
 
         // The dialog asks the user, it never re-opens the external app.
         expect(find.text('Did you send the message?'), findsOneWidget);
-        expect(find.text('Yes, Message Sent!'), findsOneWidget);
+        expect(find.text('Yes, I Sent It'), findsOneWidget);
         expect(find.text('Not Sent Yet'), findsOneWidget);
       },
     );

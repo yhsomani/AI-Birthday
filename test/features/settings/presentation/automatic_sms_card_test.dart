@@ -69,19 +69,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Automatic SMS at Midnight (00:00)'), findsOneWidget);
-      expect(
-        find.textContaining('This build is the Play Store distribution'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Play Store distribution'), findsOneWidget);
+      expect(find.text('Enable Automatic SMS'), findsNothing);
       expect(find.byType(Switch), findsNothing);
     },
   );
 
   testWidgets(
-    'AutomaticSmsCard shows switch when supported in personal distribution',
+    'global v1 capability gate disables direct SMS on a capable build',
     (tester) async {
       final gateway = TestNativeSmsGateway(supported: true, permission: true);
-
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -94,13 +91,11 @@ void main() {
           child: const MaterialApp(home: Scaffold(body: AutomaticSmsCard())),
         ),
       );
-
-      await tester.pump(const Duration(milliseconds: 50));
       await tester.pumpAndSettle();
 
-      expect(find.text('Automatic SMS at Midnight (00:00)'), findsOneWidget);
-      expect(find.text('Enable Automatic SMS'), findsOneWidget);
-      expect(find.byType(Switch), findsOneWidget);
+      expect(find.textContaining('Play Store distribution'), findsOneWidget);
+      expect(find.text('Enable Automatic SMS'), findsNothing);
+      expect(find.byType(Switch), findsNothing);
     },
   );
 }

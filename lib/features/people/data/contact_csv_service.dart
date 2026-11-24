@@ -4,6 +4,7 @@ library;
 import 'package:uuid/uuid.dart';
 
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
+import 'package:ai_birthday/core/config/product_capabilities.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
@@ -25,7 +26,7 @@ class ParsedContactCandidate {
     this.notes,
     this.preferredDeliveryChannel = DeliveryChannel.whatsapp,
     this.timezone,
-    this.autoPrepare = true,
+    this.autoPrepare = false,
     this.duplicateWarning,
   });
 
@@ -267,7 +268,9 @@ class ContactCsvService {
       final preferredTone = MessageTone.fromString(toneStr);
       final preferredDeliveryChannel = DeliveryChannel.fromString(channelStr);
       final preferredLanguage = languageStr ?? 'en';
-      final autoPrepare = (autoPrepareStr ?? 'true').toLowerCase() != 'false';
+      final autoPrepare =
+          ProductCapabilities.autoPrepare &&
+          (autoPrepareStr ?? 'false').toLowerCase() == 'true';
 
       final facts = factsStr != null && factsStr.isNotEmpty
           ? factsStr

@@ -37,14 +37,28 @@ jobs:
         run: flutter analyze
 
       - name: Run Flutter Test Suite
-        # Golden tests are a local-only gate (tagged `golden`); regenerate with
-        # `flutter test --update-goldens test/ui/goldens` and review the PNGs.
+        # Golden tests are a separate visual-regression gate below.
         run: flutter test --coverage --exclude-tags golden
+
+      - name: Verify Shell Golden Regression Tests
+        run: flutter test test/app/shell_goldens_test.dart
 
       - name: Build Play Store Android Release APK (unsigned CI artifact)
         env:
           FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
         run: flutter build apk --flavor play --release --dart-define=FIREBASE_WEB_API_KEY="$FIREBASE_WEB_API_KEY"
+
+      - name: Verify Product Capability Boundaries
+        run: |
+          if grep -R "STRIPE_SECRET_KEY\|Pay with Card / Stripe\|stripeGatewayServiceProvider" lib -n; then
+            echo "ERROR: client payment secret or Stripe product path found."
+            exit 1
+          fi
+          if grep -R "setDevSandboxEntitlement(" lib -n | grep -v "void setDevSandboxEntitlement"; then
+            echo "ERROR: production code calls the test entitlement hook."
+            exit 1
+          fi
+          echo "Client capability boundary verified."
 
       - name: Verify Play Store Manifest Excludes SEND_SMS
         run: |
@@ -113,6 +127,9 @@ jobs:
 
       - name: TypeScript Compile Check
         run: npm run build
+
+      - name: Verify Purchase Security Boundary
+        run: npx vitest run test/purchase-app-check.static.test.ts
 
       - name: Run Vitest Suite
         run: npm test

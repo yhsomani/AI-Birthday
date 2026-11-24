@@ -18,6 +18,7 @@
 9. [12 — Governance and traceability registers](12-governance-registers.md)
 10. [09 — Completeness report](09-completeness-report.md)
 11. [11 — Documentation migration and audit](11-documentation-audit.md)
+12. [13 — v1 production-readiness decision](13-v1-production-readiness.md)
 
 ## Diagrams
 

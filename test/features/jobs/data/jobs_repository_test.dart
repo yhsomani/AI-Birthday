@@ -223,4 +223,13 @@ void main() {
       expect((await repo.getById('fresh'))!.status, JobStatus.running);
     },
   );
+
+  test('resetRunningAtStartup recovers fresh previous-process jobs', () async {
+    final job = await repo.enqueue(type: 't', subjectId: 'startup');
+    await repo.claimNext(DateTime.now());
+
+    final reset = await repo.resetRunningAtStartup(DateTime.now());
+    expect(reset, 1);
+    expect((await repo.getById(job.id))!.status, JobStatus.queued);
+  });
 }

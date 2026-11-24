@@ -214,6 +214,29 @@ class DriftBirthdaysRepository implements BirthdaysRepository {
   }
 
   @override
+  Future<void> rolloverBirthday(Birthday birthday) async {
+    await _database.transaction(() async {
+      await (_database.delete(
+        _database.messageDrafts,
+      )..where((row) => row.birthdayId.equals(birthday.id))).go();
+      await _database
+          .into(_database.birthdays)
+          .insertOnConflictUpdate(
+            db.BirthdaysCompanion(
+              id: Value(birthday.id),
+              personId: Value(birthday.personId),
+              cycleYear: Value(birthday.cycleYear),
+              date: Value(birthday.date),
+              status: Value(birthday.status.name),
+              draftId: const Value(null),
+              createdAt: Value(birthday.createdAt),
+              updatedAt: Value(birthday.updatedAt),
+            ),
+          );
+    });
+  }
+
+  @override
   Future<void> updateBirthdayStatus(
     String id,
     BirthdayStatus status, {
@@ -319,6 +342,13 @@ class DriftDraftsRepository implements DraftsRepository {
             updatedAt: Value(draft.updatedAt),
           ),
         );
+  }
+
+  @override
+  Future<int> deleteDraftsForBirthday(String birthdayId) {
+    return (_database.delete(
+      _database.messageDrafts,
+    )..where((row) => row.birthdayId.equals(birthdayId))).go();
   }
 
   @override
@@ -433,6 +463,37 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
       )..where((r) => r.id.equals(birthdayId))).write(
         db.BirthdaysCompanion(
           status: Value(BirthdayStatus.handedOff.name),
+          updatedAt: Value(at.toUtc()),
+        ),
+      );
+    });
+  }
+
+  @override
+  Future<void> confirmHandoff({
+    required String birthdayId,
+    required String draftId,
+    required DateTime at,
+  }) {
+    return _database.transaction(() async {
+      final handoff = await latestHandoffForBirthday(birthdayId);
+      if (handoff == null) {
+        throw StateError('Cannot confirm delivery without a handoff event.');
+      }
+      await (_database.update(
+        _database.birthdays,
+      )..where((row) => row.id.equals(birthdayId))).write(
+        db.BirthdaysCompanion(
+          status: Value(BirthdayStatus.completed.name),
+          draftId: Value(draftId),
+          updatedAt: Value(at.toUtc()),
+        ),
+      );
+      await (_database.update(
+        _database.messageDrafts,
+      )..where((row) => row.id.equals(draftId))).write(
+        db.MessageDraftsCompanion(
+          status: Value(DraftStatus.confirmedSent.name),
           updatedAt: Value(at.toUtc()),
         ),
       );

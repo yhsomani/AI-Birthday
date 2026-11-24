@@ -75,7 +75,7 @@ class CloudBackupCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Privacy note: Cloud backup uploads your saved people, birthdays, message drafts, reminder settings, and related contact and personalization fields to this app\'s Firestore project under your signed-in account.',
+              'Privacy note: Backup uploads saved people, birthdays, drafts and reminder settings to this app\'s Firestore project under your signed-in account. It is not end-to-end encrypted and should only be enabled when you accept that cloud-service boundary. Gemini keys and auth tokens are never included.',
               style: TextStyle(
                 fontSize: 11,
                 color: context.colors.textSecondary,

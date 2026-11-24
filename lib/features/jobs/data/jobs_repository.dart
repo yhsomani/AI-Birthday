@@ -58,6 +58,10 @@ abstract interface class JobsRepository {
     DateTime now, {
     Duration grace = const Duration(minutes: 2),
   });
+
+  /// At process start, no local handler from the previous isolate can still
+  /// be running. Recover all `running` rows without making fresh work race.
+  Future<int> resetRunningAtStartup(DateTime now);
 }
 
 /// Drift/SQLite implementation of [JobsRepository].
@@ -304,6 +308,24 @@ class DriftJobsRepository implements JobsRepository {
           ),
         );
     return staleJobIds.length;
+  }
+
+  @override
+  Future<int> resetRunningAtStartup(DateTime now) async {
+    final rows = await (_database.select(
+      _database.jobs,
+    )..where((job) => job.status.equals(JobStatus.running.name))).get();
+    if (rows.isEmpty) return 0;
+    await (_database.update(
+      _database.jobs,
+    )..where((job) => job.status.equals(JobStatus.running.name))).write(
+      db.JobsCompanion(
+        status: drift.Value(JobStatus.queued.name),
+        startedAt: const drift.Value(null),
+        nextRetryAt: drift.Value(now),
+      ),
+    );
+    return rows.length;
   }
 
   static JobRecord _fromRow(db.Job row) {

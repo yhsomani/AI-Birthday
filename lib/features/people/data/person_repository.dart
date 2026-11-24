@@ -4,6 +4,7 @@ import 'package:clock/clock.dart' as clock;
 import 'package:drift/drift.dart' as drift;
 
 import '../../../core/database/app_database.dart' as db;
+import '../../birthdays/domain/models/birthday.dart';
 import '../../delivery/domain/models/delivery_channel.dart';
 import '../domain/models/relationship.dart';
 import '../domain/models/tone.dart';
@@ -21,7 +22,9 @@ abstract class PeopleStore {
   Future<Person?> getById(String id);
   Future<void> save(Person person);
   Future<void> softDelete(String id);
+  Future<void> softDeleteAggregate(String id);
   Future<void> restore(String id);
+  Future<void> restoreAggregate(String id, {Birthday? restoredBirthday});
 }
 
 /// Drift-backed [PeopleStore]. Version/timestamp integrity is enforced by the
@@ -94,6 +97,32 @@ class DriftPeopleStore implements PeopleStore {
   }
 
   @override
+  Future<void> softDeleteAggregate(String id) async {
+    final existing = await getById(id);
+    if (existing == null) return;
+    final now = _now();
+    await _database.transaction(() async {
+      await (_database.update(
+        _database.persons,
+      )..where((row) => row.id.equals(id))).write(
+        db.PersonsCompanion(
+          deletedAt: drift.Value(now.toUtc()),
+          updatedAt: drift.Value(now.toUtc()),
+          version: drift.Value(existing.version + 1),
+        ),
+      );
+      await (_database.delete(
+        _database.birthdays,
+      )..where((row) => row.personId.equals(id))).go();
+      await (_database.delete(_database.jobs)..where(
+            (row) =>
+                row.subjectId.equals(id) | row.subjectId.equals('birthday-$id'),
+          ))
+          .go();
+    });
+  }
+
+  @override
   Future<void> restore(String id) async {
     final existing = await getById(id);
     if (existing == null) return;
@@ -107,6 +136,40 @@ class DriftPeopleStore implements PeopleStore {
         version: drift.Value(existing.version + 1),
       ),
     );
+  }
+
+  @override
+  Future<void> restoreAggregate(String id, {Birthday? restoredBirthday}) async {
+    final existing = await getById(id);
+    if (existing == null) return;
+    final now = _now();
+    await _database.transaction(() async {
+      await (_database.update(
+        _database.persons,
+      )..where((row) => row.id.equals(id))).write(
+        db.PersonsCompanion(
+          deletedAt: const drift.Value(null),
+          updatedAt: drift.Value(now.toUtc()),
+          version: drift.Value(existing.version + 1),
+        ),
+      );
+      if (restoredBirthday != null) {
+        await _database
+            .into(_database.birthdays)
+            .insertOnConflictUpdate(
+              db.BirthdaysCompanion(
+                id: drift.Value(restoredBirthday.id),
+                personId: drift.Value(restoredBirthday.personId),
+                cycleYear: drift.Value(restoredBirthday.cycleYear),
+                date: drift.Value(restoredBirthday.date),
+                status: drift.Value(restoredBirthday.status.name),
+                draftId: drift.Value(restoredBirthday.draftId),
+                createdAt: drift.Value(restoredBirthday.createdAt),
+                updatedAt: drift.Value(now.toUtc()),
+              ),
+            );
+      }
+    });
   }
 
   Person _toDomain(db.Person row) => Person(
