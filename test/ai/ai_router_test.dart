@@ -127,7 +127,9 @@ void main() {
       },
     );
 
-    test('Throws AppFailure.lockedAi before reading a missing credential', () async {
+    test(
+      'Throws AppFailure.lockedAi before reading a missing credential',
+      () async {
       final countingStorage = CountingCredentialStorage();
       var nanoStatusChecks = 0;
       final router = AiRouter(
