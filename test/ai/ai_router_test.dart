@@ -127,37 +127,40 @@ void main() {
       },
     );
 
-    test('Throws AppFailure.lockedAi before reading a missing credential', () async {
-      final countingStorage = CountingCredentialStorage();
-      var nanoStatusChecks = 0;
-      final router = AiRouter(
-        credentialStorage: countingStorage,
-        userGeminiProvider: mockGeminiProvider,
-        nanoProvider: mockNanoProvider,
-        nanoStatusChecker: () async {
-          nanoStatusChecks++;
-          return GeminiNanoStatus.available;
-        },
-      );
+    test(
+      'Throws AppFailure.lockedAi before reading a missing credential',
+      () async {
+        final countingStorage = CountingCredentialStorage();
+        var nanoStatusChecks = 0;
+        final router = AiRouter(
+          credentialStorage: countingStorage,
+          userGeminiProvider: mockGeminiProvider,
+          nanoProvider: mockNanoProvider,
+          nanoStatusChecker: () async {
+            nanoStatusChecks++;
+            return GeminiNanoStatus.available;
+          },
+        );
 
-      await expectLater(
-        router.generate(
-          request: AiGenerationRequest(person: testPerson),
-          entitlement: UserEntitlement.free,
-        ),
-        throwsA(
-          isA<AppFailure>().having(
-            (e) => e.code,
-            'code',
-            AppFailureCode.aiLocked,
+        await expectLater(
+          router.generate(
+            request: AiGenerationRequest(person: testPerson),
+            entitlement: UserEntitlement.free,
           ),
-        ),
-      );
-      expect(countingStorage.hasGeminiApiKeyCalls, 0);
-      expect(nanoStatusChecks, 0);
-      expect(mockGeminiProvider.generateCalls, 0);
-      expect(mockNanoProvider.generateCalls, 0);
-    });
+          throwsA(
+            isA<AppFailure>().having(
+              (e) => e.code,
+              'code',
+              AppFailureCode.aiLocked,
+            ),
+          ),
+        );
+        expect(countingStorage.hasGeminiApiKeyCalls, 0);
+        expect(nanoStatusChecks, 0);
+        expect(mockGeminiProvider.generateCalls, 0);
+        expect(mockNanoProvider.generateCalls, 0);
+      },
+    );
 
     test(
       'Routes to UserGeminiApiProvider when user key is configured',
