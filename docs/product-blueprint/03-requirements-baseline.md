@@ -128,6 +128,16 @@ Every atomic feature specification must complete this template before it is mark
 19. Dependencies, priority and release phase.
 20. Source evidence and implementation verification status.
 
-## 6. Requirements traceability
+## 6. Scoped domain contract references
+
+Phase 2.3 provides source-backed details and named test mappings for the People and Birthday foundations:
+
+- [People lifecycle contract](phase-2.3-product-specification/people-lifecycle-contract.md) expands FR-001–FR-005, including create/edit/delete/undo, imports, export, validation, data ownership and unresolved defaults.
+- [Birthday lifecycle contract](phase-2.3-product-specification/birthday-lifecycle-contract.md) expands FR-006–FR-008 and FR-010, including Gregorian recurrence, leap-day resolution, timezone semantics, active occurrence refresh and aggregate integrity.
+- [Acceptance criteria and traceability](phase-2.3-product-specification/acceptance-criteria-and-traceability.md) maps scoped requirements to source files, named existing tests and explicit gaps.
+
+These references do not approve open decisions or close feature-contract gaps in other domains.
+
+## 7. Requirements traceability
 
 Each FR must link to at least one domain specification, journey, business rule, acceptance criterion and test case. An FR without a test mapping is not ready for implementation. A test without a requirement or defect reference must explain why it exists.
