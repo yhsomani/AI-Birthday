@@ -59,10 +59,7 @@ void main() {
 
       // New people must default to manual preparation; opt-in is explicit.
       final autoPrepareSwitch = tester.widget<SwitchListTile>(
-        find.widgetWithText(
-          SwitchListTile,
-          'Prepare drafts automatically',
-        ),
+        find.widgetWithText(SwitchListTile, 'Prepare drafts automatically'),
       );
       expect(autoPrepareSwitch.value, isFalse);
 
