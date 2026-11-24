@@ -98,7 +98,7 @@ sequenceDiagram
   UI-->>U: Show draft or failure/retry state
 ```
 
-Sources: [UI](../../../lib/features/message_studio/presentation/message_studio_screen.dart), [worker](../../../lib/features/jobs/application/job_worker.dart), [job handler](../../../lib/features/ai/application/ai_job_handler.dart), [router](../../../lib/features/ai/domain/ai_router.dart), [prompt builder](../../../lib/features/ai/domain/ai_prompt_builder.dart). At the reviewed source baseline, executable `AiRouter.generate` checks `entitlement.canUseAi` before selecting either provider. The router's top-level comments still describe the superseded BYOK-without-Pro policy; that is a source-comment defect and is not changed by this documentation-only phase.
+Sources: [UI](../../../lib/features/message_studio/presentation/message_studio_screen.dart), [worker](../../../lib/features/jobs/application/job_worker.dart), [job handler](../../../lib/features/jobs/application/ai_job_handler.dart), [router](../../../lib/features/ai/domain/ai_router.dart), [prompt builder](../../../lib/features/ai/domain/ai_prompt_builder.dart). At the reviewed source baseline, executable `AiRouter.generate` checks `entitlement.canUseAi` before selecting either provider. The router's top-level comments still describe the superseded BYOK-without-Pro policy; that is a source-comment defect and is not changed by this documentation-only phase.
 
 ## 5. Delivery semantics and state
 
