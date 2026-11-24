@@ -347,13 +347,17 @@ May require network:
 
 ## 14. Timezone and leap day
 
-Timezone rule:
-1. Recipient timezone if explicitly known.
-2. Otherwise user's timezone.
+Approved People/Birthday rules (Phase 2.3.1):
 
-Feb 29 default:
-- Feb 28 in non-leap years.
-- User may choose Mar 1.
+- Every newly persisted Person must have a valid birthday month/day. Birth year remains optional. Existing legacy records without a valid birthday are handled under a separate approved remediation policy; no birthday or occurrence may be fabricated.
+- New Persons use autoPrepare=false across manual entry and every import path. A user may explicitly opt in. Existing stored values are not mass-reset without a separate approved migration decision.
+- Each Feb 29 Person has a saved per-Person choice of Feb 28 or Mar 1 for non-leap years. Leap years remain Feb 29. A missing legacy preference requires an explicit user choice; it must not be inferred from a previously computed date.
+
+Timezone rule:
+1. Use a valid recipient IANA timezone when explicitly present.
+2. When the recipient timezone is absent, use the device-local timezone.
+3. Do not substitute a user-profile timezone.
+4. A non-empty but invalid recipient timezone is not equivalent to an absent value. Its recovery behavior remains an open decision; do not silently rewrite it.
 
 ## 15. Home
 

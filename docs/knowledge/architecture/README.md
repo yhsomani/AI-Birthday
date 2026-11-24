@@ -83,19 +83,22 @@ sequenceDiagram
   UI->>Q: Persist ai_generate job
   Q->>H: Run queued job
   H->>A: Request AI text
-  alt User Gemini key configured and not forcing Nano
+  alt No active application entitlement
+    A-->>H: AI_LOCKED; no provider call
+  else Entitled and Nano explicitly forced
+    A-->>H: Native Nano provider response or typed unavailable error
+  else Entitled and user Gemini key configured
     A-->>H: User Gemini provider response
-  else Pro entitled and Nano available
+  else Entitled and Nano available
     A-->>H: Native Nano provider response
-  else Locked / unavailable / timed out
-    A-->>H: Typed failure
-    H-->>Q: Retryable or terminal result
+  else No entitled provider available
+    A-->>H: Typed unavailable failure; preserve manual draft
   end
   H->>S: Persist resulting draft (if successful)
   UI-->>U: Show draft or failure/retry state
 ```
 
-Sources: [UI](../../../lib/features/message_studio/presentation/message_studio_screen.dart), [worker](../../../lib/features/jobs/application/job_worker.dart), [job handler](../../../lib/features/jobs/application/ai_job_handler.dart), [router](../../../lib/features/ai/domain/ai_router.dart), [prompt builder](../../../lib/features/ai/domain/ai_prompt_builder.dart). The source-level `AiRouter.generate` checks `hasGeminiApiKey` before applying the Pro gate to the non-BYOK path; a stale top-of-file comment describes another order—recorded in [gaps](../gaps/README.md).
+Sources: [UI](../../../lib/features/message_studio/presentation/message_studio_screen.dart), [worker](../../../lib/features/jobs/application/job_worker.dart), [job handler](../../../lib/features/ai/application/ai_job_handler.dart), [router](../../../lib/features/ai/domain/ai_router.dart), [prompt builder](../../../lib/features/ai/domain/ai_prompt_builder.dart). At the reviewed source baseline, executable `AiRouter.generate` checks `entitlement.canUseAi` before selecting either provider. The router's top-level comments still describe the superseded BYOK-without-Pro policy; that is a source-comment defect and is not changed by this documentation-only phase.
 
 ## 5. Delivery semantics and state
 

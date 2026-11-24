@@ -87,7 +87,7 @@ Status: source-implemented; device/UI-runtime results not independently tested i
 | Nano | Persist result | Save draft and update birthday lifecycle | [AI job handler](../../../lib/features/jobs/application/ai_job_handler.dart) |
 | Nano | Recover failure | Surface retry/alternative/manual authoring | Studio job event handling |
 
-**Policy distinction:** user's own valid Gemini key unlocks the BYOK route without app Pro; Nano requires entitlement. Implementation should not be described as background *sending*.
+**Approved policy distinction:** active application entitlement is required before either provider is selected or invoked. A personal Gemini API key changes the provider and whose API quota/billing applies; it does not bypass the app entitlement. With entitlement, a configured key is used unless Nano is explicitly selected; otherwise Nano is used only when genuinely available. Provider unavailability must preserve manual drafting. This is AI draft generation, not background message sending.
 
 ## Deep decomposition: Reminders → schedule
 
