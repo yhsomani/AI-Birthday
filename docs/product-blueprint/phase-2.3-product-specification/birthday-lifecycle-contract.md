@@ -4,7 +4,7 @@
 **Domain:** Birthday recurrence and occurrence lifecycle  
 **Requirements:** FR-006–FR-008 and FR-010; PRD-002–PRD-003  
 **Source review commit:** 93e803aee3064b046ac9b9093cfd35e4b1a0ae62  
-**Status:** Source-backed specification; leap-day policy, timezone precedence and aggregate integrity require approval  
+**Status:** Source-backed specification with Phase 2.3.1 leap-day and timezone decisions approved; data-integrity architecture remains pending  
 **Scope:** Gregorian recurrence, next occurrence, one active occurrence per Person, lifecycle refresh, date/timezone boundaries, status and draft linkage.
 
 Evidence labels: **FACT** is current repository behavior. **PROPOSED CONTRACT** is desired behavior to approve. **OPEN** identifies unresolved policy. This document is not evidence of physical-device behavior.
@@ -38,7 +38,7 @@ It does not own Person identity/profile editing, reminder offsets or Android ala
 ### 2.2 Required invariants
 
 **PROPOSED CONTRACT:**
-1. A Person may have no Birthday occurrence when no valid birthday exists.
+1. Every newly persisted Person has valid birthday month/day; a legacy no-birthday row is an exception that must not be assigned a fabricated occurrence.
 2. A Person with a valid birthday has exactly one current occurrence at a time.
 3. The occurrence ID remains stable when the cycle advances; current code uses the pattern birthday-{personId}.
 4. cycleYear and date refer to the same resolved calendar cycle.
@@ -70,23 +70,25 @@ birthYear is accepted by computeNext but does not change recurrence calculation.
 
 ### 3.3 Leap day
 
-**FACT:** LeapDayResolution.feb28 is the default. In a non-leap year, Feb 29 resolves to Feb 28. LeapDayResolution.mar1 is also implemented and tested. In leap years, it remains Feb 29.
+**FACT — source baseline:** LeapDayResolution.feb28 is the current default. LeapDayResolution.mar1 is also implemented and tested. In leap years, Feb 29 remains Feb 29.
 
-**OPEN:** Product governance must decide whether Feb 28 is the fixed product rule or the app should expose a user preference. Source has an alternate calculation parameter, but Person has no persisted leap-day preference and the UI does not expose one. Do not imply a per-recipient preference exists.
+**APPROVED PRODUCT DECISION (Phase 2.3.1):** For a Person whose birthday is Feb 29, the user chooses whether that Person's birthday is observed on Feb 28 or Mar 1 in non-leap years. The choice is per Person; leap years use Feb 29.
+
+**ARCHITECTURE CONSEQUENCE:** The target Person contract needs a persisted two-value leap-day preference for Feb 29 records, and the same resolver must be used by manual entry, import, lifecycle refresh, dashboard, calendar and reminders. The field name, exact UI, schema migration and backfill for existing Feb 29 Persons remain design/implementation work.
 
 ### 3.4 Timezone precedence and boundaries
 
-**FACT:** If Person.timezone is non-empty, the engine uses it. If null, the engine uses device-local calendar frame. BirthdayEngine.effectiveTimezone(recipientTimezone, userTimezone) exists and implements recipient → user → UTC precedence, but inspected lifecycle and People-list call sites pass only recipient timezone. They do not wire a user timezone into the helper. The effective fallback at those call sites is therefore device-local, not a stored user preference.
+**FACT:** If Person.timezone is non-empty and valid, the engine uses it. If absent, inspected call sites use the device-local calendar frame. The helper also supports a user-timezone argument, but the inspected lifecycle callers do not wire a user timezone into it.
 
-**FACT:** birthdaysStreamProvider schedules a refresh at next device-local midnight. That is not midnight for every recipient timezone.
+**APPROVED PRODUCT DECISION (Phase 2.3.1):** Resolution precedence is recipient IANA timezone when valid, otherwise device-local timezone. There is no user-profile timezone fallback in this approved rule.
 
-**PROPOSED CONTRACT:**
-- Approve one explicit precedence rule: recipient IANA timezone → user-selected IANA timezone → documented device-local fallback (or UTC, if product chooses that).
-- Use the same resolver in People list, Birthday lifecycle, Dashboard, Calendar, Reminder scheduler and import flows.
-- Recompute on app resume, relevant date boundary and device/timezone setting changes.
-- If multiple recipient timezones are supported, trigger refresh for each active recipient timezone or guarantee recomputation at every consumer boundary.
-- Invalid stored timezone must be recovered gracefully; it must not crash a stream.
+**ARCHITECTURE CONSEQUENCES:**
+- One resolver is used by People, Birthday lifecycle, Dashboard, Calendar, import and Reminder planning.
+- Device-local timezone is runtime context; it is not copied into Person as a substitute recipient preference.
+- Recompute on app resume, relevant recipient/device date boundaries, and device timezone changes.
+- The current device-local-midnight timer is insufficient by itself when recipient timezone boundaries differ. The precise multi-zone refresh scheduler remains open.
 - DST changes alter instant offsets, not the birthday's calendar month/day or whole-day countdown.
+- Invalid legacy recipient timezone and a device environment that cannot provide a timezone require explicit recovery behavior; these remain open.
 
 ### 3.5 Import/edit discrepancy
 
@@ -188,11 +190,11 @@ Birthday occurrence is the canonical date input for reminder planning, dashboard
 |---|---|---|
 | Invalid month/day | Reject before persistence | Validator and engine tests |
 | Feb 29 in leap year | Feb 29 | Engine tests |
-| Feb 29 in non-leap year | Default Feb 28; Mar 1 is alternate parameter | Engine and lifecycle tests |
+| Feb 29 in non-leap year | Use the Person's selected Feb 28 or Mar 1 policy | Calculation alternatives tested; persistence and UI for user choice not implemented |
 | Birthday equals reference date | isToday true, daysUntil zero | Engine tests |
 | Birthday already passed this year | Resolve next year | Engine tests |
 | Recipient timezone differs from device | Compute in recipient timezone | Engine tests |
-| Recipient timezone absent | Device-local calendar currently used | Source-reviewed |
+| Recipient timezone absent | Device-local calendar is the approved fallback | Source-reviewed current behavior; cross-consumer parity and boundary refresh not yet tested |
 | Invalid imported timezone | Reject/quarantine gracefully | Validator exists; import path gap |
 | App crosses device-local midnight | Refresh stream at local midnight currently | Provider source; runtime timer test needed |
 | App crosses recipient midnight before device midnight | Refresh recipient-specific occurrence | Not covered by current local-midnight timer |
@@ -204,11 +206,12 @@ Birthday occurrence is the canonical date input for reminder planning, dashboard
 | Draft linked to prior cycle | Explicit archive/delete/history policy | Current rollover clears link but retains row |
 
 ## 9. Open product/architecture decisions
+**Resolved by Phase 2.3.1:** BDY-DEC-001 is now a per-Person user choice between Feb 28 and Mar 1 for non-leap years; BDY-DEC-002 is recipient IANA timezone when valid, then device-local timezone. See [Phase 2.4 architecture design](../phase-2.4-architecture-design/README.md). These decisions are not repeated in the open table below.
+
+
 
 | ID | Question | Evidence / current behavior | Owner |
 |---|---|---|---|
-| BDY-DEC-001 | Feb 28 fixed policy or user-selectable Feb 28 / Mar 1? | Feb 28 default; Mar 1 parameter; no Person preference | Product |
-| BDY-DEC-002 | Recipient → user timezone → device local, or recipient → device local? | Helper supports user timezone but inspected callers do not pass one | Product |
 | BDY-DEC-003 | Keep one Birthday row updated each year or immutable row per cycle? | Current service keeps one row per Person and overwrites cycle/year/date | Product / Data |
 | BDY-DEC-004 | What happens to prior-cycle drafts and delivery history at rollover? | Birthday draft link clears; draft record remains | Product / Delivery |
 | BDY-DEC-005 | Recovery for duplicate Birthday rows? | Current service throws | Data |

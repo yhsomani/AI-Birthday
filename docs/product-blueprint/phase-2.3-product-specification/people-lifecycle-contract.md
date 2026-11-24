@@ -4,7 +4,7 @@
 **Domain:** People / recipient management  
 **Requirements:** FR-001–FR-005; PRD-001  
 **Source review commit:** 93e803aee3064b046ac9b9093cfd35e4b1a0ae62  
-**Status:** Source-backed specification; proposed target behavior and product decisions remain subject to approval  
+**Status:** Source-backed specification with Phase 2.3.1 approvals overlaid; target architecture and implementation remain pending  
 **Scope:** Local recipient creation, editing, retrieval, deletion/recovery, CSV/device-contact intake, export, and birthday/reminder side effects.
 
 Evidence labels: **FACT** means directly present in reviewed source or tests. **PROPOSED CONTRACT** is behavior recommended for approval before implementation. **OPEN** means a product or domain owner must decide. This document does not authorize code changes.
@@ -13,7 +13,7 @@ Evidence labels: **FACT** means directly present in reviewed source or tests. **
 
 A Person is the user-owned recipient profile that holds the minimum information needed to remember a person and prepare an appropriate birthday greeting. A Person is not a social-network contact, a device address-book mirror, or a delivery receipt.
 
-The People domain owns recipient identity and user-entered context; optional birthday month/day and birth year; relationship, tone, language, contact and timezone preferences; recipient-level preparation preferences and delivery policy; validation and the person sync envelope; and user-initiated import/export and duplicate review.
+The People domain owns recipient identity and user-entered context; required birthday month/day and optional birth year; relationship, tone, language, contact and timezone preferences; recipient-level preparation preferences and delivery policy; validation and the person sync envelope; and user-initiated import/export and duplicate review.
 
 It does not own birthday recurrence calculation, reminder scheduling mechanics, message content or AI entitlement, proof a message was sent/received, or cloud backup authorization.
 
@@ -60,23 +60,24 @@ The current model in lib/features/people/domain/models/person.dart contains:
 | version | Yes | Integer; defaults to 1 | Person-level sync version |
 | deletedAt | No | Nullable DateTime | Tombstone; non-null rows are excluded from active-list queries |
 
-### 3.1 Birthday optionality
+### 3.1 Birthday requiredness — approved in Phase 2.3.1
 
-**FACT:** The model permits a Person without a birthday. Device-contact candidates can also omit a birthday. Manual create requires month/day; editing a Person that already has a birthday also requires month/day. A contact previously imported without a birthday can be edited without adding one.
+**FACT — source baseline:** The Person model and some intake paths permit a Person without a birthday. Manual create and CSV parsing require month/day, while Android device-contact candidates may omit it. Existing persisted no-birthday records are therefore possible.
 
-**FACT:** CSV export can emit blank month/day fields for a no-birthday Person, but the CSV parser rejects rows missing a valid birthday. A no-birthday Person exported by the app is therefore not guaranteed to round-trip through CSV import.
+**APPROVED PRODUCT DECISION:** Birthday month/day is required for every newly persisted Person, regardless of entry path. There is no “Save without birthday” path. Birth year remains optional. A candidate with missing, partial or impossible month/day must not be persisted.
 
-**PROPOSED CONTRACT:** Treat Person and Birthday as separate but related records. A Person may exist without a Birthday. Product must choose one consistent create policy:
-1. require a birthday and explicitly label the form “Add birthday contact”; or
-2. support an explicit “Save without birthday” path.
-
-The choice must align with CSV/device import, list display, reminders and downstream features.
+**ARCHITECTURE CONSEQUENCES:**
+- Manual form, CSV import and device-contact import use one canonical validator before any write.
+- A missing/invalid birthday is surfaced as a validation issue; exact preview presentation (show as invalid candidate or exclude before preview) remains open.
+- A Person without a birthday found in existing storage is a legacy-data exception. Do not invent a date, silently delete the row or treat the old source behavior as the target contract.
+- Read compatibility and the remediation/migration UX for those existing rows remain open.
+- Person profile facts and the current Birthday occurrence remain separate concepts; a persisted Person with valid birthday facts must reconcile to one current occurrence under the approved cycle strategy.
 
 ### 3.2 Constructor/default discrepancy
 
 **FACT:** Person.autoPrepare defaults to true; PersonDraft.autoPrepare defaults to false; the Drift column default is false; the add/edit form initializes it to true; ParsedContactCandidate defaults to true; CSV parsing defaults it to true when absent.
 
-**OPEN:** There is no single default across direct model creation, form drafts and database defaults. Product must decide the intended value. Implementation must then apply one canonical default to the model, form, imports, database migration behavior and tests.
+**APPROVED PRODUCT DECISION:** autoPrepare defaults to false for every newly created Person and every intake path. Explicit user opt-in may set true. Implementation must align model, draft, form, import candidate, CSV fallback and database defaults. Treatment of existing stored true values and the exact migration behavior remain open.
 
 ### 3.3 Phone-number contract
 
@@ -91,7 +92,7 @@ Normal Person form/service writes use PersonInputValidator.
 | Field | Current validation | Failure behavior |
 |---|---|---|
 | Name | Trimmed value must be non-empty and at most 120 characters | Field error; no save |
-| Birthday | Month/day must both exist when required; impossible Gregorian dates rejected | Required/invalid birthday field error |
+| Birthday | Month/day must both exist for every create and every persisted Person update; impossible Gregorian dates are rejected | Required/invalid birthday field error; no write |
 | Birth year | Optional; 1900–2199 inclusive | Invalid birth year field error |
 | Phone | Optional; when supplied, 6–20 characters from digits, plus, hyphen, parentheses, period and space | Invalid phone field error |
 | Email | Optional; max 254 characters and a simple email-shape regex | Invalid email field error |
@@ -102,6 +103,9 @@ Normal Person form/service writes use PersonInputValidator.
 | Timezone | Optional; must resolve in IANA timezone database and be at most 64 characters | Invalid timezone field error |
 
 Birthday validation delegates to BirthdayEngine.isValidMonthDay. Feb 29 is accepted even when the known birth year is a non-leap year because the recurrence engine resolves the celebration date separately.
+
+**Approved intake constraint:** This validation applies to manual entry, CSV, device contacts and any future create/import path. Existing null-birthday rows are legacy exceptions and require a separately approved remediation plan.
+
 
 **PROPOSED CONTRACT:**
 - Every intake channel must use one canonical validator/normalizer before persistence.
@@ -187,6 +191,9 @@ Duplicate signals currently include same normalized name plus same cleaned phone
 ### 6.2 Android device contacts
 
 **FACT:** Device import explains the purpose of permission and asks before requesting READ_CONTACTS. It handles denial, reads name/phone/birthday through an Android method channel, converts rows to candidates, detects duplicates and uses the preview UI. It recognizes yearless --MM-DD, YYYY-MM-DD and MM/DD/YYYY date forms. A missing or unparseable birthday does not prevent the candidate from being formed; this differs from CSV parsing.
+
+**Approved target:** A device-contact candidate without a valid birthday may be presented for review, but it cannot be selected for persistence until a valid birthday is supplied. The exact invalid-row presentation remains open. The app must not create a no-birthday Person from this path.
+
 
 **PROPOSED CONTRACT:** Permission is requested only after explanation; denial is a valid exit path and must not block manual entry. The app reads only fields needed for import, never writes back to the address book, and does not continuously sync contacts. Every imported row still passes the shared validator before persistence.
 

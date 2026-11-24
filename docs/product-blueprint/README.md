@@ -1,7 +1,7 @@
 # AI-Birthday — Product Blueprint
 
-**Blueprint version:** 0.1.5  
-**Status:** Discovery baseline, Phase 2.1.1 Flutter audit, Phase 2.2 CI/documentation revalidation and Phase 2.3 People/Birthday contracts; product-wide atomic contracts, stakeholder decisions and live/device verification remain open — not stakeholder-approved or implementation-ready  
+**Blueprint version:** 0.1.6  
+**Status:** Discovery baseline, Phase 2.1.1 Flutter audit, Phase 2.2 CI/documentation revalidation, Phase 2.3 People/Birthday contracts, Phase 2.3.1 approved People/Birthday decisions and Phase 2.4 documentation-only architecture design; broader contracts, legacy-data decisions and live/device verification remain open — not implementation-ready  
 **Review date:** 2026-11-24  
 **Source review baseline:** main at 93e803aee3064b046ac9b9093cfd35e4b1a0ae62; Phase 2.3 inspects application source at that commit and adds documentation only. Earlier audit reports retain their original evidence baselines  
 **Scope:** Product discovery, product definition, requirements, architecture, UX, governance, planning and evidence-based implementation audit. No application implementation is authorized by this blueprint.
@@ -28,6 +28,8 @@
 | Phase 2.1 source-to-test audit | [Phase 2.1 — Source-to-test audit](phase-2.1-audit/README.md) |
 | Phase 2.2 revalidation and contract gaps | [Phase 2.2 — Current CI and documentation revalidation](phase-2.2-audit/README.md) |
 | Phase 2.3 People and Birthday product contracts | [Phase 2.3 — People and Birthday contracts](phase-2.3-product-specification/README.md) |
+| Phase 2.4 People/Birthday target architecture | [Phase 2.4 — Architecture design](phase-2.4-architecture-design/README.md) |
+
 | Phase 2.1.1 Flutter feature audit | [Flutter Feature Audit](phase-2.1-audit/flutter-feature-audit.md) |
 | Flutter source inventory | [65 feature source files](phase-2.1-audit/flutter-source-inventory.md) |
 | Flutter test inventory | [72 Dart test files](phase-2.1-audit/flutter-test-inventory.md) |
@@ -80,3 +82,5 @@ Every approved change must update the relevant domain specification, requirement
 | 0.1.3 | 2026-11-23 | Added Flutter feature audit for all 15 domains, 65 feature source files and 72 Dart test files. Recorded CI failure, fake-backed test limits, AI policy comment conflict and P0 Stripe architecture finding. No application files changed. |
 | 0.1.4 | 2026-11-24 | Revalidated latest main CI; corrected SSOT/root architecture AI entitlement contradictions; added current CI evidence and explicit contract-gap register. No application source/configuration changed. |
 | 0.1.5 | 2026-11-24 | Added source-backed People and Birthday lifecycle contracts with named source/test traceability, detailed gaps and open decisions. Updated governance and requirement links. No application source/configuration changed. |
+| 0.1.6 | 2026-11-24 | Recorded four approved Phase 2.3.1 People/Birthday product decisions and added Phase 2.4 documentation-only target application architecture, data-integrity/migration design and verification gates. Updated requirements, business rules and governance. No application source, tests, dependencies, schema, configuration or infrastructure changed. |
+

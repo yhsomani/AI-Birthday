@@ -5,7 +5,7 @@
 **Source baseline:** 93e803aee3064b046ac9b9093cfd35e4b1a0ae62  
 **Review date:** 2026-11-24  
 **Change boundary:** documentation only  
-**Status:** Scoped source-backed contracts and initial acceptance/test traceability drafted; product approval, architecture remediation and test obligations remain open.
+**Status:** Source-backed contracts and initial traceability delivered. Phase 2.3.1 approved four People/Birthday product decisions; Phase 2.4 target architecture is documentation-only. Legacy-data, integrity and verification decisions remain open.
 
 ## Objective
 
@@ -34,13 +34,20 @@ Convert People and Birthday from broad feature descriptions into actionable doma
 
 These are source-review observations, not proof that every path has failed in production.
 
-## Recommended next actions
+## Phase 2.3.1 approved product decisions
 
-1. Decide open product policies in both domain contracts.
-2. Agree on one Person persistence abstraction and aggregate transaction strategy.
-3. Create one canonical occurrence service for manual create/edit, imports and refresh.
-4. Add P0 tests in the traceability register before changing application behavior.
-5. Then authorize a separate implementation phase with scoped plan, migration strategy, code changes and test execution.
+| Decision | Approved direction |
+|---|---|
+| Birthday optionality | No. Every newly persisted Person must have valid birthday month/day, across manual entry, CSV and device-contact import |
+| autoPrepare default | false for all new Persons and all intake paths; explicit opt-in may enable it |
+| February 29 | Per-Person user choice: Feb 28 or Mar 1 in non-leap years; leap years remain Feb 29 |
+| Missing recipient timezone | Valid recipient IANA timezone first; device-local timezone when recipient timezone is absent |
+
+Legacy no-birthday records, existing Feb 29 preference backfill, existing autoPrepare values, invalid timezone recovery, phone normalization and delete/history semantics remain open.
+
+## Next architecture phase
+
+Phase 2.4 records the target People/Birthday application architecture, transaction boundary, migration strategy, verification plan and unresolved design decisions. It does not authorize implementation. See [Phase 2.4 architecture design](../phase-2.4-architecture-design/README.md).
 
 ## Phase 2.3 exit status
 
@@ -55,4 +62,4 @@ These are source-review observations, not proof that every path has failed in pr
 - [ ] Real Android device/timezone/import/reminder journeys are verified.
 - [ ] Every People/Birthday feature node in global registry is mapped to these contracts.
 
-**Result: PARTIAL.** Scoped contracts and source-to-test map are delivered, but implementation readiness is not approved while product, integrity and verification gaps remain open.
+**Result: PARTIAL.** Scoped contracts and source-to-test mapping are delivered and the four listed product decisions are approved. Implementation readiness remains blocked by legacy-data, architecture, migration, test and device-verification gaps.
