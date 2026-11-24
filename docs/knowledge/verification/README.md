@@ -2,13 +2,13 @@
 
 [Knowledge home](../README.md) · [Features](../features/README.md) · [Business rules](../business-rules/README.md) · [Traceability](../traceability/README.md)
 
-**Repository revision reviewed:** `2abcc1aaa24a69c0aff5bddbc13c5f05d0ed14f8` (merged PR #340). **Review date:** 2026-10-14. **Change mode:** documentation only. Existing 50-node registry remains the canonical feature inventory. This extension adds rules, source mappings, eight individual deep-feature READMEs and a full route catalog, but does not claim an exhaustive atomic feature census.
+**Original repository revision reviewed:** `2abcc1aaa24a69c0aff5bddbc13c5f05d0ed14f8` (merged PR #340). **Original review date:** 2026-10-14. **Change mode:** documentation only. AI entitlement behavior and its test assertion were rechecked during Phase 2.4.3; the remaining ledger is historical unless explicitly updated. Existing 50-node registry remains the canonical feature inventory. This extension adds rules, source mappings, eight individual deep-feature READMEs and a full route catalog, but does not claim an exhaustive atomic feature census.
 
-## Independent CI observation — important current status
+## Historical CI observation — 2026-10-14 snapshot
 
-- [GitHub Actions run 38594418108](https://github.com/yhsomani/AI-Birthday/actions/runs/38594418108) completed with **failure** at the merge commit. The **Flutter analysis and tests passed**, and the **Backend Security & Cloud Functions** and **Hosting** jobs succeeded.
-- The **Flutter release APK build** step failed while evaluating `android/settings.gradle.kts` line 20: Gradle could not resolve the `dev.flutter.flutter-plugin-loader` dependency graph because `org.jetbrains.kotlin:kotlin-stdlib:2.2.21`, the Kotlin Gradle plugin BOM, and related artifacts were not found/resolved from the plugin repository. This is a directly observed build failure, **not evidence of the definitive root cause**. Check artifact repositories, plugin management resolution, transient availability and pinned build tooling before modifying production code.
-- [Prior CI run 38591137923](https://github.com/yhsomani/AI-Birthday/actions/runs/38591137923) completed successfully at its earlier SHA. That does not override the latest failure or establish release signing, installation, deployed services or on-device Nano runtime.
+- [GitHub Actions run 38594418108](https://github.com/yhsomani/AI-Birthday/actions/runs/38594418108) completed with **failure** at the merge commit reviewed on 2026-10-14. Flutter analysis/tests, Backend Security & Cloud Functions and Hosting succeeded.
+- The Flutter release APK build step failed while resolving the Flutter plugin loader and Kotlin artifacts. This is a historical observed failure, not evidence of the definitive root cause or current main status.
+- [Prior CI run 38591137923](https://github.com/yhsomani/AI-Birthday/actions/runs/38591137923) succeeded at an earlier SHA. The later product-blueprint Phase 2.2 audit records a successful main CI run 45245907678 on commit 644571f. The Phase 2.4.3 documentation push triggered run 45334875607, which was in progress at the time of its check. Inspect GitHub Actions for the latest result; do not infer a conclusion from this historical ledger.
 
 **Link verification:** 247 relative Markdown references were structurally checked within the generated package, with 87 distinct references to pre-existing repository paths verified against the current 369-file GitHub tree (0 missing). Actual navigation/anchor rendering was not tested.
 
@@ -37,7 +37,7 @@ Read the [per-domain feature library](../features/deep-dives/README.md) and the 
 | Feb 29 in leap/non-leap years | BIRTH-CALC | [birthday engine tests](../../../test/features/birthdays/domain/birthday_engine_test.dart) | Timezone + daylight saving matrix |
 | Quiet-hours suppression and defer | REM-RULES | [reminder tests](../../../test/features/reminders/domain/reminder_scheduler_test.dart) | Scheduler tests + native device check |
 | Reboot/permission revoked exact alarms | REM-NATIVE | [native receiver](../../../android/app/src/main/kotlin/com/yashsomani/ai_birthday/BirthdayNotificationReceiver.kt) | Instrumented physical-device/emulator |
-| BYOK succeeds without Pro | AI-BYOK | [router tests](../../../test/ai/ai_router_test.dart) | Fake provider + real controlled key |
+| BYOK is blocked without active entitlement, even when a personal key is configured | AI-BYOK | [router tests](../../../test/ai/ai_router_test.dart) | Fake provider + controlled key; assert AI_LOCKED and no provider invocation |
 | Forced Nano denied without entitlement | AI-NANO | [router tests](../../../test/ai/ai_router_test.dart) | Fake bridge + entitlement permutations |
 | Timeout and durable AI retry | JOBS | [worker tests](../../../test/features/jobs/application/job_worker_test.dart) | Fault injection/cancellation test |
 | Human edits while AI request pending | STUDIO-DRAFT | [optimistic tests](../../../test/features/message_studio/presentation/message_studio_optimistic_test.dart) | Slow provider result plus concurrent edits |

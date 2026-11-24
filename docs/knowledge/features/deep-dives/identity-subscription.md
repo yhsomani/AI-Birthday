@@ -17,8 +17,12 @@ flowchart TD
  TOKEN --> VERIFY[Authenticated backend verifyPurchase]
  IAP --> VERIFY
  VERIFY --> ENT[Entitlement state]
- ENT --> NANO[May unlock app-provided Nano if available]
- OWN[Personal Gemini API key] --> BYOK[BYOK text generation without Pro]
+ ENT --> GATE{Active entitlement?}
+ GATE -->|No| LOCK[All AI providers locked]
+ GATE -->|Yes| ROUTE{Provider selection}
+ ROUTE -->|Personal key configured| BYOK[User Gemini API]
+ ROUTE -->|No key + Nano ready| NANO[Gemini Nano]
+ OWN[Personal Gemini API key] -. provider credential only .-> BYOK
 ```
 
 ## Hierarchy → atomic responsibilities
@@ -35,10 +39,10 @@ flowchart TD
 
 ## Rules, data lineage, failure branches and verification
 
-**Rules:** BR-020 + BR-013/014. `UserEntitlement.canUseAi` depends on entitlement status and unexpired `expiryDate` where present; non-BYOK Nano access is conditional on device capability. Purchase receipt *existence* is not sufficient verification.
+**Rules:** BR-020 + BR-013/014. `UserEntitlement.canUseAi` depends on entitlement status and unexpired `expiryDate` where present. Active application entitlement is required before either BYOK or Nano can be selected or invoked; a Gemini key is a provider credential, not an entitlement bypass. After entitlement passes, provider availability determines whether generation can proceed. Purchase receipt *existence* is not sufficient verification.
 
 **Error/abuse scenarios:** revoked Firebase refresh token, user cancels Play, Play unavailable, ID token expired, invalid package/product/account binding, Google identity changes while purchase pending, App Check not available, trial/grace expiry, server unreachable. Correct UX must show missing verification rather than optimistically granting Pro.
 
 **Evidence:** [auth gateway tests](../../../../test/features/auth/data/live_google_auth_gateway_test.dart), [subscription tests](../../../../test/features/subscription/subscription_service_test.dart), [backend purchase verification](../../../../backend/functions/test/subscriptionVerification.test.ts), [security auth tests](../../../../test/features/auth/adversarial_auth_security_test.dart). **Unverified:** real Play sandbox verification, staging Firebase identity, production App Check, store refund/revoke events. **TO-BE:** reactive purchase-progress state and durable pending-verification retries with clearly bounded entitlement transitions, subject to latest implementation review.
 
-> **Evidence boundary:** The implementation was reviewed in repository source at commit `2abcc1aaa24a69c0aff5bddbc13c5f05d0ed14f8`. Runtime, device, deployed backend and physical delivery behavior are not independently established by these notes.
+> **Evidence boundary:** The original deep-dive source snapshot is `2abcc1aaa24a69c0aff5bddbc13c5f05d0ed14f8`. Entitlement-first routing was rechecked against current main's AiRouter and router tests during Phase 2.4.3. Real Play sandbox verification, production App Check and deployed backend behavior remain unverified.

@@ -15,9 +15,10 @@ flowchart TD
  M -->|Manual| EDIT[Edit / autosave]
  M -->|AI| ENQ[Enqueue ai_generate job]
  ENQ --> R{AiRouter}
- R -->|Own key| BYOK[UserGeminiApiProvider]
- R -->|Entitled and Nano ready| NANO[Native Nano provider]
- R -->|Neither| FAIL[Locked or unavailable failure]
+ R -->|No active entitlement| FAIL[AI locked; no provider call]
+ R -->|Entitled + key configured| BYOK[UserGeminiApiProvider]
+ R -->|Entitled + no key + Nano ready| NANO[Native Nano provider]
+ R -->|No entitled provider available| FAIL[Unavailable failure]
  BYOK --> SAVE[Handler saves draft]
  NANO --> SAVE
  SAVE --> EDIT
@@ -34,7 +35,7 @@ flowchart TD
 | STUDIO-DRAFT · nano | Debounce input, mark edit revision and handle async stale-result protection | `_onMessageChanged`, `_performAutosave`, `_editRevision` |
 | STUDIO-AI · micro | Enqueue `ai_generate` and show progress/retry result | `_enqueueGenerate`, `_handleJobEvent` |
 | AI-PROMPT · nano | Construct short bounded prompt with only user-provided facts | [AiPromptBuilder](../../../../lib/features/ai/domain/ai_prompt_builder.dart) |
-| AI-BYOK · nano | Check configured credential; use user-owned provider without Pro | [AiRouter](../../../../lib/features/ai/domain/ai_router.dart) |
+| AI-BYOK · nano | After entitlement succeeds, check configured credential and use the user-owned provider unless Nano is explicitly selected | [AiRouter](../../../../lib/features/ai/domain/ai_router.dart) |
 | AI-NANO · nano | Require entitlement, probe Nano status, handle unavailable/hardware failure | [Router](../../../../lib/features/ai/domain/ai_router.dart), [native bridge](../../../../lib/core/platform/gemini_nano_platform.dart) |
 | STUDIO-AI · nano | Bound request to configured timeout, surface typed failure | `AiRouter._withTimeout` |
 | JOBS · nano | Apply handler output via per-birthday stable draft ID and update birthday status | [AiGenerationJobHandler](../../../../lib/features/jobs/application/ai_job_handler.dart) |
@@ -42,10 +43,10 @@ flowchart TD
 
 ## Rules, data lineage, failure branches and verification
 
-**Business rules:** BR-013..BR-015. Normal BYOK takes precedence and does not require app Pro; forced Nano or absent personal key requires entitlement. A stale `AiRouter` doc comment says entitlement-first and should not be trusted over the executable `generate` method. An invalid **configured** key should present correction options, not silently convert to missing-key.
+**Business rules:** BR-013..BR-015. Active application entitlement is required before either BYOK or Nano is selected or invoked. After entitlement passes, a configured personal key is used unless Nano is explicitly selected; without a key, Nano is used only when available. The executable `AiRouter.generate` method and the free-tier-with-key test enforce this. The router's top-level comments still describe the superseded BYOK-without-Pro policy and are stale. An invalid **configured** key should present correction options, not silently convert to missing-key.
 
 **Failure paths:** app Pro locked, unavailable device model, invalid credential/quota, HTTP timeout, lost network, user edits while job is pending, retry after restart, draft no longer available, duplicate generate button presses. The fallback must preserve manual composition.
 
 **Tests:** [router](../../../../test/ai/ai_router_test.dart), [prompt](../../../../test/ai/ai_prompt_builder_test.dart), [AI job](../../../../test/features/jobs/application/ai_job_handler_test.dart), [optimistic editor](../../../../test/features/message_studio/presentation/message_studio_optimistic_test.dart), [durable Studio](../../../../test/features/message_studio/presentation/message_studio_durable_test.dart). **Unverified:** real external Gemini API and AICore readiness on supported devices. **TO-BE:** separate oversized Studio widget into state controller, draft editor and external handoff view only after golden/interaction behavior is characterized.
 
-> **Evidence boundary:** The implementation was reviewed in repository source at commit `2abcc1aaa24a69c0aff5bddbc13c5f05d0ed14f8`. Runtime, device, deployed backend and physical delivery behavior are not independently established by these notes.
+> **Evidence boundary:** The original deep-dive source snapshot is `2abcc1aaa24a69c0aff5bddbc13c5f05d0ed14f8`. AI routing policy was rechecked against `AiRouter.generate` and `ai_router_test.dart` on current main during Phase 2.4.3. Runtime provider operation, device Nano readiness, deployed backend and physical delivery behavior are not independently established by these notes.
