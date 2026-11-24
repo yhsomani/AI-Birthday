@@ -15,10 +15,17 @@
 | DEC-009 | Birthday Autopilot is a separate product surface from core WhatsApp handoff | Existing backend docs | Proposed boundary | Stakeholder decision |
 | DEC-010 | Public Hosting is not production until external gates are evidenced | Backend/hosting READMEs | Current evidence | Release owner |
 | DEC-011 | Supported platform scope | Android evidenced; broader scope not approved | Open | Product owner |
-| DEC-012 | Leap-day occurrence policy | Not resolved in this baseline | Open | Product owner |
+| DEC-012 | Leap-day occurrence policy | BirthdayEngine defaults Feb 29 to Feb 28 in non-leap years and supports Mar 1 as an alternate calculation parameter; no per-Person setting exists | Open: Product owner must approve fixed default vs user preference | Product owner |
 | DEC-013 | Analytics/telemetry policy | No user-data collection assumed | Open | Privacy owner |
 | DEC-014 | Subscription packaging, price and trial | Purchase code exists; commercial strategy unvalidated | Open | Business owner |
 | DEC-015 | Backup semantics: one-way backup/restore vs multi-device sync | Existing docs describe snapshot backup | Open | Product/data owner |
+| DEC-016 | Person birthday optionality across create/import | Device-contact intake permits no birthday; manual create and CSV parser require one | Open: define one consistent create/import contract | Product owner |
+| DEC-017 | Canonical autoPrepare default | Person, PersonDraft, SQL, form and import candidate currently differ | Open: approve one default and migration behavior | Product / Data |
+| DEC-018 | Person phone normalization | Form validates shape; save path does not guarantee E.164 canonicalization | Open: define country context and normalization standard | Product / Data |
+| DEC-019 | Person/Birthday aggregate transaction boundary | Form and delete paths write Person and Birthday separately | Open: approve atomicity and recovery behavior | Data / Architecture |
+| DEC-020 | Canonical Person persistence adapter | Two adapters write the same Persons table | Open: consolidate or explicitly separate ownership | Architecture / Data |
+| DEC-021 | Birthday timezone precedence and refresh trigger | Recipient timezone supported; user timezone helper is not wired at inspected call sites; provider timer uses device-local midnight | Open: approve precedence and boundary refresh design | Product / Birthday / Android |
+| DEC-022 | Prior-cycle draft retention | Birthday rollover clears draftId but retains the old draft record | Open: define archive/history policy | Product / Message Studio |
 
 ## 2. Assumptions register
 
@@ -46,6 +53,8 @@
 | RSK-008 | Device-dependent Nano and exact alarms fail on supported devices | Medium / Medium | Publish support matrix and physical-device tests | Android |
 | RSK-009 | Subscription conversion assumptions lack user evidence | Unknown / High | Customer research and pricing validation | Business |
 | RSK-010 | Scope expands into unrelated social/messaging features | Medium / Medium | Product boundary and approval gate | Product |
+| RSK-011 | Person and Birthday writes can partially commit across create/edit/delete/undo | High / High | One aggregate transaction or durable recovery state; fault-injection tests | Data / Architecture |
+| RSK-012 | Person import paths and timezone calculations can persist inconsistent or invalid Birthday inputs | Medium / High | Shared intake validation and one canonical occurrence calculator; timezone boundary tests | People / Birthday |
 
 ## 4. Dependency register
 
@@ -62,6 +71,8 @@
 | DEP-009 | Consent and flavor config | Automatic SMS | Separate approval and distribution gates |
 | DEP-010 | Deployment config and legal approval | Public Hosting | No production deployment before gates |
 | DEP-011 | Separate control-plane integration contract | Autopilot mobile capability | No assumed integration from callable existence |
+| DEP-012 | Canonical Person persistence boundary and transaction strategy | Reliable Person/Birthday CRUD and Undo | All write paths use the same aggregate semantics |
+| DEP-013 | Shared birthday validation and occurrence resolver | Consistent imports, dashboard, calendar and reminders | No independent date helper may disagree with BirthdayEngine |
 
 ## 5. Traceability index
 
@@ -75,6 +86,8 @@
 | FR-024–025 | DOM-12 | JRN-007 | BR-024–028 | TST-BACKUP |
 | FR-026 | DOM-13 | JRN-005/007 | BR-033 | TST-JOBS |
 | FR-027–028 | DOM-15/16/17 | JRN-009 | BR-030–032 | TST-DELETION / TST-CONTROL |
+| FR-001–005 | [Phase 2.3 People contract](phase-2.3-product-specification/people-lifecycle-contract.md) | JRN-002 | BR-001, BR-005, BR-006 | PPL-AC-001–015 |
+| FR-006–008, FR-010 | [Phase 2.3 Birthday contract](phase-2.3-product-specification/birthday-lifecycle-contract.md) | JRN-002/003 | BR-002–004, BR-007 | BDY-AC-001–018 |
 
 ## 6. Coverage status
 
@@ -82,16 +95,16 @@
 |---|---|---|
 | Product definition | Baseline drafted | Customer and commercial validation pending |
 | Domain decomposition | Baseline drafted | Full code/source mapping pending |
-| Feature contracts | Partial | Atomic 20-field feature contracts not yet completed for every registry node |
+| Feature contracts | Partial; scoped People/Birthday contracts added in Phase 2.3 | Two domain contracts and source/test traceability exist; stakeholder approvals, several P0 acceptance tests and all other domain contracts remain open |
 | User journeys | Core journeys drafted | Edge-case and device validation pending |
-| Business rules | Initial register | Leap-day, timezone, SMS and sync policies require approval |
+| Business rules | Initial register; People/Birthday findings added | Leap-day, timezone precedence, no-birthday import, autoPrepare default, phone normalization and aggregate delete semantics require approval |
 | Technical architecture | Logical target drafted | Physical schema/API/source review pending |
 | Security/privacy | Threat baseline drafted | Full data-flow and deployment review pending |
-| Testing | Strategy drafted | Exact test IDs, source assertions and CI evidence pending |
+| Testing | Scoped People/Birthday test mapping added | Existing test names are mapped; aggregate transaction, import validation and device/timezone cases remain open |
 | Roadmap | Dependency sequence drafted | Stakeholder priorities pending |
 | Mind maps | Master and architecture diagrams created | Domain-level maps remain to be expanded |
 | Legacy migration | Not started | Preserve all existing documents until cross-reference review |
-| Git verification | Pending after documentation review | Do not claim complete until final diff and branch state checked |
+| Git verification | Verified for the Phase 2.3 revision | Commit comparison and branch head checked; changed paths are confined to product-blueprint documentation |
 
 ## 7. Glossary
 
