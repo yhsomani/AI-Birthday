@@ -276,18 +276,18 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
         try {
           final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
           final now = DateTime.now();
-          final nextDate = b_models.Birthday.nextBirthdayDate(
+          final next = const BirthdayEngine().computeNext(
             month: saved.birthdayMonth!,
             day: saved.birthdayDay!,
-            from: now,
+            birthYear: saved.birthYear,
+            timezoneName: saved.timezone,
+            reference: now,
           );
+          final nextDate = next.nextDate;
           final existingBirthday = await birthdaysRepo.getBirthdayForPerson(
             saved.id,
           );
-          final isToday =
-              nextDate.year == now.year &&
-              nextDate.month == now.month &&
-              nextDate.day == now.day;
+          final isToday = next.isToday;
           final birthdayChanged =
               existingBirthday != null &&
               (existingBirthday.date.month != nextDate.month ||
