@@ -132,9 +132,8 @@ Detailed test case IDs and source/test links must be expanded during the source 
 
 ## 6. Current verification limitation
 
+The discovery and source audit is remote repository inspection. The latest main-branch GitHub Actions run 45245907678 on commit 644571f68be024423376749fe8e50e1db02ff018 passed all Flutter, backend and Hosting CI jobs; it ran 460 Flutter tests, 11 backend Vitest files, 2 Firestore-emulator test files and 12 Hosting Node tests, and built both Android flavors. CI does not substitute for physical-device tests, live Google OAuth/Play Billing/Gemini/Stripe/Firestore flows, production purchase validation, Firebase or Hosting deployment attestation, or physical notification/SMS delivery.
+
 ## 7. People/Birthday architecture verification
 
 The Phase 2.4 [verification and implementation gates](phase-2.4-architecture-design/verification-and-implementation-gates.md) translate approved Phase 2.3.1 rules and Phase 2.3 acceptance gaps into unit, repository, migration, import, timezone, transaction-failure and device-level obligations. These are planned tests, not evidence that they have run.
-
-
-The discovery and source audit is remote repository inspection. The latest main-branch GitHub Actions run 45245907678 on commit 644571f68be024423376749fe8e50e1db02ff018 passed all Flutter, backend and Hosting CI jobs; it ran 460 Flutter tests, 11 backend Vitest files, 2 Firestore-emulator test files and 12 Hosting Node tests, and built both Android flavors. CI does not substitute for physical-device tests, live Google OAuth/Play Billing/Gemini/Stripe/Firestore flows, production purchase validation, Firebase or Hosting deployment attestation, or physical notification/SMS delivery.

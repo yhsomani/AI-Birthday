@@ -172,14 +172,13 @@ Release pipeline:
 
 ## 10. Architecture decisions still open
 
-## 11. People/Birthday detailed target design
-
-The domain-specific target architecture, repository ownership, transaction boundary, data migration strategy, open decisions and verification gates are specified in [Phase 2.4 — People/Birthday architecture design](phase-2.4-architecture-design/README.md). That design is a documentation artifact only. It does not approve a physical schema, database migration, source-code refactor or production behavior change.
-
-
 - Confirm Android-only versus multi-platform product support.
 - Confirm whether SQLite schema needs a normalized event model and explicit relational constraints.
 - Decide whether sync is a backup/restore feature or a bidirectional multi-device synchronization product.
 - Decide whether delivery history is append-only event storage or derived from current status plus audit events.
 - Define supported Android OS/device matrix for Gemini Nano and exact alarms.
 - Approve backend product boundary and deployment owner for Birthday Autopilot.
+
+## 11. People/Birthday detailed target design
+
+The domain-specific target architecture, repository ownership, transaction boundary, data migration strategy, open decisions and verification gates are specified in [Phase 2.4 — People/Birthday architecture design](phase-2.4-architecture-design/README.md). That design is a documentation artifact only. It does not approve a physical schema, database migration, source-code refactor or production behavior change.
