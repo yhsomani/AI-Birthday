@@ -80,7 +80,7 @@ Target responsibilities:
 - PersonIntakeUseCase: consume normalized candidate data from manual, CSV and Android sources; validate; detect duplicate warnings; require explicit selection; issue writes through the same lifecycle boundary.
 - PersonInputValidator: the canonical rule set for name, required birthday, birth year, contact fields, preferences, facts, notes and recipient timezone.
 - PersonRepository: one canonical port for active lookup, include-deleted lookup, create/update, tombstone/restore and query semantics.
-- BirthdayOccurrenceRepository: persistence of the approved current occurrence/history representation. Its physical model remains open under DEC-026/034.
+- BirthdayOccurrenceRepository: persistence of durable per-cycle occurrence records. Phase 2.4.1 recommends one stable occurrence identity per Person/year, unique on (personId, cycleYear); approval is pending under DEC-026/034.
 - UnitOfWork: shares one local database transaction across Person and Birthday repositories.
 
 No presentation widget or parser may write directly to a Person or Birthday table. A migration adapter may remain temporarily during cutover, but it cannot be a second long-term source of truth.
@@ -168,6 +168,18 @@ Refresh is idempotent and must:
 - never silently choose an arbitrary duplicate.
 
 ## 6. Application workflows
+## 5.4 Per-cycle identity recommendation (Phase 2.4.1)
+
+Recommend one durable Birthday identity per Person per calendar year. A cycle's identity is stable and must never be repurposed for the next year. A deterministic ID such as birthday-{personId}-{cycleYear} is one option; the database uniqueness guarantee is (personId, cycleYear), regardless of ID encoding.
+
+On rollover:
+- retain the previous cycle row and final workflow state;
+- create or reconcile a new row for the new cycle;
+- keep drafts and delivery evidence linked to the occurrence they belong to;
+- do not reuse a stable per-Person Birthday ID across different years.
+
+This recommendation aligns with one occurrence per Person per cycle. It requires approval under DEC-022/026/027 and a migration of all birthdayId references.
+
 
 ### 6.1 Create Person
 
@@ -204,9 +216,9 @@ Refresh is idempotent and must:
 
 ### 6.4 Delete and Undo
 
-Delete/Undo must be atomic from the user's perspective and implemented by one application service plus a local transaction. The service calculates a deletion plan, applies all selected row state changes in one transaction, and returns a durable undo token/expiry when restoration is available.
+Delete/Undo must be atomic from the user's perspective and implemented by one application service plus a local transaction. The service calculates a deletion plan, applies all selected row state changes in one transaction, and returns an undo token/expiry when restoration is available.
 
-The transaction invariant is an architectural requirement for implementation, but the exact aggregate scope is not. DEC-027 must decide whether drafts, prior-cycle drafts, delivery events, history, reminders and pending jobs are retained, hidden, archived, deleted or restored. Do not implement cascade deletion or irreversible cleanup until that policy is approved.
+**Phase 2.4.1 recommendation:** soft-delete the Person as the aggregate visibility boundary; keep linked occurrence/draft/delivery rows hidden from active screens while Undo is available; Undo restores the same linked state. Permanent purge and the exact treatment of drafts, prior-cycle drafts, delivery evidence, reminders and pending jobs require explicit product/privacy approval under DEC-027. Do not implement irreversible cleanup or cascade deletion before approval.
 
 A failed operation must not be swallowed or reported as success. Reminder/job cancellation occurs after commit and is retryable. Undo restores exactly the data declared recoverable by the approved deletion plan.
 

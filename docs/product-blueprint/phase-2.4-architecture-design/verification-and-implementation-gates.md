@@ -29,7 +29,7 @@
 | Idempotency | Retrying the same create/import/reconcile operation does not duplicate data | Property and repository tests with repeated operation IDs |
 | Delete/Undo | The selected aggregate is restored exactly; no swallowed errors | Failure injection at every transaction step and post-commit side effect |
 | Import | Invalid candidates never write; duplicates are advisory; partial outcomes are truthful | Parser/mapper/preview tests, retry tests and import batch tests |
-| Schema migration | Existing user data survives upgrade; constraints are added only after repair | v5-to-target upgrade fixtures, corrupt/partial fixtures, rollback and integrity checks |
+| Schema migration | Existing data survives upgrade; per-cycle identities and linked foreign IDs are preserved; constraints are added only after repair | v5-to-target fixtures, draft/delivery link migration, corrupt/partial fixtures, rollback and integrity checks |
 | Timezone boundaries | Recipient midnight, device midnight, DST and device timezone changes agree across consumers | Fake-clock tests and physical Android time/timezone-change E2E |
 | Reminder reconciliation | Alarm changes follow commit and recover after process death/reboot/permission change | Outbox/reconciliation tests plus physical-device tests |
 
@@ -62,7 +62,7 @@
 1. Build fixtures for schema version 5 with normal rows, null birthdays, Feb 29 birthdays, invalid timezone strings, duplicates, orphans, tombstones, linked drafts and delivery events.
 2. Upgrade without losing unaffected records or private profile fields.
 3. Apply approved per-row remediation choices and validate every resulting Person/occurrence.
-4. Enforce NOT NULL/unique/FK constraints only after a zero-violation preflight.
+4. Enforce Person birthday NOT NULL and Birthday UNIQUE(personId, cycleYear)/FK constraints only after approved legacy remediation and a zero-violation preflight.
 5. Simulate migration interruption and restore from backup.
 6. Verify release rollback compatibility.
 
@@ -76,6 +76,14 @@
 6. Verify Dashboard, Calendar and Reminders consume the same occurrence result.
 
 ## 4. P1/P2 test obligations
+### Phase 2.4.1 proposed per-cycle history tests
+
+- A rollover creates a new Birthday identity and leaves the prior cycle ID/date/status unchanged.
+- MessageDrafts and DeliveryEvents continue to reference the exact historical cycle after rollover.
+- Retrying rollover creates no duplicate (personId, cycleYear).
+- Delete hides associated cycle/draft/history data and Undo restores the same links, once DEC-027 is approved.
+- Migration from the current stable birthday-per-Person row updates all dependent birthdayId references atomically.
+
 
 **P1:** full Birthday status transition matrix; previous-cycle draft/history handling after DEC-027; duplicate/orphan repair; import partial failure; stale-edit conflict; reminder exact-alarm/permission/reboot journeys; accessibility and localization for birthday selection and invalid-candidate review.
 

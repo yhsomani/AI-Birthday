@@ -36,7 +36,7 @@ The target design requires:
 
 ## 3. Logical aggregate and transaction boundary
 
-Person is the aggregate root for profile identity and birthday facts. The current Birthday occurrence is associated state. The exact physical model for current vs historical occurrences remains open under DEC-026 and DEC-034.
+Person is the aggregate root for profile identity and birthday facts. The Birthday occurrence is a per-Person, per-calendar-year workflow record. Phase 2.4.1 recommends a durable record with stable identity for each cycle year; this recommendation awaits product/data approval under DEC-022/026/034.
 
 The application layer owns a UnitOfWork/transaction boundary across Person and Birthday repositories. Repositories must share the same SQLite/Drift transaction executor for an aggregate write; they must not independently start or commit nested transactions.
 
@@ -96,7 +96,7 @@ The occurrence repository must guarantee:
 - repeated reconciliation is idempotent;
 - duplicates/orphans produce repair diagnostics, not arbitrary selection.
 
-Exact uniqueness key and FK action are intentionally not fixed because DEC-026/027/034 are open. If a mutable current row is selected, a unique Person association may be appropriate. If immutable per-cycle records are selected, a unique (Person, cycleYear) key may be appropriate. Do not apply both interpretations simultaneously.
+**Phase 2.4.1 recommended physical constraints:** unique (personId, cycleYear) and a foreign key from Birthday.personId to Persons.id with ON DELETE RESTRICT. This models one durable occurrence per person/year and prevents orphan creation. Person deletion is soft-delete, so the parent row remains available for the relation. Do not apply these constraints until DEC-023/026/027/034 are approved, duplicates/orphans are repaired, and a zero-violation preflight passes.
 
 ## 5. Aggregate operation semantics
 
@@ -147,7 +147,7 @@ Post-commit platform work (cancel/rebuild alarms and jobs) cannot be part of the
 - Batch atomicity remains open: all-or-nothing batch versus per-row commits. The target design should expose per-row outcomes either way.
 - Duplicate review is advisory and cannot infer identity from phone/name similarity alone.
 - Invalid phone/timezone/birthday values must not bypass the canonical validator.
-- CSV export is a profile export, not a full backup. Legacy no-birthday record export/round-trip behavior remains open under DEC-023/035.
+- CSV export is a profile export, not a full backup. Phase 2.4.1 recommends preserving legacy no-birthday rows with blank birthday cells and an export warning; import must report those rows invalid until corrected. DEC-023/035 require owner approval.
 
 ## 7. Migration strategy
 
@@ -167,6 +167,8 @@ Migration work is a separate authorized implementation task. The following order
 No user-level data values are to be copied into diagnostic logs.
 
 ### Stage 1 — Additive compatibility schema
+**Recommended occurrence-history migration (pending approval):** re-key each existing Birthday row to the cycle it currently represents, update every linked MessageDraft/DeliveryEvent birthdayId in the same migration transaction, and preserve status, timestamps and draft links. Future years receive new occurrence rows rather than overwriting the prior cycle. Exact ID format may vary, but (personId, cycleYear) must be unique.
+
 
 Subject to approved physical design:
 - Add nullable leapDayPolicy field or equivalent versioned preference representation.
@@ -230,4 +232,4 @@ Birthday, contact and preference fields are private personal data. Inventory cou
 
 ## 10. Data design decisions still open
 
-See DEC-023 through DEC-035 in the [Phase 2.4 index](README.md). In particular, a physical schema cannot be finalized until the legacy no-birthday strategy, leap-day backfill, cycle persistence model, deletion scope and referential integrity rules are approved.
+See DEC-023 through DEC-035 in the [Phase 2.4 index](README.md) and the [Phase 2.4.1 decision closure register](../phase-2.4.1-decision-closure/decision-register-and-option-analysis.md). Physical constraints cannot be applied until legacy rows are inventoried, the per-cycle model and deletion scope are approved, and a zero-violation preflight passes.

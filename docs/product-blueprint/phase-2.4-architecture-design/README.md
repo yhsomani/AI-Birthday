@@ -32,6 +32,8 @@ The source currently disagrees with parts of this target. Approved intent does n
 | [People/Birthday application architecture](people-birthday-application-architecture.md) | Domain ownership, application services, repository boundary, canonical date resolver and workflows |
 | [Data integrity and migration design](data-integrity-and-migration-design.md) | Aggregate transaction contract, schema constraints, legacy data, migration sequencing, recovery and rollback |
 | [Verification and implementation gates](verification-and-implementation-gates.md) | Acceptance/test matrix, release blockers, phased implementation plan and evidence requirements |
+| [Phase 2.4.1 decision closure pack](../phase-2.4.1-decision-closure/README.md) | Recommended resolutions, option analysis, legacy inventory template and approval gates |
+
 
 ## 4. Target architecture at a glance
 
@@ -105,6 +107,18 @@ No open item is silently resolved by the proposed component diagram.
 - Tests listed in Phase 2.3 are existing source mappings; Phase 2.4 has not run tests, migrations or device flows.
 
 ## 9. Exit criteria
+## 8. Phase 2.4.1 decision closure status
+
+Phase 2.4.1 proposes one coherent target for unresolved branches. Recommendations are not silently promoted to product approval:
+
+- Technical architecture recommendations: DEC-019, DEC-020/025, DEC-026, DEC-032, DEC-033 and DEC-034. Architecture/Data/Android sign-off is pending.
+- Product/privacy/data decisions requiring owner approval: DEC-022, DEC-023, DEC-024, DEC-027, DEC-028, DEC-029, DEC-030, DEC-031 and DEC-035.
+- DEC-023, DEC-024, DEC-029, DEC-031 and DEC-032 also require aggregate-only local data inventory before migration details can be finalized.
+- No source, schema or user database was changed or queried in this phase.
+
+The complete alternatives, trade-offs, impacts and acceptance tests are in the [decision closure register](../phase-2.4.1-decision-closure/decision-register-and-option-analysis.md).
+
+## 9. Exit criteria
 
 - [x] Four Phase 2.3.1 product decisions recorded as approved.
 - [x] Target application boundaries and use-case flows documented.
@@ -117,4 +131,4 @@ No open item is silently resolved by the proposed component diagram.
 - [ ] Physical Android timezone/import/delete/undo flows are verified.
 - [ ] A separate implementation authorization is recorded.
 
-**Result: PARTIAL.** Documentation-only target architecture is delivered; source remediation and implementation remain unauthorized and incomplete.
+**Result: PARTIAL.** Target architecture and Phase 2.4.1 recommendations are documented. Owner approvals, existing-data inventory, physical schema/migration choices and implementation authorization remain outstanding.

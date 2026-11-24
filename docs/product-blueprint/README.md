@@ -1,6 +1,6 @@
 # AI-Birthday — Product Blueprint
 
-**Blueprint version:** 0.1.6  
+**Blueprint version:** 0.1.7  
 **Status:** Discovery baseline, Phase 2.1.1 Flutter audit, Phase 2.2 CI/documentation revalidation, Phase 2.3 People/Birthday contracts, Phase 2.3.1 approved People/Birthday decisions and Phase 2.4 documentation-only architecture design; broader contracts, legacy-data decisions and live/device verification remain open — not implementation-ready  
 **Review date:** 2026-11-24  
 **Source review baseline:** application source inspected in Phase 2.3 at 93e803aee3064b046ac9b9093cfd35e4b1a0ae62. Phase 2.3.1/2.4 documentation is based on governance head 6657322ac1679b6a0954c04340ab27b2d29924d0; no application source was re-reviewed or changed in Phase 2.4. Earlier audit reports retain their original evidence baselines  
@@ -29,6 +29,8 @@
 | Phase 2.2 revalidation and contract gaps | [Phase 2.2 — Current CI and documentation revalidation](phase-2.2-audit/README.md) |
 | Phase 2.3 People and Birthday product contracts | [Phase 2.3 — People and Birthday contracts](phase-2.3-product-specification/README.md) |
 | Phase 2.4 People/Birthday target architecture | [Phase 2.4 — Architecture design](phase-2.4-architecture-design/README.md) |
+| Phase 2.4.1 architecture decision closure | [Phase 2.4.1 — Decision closure pack](phase-2.4.1-decision-closure/README.md) |
+
 
 | Phase 2.1.1 Flutter feature audit | [Flutter Feature Audit](phase-2.1-audit/flutter-feature-audit.md) |
 | Flutter source inventory | [65 feature source files](phase-2.1-audit/flutter-source-inventory.md) |
@@ -83,4 +85,6 @@ Every approved change must update the relevant domain specification, requirement
 | 0.1.4 | 2026-11-24 | Revalidated latest main CI; corrected SSOT/root architecture AI entitlement contradictions; added current CI evidence and explicit contract-gap register. No application source/configuration changed. |
 | 0.1.5 | 2026-11-24 | Added source-backed People and Birthday lifecycle contracts with named source/test traceability, detailed gaps and open decisions. Updated governance and requirement links. No application source/configuration changed. |
 | 0.1.6 | 2026-11-24 | Recorded four approved Phase 2.3.1 People/Birthday product decisions and added Phase 2.4 documentation-only target application architecture, data-integrity/migration design and verification gates. Updated requirements, business rules and governance. No application source, tests, dependencies, schema, configuration or infrastructure changed. |
+| 0.1.7 | 2026-11-24 | Added Phase 2.4.1 decision-closure recommendations for People/Birthday data, lifecycle, repository, timezone, import and migration questions. Added a privacy-safe legacy inventory plan and updated governance/architecture references. No application source, tests, dependencies, schema, configuration or infrastructure changed. |
+
 
