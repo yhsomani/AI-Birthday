@@ -358,15 +358,15 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           );
 
       if (hasValidBirthday) {
-        final nextDate = b_models.Birthday.nextBirthdayDate(
+        final next = _engine.computeNext(
           month: person.birthdayMonth!,
           day: person.birthdayDay!,
-          from: now,
+          birthYear: person.birthYear,
+          timezoneName: person.timezone,
+          reference: now,
         );
-        final isToday =
-            nextDate.year == now.year &&
-            nextDate.month == now.month &&
-            nextDate.day == now.day;
+        final nextDate = next.nextDate;
+        final isToday = next.isToday;
 
         final birthday = b_models.Birthday(
           id: 'birthday-${person.id}',
