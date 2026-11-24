@@ -102,11 +102,12 @@ PREPARED → HANDOFF_REQUESTED → HANDED_OFF
 
 ## 3. Rule governance
 
-A rule may be marked approved only when:
-- product owner confirms the desired behavior;
-- domain owner confirms feasibility and data ownership;
-- security/privacy reviewer approves relevant processing;
-- acceptance criteria and tests exist;
-- conflicting legacy rules are identified and retired explicitly.
+Separate product approval from implementation readiness:
+
+- **Product intent approved:** the product owner explicitly confirms the desired user-facing behavior. This status can be recorded before code, schema or tests are changed.
+- **Implementation-ready:** domain owners confirm feasibility and data ownership; security/privacy review is complete where applicable; legacy conflicts and migration behavior are resolved; acceptance criteria and tests are specified with owners.
+- **Implemented/verified:** code, migration and tests exist and evidence is tied to an exact commit and environment.
+
+A governance row may therefore say “approved product rule; implementation pending.” That does not mean source behavior already conforms or that implementation is authorized.
 
 Source comments, enums and old documentation are not sufficient approval.
