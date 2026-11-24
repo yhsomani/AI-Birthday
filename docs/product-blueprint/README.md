@@ -3,7 +3,7 @@
 **Blueprint version:** 0.1.6  
 **Status:** Discovery baseline, Phase 2.1.1 Flutter audit, Phase 2.2 CI/documentation revalidation, Phase 2.3 People/Birthday contracts, Phase 2.3.1 approved People/Birthday decisions and Phase 2.4 documentation-only architecture design; broader contracts, legacy-data decisions and live/device verification remain open — not implementation-ready  
 **Review date:** 2026-11-24  
-**Source review baseline:** main at 93e803aee3064b046ac9b9093cfd35e4b1a0ae62; Phase 2.3 inspects application source at that commit and adds documentation only. Earlier audit reports retain their original evidence baselines  
+**Source review baseline:** application source inspected in Phase 2.3 at 93e803aee3064b046ac9b9093cfd35e4b1a0ae62. Phase 2.3.1/2.4 documentation is based on governance head 6657322ac1679b6a0954c04340ab27b2d29924d0; no application source was re-reviewed or changed in Phase 2.4. Earlier audit reports retain their original evidence baselines  
 **Scope:** Product discovery, product definition, requirements, architecture, UX, governance, planning and evidence-based implementation audit. No application implementation is authorized by this blueprint.
 
 > This directory separates intended product behavior from source-code evidence and historical documentation. The initial blueprint is not a claim that every product decision, feature, integration or runtime behavior has been validated.
