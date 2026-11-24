@@ -167,7 +167,6 @@ Refresh is idempotent and must:
 - emit typed errors and repair diagnostics for duplicate/orphan records;
 - never silently choose an arbitrary duplicate.
 
-## 6. Application workflows
 ## 5.4 Per-cycle identity recommendation (Phase 2.4.1)
 
 Recommend one durable Birthday identity per Person per calendar year. A cycle's identity is stable and must never be repurposed for the next year. A deterministic ID such as birthday-{personId}-{cycleYear} is one option; the database uniqueness guarantee is (personId, cycleYear), regardless of ID encoding.
@@ -180,6 +179,8 @@ On rollover:
 
 This recommendation aligns with one occurrence per Person per cycle. It requires approval under DEC-022/026/027 and a migration of all birthdayId references.
 
+
+## 6. Application workflows
 
 ### 6.1 Create Person
 

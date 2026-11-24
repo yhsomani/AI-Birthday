@@ -106,7 +106,6 @@ No open item is silently resolved by the proposed component diagram.
 - No database rows were queried for this documentation phase. The count and shape of legacy null birthdays, invalid timezones, duplicate/orphan Birthday rows and Feb 29 records are not known.
 - Tests listed in Phase 2.3 are existing source mappings; Phase 2.4 has not run tests, migrations or device flows.
 
-## 9. Exit criteria
 ## 8. Phase 2.4.1 decision closure status
 
 Phase 2.4.1 proposes one coherent target for unresolved branches. Recommendations are not silently promoted to product approval:
