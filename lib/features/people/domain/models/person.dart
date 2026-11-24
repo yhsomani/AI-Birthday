@@ -25,7 +25,7 @@ class Person {
     this.notes,
     this.preferredDeliveryChannel = DeliveryChannel.whatsapp,
     this.timezone,
-    this.autoPrepare = true,
+    this.autoPrepare = false,
     this.autoSendPolicy = AutoSendPolicy.manualOnly,
     required this.createdAt,
     required this.updatedAt,

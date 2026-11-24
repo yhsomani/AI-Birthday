@@ -57,6 +57,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // New people must default to manual preparation; opt-in is explicit.
+      final autoPrepareSwitch = tester.widget<SwitchListTile>(
+        find.widgetWithText(
+          SwitchListTile,
+          'Prepare drafts automatically',
+        ),
+      );
+      expect(autoPrepareSwitch.value, isFalse);
+
       // Before saving: "Save" label is visible, no spinner
       expect(find.text('Save'), findsOneWidget);
       expect(find.text('Saving…'), findsNothing);

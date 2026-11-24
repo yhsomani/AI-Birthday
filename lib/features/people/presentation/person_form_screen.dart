@@ -67,7 +67,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
   p_rel.RelationshipCloseness _closeness = p_rel.RelationshipCloseness.casual;
   String _preferredLanguage = 'en';
   d_chan.DeliveryChannel _deliveryChannel = d_chan.DeliveryChannel.whatsapp;
-  bool _autoPrepare = true;
+  bool _autoPrepare = false;
   AutoSendPolicy _autoSendPolicy = AutoSendPolicy.manualOnly;
   Person? _loaded;
   PersonValidation? _validation;
