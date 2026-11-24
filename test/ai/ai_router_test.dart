@@ -15,11 +15,13 @@ class MockAiProvider implements AiMessageProvider {
   @override
   final String providerId;
   final String responseMessage;
+  int generateCalls = 0;
 
   @override
   Future<AiGenerationResult> generateMessage(
     AiGenerationRequest request,
   ) async {
+    generateCalls++;
     return AiGenerationResult(
       message: responseMessage,
       providerType: providerId,
@@ -35,6 +37,17 @@ class HangingAiProvider implements AiMessageProvider {
   @override
   Future<AiGenerationResult> generateMessage(AiGenerationRequest request) {
     return Completer<AiGenerationResult>().future;
+  }
+}
+
+/// Tracks credential reads so entitlement ordering is part of the contract.
+class CountingCredentialStorage extends InMemoryCredentialStorage {
+  int hasGeminiApiKeyCalls = 0;
+
+  @override
+  Future<bool> hasGeminiApiKey() async {
+    hasGeminiApiKeyCalls++;
+    return super.hasGeminiApiKey();
   }
 }
 
@@ -68,17 +81,24 @@ void main() {
     test(
       'AI drafting requires an active subscription entitlement even with personal key',
       () async {
-        await credentialStorage.saveGeminiApiKey('AIzaSyDummyKey');
+        final countingStorage = CountingCredentialStorage();
+        await countingStorage.saveGeminiApiKey('AIzaSyDummyKey');
+        var nanoStatusChecks = 0;
 
         final router = AiRouter(
-          credentialStorage: credentialStorage,
+          credentialStorage: countingStorage,
           userGeminiProvider: mockGeminiProvider,
           nanoProvider: mockNanoProvider,
+          nanoStatusChecker: () async {
+            nanoStatusChecks++;
+            return GeminiNanoStatus.available;
+          },
         );
 
-        // Free tier is locked
-        expect(
-          () => router.generate(
+        // Free tier is locked before credentials, device capabilities, or
+        // providers are touched.
+        await expectLater(
+          router.generate(
             request: AiGenerationRequest(person: testPerson),
             entitlement: UserEntitlement.free,
           ),
@@ -90,26 +110,38 @@ void main() {
             ),
           ),
         );
+        expect(countingStorage.hasGeminiApiKeyCalls, 0);
+        expect(nanoStatusChecks, 0);
+        expect(mockGeminiProvider.generateCalls, 0);
+        expect(mockNanoProvider.generateCalls, 0);
 
-        // Pro tier with user key routes to user_gemini
+        // Pro tier with user key routes to user_gemini.
         final result = await router.generate(
           request: AiGenerationRequest(person: testPerson),
           entitlement: UserEntitlement.proActive,
         );
 
         expect(result.providerType, 'user_gemini');
+        expect(countingStorage.hasGeminiApiKeyCalls, 1);
+        expect(mockGeminiProvider.generateCalls, 1);
       },
     );
 
-    test('Throws AppFailure.lockedAi when entitlement is not active', () async {
+    test('Throws AppFailure.lockedAi before reading a missing credential', () async {
+      final countingStorage = CountingCredentialStorage();
+      var nanoStatusChecks = 0;
       final router = AiRouter(
-        credentialStorage: credentialStorage,
+        credentialStorage: countingStorage,
         userGeminiProvider: mockGeminiProvider,
         nanoProvider: mockNanoProvider,
+        nanoStatusChecker: () async {
+          nanoStatusChecks++;
+          return GeminiNanoStatus.available;
+        },
       );
 
-      expect(
-        () => router.generate(
+      await expectLater(
+        router.generate(
           request: AiGenerationRequest(person: testPerson),
           entitlement: UserEntitlement.free,
         ),
@@ -121,6 +153,10 @@ void main() {
           ),
         ),
       );
+      expect(countingStorage.hasGeminiApiKeyCalls, 0);
+      expect(nanoStatusChecks, 0);
+      expect(mockGeminiProvider.generateCalls, 0);
+      expect(mockNanoProvider.generateCalls, 0);
     });
 
     test(

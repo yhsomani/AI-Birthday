@@ -11,11 +11,13 @@ import 'package:ai_birthday/features/ai/domain/ai_provider.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 
 /// Routes AI requests according to the SSOT §5 logic:
-/// 1. A personal Gemini API key (BYOK) permits user-key generation without Pro.
-/// 2. Otherwise, Pro entitlement is required for the on-device Nano path.
-/// 3. With entitlement, use Nano only when it is available on this device.
-/// 4. Forced Nano requires both entitlement and device support; otherwise the
-///    request returns a typed locked/unavailable error.
+/// 1. Active application entitlement is required before credential access or
+///    provider selection; a personal Gemini API key never bypasses Pro.
+/// 2. After entitlement passes, use the personal Gemini API key when configured,
+///    unless the caller explicitly forces Nano.
+/// 3. Without a personal key, use Nano only when it is available on this device.
+/// 4. Forced Nano requires entitlement and device support; otherwise the request
+///    returns a typed locked/unavailable error.
 class AiRouter {
   AiRouter({
     required CredentialStorage credentialStorage,
@@ -47,15 +49,16 @@ class AiRouter {
     required UserEntitlement entitlement,
     bool forceNano = false,
   }) async {
-    final hasUserKey = await _credentialStorage.hasGeminiApiKey();
-
-    // AI features strictly require an active subscription entitlement.
+    // Enforce the application entitlement before reading credentials, probing
+    // device capabilities, selecting a provider, or invoking an AI provider.
     if (!entitlement.canUseAi) {
       _logger.info('AiRouter', 'AI request blocked: no active entitlement');
       throw const AppFailure.lockedAi(
         action: 'Subscribe to AI-Birthday Pro to use AI-powered drafting.',
       );
     }
+
+    final hasUserKey = await _credentialStorage.hasGeminiApiKey();
 
     // If explicit Nano requested or no user key configured, check Nano
     if (forceNano || !hasUserKey) {
