@@ -1,7 +1,7 @@
 # AI-Birthday — Single Source of Truth
 
-**Version:** 1.0.0  
-**Status:** Final product and architecture direction  
+**Version:** 1.0.1  
+**Status:** Approved core product direction; detailed domain, legacy-data and architecture decisions remain governed by the product blueprint  
 **Application:** Flutter / Dart  
 **Android native layer:** Kotlin  
 **Primary AI:** User-provided Gemini API credential  

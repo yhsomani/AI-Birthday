@@ -3,7 +3,7 @@
 **Prompt version:** 2.0  
 **Repository:** https://github.com/yhsomani/AI-Birthday  
 **Execution class:** Product discovery, specification, architecture planning, documentation governance and evidence-based audit only  
-**Current continuation baseline:** main at 6eed3e28cad0f8ef9243454786e82a37e488efe9; blueprint 0.1.8  
+**Session baseline:** Always inspect the live main HEAD and current blueprint version before execution. The initial application/source evidence baseline for the current blueprint is recorded in the product blueprint index.  
 **Current phase:** Continue from Phase 2.4.2. Do not restart completed work.
 
 ---
