@@ -1,6 +1,11 @@
 # Test Coverage and Gaps
 
-## Latest inspected workflow
+> **Historical baseline note:** The run and results immediately below describe the earlier Phase 2.1 snapshot, not the latest main branch. Current CI revalidation is documented in [Phase 2.2](../phase-2.2-audit/current-ci-verification.md); do not use the older failure as current branch status.
+
+## Current main-branch CI revalidation
+
+Run [45245907678](https://github.com/yhsomani/AI-Birthday/actions/runs/45245907678) on commit 644571f68be024423376749fe8e50e1db02ff018 completed successfully. Flutter passed 460 tests and built both Android flavors; backend lint/build, 11 Vitest files and 2 Firestore-emulator test files passed; Hosting typecheck, 12 Node tests and production build passed. CI is not evidence of physical-device, live provider, Play Console, or deployment verification.
+## Historical CI baseline reviewed in Phase 2.1
 
 [GitHub Actions run 45230577466](https://github.com/yhsomani/AI-Birthday/actions/runs/45230577466)
 

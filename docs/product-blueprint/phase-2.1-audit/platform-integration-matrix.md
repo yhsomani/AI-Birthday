@@ -27,6 +27,6 @@ Five channels are declared:
 | SMS | `lib/features/delivery/data/sms_delivery_service.dart`, Kotlin channel | SMS service tests present | Build flavor, permissions, actual send constraints |
 | Notifications | Kotlin notification channel and receiver | Scheduler/gateway tests present | Reboot, timezone, exact alarm, notification permission revocation |
 
-## Build evidence
+## Build evidence update
 
-The latest Flutter workflow skipped both Play Store and personal sideload APK builds because the Flutter test job failed. Manifest verification was also skipped. Do not claim the two flavors are currently build-verified from that run.
+The earlier Phase 2.1 workflow skipped Android builds after a Flutter test failure. The latest main-branch run [45245907678](https://github.com/yhsomani/AI-Birthday/actions/runs/45245907678) on commit 644571f68be024423376749fe8e50e1db02ff018 successfully built the Play and Personal release-flavor APK artifacts. The Play merged-manifest check confirmed android.permission.SEND_SMS was absent. These were CI build artifacts (the workflow labels the Play artifact unsigned); this does not establish a signed store-ready package, physical-device behavior, successful SMS delivery, or store-policy approval. Native permission lifecycle and device integration remain open.

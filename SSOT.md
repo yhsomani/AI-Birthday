@@ -106,23 +106,23 @@ AiRouter
 
 ## 5. Final AI routing rule
 
-AI routing prioritizes personal credentials (BYOK) before checking subscription entitlement:
+AI routing always checks the active application subscription entitlement before selecting or calling a provider. BYOK is a provider credential, not an entitlement bypass:
 
-```text
+~~~text
 AI request
   ↓
-User personal Gemini API key configured? (BYOK)
-  ├── YES → UserGeminiApiProvider (unlocked, personal quota & billing)
-  └── NO
-       ↓
-Active application Pro entitlement?
-  ├── NO  → AI_LOCKED (subscription required for app-provided AI)
+Active application entitlement?
+  ├── NO  → AI_LOCKED; do not call Gemini API or Nano
   └── YES
        ↓
-Gemini Nano/AICore available on device?
+User Gemini API key configured?
+  ├── YES → UserGeminiApiProvider (user key, quota and billing)
+  └── NO
+       ↓
+Gemini Nano/AICore available and ready?
   ├── YES → GeminiNanoProvider
-  └── NO  → AI_UNAVAILABLE
-```
+  └── NO  → AI_UNAVAILABLE; preserve manual drafting
+~~~
 
 There is no automatic application-owned cloud Gemini fallback.
 
@@ -295,14 +295,14 @@ Delivery semantics must distinguish:
 
 ## 11. Subscription
 
-Application-provided AI (Gemini Nano on-device) requires active Pro entitlement.
-Users who supply their own personal Gemini API key (BYOK) can generate messages without an active Pro subscription (personal quota and billing).
+Every AI provider requires an active application Pro entitlement. A personal Gemini API key changes which provider is used after the entitlement check; it does not unlock AI for a free or unverified account.
 
-```text
-BYOK (Personal Gemini Key) → UNLOCKED (free, user-owned key)
-NO KEY + NO ENTITLEMENT    → ALL AI LOCKED (Pro subscription required)
-NO KEY + PRO ENTITLEMENT   → GEMINI NANO ALLOWED
-```
+~~~text
+NO ENTITLEMENT + ANY PROVIDER CONFIGURATION → ALL AI LOCKED
+ENTITLEMENT + PERSONAL GEMINI KEY            → USER GEMINI API
+ENTITLEMENT + NO KEY + NANO READY             → GEMINI NANO
+ENTITLEMENT + NO KEY + NANO UNAVAILABLE       → AI_UNAVAILABLE
+~~~
 
 Android purchase path:
 

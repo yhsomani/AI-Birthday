@@ -29,3 +29,13 @@ Preserve historical documents and their provenance. Do not delete or silently re
 - No content is removed until its replacement is checked.
 - All internal links, anchors, Mermaid and JSON validate.
 - Registry snapshot SHA is updated only after source and test review, never merely because docs changed.
+
+
+## Phase 2.2 consistency migration
+
+| Document/source | Discrepancy | Action in revision 0.1.4 | Remaining work |
+|---|---|---|---|
+| Root SSOT.md, §5 and §11 | Described BYOK as an entitlement bypass | Corrected to require active application entitlement before any AI provider call | Keep synchronized with approved product policy |
+| Root ARCHITECTURE.md, §8 | Listed BYOK before entitlement check | Corrected provider-routing order and all-provider entitlement requirement | Stale comments in lib/features/ai/domain/ai_router.dart still need a separately authorized source change |
+| Phase 2.1 CI reports | Presented failed run 45230577466 as latest | Retained as historical evidence and linked the green current run 45245907678 | Refresh after each relevant main-branch CI result |
+| API and platform verification notes | Claimed backend tests/Android build steps did not run | Added current backend and Android CI pass evidence | Real device, live provider and deployment verification remain open |

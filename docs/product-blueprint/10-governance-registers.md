@@ -7,7 +7,7 @@
 | DEC-001 | Product is a personal birthday assistant, not a general AI chatbot | Adopt as working definition | Proposed | Product owner approval |
 | DEC-002 | Local-first is the default for core personal data | Existing direction | Proposed | Privacy review |
 | DEC-003 | User reviews and initiates all WhatsApp messages | Adopt | Existing product boundary | Preserve and test |
-| DEC-004 | Active app subscription gates all AI providers, including BYOK and Nano | Prior explicit user decision; current repo SSOT and source need reconciliation | Confirmed prior decision; verify current implementation | Product + AI owner |
+| DEC-004 | Active app subscription gates all AI providers, including BYOK and Nano | Explicit product decision; current router behavior, tests and Settings copy agree. SSOT and root architecture text reconciled in revision 0.1.4; stale router source comments remain | Confirmed product rule; source behavior/test-backed, device/provider runtime not independently verified | Product + AI owner: separately authorize stale source-comment correction |
 | DEC-005 | Invalid configured key is an error, not missing configuration | Adopt | Proposed | AI owner |
 | DEC-006 | Cloud backup is opt-in | Existing direction | Proposed | Product/privacy approval |
 | DEC-007 | Backup is not described as end-to-end encrypted without evidence | Required claim boundary | Confirmed by current architecture docs | Security owner |

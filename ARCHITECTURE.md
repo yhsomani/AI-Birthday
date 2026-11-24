@@ -155,12 +155,15 @@ The verification endpoint supports Firebase authentication and Firebase App Chec
 
 `AiRouter` is the only component allowed to select the AI provider.
 
-Rules:
+Rules (aligned with the current AiRouter implementation, tests and approved product policy):
 
-1. User personal Gemini API key exists (BYOK) → route to user Gemini (unlocked without application subscription).
-2. No user key + Pro entitlement active + Gemini Nano is usable → route to on-device Nano.
-3. No user key + No active Pro entitlement → AI locked.
-4. Otherwise → truthful provider-unavailable error.
+1. Check active application entitlement before selecting or invoking any provider.
+2. Without active entitlement, return AI locked and make zero Gemini API or Nano calls, even when a personal Gemini key is configured.
+3. With active entitlement and a configured personal Gemini key, use the user Gemini API provider.
+4. With active entitlement and no personal key, use Gemini Nano only when the device reports it ready.
+5. If no entitled provider is available, return a truthful unavailable/credential error and preserve manual drafting.
+
+BYOK is a provider credential, not a subscription bypass.
 
 The user's Gemini key is never stored in the SQLite database or sent to Firestore backup.
 

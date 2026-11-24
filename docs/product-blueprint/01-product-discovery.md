@@ -19,7 +19,7 @@ The loop is the organizing principle for product scope, navigation, lifecycle st
 | The current application is Flutter/Dart with native Android Kotlin integrations | FACT — repository | Root project files and Android source tree |
 | The product currently describes itself as local-first | FACT — repository | README, SSOT, architecture and data-lineage documents |
 | User-reviewed messaging is a core product boundary | FACT — repository + prior decision | README, SSOT and delivery audit |
-| AI access is subscription-gated for all providers | FACT — prior decision | Explicit project decision retained from earlier work; current repository docs conflict and need correction |
+| AI access is subscription-gated for all providers | FACT — prior decision + current executable evidence | Explicit product decision; current router behavior, tests and Settings copy enforce it. Legacy SSOT/root architecture text and router comments were stale; the SSOT and root architecture text are reconciled in blueprint revision 0.1.4. Router source comments remain a documentation-only audit finding |
 | Cloud backup is optional | FACT — repository direction | README and architecture |
 | Birthday Autopilot is a separate server-side coordination surface | FACT — repository | Backend README and knowledge portal |
 | There is a validated market need, market size or willingness to pay | OPEN | No customer research or market evidence reviewed in this baseline |

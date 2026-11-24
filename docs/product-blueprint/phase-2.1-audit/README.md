@@ -4,7 +4,7 @@
 **Repository HEAD reviewed:** `4380220014d88a6b05f61466043bc7e319c8dbef`  
 **Review date:** 2026-11-23  
 **Scope:** Documentation only  
-**Status:** **IN PROGRESS — evidence baseline created; exhaustive source audit not yet complete**
+**Status:** **IN PROGRESS — Phase 2.1.1 Flutter source/test inventory complete; full cross-domain audit remains open**
 
 ## Purpose
 

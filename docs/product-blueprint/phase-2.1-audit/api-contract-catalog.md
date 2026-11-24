@@ -45,9 +45,9 @@ Do not assume every export uses the same guard. The exact guard, schema, respons
 
 `SubscriptionVerificationService` defines product ID `ai_birthday_pro_monthly` and expected Android package `com.yashsomani.ai_birthday`. It rejects package/product mismatch and queries Google Play through its verifier. This source presence does not prove Play Console configuration or live purchase verification.
 
-## CI limitation
+## CI verification update
 
-Latest backend workflow run failed during `npm ci`. Backend dependency audit, lint, TypeScript compile, Vitest and Firestore emulator tests were skipped. Therefore there is no fresh CI test evidence for these exports in run 45230577466.
+The backend CI failure recorded in the earlier Phase 2.1 snapshot is historical. The latest main run [45245907678](https://github.com/yhsomani/AI-Birthday/actions/runs/45245907678) on commit 644571f68be024423376749fe8e50e1db02ff018 passed dependency installation, production dependency audit, lint, TypeScript compilation, 11 Vitest files and 2 Firestore-emulator test files. This verifies the executed CI suites, not every endpoint contract, live deployment or production configuration.
 
 ## Required per-endpoint fields for completion
 
@@ -97,4 +97,4 @@ The shared `commonOptions` object enables App Check, but `verifyPurchase` delibe
 - `CTRL-DELETE`: `backend/functions/test/deletionReceipt.test.ts`
 - `CTRL-PURCHASE`: `backend/functions/test/subscriptionVerification.test.ts`
 
-These tests were not run in the latest CI workflow because dependency installation failed.
+These mapped backend tests ran in the latest CI workflow and passed (11 Vitest files and 2 Firestore-emulator test files). Exact per-handler assertion mapping and deployment evidence remain open.
