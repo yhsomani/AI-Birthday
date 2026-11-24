@@ -117,8 +117,9 @@
 | Testing | Scoped People/Birthday test mapping added | Existing test names are mapped; aggregate transaction, import validation and device/timezone cases remain open |
 | Roadmap | Dependency sequence drafted | Stakeholder priorities pending |
 | Mind maps | Master and architecture diagrams created | Domain-level maps remain to be expanded |
-| Legacy migration | Not started | Preserve all existing documents until cross-reference review |
-| Git verification | Verified for the Phase 2.4.1 documentation revision | Commit comparison and branch head checked; changed paths are confined to product-blueprint documentation |
+| Legacy migration | Repository/schema inventory completed; real local-data inventory blocked | No database artifact or authorized local DB copy exists in repository context; aggregate-only query pack prepared, no rows inspected |
+| Decision approval | Recommendations documented; formal approvals not captured | Phase 2.4.2 lists approval authority and outstanding decisions; no approval inferred from the phase command |
+| Git verification | Verified for the Phase 2.4.2 documentation revision | Commit comparison and branch head checked; changed paths are confined to product-blueprint documentation |
 
 ## 7. Glossary
 
