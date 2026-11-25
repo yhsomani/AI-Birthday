@@ -26,6 +26,15 @@ enum PurchaseFailure {
   unknown,
 }
 
+enum EntitlementCheckState {
+  checking,
+  verified,
+  cached,
+  stale,
+  expired,
+  unavailable,
+}
+
 class _VerifiedEntitlement {
   const _VerifiedEntitlement({
     required this.status,
@@ -54,6 +63,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
     AppLogger? logger,
     Future<String?> Function()? authTokenProvider,
     Future<String?> Function()? accountBindingProvider,
+    Future<String?> Function()? accountIdProvider,
     Future<String?> Function()? appCheckTokenProvider,
     DateTime Function()? now,
     String? verificationEndpoint,
@@ -63,12 +73,13 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
        _logger = logger ?? ConsoleAppLogger(),
        _authTokenProvider = authTokenProvider,
        _accountBindingProvider = accountBindingProvider,
+       _accountIdProvider = accountIdProvider,
        _appCheckTokenProvider = appCheckTokenProvider,
        _now = now ?? clock.clock.now,
        _verificationEndpoint =
            verificationEndpoint ?? FirebaseConfig.functionUrl('verifyPurchase'),
        super(initial) {
-    _initIapAndRestore();
+    initializationComplete;
   }
 
   final SecureStoreDriver? _store;
@@ -77,11 +88,13 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   final AppLogger _logger;
   final Future<String?> Function()? _authTokenProvider;
   final Future<String?> Function()? _accountBindingProvider;
+  final Future<String?> Function()? _accountIdProvider;
   final Future<String?> Function()? _appCheckTokenProvider;
   final DateTime Function() _now;
   final String _verificationEndpoint;
 
   StreamSubscription<List<iap.PurchaseDetails>>? _iapSubscription;
+  Timer? _entitlementBoundaryTimer;
   Completer<bool>? _restoreCompleter;
   PurchaseStatus _purchaseStatus = PurchaseStatus.idle;
   PurchaseStatus get purchaseStatus => _purchaseStatus;
@@ -96,13 +109,29 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   // real package and every purchase verified as 'none'.
   static const String _kPackageName = 'com.yashsomani.ai_birthday';
   static const String _kBindingPrefix = 'purchase_binding_';
+  static const String _kEntitlementCacheKey = 'verified_entitlement_v1';
 
-  /// How long an in-session grant survives failed re-verification before the
+  /// How long a server-verified grant survives failed re-verification before the
   /// app stops claiming Pro (audit P1-3). A successful verification resets it.
   static const Duration _kPreserveTtl = Duration(hours: 24);
   static const Duration _kVerifyTimeout = Duration(seconds: 15);
 
   DateTime? _lastVerifiedAt;
+  bool _isCheckingEntitlement = true;
+  bool _loadedFromCache = false;
+  late final Future<void> initializationComplete = _initIapAndRestore();
+
+  bool get isCheckingEntitlement => _isCheckingEntitlement;
+
+  EntitlementCheckState get checkState {
+    if (_isCheckingEntitlement) return EntitlementCheckState.checking;
+    if (state.isExpired) return EntitlementCheckState.expired;
+    if (state.isVerificationStale) return EntitlementCheckState.stale;
+    if (!state.canUseAi) return EntitlementCheckState.unavailable;
+    return _loadedFromCache
+        ? EntitlementCheckState.cached
+        : EntitlementCheckState.verified;
+  }
 
   /// True after a purchase event whose verification failed, while the
   /// purchase is left unacknowledged (so Play re-emits it for retry).
@@ -111,6 +140,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
 
   Future<void> _initIapAndRestore() async {
     try {
+      await _loadCachedEntitlement();
       final available = await _iap.isAvailable();
       if (!available) return;
 
@@ -137,7 +167,120 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
         error: error,
         stackTrace: stackTrace,
       );
+    } finally {
+      if (mounted) {
+        _isCheckingEntitlement = false;
+        // Emit a distinct instance so cold-start/no-cache reaches a truthful
+        // terminal state even if the entitlement value is still Free.
+        state = UserEntitlement(
+          status: state.status,
+          productId: state.productId,
+          expiryDate: state.expiryDate,
+          isAutoRenewing: state.isAutoRenewing,
+          verifiedAt: state.verifiedAt,
+        );
+      }
     }
+  }
+
+  Future<void> reloadAccountEntitlement() async {
+    _isCheckingEntitlement = true;
+    _loadedFromCache = false;
+    _lastVerifiedAt = null;
+    state = UserEntitlement.free;
+    await _loadCachedEntitlement();
+    _isCheckingEntitlement = false;
+    state = UserEntitlement(
+      status: state.status,
+      productId: state.productId,
+      expiryDate: state.expiryDate,
+      isAutoRenewing: state.isAutoRenewing,
+      verifiedAt: state.verifiedAt,
+    );
+  }
+
+  Future<void> _loadCachedEntitlement() async {
+    final store = _store;
+    final accountId = await _accountIdProvider?.call();
+    if (store == null || accountId == null || accountId.isEmpty) return;
+    final raw = await store.read(_kEntitlementCacheKey);
+    if (raw == null) return;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic> ||
+          decoded['accountId'] != accountId) {
+        return;
+      }
+      final verifiedAt = DateTime.tryParse(
+        decoded['verifiedAt'] as String? ?? '',
+      );
+      final expiry = DateTime.tryParse(decoded['expiryDate'] as String? ?? '');
+      final statusName = decoded['status'] as String?;
+      final status = EntitlementStatus.values
+          .where((s) => s.name == statusName)
+          .firstOrNull;
+      if (verifiedAt == null || status == null) return;
+      if (!mounted) return;
+      _lastVerifiedAt = verifiedAt;
+      _loadedFromCache = true;
+      state = UserEntitlement(
+        status: status,
+        productId: decoded['productId'] as String?,
+        expiryDate: expiry,
+        isAutoRenewing: decoded['isAutoRenewing'] == true,
+        verifiedAt: verifiedAt,
+        maxCacheAge: _kPreserveTtl,
+      );
+      _scheduleEntitlementBoundary(state);
+    } catch (error, stackTrace) {
+      _logger.warning(
+        'Subscription',
+        'Stored entitlement cache was ignored.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  void _scheduleEntitlementBoundary(UserEntitlement entitlement) {
+    _entitlementBoundaryTimer?.cancel();
+    final verifiedAt = entitlement.verifiedAt;
+    if (verifiedAt == null || !entitlement.status.isEntitled) return;
+    final staleAt = verifiedAt.add(_kPreserveTtl);
+    final expiryAt = entitlement.expiryDate;
+    final boundary = expiryAt != null && expiryAt.isBefore(staleAt)
+        ? expiryAt
+        : staleAt;
+    final delay = boundary.difference(_now());
+    if (delay.isNegative || delay == Duration.zero) return;
+    _entitlementBoundaryTimer = Timer(delay, () {
+      if (!mounted) return;
+      state = UserEntitlement(
+        status: state.status,
+        productId: state.productId,
+        expiryDate: state.expiryDate,
+        isAutoRenewing: state.isAutoRenewing,
+        verifiedAt: state.verifiedAt,
+        maxCacheAge: _kPreserveTtl,
+      );
+    });
+  }
+
+  Future<void> _persistVerifiedEntitlement(UserEntitlement entitlement) async {
+    final store = _store;
+    final accountId = await _accountIdProvider?.call();
+    if (store == null || accountId == null || accountId.isEmpty) return;
+    await store.write(
+      _kEntitlementCacheKey,
+      jsonEncode({
+        'accountId': accountId,
+        'status': entitlement.status.name,
+        'productId': entitlement.productId,
+        'expiryDate': entitlement.expiryDate?.toUtc().toIso8601String(),
+        'isAutoRenewing': entitlement.isAutoRenewing,
+        'verifiedAt': entitlement.verifiedAt?.toUtc().toIso8601String(),
+      }),
+    );
   }
 
   Future<void> _onPurchasesUpdated(List<iap.PurchaseDetails> purchases) async {
@@ -156,9 +299,11 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
         verified = await _verifyPurchase(purchase);
 
         if (verified != null) {
-          _lastVerifiedAt = _now();
+          final verifiedNow = _now();
+          _lastVerifiedAt = verifiedNow;
           _hasPendingVerification = false;
-          state = UserEntitlement(
+          _loadedFromCache = false;
+          final next = UserEntitlement(
             status: verified.status,
             productId: verified.productId,
             expiryDate: DateTime.fromMillisecondsSinceEpoch(
@@ -166,7 +311,12 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
               isUtc: true,
             ),
             isAutoRenewing: verified.isAutoRenewing,
+            verifiedAt: verifiedNow,
+            maxCacheAge: _kPreserveTtl,
           );
+          state = next;
+          _scheduleEntitlementBoundary(next);
+          unawaited(_persistVerifiedEntitlement(next));
           _purchaseStatus = PurchaseStatus.success;
         } else {
           // Verification could not be completed (network/server). A
@@ -317,6 +467,7 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
 
   @override
   void dispose() {
+    _entitlementBoundaryTimer?.cancel();
     _iapSubscription?.cancel();
     _http.close();
     super.dispose();
@@ -477,12 +628,12 @@ class SubscriptionNotifier extends StateNotifier<UserEntitlement> {
   /// Test-only hook. Production entitlement still originates from verified
   /// purchase callbacks; this method is unavailable outside debug builds.
   void resetToFreeTier() {
-    _logger.info('Subscription', 'Resetting entitlement to Free tier');
+    _logger.info('Subscription', 'Resetting active entitlement view to Free');
+    _entitlementBoundaryTimer?.cancel();
+    _lastVerifiedAt = null;
+    _loadedFromCache = false;
+    _isCheckingEntitlement = false;
     state = UserEntitlement.free;
-    final store = _store;
-    if (store != null) {
-      unawaited(store.delete('user_subscription_entitlement'));
-    }
   }
 
   /// Test hook for deterministic sandbox state. The assertion is paired with

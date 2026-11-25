@@ -51,6 +51,41 @@ void main() {
       expect(result.error, contains('Please sign in'));
     });
 
+    test(
+      'account switch blocks local records from being uploaded under B',
+      () async {
+        var requests = 0;
+        final service = CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: MockClient((_) async {
+            requests++;
+            return http.Response('{}', 200);
+          }),
+        );
+        await service.assignLocalDataOwner('account-a');
+
+        final result = await service.sync(
+          const AuthState(
+            status: AuthStatus.signedIn,
+            identity: GoogleIdentity(
+              googleSubject: 'sub-b',
+              email: 'b@example.com',
+              displayName: 'B',
+              firebaseUid: 'account-b',
+              idToken: 'token-b',
+            ),
+          ),
+        );
+
+        expect(result.success, isFalse);
+        expect(result.errorCode, 'ownership');
+        expect(result.error, contains('Nothing has been uploaded'));
+        expect(requests, 0);
+        expect(await service.getLocalDataOwner(), 'account-a');
+      },
+    );
+
     test('uploads all records in one batched Firestore commit', () async {
       final now = DateTime.now();
 
@@ -63,6 +98,7 @@ void main() {
               name: 'Taylor Swift',
               birthdayMonth: const Value(12),
               birthdayDay: const Value(13),
+              leapDayResolution: const Value('mar1'),
               relationship: 'Friend',
               relationshipCloseness: 'close',
               preferredLanguage: 'en',
@@ -141,6 +177,7 @@ void main() {
         final personFields =
             ((personWrite['update'] as Map)['fields'] as Map<String, dynamic>);
         expect(personFields['name']['stringValue'], 'Taylor Swift');
+        expect(personFields['leapDayResolution']['stringValue'], 'mar1');
 
         final birthdayWrite = writes.cast<Map<String, dynamic>>().firstWhere(
           (w) => ((w['update'] as Map)['name'] as String).endsWith(
@@ -559,6 +596,12 @@ void main() {
       final result = await service.restore(auth);
       expect(result.success, isTrue);
       expect(result.downloadedCount, 0);
+      expect(result.skippedCount, 0);
+      expect(result.conflictCount, 1);
+      expect(
+        result.conflictRecords.single,
+        contains('device-local preference preserved'),
+      );
 
       final local = await (db.select(
         db.reminderSettingsEntries,
@@ -941,6 +984,212 @@ void main() {
 
         expect(authorizations, isNotEmpty);
         expect(authorizations, everyElement('Bearer fresh-token'));
+      },
+    );
+
+    test(
+      'restore preserves legacy-null and restores explicit leap policy',
+      () async {
+        final old = DateTime.utc(2026, 1, 1);
+        await db
+            .into(db.persons)
+            .insert(
+              PersonsCompanion.insert(
+                id: 'p-existing',
+                name: 'Existing Leap',
+                birthdayMonth: const Value(2),
+                birthdayDay: const Value(29),
+                leapDayResolution: const Value('mar1'),
+                relationship: 'friend',
+                relationshipCloseness: 'close',
+                preferredLanguage: 'en',
+                preferredTone: 'warm',
+                importantFacts: '',
+                preferredDeliveryChannel: 'whatsapp',
+                autoSendPolicy: 'manualOnly',
+                createdAt: old,
+                updatedAt: old,
+                version: 1,
+              ),
+            );
+
+        final newer = DateTime.utc(2026, 2, 1);
+        final client = MockClient(
+          (request) => servePublished(request, (subReq) async {
+            if (!subReq.url.path.endsWith('/people')) {
+              return http.Response(jsonEncode({'documents': []}), 200);
+            }
+            Map<String, dynamic> fields(String id, String name) => {
+              'id': {'stringValue': id},
+              'name': {'stringValue': name},
+              'birthdayMonth': {'integerValue': '2'},
+              'birthdayDay': {'integerValue': '29'},
+              'createdAt': {'stringValue': old.toIso8601String()},
+              'updatedAt': {'stringValue': newer.toIso8601String()},
+              'version': {'integerValue': '2'},
+            };
+            return http.Response(
+              jsonEncode({
+                'documents': [
+                  {
+                    'name': 'users/uid-test/people/p-existing',
+                    'fields': fields('p-existing', 'Existing Leap'),
+                  },
+                  {
+                    'name': 'users/uid-test/people/p-new',
+                    'fields': {
+                      ...fields('p-new', 'New Leap'),
+                      'leapDayResolution': {'stringValue': 'feb28'},
+                    },
+                  },
+                  {
+                    'name': 'users/uid-test/people/p-old-backup',
+                    'fields': fields('p-old-backup', 'Legacy Leap'),
+                  },
+                ],
+              }),
+              200,
+            );
+          }),
+        );
+
+        final result = await CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: client,
+        ).restore(_signedInAuth);
+
+        expect(result.success, isTrue);
+        final existing = await (db.select(
+          db.persons,
+        )..where((row) => row.id.equals('p-existing'))).getSingle();
+        final restored = await (db.select(
+          db.persons,
+        )..where((row) => row.id.equals('p-new'))).getSingle();
+        final legacy = await (db.select(
+          db.persons,
+        )..where((row) => row.id.equals('p-old-backup'))).getSingle();
+        expect(existing.leapDayResolution, 'mar1');
+        expect(restored.leapDayResolution, 'feb28');
+        expect(legacy.leapDayResolution, isNull);
+      },
+    );
+
+    test(
+      'newer cloud draft cannot overwrite confirmed-sent local draft',
+      () async {
+        final localTime = DateTime.utc(2026, 1, 1);
+        final remoteTime = DateTime.utc(2026, 2, 1);
+        await db
+            .into(db.persons)
+            .insert(
+              PersonsCompanion.insert(
+                id: 'p-sent',
+                name: 'Sent Recipient',
+                relationship: 'friend',
+                relationshipCloseness: 'close',
+                preferredLanguage: 'en',
+                preferredTone: 'warm',
+                importantFacts: '',
+                preferredDeliveryChannel: 'whatsapp',
+                autoSendPolicy: 'manualOnly',
+                createdAt: localTime,
+                updatedAt: localTime,
+                version: 1,
+              ),
+            );
+        await db
+            .into(db.birthdays)
+            .insert(
+              BirthdaysCompanion.insert(
+                id: 'b-sent',
+                personId: 'p-sent',
+                cycleYear: 2026,
+                date: DateTime.utc(2026, 10, 1),
+                status: 'completed',
+                draftId: const Value('d-sent'),
+                createdAt: localTime,
+                updatedAt: localTime,
+              ),
+            );
+        await db
+            .into(db.messageDrafts)
+            .insert(
+              MessageDraftsCompanion.insert(
+                id: 'd-sent',
+                birthdayId: 'b-sent',
+                personId: 'p-sent',
+                body: 'The exact confirmed message',
+                tone: 'warm',
+                length: 'medium',
+                status: 'confirmedSent',
+                providerType: 'manual',
+                createdAt: localTime,
+                updatedAt: localTime,
+              ),
+            );
+
+        final client = MockClient(
+          (request) => servePublished(request, (subReq) async {
+            if (subReq.url.path.endsWith('/drafts')) {
+              return http.Response(
+                jsonEncode({
+                  'documents': [
+                    {
+                      'name': 'users/uid-test/drafts/d-sent',
+                      'fields': {
+                        'id': {'stringValue': 'd-sent'},
+                        'birthdayId': {'stringValue': 'b-sent'},
+                        'personId': {'stringValue': 'p-sent'},
+                        'body': {'stringValue': 'A newer unsent revision'},
+                        'tone': {'stringValue': 'warm'},
+                        'length': {'stringValue': 'medium'},
+                        'status': {'stringValue': 'draft'},
+                        'providerType': {'stringValue': 'manual'},
+                        'variationIndex': {'integerValue': '0'},
+                        'createdAt': {
+                          'stringValue': localTime.toIso8601String(),
+                        },
+                        'updatedAt': {
+                          'stringValue': remoteTime.toIso8601String(),
+                        },
+                      },
+                    },
+                  ],
+                }),
+                200,
+              );
+            }
+            return http.Response(jsonEncode({'documents': []}), 200);
+          }),
+        );
+
+        final result = await CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: client,
+        ).restore(_signedInAuth);
+
+        expect(result.success, isTrue);
+        expect(
+          result.downloadedCount,
+          1,
+          reason: '${result.skippedRecords} / ${result.conflictRecords}',
+        );
+        expect(result.conflictCount, 1);
+        final drafts = await db.select(db.messageDrafts).get();
+        expect(drafts, hasLength(2));
+        final original = drafts.singleWhere((row) => row.id == 'd-sent');
+        final revision = drafts.singleWhere((row) => row.id != 'd-sent');
+        expect(original.body, 'The exact confirmed message');
+        expect(original.status, 'confirmedSent');
+        expect(revision.id, startsWith('d-sent-restore-revision-'));
+        expect(revision.body, 'A newer unsent revision');
+        final birthday = await (db.select(
+          db.birthdays,
+        )..where((row) => row.id.equals('b-sent'))).getSingle();
+        expect(birthday.draftId, revision.id);
+        expect(birthday.status, 'messageDrafted');
       },
     );
 

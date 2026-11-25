@@ -133,6 +133,14 @@ class AiGenerationJobHandler implements JobHandler {
         message: 'Recipient no longer exists, so a message was not drafted.',
       );
     }
+    if (!person.hasResolvableBirthday) {
+      return JobFailed(
+        retryable: false,
+        code: 'requiresRepair',
+        message:
+            'Choose a non-leap-year celebration date before drafting a message.',
+      );
+    }
     final birthday = await _birthdaysRepository.getBirthday(payload.birthdayId);
     if (birthday == null) {
       return JobFailed(
@@ -184,11 +192,19 @@ class AiGenerationJobHandler implements JobHandler {
         (enqueuedAt == null || current.updatedAt.isAfter(enqueuedAt));
     if (stale) return const JobSucceeded();
 
-    // Apply: idempotent upsert onto the stable per-birthday draft row.
+    // Apply: normal retries converge on the active row, while an immutable
+    // confirmed-sent row is preserved by creating a new revision.
     final now = DateTime.now();
-    await _draftsRepository.saveDraft(
+    final canonicalDraft = await _draftsRepository.getDraft(payload.birthdayId);
+    final startsNewRevision =
+        current?.status == DraftStatus.confirmedSent ||
+        (latestBirthday.draftId == null && canonicalDraft != null);
+    final revisionId = startsNewRevision
+        ? '${payload.birthdayId}-revision-${now.microsecondsSinceEpoch}'
+        : payload.birthdayId;
+    final applied = await _draftsRepository.saveDraftAndUpdateBirthday(
       MessageDraft(
-        id: payload.birthdayId,
+        id: revisionId,
         birthdayId: payload.birthdayId,
         personId: payload.personId,
         body: result.message,
@@ -196,16 +212,17 @@ class AiGenerationJobHandler implements JobHandler {
         length: payload.length,
         status: DraftStatus.draft,
         providerType: result.providerType,
-        createdAt: current?.createdAt ?? now,
+        createdAt: startsNewRevision ? now : current?.createdAt ?? now,
         updatedAt: now,
       ),
-    );
-    await _birthdaysRepository.updateBirthdayStatus(
-      payload.birthdayId,
       BirthdayStatus.messageDrafted,
-      draftId: payload.birthdayId,
+      requireUnchanged: true,
+      expectedCurrentDraft: current,
     );
+    if (!applied) {
+      return const JobSucceeded();
+    }
 
-    return JobSucceeded(payload.birthdayId);
+    return JobSucceeded(revisionId);
   }
 }

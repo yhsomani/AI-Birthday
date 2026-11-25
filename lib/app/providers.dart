@@ -91,6 +91,10 @@ final subscriptionNotifierProvider =
             subject,
           );
         },
+        accountIdProvider: () async {
+          final auth = await ref.read(authControllerProvider.future);
+          return auth.identity?.firebaseUid ?? auth.identity?.googleSubject;
+        },
         appCheckTokenProvider: () async {
           try {
             return await FirebaseAppCheck.instance.getLimitedUseToken();
@@ -117,6 +121,9 @@ final subscriptionNotifierProvider =
             prevAuth.identity!.googleSubject !=
                 nextAuth.identity!.googleSubject) {
           notifier.resetToFreeTier();
+          unawaited(notifier.reloadAccountEntitlement());
+        } else if (nextAuth.isSignedIn && !(prevAuth?.isSignedIn ?? false)) {
+          unawaited(notifier.reloadAccountEntitlement());
         }
       });
 

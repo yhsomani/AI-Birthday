@@ -7,8 +7,6 @@ import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/core/config/product_capabilities.dart';
 import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
-import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart'
-    as b_models;
 import 'package:ai_birthday/features/people/data/person_providers.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart'
     as p_rel;
@@ -68,6 +66,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
   p_rel.RelationshipCloseness _closeness = p_rel.RelationshipCloseness.casual;
   String _preferredLanguage = 'en';
   d_chan.DeliveryChannel _deliveryChannel = d_chan.DeliveryChannel.whatsapp;
+  LeapDayResolution? _leapDayResolution;
   bool _autoPrepare = false;
   AutoSendPolicy _autoSendPolicy = AutoSendPolicy.manualOnly;
   Person? _loaded;
@@ -157,6 +156,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
     _month = person.birthdayMonth;
     _day = person.birthdayDay;
     _birthYear.text = person.birthYear?.toString() ?? '';
+    _leapDayResolution = person.leapDayResolution;
     _phone.text = person.phoneNumber ?? '';
     _email.text = person.email ?? '';
     _relationship.text = person.relationship.displayName;
@@ -193,6 +193,9 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
     setState(() {
       _dirty = true;
       _month = month;
+      if (month != 2) {
+        _leapDayResolution = null;
+      }
       if (month != null) {
         final maxDay = month == 2
             ? 29
@@ -233,6 +236,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       birthdayMonth: _month,
       birthdayDay: _day,
       birthYear: int.tryParse(_birthYear.text.trim()),
+      leapDayResolution: _month == 2 && _day == 29 ? _leapDayResolution : null,
       phoneNumber: emptyToNull(_phone.text),
       email: emptyToNull(_email.text),
       relationship: p_rel.RelationshipCategory.fromString(
@@ -274,55 +278,6 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       final saved = _isEditing
           ? await service.update(_loaded!, draft)
           : await service.create(draft);
-
-      if (saved.hasBirthday) {
-        try {
-          final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
-          final now = DateTime.now();
-          final next = const BirthdayEngine().computeNext(
-            month: saved.birthdayMonth!,
-            day: saved.birthdayDay!,
-            birthYear: saved.birthYear,
-            timezoneName: saved.timezone,
-            reference: now,
-          );
-          final nextDate = next.nextDate;
-          final existingBirthday = await birthdaysRepo.getBirthdayForPerson(
-            saved.id,
-          );
-          final isToday = next.isToday;
-          final birthdayChanged =
-              existingBirthday != null &&
-              (existingBirthday.date.month != nextDate.month ||
-                  existingBirthday.date.day != nextDate.day);
-
-          final birthdayModel = b_models.Birthday(
-            id: existingBirthday?.id ?? 'birthday-${saved.id}',
-            personId: saved.id,
-            cycleYear: nextDate.year,
-            date: nextDate,
-            status: birthdayChanged
-                ? (isToday
-                      ? b_models.BirthdayStatus.reminderDue
-                      : b_models.BirthdayStatus.upcoming)
-                : existingBirthday?.status ??
-                      (isToday
-                          ? b_models.BirthdayStatus.reminderDue
-                          : b_models.BirthdayStatus.upcoming),
-            draftId: birthdayChanged ? null : existingBirthday?.draftId,
-            createdAt: existingBirthday?.createdAt ?? now,
-            updatedAt: now,
-          );
-          await birthdaysRepo.saveBirthday(birthdayModel);
-        } catch (e) {
-          if (!_isEditing) {
-            try {
-              await service.remove(saved.id);
-            } catch (_) {}
-          }
-          rethrow;
-        }
-      }
 
       try {
         final smsService = ref.read(birthdaySmsServiceProvider);
@@ -450,6 +405,9 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                               onChanged: (value) => setState(() {
                                 _dirty = true;
                                 _day = value;
+                                if (_month != 2 || _day != 29) {
+                                  _leapDayResolution = null;
+                                }
                               }),
                               decoration: const InputDecoration(
                                 labelText: 'Day',
@@ -458,6 +416,34 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                           ),
                         ],
                       ),
+                      if (_month == 2 && _day == 29) ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<LeapDayResolution>(
+                          isExpanded: true,
+                          initialValue: _leapDayResolution,
+                          decoration: InputDecoration(
+                            labelText: 'In non-leap years, celebrate on',
+                            helperText:
+                                'Required and saved for Calendar and reminders.',
+                            errorText:
+                                _errorFor(PersonField.birthday) ==
+                                    InputError.leapDayPolicyRequired.label
+                                ? InputError.leapDayPolicyRequired.label
+                                : null,
+                          ),
+                          items: [
+                            for (final policy in LeapDayResolution.values)
+                              DropdownMenuItem(
+                                value: policy,
+                                child: Text(policy.displayName),
+                              ),
+                          ],
+                          onChanged: (value) => setState(() {
+                            _dirty = true;
+                            _leapDayResolution = value;
+                          }),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       TextField(
                         controller: _birthYear,

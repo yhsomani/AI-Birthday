@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_birthday/app/app.dart';
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/core/security/credential_storage.dart';
+import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 
 /// In-memory [SecureStoreDriver] (mirrors test/widget_test.dart).
 class FakeStoreDriver implements SecureStoreDriver {
@@ -40,7 +41,10 @@ Future<void> pumpCompletedApp(
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [credentialStorageProvider.overrideWithValue(storage)],
+      overrides: [
+        credentialStorageProvider.overrideWithValue(storage),
+        entitlementProvider.overrideWithValue(UserEntitlement.free),
+      ],
       child: const AiBirthdayApp(),
     ),
   );

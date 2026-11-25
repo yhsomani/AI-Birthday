@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +9,7 @@ import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dar
 import 'package:ai_birthday/features/delivery/domain/repositories/delivery_events_repository.dart';
 import 'package:ai_birthday/features/history/presentation/history_screen.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
+import 'package:ai_birthday/features/people/domain/models/person.dart';
 
 /// Records [handoffs] for `watchHandoffs`, but only forwards the requested
 /// subset to [watchLatestHandoffs] — mirroring the drift repository's
@@ -21,6 +24,16 @@ class _FakeDeliveryEventsRepository implements DeliveryEventsRepository {
     required String birthdayId,
     required DeliveryChannel channel,
     required DateTime at,
+    String? draftId,
+  }) async {}
+
+  @override
+  Future<void> recordOutcome({
+    required String birthdayId,
+    required DeliveryChannel channel,
+    required DeliveryOutcome outcome,
+    required DateTime at,
+    String? draftId,
   }) async {}
 
   @override
@@ -28,6 +41,7 @@ class _FakeDeliveryEventsRepository implements DeliveryEventsRepository {
     required String birthdayId,
     required DeliveryChannel channel,
     required DateTime at,
+    String? draftId,
   }) async {}
 
   @override
@@ -124,8 +138,75 @@ void main() {
         expect(find.text('User Confirmed Sent'), findsOneWidget);
         // No evidence → honest neutral label, never an "Opened" claim.
         expect(find.text('Ready to Send'), findsOneWidget);
+        expect(find.text('Studio'), findsNothing);
       },
     );
+
+    testWidgets(
+      'shows dependent people loading instead of removed-contact state',
+      (tester) async {
+        final people = StreamController<List<Person>>();
+        addTearDown(people.close);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              draftsStreamProvider.overrideWith(
+                (_) => Stream.value([
+                  MessageDraft(
+                    id: 'd-loading',
+                    birthdayId: 'b-loading',
+                    personId: 'p-loading',
+                    body: 'Waiting for contact',
+                    createdAt: DateTime(2026),
+                    updatedAt: DateTime(2026),
+                  ),
+                ]),
+              ),
+              peopleStreamProvider.overrideWith((_) => people.stream),
+              latestHandoffsForDraftsProvider.overrideWith(
+                (_) => Stream.value(const <DeliveryHandoff>[]),
+              ),
+            ],
+            child: const MaterialApp(home: HistoryScreen()),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+        expect(find.text('Removed contact'), findsNothing);
+      },
+    );
+
+    testWidgets('shows a retryable dependent handoff error', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            draftsStreamProvider.overrideWith(
+              (_) => Stream.value([
+                MessageDraft(
+                  id: 'd-error',
+                  birthdayId: 'b-error',
+                  personId: 'p-error',
+                  body: 'Saved message',
+                  createdAt: DateTime(2026),
+                  updatedAt: DateTime(2026),
+                ),
+              ]),
+            ),
+            peopleStreamProvider.overrideWith((_) => Stream.value([])),
+            latestHandoffsForDraftsProvider.overrideWith(
+              (_) => Stream<List<DeliveryHandoff>>.error(StateError('offline')),
+            ),
+          ],
+          child: const MaterialApp(home: HistoryScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not load delivery activity'), findsOneWidget);
+      expect(find.text('Saved message'), findsNothing);
+      expect(find.text('Try again'), findsOneWidget);
+    });
   });
 
   group('latestHandoffsForDraftsProvider (batched related data)', () {

@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,14 +37,19 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     super.dispose();
   }
 
-  NextBirthday? _next(Person person) => person.hasBirthday
-      ? _engine.computeNext(
-          month: person.birthdayMonth!,
-          day: person.birthdayDay!,
-          birthYear: person.birthYear,
-          timezoneName: person.timezone,
-        )
-      : null;
+  NextBirthday? _next(Person person) {
+    if (!person.hasBirthday ||
+        (person.isLeapDayBirthday && person.leapDayResolution == null)) {
+      return null;
+    }
+    return _engine.computeNext(
+      month: person.birthdayMonth!,
+      day: person.birthdayDay!,
+      birthYear: person.birthYear,
+      timezoneName: person.timezone,
+      leapDay: person.leapDayResolution,
+    );
+  }
 
   String _countdownLabel(NextBirthday? next) {
     if (next == null) return '';
@@ -122,6 +130,45 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
             'Paste CSV with columns: Name, Month, Day, Year, Phone, Relationship.',
             style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
           ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final picked = await FilePicker.platform.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: const ['csv'],
+                withData: true,
+              );
+              if (picked == null) return;
+              final file = picked.files.single;
+              if (file.size > ContactCsvService.maxInputBytes ||
+                  file.bytes == null) {
+                if (sheetContext.mounted) {
+                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Choose a CSV file no larger than 1 MB.'),
+                    ),
+                  );
+                }
+                return;
+              }
+              try {
+                textController.text = utf8.decode(
+                  file.bytes!,
+                  allowMalformed: false,
+                );
+              } on FormatException {
+                if (sheetContext.mounted) {
+                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('The CSV must be UTF-8 encoded.'),
+                    ),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.attach_file),
+            label: const Text('Choose CSV File'),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: textController,
@@ -152,20 +199,40 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
 
     if (parsedCandidates == null || !context.mounted) return;
 
-    if (parsedCandidates.invalidRows.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Skipped ${parsedCandidates.invalidRows.length} invalid rows (e.g. ${parsedCandidates.invalidRows.first})',
-          ),
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
-
     if (parsedCandidates.candidates.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No valid contact entries found in CSV.')),
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('CSV repair summary'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '0 of ${parsedCandidates.totalRows} rows are ready. No records were saved.',
+                  ),
+                  if (parsedCandidates.mappedColumns.isNotEmpty)
+                    Text(
+                      'Mapped: ${parsedCandidates.mappedColumns.join(', ')}',
+                    ),
+                  for (final issue in parsedCandidates.invalidRows) ...[
+                    const SizedBox(height: 8),
+                    Text(issue),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
       );
       return;
     }
@@ -175,15 +242,20 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
       ref,
       parsedCandidates.candidates,
       title: 'Review CSV Contacts',
+      repairIssues: parsedCandidates.invalidRows,
+      mappedColumns: parsedCandidates.mappedColumns,
     );
   }
 
   Future<void> _reviewAndImportCandidates(
     BuildContext context,
     WidgetRef ref,
-    List<ParsedContactCandidate> parsedCandidates, {
+    List<ParsedContactCandidate> initialCandidates, {
     required String title,
+    List<String> repairIssues = const [],
+    List<String> mappedColumns = const [],
   }) async {
+    final parsedCandidates = [...initialCandidates];
     if (parsedCandidates.isEmpty) {
       ScaffoldMessenger.of(
         context,
@@ -193,12 +265,20 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
 
     final selectedIndices = <int>{
       for (int i = 0; i < parsedCandidates.length; i++)
-        if (!parsedCandidates[i].isPotentialDuplicate) i,
+        if (parsedCandidates[i].isImportable &&
+            !parsedCandidates[i].isPotentialDuplicate)
+          i,
     };
 
     // Calculate once to avoid multiple O(N) evaluations in the builder.
-    final int duplicateCount = parsedCandidates.length - selectedIndices.length;
-    final int newCount = selectedIndices.length;
+    int duplicateCount() => parsedCandidates
+        .where((candidate) => candidate.isPotentialDuplicate)
+        .length;
+    int repairCount() =>
+        parsedCandidates.where((candidate) => !candidate.isImportable).length +
+        repairIssues.length;
+    int readyCount() =>
+        parsedCandidates.where((candidate) => candidate.isImportable).length;
 
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
@@ -223,17 +303,18 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                 TextButton(
                   onPressed: () {
                     setReviewState(() {
-                      if (selectedIndices.length == parsedCandidates.length) {
+                      if (selectedIndices.length == readyCount()) {
                         selectedIndices.clear();
                       } else {
-                        selectedIndices.addAll(
-                          List.generate(parsedCandidates.length, (i) => i),
-                        );
+                        selectedIndices.addAll([
+                          for (var i = 0; i < parsedCandidates.length; i++)
+                            if (parsedCandidates[i].isImportable) i,
+                        ]);
                       }
                     });
                   },
                   child: Text(
-                    selectedIndices.length == parsedCandidates.length
+                    selectedIndices.length == readyCount()
                         ? 'Deselect All'
                         : 'Select All',
                   ),
@@ -241,7 +322,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
               ],
             ),
             Text(
-              '${parsedCandidates.length} birthdays found: $newCount new, $duplicateCount already added.',
+              '${parsedCandidates.length} candidates: ${selectedIndices.length} selected, ${readyCount()} ready, '
+              '${duplicateCount()} duplicate${duplicateCount() == 1 ? '' : 's'}, '
+              '${repairCount()} need repair.',
               style: TextStyle(
                 fontSize: 12,
                 color: ctx.colors.textSecondary,
@@ -256,6 +339,36 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                 color: context.colors.textSecondary,
               ),
             ),
+            if (mappedColumns.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Mapped columns: ${mappedColumns.join(', ')}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: ctx.colors.textSecondary,
+                  ),
+                ),
+              ),
+            if (repairIssues.isNotEmpty)
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: Text('${repairIssues.length} CSV rows need repair'),
+                children: [
+                  for (final issue in repairIssues)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, size: 16),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(issue)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             const Divider(),
             ConstrainedBox(
               constraints: BoxConstraints(
@@ -268,15 +381,17 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                   final isSelected = selectedIndices.contains(i);
                   return CheckboxListTile(
                     value: isSelected,
-                    onChanged: (val) {
-                      setReviewState(() {
-                        if (val == true) {
-                          selectedIndices.add(i);
-                        } else {
-                          selectedIndices.remove(i);
-                        }
-                      });
-                    },
+                    onChanged: c.isImportable
+                        ? (val) {
+                            setReviewState(() {
+                              if (val == true) {
+                                selectedIndices.add(i);
+                              } else {
+                                selectedIndices.remove(i);
+                              }
+                            });
+                          }
+                        : null,
                     title: Text(
                       c.name,
                       style: const TextStyle(fontWeight: FontWeight.bold),
@@ -293,6 +408,47 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                               : 'No birthday • ${c.relationship.displayName}'
                                     '${c.phoneNumber != null ? ' • ${c.phoneNumber}' : ''}',
                         ),
+                        if (c.birthdayMonth == 2 && c.birthdayDay == 29) ...[
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<LeapDayResolution>(
+                            initialValue: c.leapDayResolution,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'In non-leap years, celebrate on',
+                              isDense: true,
+                            ),
+                            items: [
+                              for (final policy in LeapDayResolution.values)
+                                DropdownMenuItem(
+                                  value: policy,
+                                  child: Text(policy.displayName),
+                                ),
+                            ],
+                            onChanged: (policy) {
+                              if (policy == null) return;
+                              setReviewState(() {
+                                parsedCandidates[i] = c.copyWith(
+                                  leapDayResolution: policy,
+                                  clearInvalidReason: true,
+                                );
+                                if (!c.isPotentialDuplicate) {
+                                  selectedIndices.add(i);
+                                }
+                              });
+                            },
+                          ),
+                        ],
+                        if (c.invalidReason != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Needs repair: ${c.invalidReason}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(ctx).colorScheme.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                         if (c.isPotentialDuplicate) ...[
                           const SizedBox(height: 4),
                           // Contrast-tested warning tone, light + dark
@@ -340,58 +496,63 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     if (confirmed != true || !context.mounted) return;
 
     final peopleRepo = ref.read(peopleRepositoryProvider);
-    final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
     final now = DateTime.now();
-    int importedCount = 0;
+    final people = <Person>[];
+    final birthdays = <b_models.Birthday>[];
 
     for (final index in selectedIndices) {
       final candidate = parsedCandidates[index];
+      if (!candidate.isImportable) continue;
       final person = candidate.toPerson();
-      await peopleRepo.savePerson(person);
-
-      final hasValidBirthday =
-          person.hasBirthday &&
-          _engine.isValidMonthDay(
-            person.birthdayMonth!,
-            person.birthdayDay!,
-            year: person.birthYear,
-          );
-
-      if (hasValidBirthday) {
-        final next = _engine.computeNext(
-          month: person.birthdayMonth!,
-          day: person.birthdayDay!,
-          birthYear: person.birthYear,
-          timezoneName: person.timezone,
-          reference: now,
-        );
-        final nextDate = next.nextDate;
-        final isToday = next.isToday;
-
-        final birthday = b_models.Birthday(
+      final next = _engine.computeNext(
+        month: person.birthdayMonth!,
+        day: person.birthdayDay!,
+        birthYear: person.birthYear,
+        timezoneName: person.timezone,
+        leapDay: person.leapDayResolution,
+        reference: now,
+      );
+      if (next == null) continue;
+      people.add(person);
+      birthdays.add(
+        b_models.Birthday(
           id: 'birthday-${person.id}',
           personId: person.id,
-          cycleYear: nextDate.year,
-          date: nextDate,
-          status: isToday
+          cycleYear: next.year,
+          date: next.nextDate,
+          status: next.isToday
               ? b_models.BirthdayStatus.reminderDue
               : b_models.BirthdayStatus.upcoming,
           createdAt: now,
           updatedAt: now,
+        ),
+      );
+    }
+
+    try {
+      await peopleRepo.saveImportBatch(people: people, birthdays: birthdays);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Import failed. 0 of ${people.length} contacts were saved; no partial import occurred. You can retry the exact batch.',
+            ),
+          ),
         );
-        await birthdaysRepo.saveBirthday(birthday);
       }
-      importedCount++;
+      return;
     }
 
     if (!context.mounted) return;
-
     final messenger = ScaffoldMessenger.of(context);
-    // Batch imports write through the repositories (bypassing PersonService's
-    // onChanged hook), so refresh the reminder plan explicitly.
     await resyncReminderSchedule(ProviderScope.containerOf(context));
     messenger.showSnackBar(
-      SnackBar(content: Text('Successfully imported $importedCount contacts.')),
+      SnackBar(
+        content: Text(
+          'Imported ${people.length} of ${people.length}; ${repairIssues.length + parsedCandidates.where((c) => !c.isImportable).length} rows remain for repair.',
+        ),
+      ),
     );
   }
 
@@ -729,16 +890,11 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                         itemBuilder: (context, index) {
                           final person = filtered[index];
                           final next = _next(person);
-                          final dateStr = person.hasBirthday
-                              ? DateFormat.MMMMd().format(
-                                  next?.nextDate ??
-                                      DateTime(
-                                        DateTime.now().year,
-                                        person.birthdayMonth!,
-                                        person.birthdayDay!,
-                                      ),
-                                )
-                              : 'No birthday set';
+                          final dateStr = !person.hasBirthday
+                              ? 'No birthday set'
+                              : !person.hasResolvableBirthday
+                              ? 'Feb 29 • choose celebration date'
+                              : DateFormat.MMMMd().format(next!.nextDate);
                           final ageTurn =
                               (person.hasBirthday &&
                                   person.birthYear != null &&
@@ -824,7 +980,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                                   }
                                 },
                                 itemBuilder: (context) => [
-                                  if (person.hasBirthday)
+                                  if (person.hasResolvableBirthday)
                                     const PopupMenuItem(
                                       value: 'message',
                                       child: Row(
@@ -955,16 +1111,11 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
         _buildDetailRow(
           context,
           'Birthday',
-          person.hasBirthday
-              ? DateFormat.MMMMd().format(
-                  _next(person)?.nextDate ??
-                      DateTime(
-                        DateTime.now().year,
-                        person.birthdayMonth!,
-                        person.birthdayDay!,
-                      ),
-                )
-              : 'Not set',
+          !person.hasBirthday
+              ? 'Not set'
+              : !person.hasResolvableBirthday
+              ? 'February 29 • celebration date needs repair'
+              : DateFormat.MMMMd().format(_next(person)!.nextDate),
         ),
         if (person.phoneNumber != null)
           _buildDetailRow(context, 'Phone', person.phoneNumber!),
@@ -1007,7 +1158,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
             ),
           ),
         const SizedBox(height: AppSpacing.lg),
-        if (person.hasBirthday) ...[
+        if (person.hasResolvableBirthday) ...[
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(

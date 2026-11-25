@@ -19,6 +19,8 @@ class CloudSyncResult {
     this.downloadedCount = 0,
     this.skippedCount = 0,
     this.skippedRecords = const [],
+    this.conflictCount = 0,
+    this.conflictRecords = const [],
     this.error,
     this.errorCode,
     this.retryable = false,
@@ -30,6 +32,8 @@ class CloudSyncResult {
   final int downloadedCount;
   final int skippedCount;
   final List<String> skippedRecords;
+  final int conflictCount;
+  final List<String> conflictRecords;
   final String? error;
 
   /// Stable failure classification consumed by the durable job worker:
@@ -40,6 +44,16 @@ class CloudSyncResult {
   /// Whether a failed result can reasonably be retried as-is.
   final bool retryable;
   final DateTime timestamp;
+
+  String toResultRef() => jsonEncode({
+    'timestamp': timestamp.toIso8601String(),
+    'uploaded': uploadedCount,
+    'restored': downloadedCount,
+    'skipped': skippedCount,
+    'skippedDetails': skippedRecords,
+    'conflicts': conflictCount,
+    'conflictDetails': conflictRecords,
+  });
 }
 
 class CloudSyncService {
@@ -76,6 +90,36 @@ class CloudSyncService {
   static const String _defaultFirebaseApiKey = FirebaseConfig.webApiKey;
 
   static const String _lastSyncPrefix = 'cloud_last_sync_timestamp_';
+  static const String _localDataOwnerKey = 'cloud_local_data_owner_v1';
+
+  Future<String?> getLocalDataOwner() => _store.read(_localDataOwnerKey);
+
+  /// Records an explicit decision to bind the single local dataset to an
+  /// account. UI must call this only after warning the user when the owner
+  /// changes; the sync path itself never silently reassigns existing data.
+  Future<void> assignLocalDataOwner(String accountId) async {
+    if (accountId.isEmpty) throw ArgumentError.value(accountId, 'accountId');
+    await _store.write(_localDataOwnerKey, accountId);
+  }
+
+  Future<CloudSyncResult?> ownershipFailure(
+    String accountId,
+    DateTime timestamp,
+  ) async {
+    final owner = await getLocalDataOwner();
+    if (owner == null || owner.isEmpty) {
+      await assignLocalDataOwner(accountId);
+      return null;
+    }
+    if (owner == accountId) return null;
+    return CloudSyncResult(
+      success: false,
+      error:
+          'These local records belong to a different signed-in account. Nothing has been uploaded. Reopen Cloud Backup and explicitly decide who owns this device data.',
+      errorCode: 'ownership',
+      timestamp: timestamp,
+    );
+  }
 
   Future<DateTime?> getLastSyncTime(String accountId) async {
     try {
@@ -239,6 +283,8 @@ class CloudSyncService {
       'birthdayMonth': _firestoreInt(p.birthdayMonth!),
     if (p.birthdayDay != null) 'birthdayDay': _firestoreInt(p.birthdayDay!),
     if (p.birthYear != null) 'birthYear': _firestoreInt(p.birthYear!),
+    if (p.leapDayResolution != null)
+      'leapDayResolution': _firestoreString(p.leapDayResolution!),
     if (p.phoneNumber != null) 'phoneNumber': _firestoreString(p.phoneNumber!),
     if (p.email != null) 'email': _firestoreString(p.email!),
     'relationship': _firestoreString(p.relationship),
@@ -385,6 +431,9 @@ class CloudSyncService {
         timestamp: now,
       );
     }
+
+    final ownershipBlocked = await ownershipFailure(uid, now);
+    if (ownershipBlocked != null) return ownershipBlocked;
 
     if (_apiKey.isEmpty) {
       return CloudSyncResult(
@@ -570,6 +619,9 @@ class CloudSyncService {
       );
     }
 
+    final ownershipBlocked = await ownershipFailure(uid, now);
+    if (ownershipBlocked != null) return ownershipBlocked;
+
     if (_apiKey.isEmpty) {
       return CloudSyncResult(
         success: false,
@@ -675,6 +727,7 @@ class CloudSyncService {
       }
 
       final skippedRecords = <String>[];
+      final conflictRecords = <String>[];
 
       // Apply every local write in one transaction, so a failure part-way
       // cannot leave a mixed dataset.
@@ -706,7 +759,7 @@ class CloudSyncService {
           final existing = existingPeople[id];
           if (existing != null &&
               !remoteUpdatedAt.isAfter(existing.updatedAt)) {
-            skippedRecords.add('people/$id: local copy is equal or newer');
+            conflictRecords.add('people/$id: local copy is equal or newer');
             continue;
           }
 
@@ -715,11 +768,15 @@ class CloudSyncService {
           // restore must never resurrect a contact the user deleted on-device
           // (audit F-2). Tombstones in the cloud still apply below.
           if (existing?.deletedAt != null && deletedAt == null) {
-            skippedRecords.add('people/$id: local tombstone preserved');
+            conflictRecords.add('people/$id: local tombstone preserved');
             continue;
           }
 
           final createdAt = _date(fields, 'createdAt') ?? remoteUpdatedAt;
+          final hasLeapDayResolution = fields.containsKey('leapDayResolution');
+          final restoredLeapDayResolution = hasLeapDayResolution
+              ? _string(fields, 'leapDayResolution')
+              : existing?.leapDayResolution;
           await _db
               .into(_db.persons)
               .insertOnConflictUpdate(
@@ -729,6 +786,7 @@ class CloudSyncService {
                   birthdayMonth: drift.Value(_integer(fields, 'birthdayMonth')),
                   birthdayDay: drift.Value(_integer(fields, 'birthdayDay')),
                   birthYear: drift.Value(_integer(fields, 'birthYear')),
+                  leapDayResolution: drift.Value(restoredLeapDayResolution),
                   phoneNumber: drift.Value(_string(fields, 'phoneNumber')),
                   email: drift.Value(_string(fields, 'email')),
                   relationship: drift.Value(
@@ -772,7 +830,7 @@ class CloudSyncService {
         }
 
         var existingBirthdays = const <String, Birthday>{};
-        if (birthdayDocs.isNotEmpty) {
+        if (birthdayDocs.isNotEmpty || draftDocs.isNotEmpty) {
           existingBirthdays = {
             for (final row in await _db.select(_db.birthdays).get())
               row.id: row,
@@ -801,7 +859,7 @@ class CloudSyncService {
           final existing = existingBirthdays[id];
           if (existing != null &&
               !remoteUpdatedAt.isAfter(existing.updatedAt)) {
-            skippedRecords.add('birthdays/$id: local copy is equal or newer');
+            conflictRecords.add('birthdays/$id: local copy is equal or newer');
             continue;
           }
 
@@ -864,7 +922,64 @@ class CloudSyncService {
           final existing = existingDrafts[id];
           if (existing != null &&
               !remoteUpdatedAt.isAfter(existing.updatedAt)) {
-            skippedRecords.add('drafts/$id: local copy is equal or newer');
+            conflictRecords.add('drafts/$id: local copy is equal or newer');
+            continue;
+          }
+
+          if (existing?.status == 'confirmedSent') {
+            final revisionId =
+                '$id-restore-revision-${remoteUpdatedAt.toUtc().microsecondsSinceEpoch}';
+            if (existingDrafts.containsKey(revisionId)) {
+              conflictRecords.add(
+                'drafts/$id: confirmed-sent original preserved; newer restored revision already exists',
+              );
+              continue;
+            }
+
+            final remoteStatus = _string(fields, 'status') ?? 'draft';
+            final birthdayStatus = remoteStatus == 'confirmedSent'
+                ? 'completed'
+                : 'messageDrafted';
+
+            // Keep the delivery evidence immutable. The newer cloud content is
+            // restored as a separate editorial revision and the birthday's
+            // active draft pointer moves in the same transaction.
+            await _db
+                .into(_db.messageDrafts)
+                .insert(
+                  MessageDraftsCompanion(
+                    id: drift.Value(revisionId),
+                    birthdayId: drift.Value(birthdayId),
+                    personId: drift.Value(personId),
+                    body: drift.Value(body),
+                    tone: drift.Value(_string(fields, 'tone') ?? 'warm'),
+                    length: drift.Value(_string(fields, 'length') ?? 'medium'),
+                    status: drift.Value(remoteStatus),
+                    providerType: drift.Value(
+                      _string(fields, 'providerType') ?? 'manual',
+                    ),
+                    variationIndex: drift.Value(
+                      _integer(fields, 'variationIndex') ?? 0,
+                    ),
+                    createdAt: drift.Value(
+                      _date(fields, 'createdAt') ?? remoteUpdatedAt,
+                    ),
+                    updatedAt: drift.Value(remoteUpdatedAt),
+                  ),
+                );
+            await (_db.update(
+              _db.birthdays,
+            )..where((row) => row.id.equals(birthdayId))).write(
+              BirthdaysCompanion(
+                draftId: drift.Value(revisionId),
+                status: drift.Value(birthdayStatus),
+                updatedAt: drift.Value(now),
+              ),
+            );
+            conflictRecords.add(
+              'drafts/$id: confirmed-sent original preserved; newer revision restored as $revisionId',
+            );
+            restored++;
             continue;
           }
 
@@ -915,7 +1030,7 @@ class CloudSyncService {
           // ambiguous cloud copy during a merge-style restore.
           final existing = existingReminders[key];
           if (existing != null) {
-            skippedRecords.add(
+            conflictRecords.add(
               'reminderSettings/$key: device-local preference preserved',
             );
             continue;
@@ -943,7 +1058,11 @@ class CloudSyncService {
       _logger?.info(
         'CloudRestore',
         'Restore finished successfully.',
-        params: {'restored': restored, 'skipped': skippedRecords.length},
+        params: {
+          'restored': restored,
+          'skipped': skippedRecords.length,
+          'conflicts': conflictRecords.length,
+        },
       );
 
       return CloudSyncResult(
@@ -951,6 +1070,8 @@ class CloudSyncService {
         downloadedCount: restored,
         skippedCount: skippedRecords.length,
         skippedRecords: skippedRecords,
+        conflictCount: conflictRecords.length,
+        conflictRecords: conflictRecords,
         timestamp: now,
       );
     } catch (error, stackTrace) {

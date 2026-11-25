@@ -137,7 +137,7 @@ class BirthdaySmsService {
   final BirthdayEngine engine;
 
   /// Pure computation of midnight send timestamp for a given person and birthday.
-  DateTime computeSendTime({
+  DateTime? computeSendTime({
     required Person person,
     required DateTime reference,
     String? fallbackTimezone,
@@ -148,8 +148,10 @@ class BirthdaySmsService {
       day: person.birthdayDay!,
       birthYear: person.birthYear,
       timezoneName: timezone,
+      leapDay: person.leapDayResolution,
       reference: reference,
     );
+    if (next == null) return null;
 
     // Midnight at the very beginning of the birthday date (00:00:00)
     return DateTime(
@@ -190,7 +192,10 @@ class BirthdaySmsService {
     final isDraftApproved = draft?.status == DraftStatus.approvedForAutoSms;
     final hasBirthday = person.hasBirthday && birthday != null;
 
+    final hasResolvedLeapPolicy =
+        !person.isLeapDayBirthday || person.leapDayResolution != null;
     final isEligible =
+        hasResolvedLeapPolicy &&
         hasPhone &&
         isAutoSmsApproved &&
         hasDraft &&
@@ -211,8 +216,8 @@ class BirthdaySmsService {
       fallbackTimezone: fallbackTimezone,
     );
 
-    // If the send time has already passed for this year's birthday, do not schedule
-    if (sendTime.isBefore(refDate)) {
+    // A legacy unresolved leap-day or an elapsed occurrence cancels stale work.
+    if (sendTime == null || sendTime.isBefore(refDate)) {
       await gateway.cancelSmsJob('sms_${birthday.id}');
       return false;
     }

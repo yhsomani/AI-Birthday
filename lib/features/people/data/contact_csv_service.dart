@@ -1,8 +1,11 @@
 /// CSV import, export, normalization, and duplicate detection service (SSOT §18).
 library;
 
+import 'dart:convert';
+
 import 'package:uuid/uuid.dart';
 
+import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/core/config/product_capabilities.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
@@ -16,6 +19,7 @@ class ParsedContactCandidate {
     this.birthdayMonth,
     this.birthdayDay,
     this.birthYear,
+    this.leapDayResolution,
     this.phoneNumber,
     this.email,
     this.relationship = RelationshipCategory.friend,
@@ -28,12 +32,14 @@ class ParsedContactCandidate {
     this.timezone,
     this.autoPrepare = false,
     this.duplicateWarning,
+    this.invalidReason,
   });
 
   final String name;
   final int? birthdayMonth;
   final int? birthdayDay;
   final int? birthYear;
+  final LeapDayResolution? leapDayResolution;
   final String? phoneNumber;
   final String? email;
   final RelationshipCategory relationship;
@@ -49,7 +55,39 @@ class ParsedContactCandidate {
   /// Human-readable explanation if this candidate looks like a duplicate (SSOT §18).
   final String? duplicateWarning;
 
+  /// Row-specific repair required before this candidate can be imported.
+  final String? invalidReason;
+
+  bool get isImportable =>
+      invalidReason == null &&
+      hasBirthday &&
+      (birthdayMonth != 2 || birthdayDay != 29 || leapDayResolution != null);
+
   bool get isPotentialDuplicate => duplicateWarning != null;
+
+  ParsedContactCandidate copyWith({
+    LeapDayResolution? leapDayResolution,
+    bool clearInvalidReason = false,
+  }) => ParsedContactCandidate(
+    name: name,
+    birthdayMonth: birthdayMonth,
+    birthdayDay: birthdayDay,
+    birthYear: birthYear,
+    leapDayResolution: leapDayResolution ?? this.leapDayResolution,
+    phoneNumber: phoneNumber,
+    email: email,
+    relationship: relationship,
+    relationshipCloseness: relationshipCloseness,
+    preferredLanguage: preferredLanguage,
+    preferredTone: preferredTone,
+    importantFacts: importantFacts,
+    notes: notes,
+    preferredDeliveryChannel: preferredDeliveryChannel,
+    timezone: timezone,
+    autoPrepare: autoPrepare,
+    duplicateWarning: duplicateWarning,
+    invalidReason: clearInvalidReason ? null : invalidReason,
+  );
 
   /// Returns true if this candidate has a valid birthday specified.
   bool get hasBirthday => _isValidMonthDay(birthdayMonth, birthdayDay);
@@ -62,6 +100,7 @@ class ParsedContactCandidate {
       birthdayMonth: birthdayMonth,
       birthdayDay: birthdayDay,
       birthYear: birthYear,
+      leapDayResolution: leapDayResolution,
       phoneNumber: phoneNumber,
       email: email,
       relationship: relationship,
@@ -81,21 +120,33 @@ class ParsedContactCandidate {
 
 /// Result of a CSV parse operation containing valid candidates and details on skipped rows.
 class CsvParseResult {
-  const CsvParseResult({required this.candidates, this.invalidRows = const []});
+  const CsvParseResult({
+    required this.candidates,
+    this.invalidRows = const [],
+    this.totalRows = 0,
+    this.mappedColumns = const [],
+  });
 
   final List<ParsedContactCandidate> candidates;
   final List<String> invalidRows;
+  final int totalRows;
+  final List<String> mappedColumns;
+
+  int get repairCount => invalidRows.length;
 }
 
 class ContactCsvService {
   const ContactCsvService();
+
+  static const int maxInputBytes = 1024 * 1024;
+  static const int maxRows = 1000;
 
   /// Exports [people] to RFC-4180 compliant CSV format (AUD-001: complete, lossless contact backup).
   String exportToCsv(List<Person> people) {
     final buffer = StringBuffer();
     // CSV Header
     buffer.writeln(
-      'Name,Birthday Month,Birthday Day,Birth Year,Phone Number,Email,Relationship,Relationship Closeness,Preferred Language,Preferred Tone,Facts,Notes,Preferred Delivery Channel,Timezone,Auto Prepare',
+      'Name,Birthday Month,Birthday Day,Birth Year,Phone Number,Email,Relationship,Relationship Closeness,Preferred Language,Preferred Tone,Facts,Notes,Preferred Delivery Channel,Timezone,Auto Prepare,Leap Day Policy',
     );
 
     for (final person in people) {
@@ -115,6 +166,7 @@ class ContactCsvService {
         _escapeCsv(person.preferredDeliveryChannel.name),
         _escapeCsv(person.timezone ?? ''),
         person.autoPrepare ? 'true' : 'false',
+        _escapeCsv(person.leapDayResolution?.name ?? ''),
       ];
       buffer.writeln(fields.join(','));
     }
@@ -140,6 +192,17 @@ class ContactCsvService {
   }) {
     final records = _splitRecords(csvContent);
     if (records.isEmpty) return const CsvParseResult(candidates: []);
+    final nonEmptyRows = records.where((row) => row.trim().isNotEmpty).length;
+    if (utf8.encode(csvContent).length > maxInputBytes ||
+        nonEmptyRows > maxRows + 1) {
+      return CsvParseResult(
+        candidates: const [],
+        totalRows: nonEmptyRows,
+        invalidRows: [
+          'Import too large: use at most $maxRows rows and $maxInputBytes bytes.',
+        ],
+      );
+    }
 
     final candidates = <ParsedContactCandidate>[];
     final invalidRows = <String>[];
@@ -165,6 +228,8 @@ class ContactCsvService {
             final col = fields[i].trim().toLowerCase();
             if (col == 'name' || col == 'recipient') {
               headerMap['name'] = i;
+            } else if (col.contains('leap') || col.contains('feb 29')) {
+              headerMap['leap'] = i;
             } else if (col.contains('month')) {
               headerMap['month'] = i;
             } else if (col.contains('day')) {
@@ -260,6 +325,10 @@ class ContactCsvService {
       final channelStr = getCol('channel', -1, 12);
       final tzStr = getCol('timezone', -1, 13);
       final autoPrepareStr = getCol('autoprepare', -1, 14);
+      final leapPolicy = LeapDayResolution.fromString(getCol('leap', -1, 15));
+      final leapRepairReason = month == 2 && day == 29 && leapPolicy == null
+          ? 'Choose February 28 or March 1 for non-leap years'
+          : null;
 
       final relationship = RelationshipCategory.fromString(relStr);
       final relationshipCloseness = RelationshipCloseness.fromString(
@@ -350,6 +419,7 @@ class ContactCsvService {
           birthdayMonth: month,
           birthdayDay: day,
           birthYear: year,
+          leapDayResolution: leapPolicy,
           phoneNumber: phone,
           email: email,
           relationship: relationship,
@@ -362,11 +432,17 @@ class ContactCsvService {
           timezone: tzStr,
           autoPrepare: autoPrepare,
           duplicateWarning: duplicateWarning,
+          invalidReason: leapRepairReason,
         ),
       );
     }
 
-    return CsvParseResult(candidates: candidates, invalidRows: invalidRows);
+    return CsvParseResult(
+      candidates: candidates,
+      invalidRows: invalidRows,
+      totalRows: candidates.length + invalidRows.length,
+      mappedColumns: headerMap.keys.toList()..sort(),
+    );
   }
 
   // ⚡ Bolt: Pre-compile RegExp for faster phone number cleaning

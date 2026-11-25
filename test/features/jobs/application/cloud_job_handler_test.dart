@@ -153,7 +153,12 @@ void main() {
     );
 
     expect(outcome, isA<JobSucceeded>());
-    expect((outcome as JobSucceeded).resultRef, '2026-01-01T00:00:00.000Z');
+    final ref = jsonDecode((outcome as JobSucceeded).resultRef!);
+    expect(ref['timestamp'], '2026-01-01T00:00:00.000Z');
+    expect(ref['uploaded'], 0);
+    expect(ref['restored'], 0);
+    expect(ref['skipped'], 0);
+    expect(ref['conflicts'], 0);
     expect(service.backupCalls, 1);
     expect(service.restoreCalls, 0);
   });

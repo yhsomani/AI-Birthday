@@ -49,14 +49,22 @@ void main() {
     expect(feb30.errorFor(PersonField.birthday), InputError.invalidBirthday);
   });
 
-  test('Feb 29 accepted when year unknown and accepted for leap years', () {
+  test('Feb 29 requires an explicit non-leap-year policy', () {
     final unknown = validator.validate(
       base().copyWith(birthdayMonth: 2, birthdayDay: 29),
     );
-    expect(unknown.isValid, isTrue);
+    expect(
+      unknown.errorFor(PersonField.birthday),
+      InputError.leapDayPolicyRequired,
+    );
 
     final leap = validator.validate(
-      base().copyWith(birthdayMonth: 2, birthdayDay: 29, birthYear: 2024),
+      base().copyWith(
+        birthdayMonth: 2,
+        birthdayDay: 29,
+        birthYear: 2024,
+        leapDayResolution: LeapDayResolution.mar1,
+      ),
     );
     expect(leap.isValid, isTrue);
   });
@@ -111,7 +119,13 @@ void main() {
   test('engine and validator agree on month cardinality', () {
     void check(int month, int day, bool expectValid) {
       final v = validator.validate(
-        base().copyWith(birthdayMonth: month, birthdayDay: day),
+        base().copyWith(
+          birthdayMonth: month,
+          birthdayDay: day,
+          leapDayResolution: month == 2 && day == 29
+              ? LeapDayResolution.feb28
+              : null,
+        ),
       );
       expect(
         v.isValid,

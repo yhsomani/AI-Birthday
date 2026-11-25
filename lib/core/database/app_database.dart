@@ -27,6 +27,7 @@ class Persons extends Table {
   IntColumn get birthdayMonth => integer().nullable()();
   IntColumn get birthdayDay => integer().nullable()();
   IntColumn get birthYear => integer().nullable()();
+  TextColumn get leapDayResolution => text().nullable()();
   TextColumn get phoneNumber => text().nullable()();
   TextColumn get email => text().nullable()();
   TextColumn get relationship => text()();
@@ -93,16 +94,18 @@ class ReminderSettingsEntries extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-/// Persisted evidence of a successful external-app launch (audit 03 P1-1).
+/// Append-only evidence of a manual delivery action and its outcome.
 ///
-/// This is the ONLY durable record that a message was handed off; the app
+/// This is the durable record that a message was handed off, copied or not sent; the app
 /// must never infer "opened" from birthday/draft status alone. `channel`
 /// stores a [DeliveryChannel] name so History can label the exact app
 /// (WhatsApp vs SMS vs Share Sheet) rather than guessing.
 class DeliveryEvents extends Table {
   TextColumn get id => text()();
   TextColumn get birthdayId => text()();
+  TextColumn get draftId => text().nullable()();
   TextColumn get channel => text()();
+  TextColumn get outcome => text().withDefault(const Constant('launched'))();
   DateTimeColumn get handedOffAt => dateTime()();
 
   @override
@@ -168,7 +171,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -197,6 +200,30 @@ class AppDatabase extends _$AppDatabase {
       if (from < 5) {
         await m.createTable(jobs);
       }
+      if (from < 6 &&
+          !await _tableColumnExists('persons', 'leap_day_resolution')) {
+        await m.addColumn(persons, persons.leapDayResolution);
+      }
+      if (from < 6) {
+        final draftIdExists = await _tableColumnExists(
+          'delivery_events',
+          'draft_id',
+        );
+        if (!draftIdExists) {
+          await customStatement(
+            'ALTER TABLE delivery_events ADD COLUMN draft_id TEXT NULL',
+          );
+        }
+        final outcomeExists = await _tableColumnExists(
+          'delivery_events',
+          'outcome',
+        );
+        if (!outcomeExists) {
+          await customStatement(
+            "ALTER TABLE delivery_events ADD COLUMN outcome TEXT NOT NULL DEFAULT 'launched'",
+          );
+        }
+      }
     },
     beforeOpen: (details) async {
       // Query audit: delivery_events is the only unbounded table and
@@ -216,4 +243,9 @@ class AppDatabase extends _$AppDatabase {
       );
     },
   );
+
+  Future<bool> _tableColumnExists(String table, String column) async {
+    final columns = await customSelect('PRAGMA table_info($table)').get();
+    return columns.any((row) => row.read<String>('name') == column);
+  }
 }

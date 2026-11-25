@@ -1,6 +1,9 @@
-import 'package:ai_birthday/core/database/app_database.dart' hide MessageDraft;
+import 'package:ai_birthday/core/database/app_database.dart'
+    hide Birthday, MessageDraft;
 import 'package:ai_birthday/core/database/drift_repositories.dart';
 import 'package:ai_birthday/features/birthdays/application/birthday_lifecycle_service.dart';
+import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
+import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
@@ -47,6 +50,39 @@ void main() {
     tearDown(() async {
       await db.close();
     });
+
+    test(
+      'batch import is all-or-nothing when a birthday write fails',
+      () async {
+        await db.customStatement('''
+        CREATE TRIGGER reject_second_birthday BEFORE INSERT ON birthdays
+        WHEN NEW.person_id = 'p-2'
+        BEGIN
+          SELECT RAISE(ABORT, 'birthday write failed');
+        END;
+      ''');
+        final people = [person(id: 'p-1'), person(id: 'p-2')];
+        final birthdays = [
+          for (final p in people)
+            Birthday(
+              id: 'birthday-${p.id}',
+              personId: p.id,
+              cycleYear: 2026,
+              date: DateTime(2026, 10, 15),
+              createdAt: p.createdAt,
+              updatedAt: p.updatedAt,
+            ),
+        ];
+
+        await expectLater(
+          repo.saveImportBatch(people: people, birthdays: birthdays),
+          throwsA(isA<Exception>()),
+        );
+
+        expect(await repo.getPeople(), isEmpty);
+        expect(await db.select(db.birthdays).get(), isEmpty);
+      },
+    );
 
     test(
       'deletePerson tombstones the row and bumps the sync version',
@@ -122,6 +158,7 @@ void main() {
           birthdayMonth: 7,
           birthdayDay: 14,
           birthYear: 1992,
+          leapDayResolution: LeapDayResolution.mar1,
           phoneNumber: '+15551234567',
           email: 'jordan@example.com',
           relationship: RelationshipCategory.mentor,
@@ -148,6 +185,7 @@ void main() {
         expect(loaded.birthdayMonth, 7);
         expect(loaded.birthdayDay, 14);
         expect(loaded.birthYear, 1992);
+        expect(loaded.leapDayResolution, LeapDayResolution.mar1);
         expect(loaded.phoneNumber, '+15551234567');
         expect(loaded.email, 'jordan@example.com');
         expect(loaded.relationship, RelationshipCategory.mentor);
@@ -255,6 +293,46 @@ void main() {
     test('watchLatestHandoffs emits an empty batch for no birthdays', () async {
       expect(await repo.watchLatestHandoffs({}).first, isEmpty);
     });
+
+    test(
+      'delivery choices and failures are append-only persisted outcomes',
+      () async {
+        final at = DateTime.utc(2026, 1, 4, 9);
+        await repo.recordOutcome(
+          birthdayId: 'b-history',
+          draftId: 'draft-1',
+          channel: DeliveryChannel.clipboard,
+          outcome: DeliveryOutcome.copied,
+          at: at,
+        );
+        await repo.recordOutcome(
+          birthdayId: 'b-history',
+          draftId: 'draft-1',
+          channel: DeliveryChannel.share,
+          outcome: DeliveryOutcome.launchFailed,
+          at: at.add(const Duration(seconds: 1)),
+        );
+        await repo.recordOutcome(
+          birthdayId: 'b-history',
+          draftId: 'draft-1',
+          channel: DeliveryChannel.share,
+          outcome: DeliveryOutcome.notSent,
+          at: at.add(const Duration(seconds: 2)),
+        );
+
+        final events = await repo.watchHandoffs().first;
+        expect(events, hasLength(3));
+        expect(
+          events.map((event) => event.outcome),
+          containsAll([
+            DeliveryOutcome.copied,
+            DeliveryOutcome.launchFailed,
+            DeliveryOutcome.notSent,
+          ]),
+        );
+        expect(events.every((event) => event.draftId == 'draft-1'), isTrue);
+      },
+    );
   });
 
   group('recordHandoffAndMarkHandedOff is one transaction (audit F20)', () {
@@ -347,6 +425,104 @@ void main() {
       final drafts = await repo.getAllDrafts();
       expect(drafts.map((d) => d.id).toList(), ['d-b', 'd-a']);
     });
+
+    test(
+      'draft and birthday link roll back together when linking fails',
+      () async {
+        final t = DateTime.utc(2026, 1, 1, 9);
+        await db
+            .into(db.birthdays)
+            .insert(
+              BirthdaysCompanion.insert(
+                id: 'b-atomic',
+                personId: 'p-atomic',
+                cycleYear: 2026,
+                date: DateTime.utc(2026, 10, 15),
+                status: BirthdayStatus.upcoming.name,
+                createdAt: t,
+                updatedAt: t,
+              ),
+            );
+        await db.customStatement('''
+        CREATE TRIGGER reject_birthday_link BEFORE UPDATE ON birthdays
+        WHEN NEW.id = 'b-atomic'
+        BEGIN
+          SELECT RAISE(ABORT, 'birthday link failed');
+        END;
+      ''');
+
+        await expectLater(
+          repo.saveDraftAndUpdateBirthday(
+            MessageDraft(
+              id: 'b-atomic',
+              birthdayId: 'b-atomic',
+              personId: 'p-atomic',
+              body: 'Must not remain unlinked',
+              status: DraftStatus.draft,
+              createdAt: t,
+              updatedAt: t.add(const Duration(minutes: 1)),
+            ),
+            BirthdayStatus.messageDrafted,
+          ),
+          throwsException,
+        );
+
+        expect(await repo.getDraft('b-atomic'), isNull);
+        final birthday = await (db.select(
+          db.birthdays,
+        )..where((row) => row.id.equals('b-atomic'))).getSingle();
+        expect(birthday.status, BirthdayStatus.upcoming.name);
+        expect(birthday.draftId, isNull);
+      },
+    );
+
+    test(
+      'confirmed-sent drafts are immutable and later edits use a revision',
+      () async {
+        final t = DateTime.utc(2026, 1, 1, 9);
+        final confirmed = MessageDraft(
+          id: 'b-terminal',
+          birthdayId: 'b-terminal',
+          personId: 'p-terminal',
+          body: 'The exact sent message',
+          status: DraftStatus.draft,
+          createdAt: t,
+          updatedAt: t,
+        );
+        await repo.saveDraft(confirmed);
+        await repo.saveDraft(
+          confirmed.copyWith(status: DraftStatus.confirmedSent),
+        );
+
+        await expectLater(
+          repo.saveDraft(
+            confirmed.copyWith(
+              body: 'Attempted overwrite',
+              updatedAt: t.add(const Duration(minutes: 1)),
+            ),
+          ),
+          throwsStateError,
+        );
+
+        final revision = confirmed.copyWith(
+          id: 'b-terminal-revision-1',
+          body: 'A new unsent edit',
+          status: DraftStatus.draft,
+          createdAt: t.add(const Duration(minutes: 1)),
+          updatedAt: t.add(const Duration(minutes: 1)),
+        );
+        await repo.saveDraft(revision);
+
+        final drafts = await repo.getAllDrafts();
+        expect(drafts, hasLength(2));
+        final original = drafts.singleWhere(
+          (draft) => draft.id == 'b-terminal',
+        );
+        expect(original.body, 'The exact sent message');
+        expect(original.status, DraftStatus.confirmedSent);
+        expect((await repo.getDraftForBirthday('b-terminal'))?.id, revision.id);
+      },
+    );
 
     test('pruneOrphanedDrafts removes shadowed legacy rows and dead-birthday '
         'drafts, keeps live ones, and is idempotent', () async {
@@ -466,6 +642,93 @@ void main() {
     });
 
     test(
+      'unresolved legacy leap day refresh preserves cycle drafts and jobs',
+      () async {
+        final db = AppDatabase(NativeDatabase.memory());
+        addTearDown(db.close);
+        final birthdaysRepo = DriftBirthdaysRepository(db);
+        final now = DateTime.utc(2026, 1, 1, 8);
+        const birthdayId = 'birthday-p-leap';
+        final person = domain.Person(
+          id: 'p-leap',
+          name: 'Legacy Leap',
+          birthdayMonth: 2,
+          birthdayDay: 29,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await birthdaysRepo.saveBirthday(
+          Birthday(
+            id: birthdayId,
+            personId: person.id,
+            cycleYear: 2026,
+            date: DateTime(2026, 2, 28),
+            draftId: 'draft-active',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        for (final status in [DraftStatus.ready, DraftStatus.confirmedSent]) {
+          await db
+              .into(db.messageDrafts)
+              .insert(
+                MessageDraftsCompanion.insert(
+                  id: status == DraftStatus.ready
+                      ? 'draft-active'
+                      : 'draft-sent',
+                  birthdayId: birthdayId,
+                  personId: person.id,
+                  body: 'Message',
+                  tone: 'warm',
+                  length: 'standard',
+                  status: status.name,
+                  providerType: 'manual',
+                  createdAt: now,
+                  updatedAt: now,
+                ),
+              );
+        }
+        await db
+            .into(db.jobs)
+            .insert(
+              JobsCompanion.insert(
+                id: 'job-active',
+                type: 'ai_generate',
+                status: 'queued',
+                subjectId: birthdayId,
+                createdAt: now,
+                maxAttempts: const Value(1),
+              ),
+            );
+
+        await const BirthdayLifecycleService().refresh(
+          people: [person],
+          birthdaysRepository: birthdaysRepo,
+        );
+
+        expect(await birthdaysRepo.getBirthdayForPerson(person.id), isNotNull);
+        expect(
+          (await db.select(db.messageDrafts).get()).map((row) => row.id),
+          unorderedEquals(['draft-active', 'draft-sent']),
+        );
+        expect(await db.select(db.jobs).get(), hasLength(1));
+        expect(
+          (await DriftDraftsRepository(db).getDraftForBirthday(birthdayId))?.id,
+          'draft-active',
+        );
+
+        await const BirthdayLifecycleService().refresh(
+          people: [person.copyWith(leapDayResolution: LeapDayResolution.feb28)],
+          birthdaysRepository: birthdaysRepo,
+        );
+        expect(
+          (await birthdaysRepo.getBirthdayForPerson(person.id))!.date,
+          DateTime(2027, 2, 28),
+        );
+      },
+    );
+
+    test(
       'batch read throws on duplicate personId like getSingleOrNull',
       () async {
         final db = AppDatabase(NativeDatabase.memory());
@@ -522,6 +785,75 @@ void main() {
     tearDown(() async {
       await db.close();
     });
+
+    test(
+      'rejects a draft belonging to another birthday, including legacy handoff',
+      () async {
+        final now = DateTime.utc(2026, 1, 1, 9);
+        Future<void> seedBirthday(String id) => db
+            .into(db.birthdays)
+            .insert(
+              BirthdaysCompanion.insert(
+                id: id,
+                personId: 'p-$id',
+                cycleYear: 2026,
+                date: now,
+                status: BirthdayStatus.handedOff.name,
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+        await seedBirthday('b-requested');
+        await seedBirthday('b-other');
+        await db
+            .into(db.messageDrafts)
+            .insert(
+              MessageDraftsCompanion.insert(
+                id: 'draft-other',
+                birthdayId: 'b-other',
+                personId: 'p-b-other',
+                body: 'Other birthday message',
+                tone: 'warm',
+                length: 'standard',
+                status: DraftStatus.ready.name,
+                providerType: 'manual',
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+        // Legacy row intentionally has no draftId, so the ownership check must
+        // still be enforced from the persisted draft itself.
+        await repo.recordHandoff(
+          birthdayId: 'b-requested',
+          channel: DeliveryChannel.whatsapp,
+          at: now,
+        );
+
+        await expectLater(
+          repo.confirmHandoff(
+            birthdayId: 'b-requested',
+            draftId: 'draft-other',
+            at: now.add(const Duration(minutes: 1)),
+          ),
+          throwsStateError,
+        );
+
+        final requested = await (db.select(
+          db.birthdays,
+        )..where((row) => row.id.equals('b-requested'))).getSingle();
+        final other = await (db.select(
+          db.birthdays,
+        )..where((row) => row.id.equals('b-other'))).getSingle();
+        final draft = await (db.select(
+          db.messageDrafts,
+        )..where((row) => row.id.equals('draft-other'))).getSingle();
+        expect(requested.status, BirthdayStatus.handedOff.name);
+        expect(requested.draftId, isNull);
+        expect(other.status, BirthdayStatus.handedOff.name);
+        expect(draft.status, DraftStatus.ready.name);
+        expect(await repo.watchHandoffs().first, hasLength(1));
+      },
+    );
 
     test(
       'confirmation requires evidence and atomically completes draft + birthday',

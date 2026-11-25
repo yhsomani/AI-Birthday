@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 
 abstract interface class PeopleRepository {
@@ -7,6 +8,10 @@ abstract interface class PeopleRepository {
   Future<List<Person>> getPeople();
   Future<Person?> getPerson(String id);
   Future<void> savePerson(Person person);
+  Future<void> saveImportBatch({
+    required List<Person> people,
+    required List<Birthday> birthdays,
+  });
   Future<void> deletePerson(String id);
 }
 
@@ -39,6 +44,20 @@ class InMemoryPeopleRepository implements PeopleRepository {
   @override
   Future<void> savePerson(Person person) async {
     _store[person.id] = person;
+    _controller.add(_sortedPeople());
+  }
+
+  @override
+  Future<void> saveImportBatch({
+    required List<Person> people,
+    required List<Birthday> birthdays,
+  }) async {
+    if (people.length != birthdays.length) {
+      throw ArgumentError('Every imported person must have one birthday.');
+    }
+    for (var i = 0; i < people.length; i++) {
+      _store[people[i].id] = people[i];
+    }
     _controller.add(_sortedPeople());
   }
 

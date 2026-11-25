@@ -14,8 +14,8 @@ import 'package:ai_birthday/core/config/product_capabilities.dart';
 import 'package:ai_birthday/core/errors/app_failure.dart';
 import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
-import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_repository.dart';
 import 'package:ai_birthday/features/delivery/data/whatsapp_handoff_builder.dart';
+import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dart';
 import 'package:ai_birthday/features/jobs/application/ai_job_handler.dart';
 import 'package:ai_birthday/features/jobs/domain/job.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
@@ -74,10 +74,12 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
 
   // Captured at load: dispose() runs after ref becomes unusable.
   DraftsRepository? _draftsRepo;
-  BirthdaysRepository? _birthdaysRepo;
 
   Timer? _autosaveTimer;
   bool _isSaving = false;
+  Future<void>? _saveFuture;
+  bool _hasUnsavedChanges = false;
+  bool _saveFailed = false;
   DateTime? _lastSavedTime;
   // Single-flight guard: stops a rapid double-tap from launching the external
   // delivery app twice (two SMS composers, two handoff records).
@@ -110,9 +112,6 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     WidgetsBinding.instance.removeObserver(this);
     _aiJobSub?.cancel();
     _autosaveTimer?.cancel();
-    if (_messageController.text.isNotEmpty && _person != null) {
-      _saveDraft(status: _draft?.status ?? DraftStatus.draft);
-    }
     _messageController.dispose();
     _customInstructionController.dispose();
     super.dispose();
@@ -120,39 +119,85 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
 
   void _onMessageChanged(String text) {
     _editRevision++;
-    if (ProductCapabilities.automaticSms &&
+    _hasUnsavedChanges = true;
+    if (_draft?.status == DraftStatus.confirmedSent) {
+      final now = DateTime.now();
+      _draft = _draft?.copyWith(
+        id: '$_activeBirthdayId-revision-${now.microsecondsSinceEpoch}',
+        status: DraftStatus.draft,
+        createdAt: now,
+        updatedAt: now,
+      );
+      _birthday = _birthday?.copyWith(status: BirthdayStatus.messageDrafted);
+    } else if (ProductCapabilities.automaticSms &&
         _draft?.status == DraftStatus.approvedForAutoSms) {
       _draft = _draft?.copyWith(status: DraftStatus.draft);
       _reconcileAutoSms();
     }
     setState(() {});
+    _scheduleAutosave();
+  }
+
+  void _scheduleAutosave() {
     _autosaveTimer?.cancel();
     _autosaveTimer = Timer(const Duration(milliseconds: 750), () {
       _performAutosave();
     });
   }
 
+  void _onDraftPreferencesChanged(VoidCallback update) {
+    setState(update);
+    _editRevision++;
+    _hasUnsavedChanges = true;
+    _scheduleAutosave();
+  }
+
   Future<void> _performAutosave() async {
+    final inFlight = _saveFuture;
+    if (inFlight != null) return inFlight;
+    final save = _performAutosaveOnce();
+    _saveFuture = save;
+    try {
+      await save;
+    } finally {
+      if (identical(_saveFuture, save)) _saveFuture = null;
+    }
+  }
+
+  Future<void> _performAutosaveOnce() async {
     if (_person == null || !mounted) return;
+    final savingRevision = _editRevision;
     setState(() => _isSaving = true);
     try {
       await _saveDraft(status: _draft?.status ?? DraftStatus.draft);
       if (mounted) {
         setState(() {
           _isSaving = false;
+          _saveFailed = false;
+          _hasUnsavedChanges = savingRevision != _editRevision;
           _lastSavedTime = DateTime.now();
+          _errorMessage = null;
+          _lastFailureCode = null;
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
           _isSaving = false;
+          _saveFailed = true;
+          _hasUnsavedChanges = true;
           _lastSavedTime = null;
           _errorMessage =
-              'Your latest message could not be saved. It is still in the editor; check storage and try again.';
+              'Your latest message could not be saved. It is still in the editor; use Save now to retry.';
         });
       }
     }
+  }
+
+  Future<bool> _saveBeforeLeaving() async {
+    _autosaveTimer?.cancel();
+    await _performAutosave();
+    return !_saveFailed && !_hasUnsavedChanges;
   }
 
   String get _activeBirthdayId => _birthday?.id ?? widget.birthdayId ?? '';
@@ -164,7 +209,6 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     final pRepo = ref.read(peopleRepositoryProvider);
     final dRepo = ref.read(draftsRepositoryProvider);
     _draftsRepo = dRepo;
-    _birthdaysRepo = bRepo;
 
     Birthday? birthday;
     if (widget.birthdayId != null && widget.birthdayId!.isNotEmpty) {
@@ -180,6 +224,15 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     if (birthday != null) {
       final targetId = birthday.id;
       final person = await pRepo.getPerson(birthday.personId);
+      if (person == null || !person.hasResolvableBirthday) {
+        setState(() {
+          _errorMessage = person == null
+              ? 'Recipient not found.'
+              : 'Choose a non-leap-year celebration date before opening Studio.';
+          _isLoading = false;
+        });
+        return;
+      }
       final draft = await dRepo.getDraftForBirthday(birthday.id);
 
       setState(() {
@@ -190,7 +243,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           _messageController.text = draft.body;
           _selectedTone = draft.tone;
           _selectedLength = draft.length;
-        } else if (person != null) {
+        } else {
           _selectedTone = person.preferredTone;
         }
         _isLoading = false;
@@ -392,6 +445,15 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         );
       }
     } else if (ours && userEdited) {
+      if (draft != null) {
+        setState(() {
+          _draft = draft;
+          _birthday = _birthday?.copyWith(
+            draftId: draft.id,
+            status: BirthdayStatus.messageDrafted,
+          );
+        });
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_pendingStaleLabel ?? 'Your edits were kept.')),
       );
@@ -402,7 +464,17 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     if (_person == null) return;
     final repo = _draftsRepo;
     if (repo == null) return;
-    final draftId = _draft?.id ?? _activeBirthdayId;
+    final birthday = _birthday;
+    if (birthday == null) return;
+    final savedRevision = _editRevision;
+    final now = DateTime.now();
+    final canonicalDraft = await repo.getDraft(_activeBirthdayId);
+    final startsNewRevision =
+        _draft?.status == DraftStatus.confirmedSent ||
+        (birthday.draftId == null && canonicalDraft != null);
+    final draftId = startsNewRevision
+        ? '$_activeBirthdayId-revision-${now.microsecondsSinceEpoch}'
+        : _draft?.id ?? _activeBirthdayId;
     final updatedDraft = MessageDraft(
       id: draftId,
       birthdayId: _activeBirthdayId,
@@ -412,34 +484,25 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       length: _selectedLength,
       status: status,
       providerType: _draft?.providerType ?? 'manual',
-      createdAt: _draft?.createdAt ?? DateTime.now(),
-      updatedAt: DateTime.now(),
+      createdAt: startsNewRevision ? now : _draft?.createdAt ?? now,
+      updatedAt: now,
     );
 
-    await repo.saveDraft(updatedDraft);
-    final birthdayRepo = _birthdaysRepo;
-    final birthday = _birthday;
-    if (birthdayRepo != null && birthday != null) {
-      final nextStatus =
-          status == DraftStatus.confirmedSent ||
-              birthday.status == BirthdayStatus.completed
-          ? BirthdayStatus.completed
-          : birthday.status == BirthdayStatus.handedOff
-          ? BirthdayStatus.handedOff
-          : BirthdayStatus.messageDrafted;
-      await birthdayRepo.updateBirthdayStatus(
-        birthday.id,
-        nextStatus,
-        draftId: updatedDraft.id,
-      );
-      _birthday = birthday.copyWith(
-        draftId: updatedDraft.id,
-        status: nextStatus,
-      );
-    }
+    final nextStatus = status == DraftStatus.confirmedSent
+        ? BirthdayStatus.completed
+        : birthday.status == BirthdayStatus.handedOff && !startsNewRevision
+        ? BirthdayStatus.handedOff
+        : BirthdayStatus.messageDrafted;
+    await repo.saveDraftAndUpdateBirthday(updatedDraft, nextStatus);
+    _birthday = birthday.copyWith(draftId: updatedDraft.id, status: nextStatus);
     if (mounted) {
       setState(() {
         _draft = updatedDraft;
+        if (_editRevision == savedRevision) {
+          _hasUnsavedChanges = false;
+          _saveFailed = false;
+          _lastSavedTime = DateTime.now();
+        }
       });
     }
   }
@@ -501,10 +564,20 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             .read(deliveryEventsRepositoryProvider)
             .recordHandoffAndMarkHandedOff(
               birthdayId: _activeBirthdayId,
+              draftId: _draft?.id,
               channel: DeliveryChannel.whatsapp,
               at: DateTime.now(),
             );
       } else {
+        await ref
+            .read(deliveryEventsRepositoryProvider)
+            .recordOutcome(
+              birthdayId: _activeBirthdayId,
+              draftId: _draft?.id,
+              channel: DeliveryChannel.whatsapp,
+              outcome: DeliveryOutcome.launchFailed,
+              at: DateTime.now(),
+            );
         await ref
             .read(birthdaysRepositoryProvider)
             .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
@@ -581,12 +654,20 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             .read(deliveryEventsRepositoryProvider)
             .recordHandoffAndMarkHandedOff(
               birthdayId: _activeBirthdayId,
+              draftId: _draft?.id,
               channel: DeliveryChannel.sms,
               at: DateTime.now(),
             );
       } else {
-        // Any channel that fails to open must surface as action-required, same
-        // as WhatsApp (audit 03 AC4/P2-2).
+        await ref
+            .read(deliveryEventsRepositoryProvider)
+            .recordOutcome(
+              birthdayId: _activeBirthdayId,
+              draftId: _draft?.id,
+              channel: DeliveryChannel.sms,
+              outcome: DeliveryOutcome.launchFailed,
+              at: DateTime.now(),
+            );
         await ref
             .read(birthdaysRepositoryProvider)
             .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
@@ -633,10 +714,20 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             .read(deliveryEventsRepositoryProvider)
             .recordHandoffAndMarkHandedOff(
               birthdayId: _activeBirthdayId,
+              draftId: _draft?.id,
               channel: DeliveryChannel.share,
               at: DateTime.now(),
             );
       } else {
+        await ref
+            .read(deliveryEventsRepositoryProvider)
+            .recordOutcome(
+              birthdayId: _activeBirthdayId,
+              draftId: _draft?.id,
+              channel: DeliveryChannel.share,
+              outcome: DeliveryOutcome.launchFailed,
+              at: DateTime.now(),
+            );
         await ref
             .read(birthdaysRepositoryProvider)
             .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
@@ -859,6 +950,13 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     );
   }
 
+  DeliveryChannel _handoffChannelForName(String name) => switch (name) {
+    'WhatsApp' => DeliveryChannel.whatsapp,
+    'SMS' => DeliveryChannel.sms,
+    'Share Sheet' => DeliveryChannel.share,
+    _ => DeliveryChannel.whatsapp,
+  };
+
   void _showHandoffConfirmationDialog(
     String detailInfo, {
     required bool wasLaunched,
@@ -910,16 +1008,35 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           actions: [
             if (!wasLaunched)
               TextButton(
-                onPressed: () {
-                  Clipboard.setData(
-                    ClipboardData(text: _messageController.text.trim()),
-                  );
-                  Navigator.of(context).pop();
+                onPressed: () async {
+                  await _copyToClipboard();
+                  if (context.mounted) Navigator.of(context).pop();
                 },
                 child: const Text('Copy message'),
               ),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () async {
+                try {
+                  await ref
+                      .read(deliveryEventsRepositoryProvider)
+                      .recordOutcome(
+                        birthdayId: _activeBirthdayId,
+                        draftId: _draft?.id,
+                        channel: _handoffChannelForName(channelName),
+                        outcome: DeliveryOutcome.notSent,
+                        at: DateTime.now(),
+                      );
+                  if (context.mounted) Navigator.of(context).pop();
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not save your not-sent choice.'),
+                      ),
+                    );
+                  }
+                }
+              },
               child: const Text('Not Sent Yet'),
             ),
             FilledButton(
@@ -982,14 +1099,33 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     );
   }
 
-  void _copyToClipboard() {
+  Future<void> _copyToClipboard() async {
     final text = _messageController.text.trim();
-    if (text.isNotEmpty) {
-      Clipboard.setData(ClipboardData(text: text));
+    if (text.isEmpty) return;
+    try {
+      if (_hasUnsavedChanges || _draft == null) {
+        await _saveDraft(status: DraftStatus.draft);
+      }
+      await Clipboard.setData(ClipboardData(text: text));
+      await ref
+          .read(deliveryEventsRepositoryProvider)
+          .recordOutcome(
+            birthdayId: _activeBirthdayId,
+            draftId: _draft?.id,
+            channel: DeliveryChannel.clipboard,
+            outcome: DeliveryOutcome.copied,
+            at: DateTime.now(),
+          );
+      if (!mounted) return;
       HapticFeedback.lightImpact();
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Copied to clipboard 📋')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Copy could not be saved to History.')),
+      );
     }
   }
 
@@ -1164,240 +1300,286 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     final phoneMissing = rawPhone.isEmpty;
     final phoneInvalid = !phoneMissing && !hasUsablePhone;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Message for ${_person!.name}'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.copy_outlined),
-            tooltip: 'Copy',
-            onPressed: _copyToClipboard,
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          16,
-          16,
-          AppSpacing.bottomClearance + MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        children: [
-          // Recipient Context Card
-          _buildRecipientCard(
-            phoneMissing: phoneMissing,
-            phoneInvalid: phoneInvalid,
-            isCompleted: isCompleted,
-          ),
-          const SizedBox(height: AppSpacing.md),
-
-          // Tone & Length Controls (AI personalization; hidden when AI is locked)
-          if (!aiLocked) ...[
-            _buildControlsCard(),
-            const SizedBox(height: AppSpacing.md),
-          ] else ...[
-            _buildAiLockedNotice(),
-            const SizedBox(height: AppSpacing.md),
+    return PopScope<void>(
+      canPop: !_hasUnsavedChanges && !_isSaving && !_saveFailed,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final saved = await _saveBeforeLeaving();
+        if (saved && context.mounted) Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Message for ${_person!.name}'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.copy_outlined),
+              tooltip: 'Copy',
+              onPressed: _copyToClipboard,
+            ),
           ],
+        ),
+        body: ListView(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            AppSpacing.bottomClearance +
+                MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          children: [
+            // Recipient Context Card
+            _buildRecipientCard(
+              phoneMissing: phoneMissing,
+              phoneInvalid: phoneInvalid,
+              isCompleted: isCompleted,
+            ),
+            const SizedBox(height: AppSpacing.md),
 
-          // Error banner with recovery action buttons
-          if (_errorMessage != null) ...[
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.sm),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.errorContainer.withValues(alpha: 0.5),
-                borderRadius: AppSpacing.roundedMd,
-                border: Border.all(
+            // Tone & Length Controls (AI personalization; hidden when AI is locked)
+            if (!aiLocked) ...[
+              _buildControlsCard(),
+              const SizedBox(height: AppSpacing.md),
+            ] else ...[
+              _buildAiLockedNotice(),
+              const SizedBox(height: AppSpacing.md),
+            ],
+
+            // Error banner with recovery action buttons
+            if (_errorMessage != null) ...[
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
                   color: Theme.of(
                     context,
-                  ).colorScheme.error.withValues(alpha: 0.3),
+                  ).colorScheme.errorContainer.withValues(alpha: 0.5),
+                  borderRadius: AppSpacing.roundedMd,
+                  border: Border.all(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.error.withValues(alpha: 0.3),
+                  ),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                            fontSize: 13,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      TextButton.icon(
-                        icon: const Icon(Icons.refresh, size: 16),
-                        label: const Text('Retry'),
-                        onPressed: () => _generateWithAi(),
-                        style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                      // On a credential failure, offer the on-device fallback
-                      // (audit 02 AC P1-1): retry with Gemini Nano forced.
-                      if (_lastFailureCode ==
-                          AppFailureCode.aiCredentialInvalid)
-                        TextButton.icon(
-                          icon: const Icon(Icons.phone_android, size: 16),
-                          label: const Text('Use on-device AI (Gemini Nano)'),
-                          onPressed: () => _generateWithAi(forceNano: true),
-                          style: TextButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.edit_note, size: 16),
-                        label: const Text('Write manually'),
-                        onPressed: () {
-                          setState(() => _errorMessage = null);
-                        },
-                        style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.tune, size: 16),
-                        label: const Text('AI Settings'),
-                        onPressed: _openSettings,
-                        style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-          ],
-
-          // Message Editor Box
-          _buildMessageEditor(showAiTools: !aiLocked),
-          const SizedBox(height: AppSpacing.lg),
-
-          // Action Buttons
-          ResponsiveActionBar(
-            primary: isCompleted
-                ? FilledButton.icon(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      context.go('/history');
-                    },
-                    icon: const Icon(Icons.history),
-                    label: const Text('View in History'),
-                  )
-                : isHandedOff
-                ? // Already handed off: ask to confirm, never re-launch
-                  // (audit 03 AC3/C2 — works for any channel, not just WhatsApp).
-                  FilledButton.icon(
-                    onPressed: _confirmFromHandedOff,
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Confirm Sent'),
-                  )
-                : !hasUsablePhone
-                ? FilledButton.icon(
-                    onPressed: _openPhoneSetup,
-                    icon: const Icon(Icons.person_add_alt_1),
-                    label: Text(
-                      phoneMissing ? 'Add Phone Number' : 'Fix Phone Number',
+                      ],
                     ),
-                  )
-                : FilledButton.icon(
-                    onPressed: _isSending ? null : _handleWhatsAppSend,
-                    icon: const Icon(Icons.chat),
-                    label: const Text('Send on WhatsApp'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.whatsappGreen,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-            secondary: aiLocked
-                ? FilledButton.tonalIcon(
-                    onPressed: _openSettings,
-                    icon: const Icon(Icons.star_outline),
-                    label: const Text('Unlock with Pro'),
-                  )
-                : FilledButton.tonalIcon(
-                    onPressed: _isGenerating ? null : _generateWithAi,
-                    icon: _isGenerating
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        if (_saveFailed)
+                          FilledButton.icon(
+                            icon: const Icon(Icons.save_outlined, size: 16),
+                            label: const Text('Save now'),
+                            onPressed: _performAutosave,
                           )
-                        : const Icon(Icons.auto_awesome),
-                    label: Text(
-                      _isGenerating
-                          ? (_retryingLabel ?? 'Drafting...')
-                          : 'Generate with AI',
+                        else
+                          TextButton.icon(
+                            icon: const Icon(Icons.refresh, size: 16),
+                            label: const Text('Retry'),
+                            onPressed: () => _generateWithAi(),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        // On a credential failure, offer the on-device fallback
+                        // (audit 02 AC P1-1): retry with Gemini Nano forced.
+                        if (!_saveFailed &&
+                            _lastFailureCode ==
+                                AppFailureCode.aiCredentialInvalid)
+                          TextButton.icon(
+                            icon: const Icon(Icons.phone_android, size: 16),
+                            label: const Text('Use on-device AI (Gemini Nano)'),
+                            onPressed: () => _generateWithAi(forceNano: true),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        if (!_saveFailed)
+                          TextButton.icon(
+                            icon: const Icon(Icons.edit_note, size: 16),
+                            label: const Text('Write manually'),
+                            onPressed: () {
+                              setState(() => _errorMessage = null);
+                            },
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        if (!_saveFailed)
+                          TextButton.icon(
+                            icon: const Icon(Icons.tune, size: 16),
+                            label: const Text('AI Settings'),
+                            onPressed: _openSettings,
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                      ],
                     ),
-                  ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          // Alternate delivery channels (SSOT §10)
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              if (hasUsablePhone)
-                OutlinedButton.icon(
-                  onPressed: _isSending ? null : _handleSmsSend,
-                  icon: const Icon(Icons.sms_outlined, size: 18),
-                  label: const Text('Send via SMS'),
+                  ],
                 ),
-              OutlinedButton.icon(
-                onPressed: _isSending ? null : _handleShareSend,
-                icon: const Icon(Icons.share_outlined, size: 18),
-                label: const Text('Share Sheet'),
               ),
-              OutlinedButton.icon(
-                onPressed: _copyToClipboard,
-                icon: const Icon(Icons.copy_outlined, size: 18),
-                label: const Text('Copy Text'),
-              ),
+              const SizedBox(height: AppSpacing.md),
             ],
-          ),
-          if (ProductCapabilities.automaticSms &&
-              _person?.autoSendPolicy == AutoSendPolicy.automaticSmsApproved &&
-              hasUsablePhone &&
-              !isCompleted) ...[
-            const SizedBox(height: AppSpacing.sm),
-            SizedBox(
-              width: double.infinity,
-              child: _draft?.status == DraftStatus.approvedForAutoSms
-                  ? FilledButton.tonalIcon(
-                      onPressed: _revokeAutoSmsApproval,
-                      icon: const Icon(Icons.check_circle, color: Colors.green),
-                      label: const Text(
-                        'Approved for Auto-SMS (Tap to Revoke)',
+
+            // Message Editor Box
+            _buildMessageEditor(showAiTools: !aiLocked),
+            const SizedBox(height: AppSpacing.lg),
+
+            // Action Buttons
+            ResponsiveActionBar(
+              primary: isCompleted
+                  ? FilledButton.icon(
+                      onPressed: () async {
+                        HapticFeedback.lightImpact();
+                        if (await _saveBeforeLeaving() && context.mounted) {
+                          context.go('/history');
+                        }
+                      },
+                      icon: const Icon(Icons.history),
+                      label: const Text('View in History'),
+                    )
+                  : isHandedOff
+                  ? // Already handed off: ask to confirm, never re-launch
+                    // (audit 03 AC3/C2 — works for any channel, not just WhatsApp).
+                    FilledButton.icon(
+                      onPressed: _confirmFromHandedOff,
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: const Text('Confirm Sent'),
+                    )
+                  : !hasUsablePhone &&
+                        (person.preferredDeliveryChannel ==
+                                DeliveryChannel.whatsapp ||
+                            person.preferredDeliveryChannel ==
+                                DeliveryChannel.sms)
+                  ? FilledButton.icon(
+                      onPressed: _openPhoneSetup,
+                      icon: const Icon(Icons.person_add_alt_1),
+                      label: Text(
+                        phoneMissing ? 'Add Phone Number' : 'Fix Phone Number',
                       ),
                     )
-                  : OutlinedButton.icon(
-                      onPressed: _approveForAutoSms,
-                      icon: const Icon(Icons.alarm_on),
-                      label: const Text('Approve for Midnight Auto-SMS'),
+                  : switch (person.preferredDeliveryChannel) {
+                      DeliveryChannel.sms => FilledButton.icon(
+                        onPressed: _isSending ? null : _handleSmsSend,
+                        icon: const Icon(Icons.sms_outlined),
+                        label: const Text('Send via SMS'),
+                      ),
+                      DeliveryChannel.share => FilledButton.icon(
+                        onPressed: _isSending ? null : _handleShareSend,
+                        icon: const Icon(Icons.share_outlined),
+                        label: const Text('Open Share Sheet'),
+                      ),
+                      DeliveryChannel.clipboard => FilledButton.icon(
+                        onPressed: _copyToClipboard,
+                        icon: const Icon(Icons.copy_outlined),
+                        label: const Text('Copy Message'),
+                      ),
+                      DeliveryChannel.whatsapp => FilledButton.icon(
+                        onPressed: _isSending ? null : _handleWhatsAppSend,
+                        icon: const Icon(Icons.chat),
+                        label: const Text('Send on WhatsApp'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.whatsappGreen,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    },
+              secondary: aiLocked
+                  ? FilledButton.tonalIcon(
+                      onPressed: _openSettings,
+                      icon: const Icon(Icons.star_outline),
+                      label: const Text('Unlock with Pro'),
+                    )
+                  : FilledButton.tonalIcon(
+                      onPressed: _isGenerating ? null : _generateWithAi,
+                      icon: _isGenerating
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.auto_awesome),
+                      label: Text(
+                        _isGenerating
+                            ? (_retryingLabel ?? 'Drafting...')
+                            : 'Generate with AI',
+                      ),
                     ),
             ),
+            const SizedBox(height: AppSpacing.sm),
+            // Alternate delivery channels (SSOT §10)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                if (hasUsablePhone)
+                  OutlinedButton.icon(
+                    onPressed: _isSending ? null : _handleSmsSend,
+                    icon: const Icon(Icons.sms_outlined, size: 18),
+                    label: const Text('Send via SMS'),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: _isSending ? null : _handleShareSend,
+                  icon: const Icon(Icons.share_outlined, size: 18),
+                  label: const Text('Share Sheet'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _copyToClipboard,
+                  icon: const Icon(Icons.copy_outlined, size: 18),
+                  label: const Text('Copy Text'),
+                ),
+              ],
+            ),
+            if (ProductCapabilities.automaticSms &&
+                _person?.autoSendPolicy ==
+                    AutoSendPolicy.automaticSmsApproved &&
+                hasUsablePhone &&
+                !isCompleted) ...[
+              const SizedBox(height: AppSpacing.sm),
+              SizedBox(
+                width: double.infinity,
+                child: _draft?.status == DraftStatus.approvedForAutoSms
+                    ? FilledButton.tonalIcon(
+                        onPressed: _revokeAutoSmsApproval,
+                        icon: const Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                        ),
+                        label: const Text(
+                          'Approved for Auto-SMS (Tap to Revoke)',
+                        ),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: _approveForAutoSms,
+                        icon: const Icon(Icons.alarm_on),
+                        label: const Text('Approve for Midnight Auto-SMS'),
+                      ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1533,7 +1715,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                   label: Text(t.displayName),
                   selected: isSelected,
                   onSelected: (val) {
-                    if (val) setState(() => _selectedTone = t);
+                    if (val) {
+                      _onDraftPreferencesChanged(() => _selectedTone = t);
+                    }
                   },
                 );
               }).toList(),
@@ -1552,7 +1736,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                   label: Text(l.name.toUpperCase()),
                   selected: isSelected,
                   onSelected: (val) {
-                    if (val) setState(() => _selectedLength = l);
+                    if (val) {
+                      _onDraftPreferencesChanged(() => _selectedLength = l);
+                    }
                   },
                 );
               }).toList(),

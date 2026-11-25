@@ -1,3 +1,4 @@
+import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/calendar/presentation/calendar_screen.dart';
 import 'package:ai_birthday/features/people/data/person_providers.dart';
 import 'package:ai_birthday/features/people/domain/person.dart';
@@ -18,6 +19,7 @@ void main() {
     required int month,
     required int day,
     int? birthYear,
+    LeapDayResolution? leapDayResolution,
   }) {
     final now = DateTime.utc(2025, 1, 1, 8);
     return Person(
@@ -26,6 +28,7 @@ void main() {
       birthdayMonth: month,
       birthdayDay: day,
       birthYear: birthYear,
+      leapDayResolution: leapDayResolution,
       createdAt: now,
       updatedAt: now,
     );
@@ -98,7 +101,15 @@ void main() {
   ) async {
     final store = FakePeopleStore();
     addTearDown(store.close);
-    await store.save(person(id: 'b', name: 'Bri', month: 2, day: 29));
+    await store.save(
+      person(
+        id: 'b',
+        name: 'Bri',
+        month: 2,
+        day: 29,
+        leapDayResolution: LeapDayResolution.feb28,
+      ),
+    );
 
     await pumpHarness(tester, store);
 
@@ -133,6 +144,66 @@ void main() {
     await tester.tap(find.byTooltip('Previous month'));
     await tester.pumpAndSettle();
     expect(find.text('February 2026'), findsOneWidget);
+  });
+
+  testWidgets(
+    'Mar 1 policy places leap birthday in March and Today jumps back',
+    (tester) async {
+      final store = FakePeopleStore();
+      addTearDown(store.close);
+      await store.save(
+        person(
+          id: 'leap',
+          name: 'Leap',
+          month: 2,
+          day: 29,
+          leapDayResolution: LeapDayResolution.mar1,
+        ),
+      );
+      await pumpHarness(tester, store);
+
+      await tester.tap(find.byTooltip('Next month'));
+      await tester.pumpAndSettle();
+      await openDay(tester, '1');
+      expect(find.text('Leap'), findsOneWidget);
+
+      await tester.tapAt(const Offset(4, 4));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Jump to today'));
+      await tester.pumpAndSettle();
+      expect(find.text('February 2026'), findsOneWidget);
+    },
+  );
+
+  testWidgets('day cells expose full dates at narrow large-text sizes', (
+    tester,
+  ) async {
+    final store = FakePeopleStore();
+    addTearDown(store.close);
+    await store.save(person(id: 'a', name: 'Ana', month: 2, day: 5));
+    tester.view.physicalSize = const Size(320, 640);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => CalendarScreen(now: () => fixedNow),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [peopleStoreProvider.overrideWithValue(store)],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final daySemantics = tester.getSemantics(find.text('10'));
+    expect(daySemantics.label, contains('February 10, 2026'));
+    expect(daySemantics.label, contains('today'));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('month navigation buttons trigger haptic feedback', (

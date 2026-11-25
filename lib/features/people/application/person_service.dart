@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/logging/app_logger.dart';
 import '../data/person_repository.dart';
+import '../../birthdays/domain/birthday_engine.dart';
 import '../../birthdays/domain/models/birthday.dart';
 import '../domain/person.dart';
 import '../domain/person_input.dart';
@@ -51,7 +52,8 @@ class PersonService {
           ? person.autoSendPolicy
           : AutoSendPolicy.manualOnly,
     );
-    await _store.save(safePerson);
+    final birthday = await _nextBirthday(safePerson);
+    await _store.saveAggregate(safePerson, birthday: birthday);
     _logger.info(
       'people',
       'created person',
@@ -72,7 +74,8 @@ class PersonService {
           ? updated.autoSendPolicy
           : AutoSendPolicy.manualOnly,
     );
-    await _store.save(safeUpdated);
+    final birthday = await _nextBirthday(safeUpdated);
+    await _store.saveAggregate(safeUpdated, birthday: birthday);
     _logger.info(
       'people',
       'updated person',
@@ -93,6 +96,42 @@ class PersonService {
     _logger.info('people', 'restored person', params: {'personId': id});
     await _store.restoreAggregate(id, restoredBirthday: birthday);
     await _onChanged?.call();
+  }
+
+  Future<Birthday?> _nextBirthday(Person person) async {
+    if (!person.hasBirthday) return null;
+    final prior = await _store.getBirthdayForPerson(person.id);
+    final now = _now();
+    final next = const BirthdayEngine().computeNext(
+      month: person.birthdayMonth!,
+      day: person.birthdayDay!,
+      birthYear: person.birthYear,
+      timezoneName: person.timezone,
+      leapDay: person.leapDayResolution,
+      reference: now,
+    );
+    if (next == null) return null;
+    final dateChanged =
+        prior != null &&
+        (prior.cycleYear != next.year ||
+            prior.date.month != next.nextDate.month ||
+            prior.date.day != next.nextDate.day);
+    final status = dateChanged
+        ? (next.isToday ? BirthdayStatus.reminderDue : BirthdayStatus.upcoming)
+        : prior?.status ??
+              (next.isToday
+                  ? BirthdayStatus.reminderDue
+                  : BirthdayStatus.upcoming);
+    return Birthday(
+      id: prior?.id ?? 'birthday-${person.id}',
+      personId: person.id,
+      cycleYear: next.year,
+      date: next.nextDate,
+      status: status,
+      draftId: dateChanged ? null : prior?.draftId,
+      createdAt: prior?.createdAt ?? now,
+      updatedAt: now,
+    );
   }
 
   void _ensureValid(PersonDraft draft, {bool requireBirthday = true}) {

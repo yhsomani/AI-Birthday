@@ -40,14 +40,21 @@ class BirthdayLifecycleService {
 
     for (final person in people) {
       if (!person.hasBirthday) continue;
+      if (person.isLeapDayBirthday && person.leapDayResolution == null) {
+        // Legacy data is deliberately preserved until the user chooses a
+        // policy. Scheduling/UI consumers suppress it through resolvability.
+        continue;
+      }
 
       final next = engine.computeNext(
         month: person.birthdayMonth!,
         day: person.birthdayDay!,
         birthYear: person.birthYear,
         timezoneName: person.timezone,
+        leapDay: person.leapDayResolution,
         reference: reference,
       );
+      if (next == null) continue;
 
       final existing = existingByPerson[person.id];
       final targetStatus = next.isToday

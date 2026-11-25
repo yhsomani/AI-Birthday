@@ -111,6 +111,27 @@ void main() {
       await tester.tap(find.text('Back Up Now'));
     }
 
+    testWidgets('account switch requires explicit local-data ownership', (
+      tester,
+    ) async {
+      final service = GatedCloudSyncService(db: harness.db);
+      await service.assignLocalDataOwner('previous-account');
+      await pumpSettings(tester, service: service);
+      await signIn(tester);
+
+      await tapBackUpNow(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Who owns the data on this device?'), findsOneWidget);
+      expect(find.text('Use with this account'), findsOneWidget);
+      expect(await service.getLocalDataOwner(), 'previous-account');
+      expect(await harness.db.select(harness.db.jobs).get(), isEmpty);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Backing up...'), findsNothing);
+    });
+
     testWidgets(
       'backup shows truthful running state, then completes with the snackbar',
       (tester) async {

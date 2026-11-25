@@ -2,11 +2,23 @@ import 'package:timezone/timezone.dart' as tz;
 
 /// How a Feb 29 birthday is treated in a non-leap year (SSOT §14).
 enum LeapDayResolution {
-  /// Celebrate on Feb 28 (default).
+  /// Celebrate on Feb 28 (default when a preference has explicitly been saved).
   feb28,
 
   /// Celebrate on Mar 1.
-  mar1,
+  mar1;
+
+  String get displayName => switch (this) {
+    LeapDayResolution.feb28 => 'February 28',
+    LeapDayResolution.mar1 => 'March 1',
+  };
+
+  static LeapDayResolution? fromString(String? value) =>
+      switch (value?.trim().toLowerCase()) {
+        'feb28' || 'february 28' || 'feb 28' => LeapDayResolution.feb28,
+        'mar1' || 'march 1' || 'mar 1' => LeapDayResolution.mar1,
+        _ => null,
+      };
 }
 
 /// The next occurrence of a recipient birthday relative to a reference date.
@@ -111,21 +123,25 @@ class BirthdayEngine {
   /// [reference] is treated as an absolute instant converted to that zone.
   /// Otherwise [reference]'s own wall-clock fields define the calendar frame
   /// (the user's local device frame).
-  NextBirthday computeNext({
+  NextBirthday? computeNext({
     required int month,
     required int day,
     int? birthYear,
     String? timezoneName,
-    LeapDayResolution leapDay = LeapDayResolution.feb28,
+    LeapDayResolution? leapDay,
     DateTime? reference,
   }) {
+    if (month == feb29Month && day == feb29Day && leapDay == null) {
+      return null;
+    }
+    final resolvedLeapDay = leapDay ?? LeapDayResolution.feb28;
     final ref = reference ?? DateTime.now().toUtc();
     if (timezoneName != null) {
       return _computeInTimezone(
         month: month,
         day: day,
         timezoneName: timezoneName,
-        leapDay: leapDay,
+        leapDay: resolvedLeapDay,
         reference: ref.toUtc(),
       );
     }
@@ -135,7 +151,7 @@ class BirthdayEngine {
     return _computeWallClock(
       month: month,
       day: day,
-      leapDay: leapDay,
+      leapDay: resolvedLeapDay,
       reference: ref.isUtc ? ref.toLocal() : ref,
     );
   }

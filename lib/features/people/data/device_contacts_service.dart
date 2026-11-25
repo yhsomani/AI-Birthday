@@ -130,6 +130,13 @@ class DeviceContact {
       notes: 'Imported from phone contacts',
       autoPrepare: ProductCapabilities.autoPrepare,
       duplicateWarning: duplicateWarning,
+      invalidReason: parsed == null
+          ? (birthdayString == null || birthdayString!.trim().isEmpty
+                ? 'Birthday missing — add it in your device contacts or repair it here'
+                : 'Birthday is invalid — expected a real calendar date')
+          : (month == 2 && day == 29
+                ? 'Choose February 28 or March 1 for non-leap years'
+                : null),
     );
   }
 

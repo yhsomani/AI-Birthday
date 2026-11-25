@@ -1,3 +1,4 @@
+import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/people/domain/person.dart';
 import 'package:ai_birthday/features/reminders/domain/quiet_hours.dart';
 import 'package:ai_birthday/features/reminders/domain/reminder_kind.dart';
@@ -18,6 +19,7 @@ void main() {
     int month = 3,
     int day = 20,
     String? timezone,
+    LeapDayResolution? leapDayResolution,
   }) {
     final now = DateTime.utc(2026, 1, 1, 8);
     return Person(
@@ -25,6 +27,7 @@ void main() {
       name: name,
       birthdayMonth: month,
       birthdayDay: day,
+      leapDayResolution: leapDayResolution,
       timezone: timezone,
       createdAt: now,
       updatedAt: now,
@@ -92,10 +95,28 @@ void main() {
     expect(plan.active, hasLength(4));
   });
 
-  test('resolves leap-day birthdays in non-leap years via the engine', () {
+  test('unresolved leap-day birthdays do not schedule reminders', () {
     const scheduler = ReminderScheduler();
     final plan = scheduler.plan(
       people: [person(month: 2, day: 29, name: 'Leap')],
+      reference: DateTime.utc(2026, 2, 1),
+      enabled: const {ReminderKind.birthday},
+    );
+    expect(plan.active, isEmpty);
+    expect(plan.suppressed, isEmpty);
+  });
+
+  test('resolves leap-day birthdays using the saved policy', () {
+    const scheduler = ReminderScheduler();
+    final plan = scheduler.plan(
+      people: [
+        person(
+          month: 2,
+          day: 29,
+          name: 'Leap',
+          leapDayResolution: LeapDayResolution.feb28,
+        ),
+      ],
       reference: DateTime.utc(2026, 2, 1),
       enabled: const {ReminderKind.birthday},
     );

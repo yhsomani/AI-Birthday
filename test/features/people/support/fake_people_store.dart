@@ -56,6 +56,15 @@ class FakePeopleStore implements PeopleStore {
   }
 
   @override
+  Future<void> saveAggregate(Person person, {Birthday? birthday}) async {
+    _people[person.id] = person;
+    _emit();
+  }
+
+  @override
+  Future<Birthday?> getBirthdayForPerson(String personId) async => null;
+
+  @override
   Future<void> softDelete(String id) async {
     final existing = _people[id];
     if (existing == null) return;

@@ -1,11 +1,42 @@
+import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 import 'package:ai_birthday/features/auth/domain/google_identity.dart';
+import 'package:ai_birthday/core/platform/gemini_nano_platform.dart';
 import 'package:ai_birthday/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../auth/support/fake_auth_gateway.dart';
+
+class FakeDownloadableNano implements GeminiNanoPlatform {
+  NanoState state = NanoState.downloadable;
+  int downloadCalls = 0;
+  int statusCalls = 0;
+
+  @override
+  Future<NanoState> currentState() async {
+    statusCalls++;
+    return state;
+  }
+
+  @override
+  Future<NanoState> startDownload() async {
+    downloadCalls++;
+    state = NanoState.downloading;
+    return state;
+  }
+
+  @override
+  Stream<NanoState> get stateChanges => const Stream.empty();
+
+  @override
+  Future<NanoGenerationResult> generate(String prompt) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> dispose() async {}
+}
 
 void main() {
   Future<void> pumpSettings(
@@ -28,6 +59,45 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'downloadable Nano exposes working download and refresh actions',
+    (tester) async {
+      final nano = FakeDownloadableNano();
+      await pumpSettings(
+        tester,
+        overrides: [
+          googleAuthGatewayProvider.overrideWithValue(
+            FakeAuthGateway(configured: false),
+          ),
+          geminiNanoPlatformProvider.overrideWithValue(nano),
+        ],
+      );
+
+      expect(nano.statusCalls, greaterThanOrEqualTo(1));
+      for (
+        var i = 0;
+        i < 8 && find.text('Gemini Nano (AICore)').evaluate().isEmpty;
+        i++
+      ) {
+        await tester.drag(find.byType(ListView), const Offset(0, -700));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('Gemini Nano (AICore)'), findsOneWidget);
+      final download = find.text('Download model');
+      await tester.ensureVisible(download);
+      await tester.tap(download);
+      await tester.pumpAndSettle();
+
+      expect(nano.downloadCalls, 1);
+      expect(find.text('Downloading on-device model...'), findsOneWidget);
+      final refresh = find.text('Refresh status');
+      await tester.ensureVisible(refresh);
+      await tester.tap(refresh);
+      await tester.pumpAndSettle();
+      expect(nano.statusCalls, greaterThanOrEqualTo(2));
+    },
+  );
 
   testWidgets('account tile reports unavailability truthfully on host builds', (
     tester,

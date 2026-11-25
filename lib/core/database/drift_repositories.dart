@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 
 import 'package:ai_birthday/core/database/app_database.dart' as db;
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
+import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_repository.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dart';
@@ -70,6 +71,7 @@ class DriftPeopleRepository implements PeopleRepository {
             birthdayMonth: Value(person.birthdayMonth),
             birthdayDay: Value(person.birthdayDay),
             birthYear: Value(person.birthYear),
+            leapDayResolution: Value(person.leapDayResolution?.name),
             phoneNumber: Value(person.phoneNumber),
             email: Value(person.email),
             relationship: Value(person.relationship.name),
@@ -94,6 +96,42 @@ class DriftPeopleRepository implements PeopleRepository {
                       : Value(existing!.deletedAt)),
           ),
         );
+  }
+
+  @override
+  Future<void> saveImportBatch({
+    required List<Person> people,
+    required List<Birthday> birthdays,
+  }) async {
+    if (people.length != birthdays.length) {
+      throw ArgumentError('Every imported person must have one birthday.');
+    }
+    final birthdayByPerson = {for (final b in birthdays) b.personId: b};
+    await _database.transaction(() async {
+      for (final person in people) {
+        await savePerson(person);
+        final birthday = birthdayByPerson[person.id];
+        if (birthday == null) {
+          throw StateError(
+            'Missing birthday for imported person ${person.id}.',
+          );
+        }
+        await _database
+            .into(_database.birthdays)
+            .insertOnConflictUpdate(
+              db.BirthdaysCompanion(
+                id: Value(birthday.id),
+                personId: Value(birthday.personId),
+                cycleYear: Value(birthday.cycleYear),
+                date: Value(birthday.date),
+                status: Value(birthday.status.name),
+                draftId: Value(birthday.draftId),
+                createdAt: Value(birthday.createdAt),
+                updatedAt: Value(birthday.updatedAt),
+              ),
+            );
+      }
+    });
   }
 
   @override
@@ -126,6 +164,7 @@ class DriftPeopleRepository implements PeopleRepository {
       birthdayMonth: row.birthdayMonth,
       birthdayDay: row.birthdayDay,
       birthYear: row.birthYear,
+      leapDayResolution: LeapDayResolution.fromString(row.leapDayResolution),
       phoneNumber: row.phoneNumber,
       email: row.email,
       relationship: RelationshipCategory.fromString(row.relationship),
@@ -216,9 +255,15 @@ class DriftBirthdaysRepository implements BirthdaysRepository {
   @override
   Future<void> rolloverBirthday(Birthday birthday) async {
     await _database.transaction(() async {
+      await (_database.delete(_database.messageDrafts)..where(
+            (row) =>
+                row.birthdayId.equals(birthday.id) &
+                row.status.equals(DraftStatus.confirmedSent.name).not(),
+          ))
+          .go();
       await (_database.delete(
-        _database.messageDrafts,
-      )..where((row) => row.birthdayId.equals(birthday.id))).go();
+        _database.jobs,
+      )..where((row) => row.subjectId.equals(birthday.id))).go();
       await _database
           .into(_database.birthdays)
           .insertOnConflictUpdate(
@@ -261,6 +306,29 @@ class DriftBirthdaysRepository implements BirthdaysRepository {
     await (_database.delete(
       _database.birthdays,
     )..where((r) => r.id.equals(id))).go();
+  }
+
+  @override
+  Future<void> disableBirthdayForPerson(String personId) async {
+    await _database.transaction(() async {
+      final rows = await (_database.select(
+        _database.birthdays,
+      )..where((row) => row.personId.equals(personId))).get();
+      if (rows.isEmpty) return;
+      final ids = rows.map((row) => row.id).toList();
+      await (_database.delete(
+        _database.birthdays,
+      )..where((row) => row.id.isIn(ids))).go();
+      await (_database.delete(_database.messageDrafts)..where(
+            (row) =>
+                row.birthdayId.isIn(ids) &
+                row.status.equals(DraftStatus.confirmedSent.name).not(),
+          ))
+          .go();
+      await (_database.delete(
+        _database.jobs,
+      )..where((row) => row.subjectId.isIn(ids))).go();
+    });
   }
 
   static Birthday _birthdayFromRow(db.Birthday row) {
@@ -317,14 +385,112 @@ class DriftDraftsRepository implements DraftsRepository {
 
   @override
   Future<MessageDraft?> getDraftForBirthday(String birthdayId) async {
-    final row = await (_database.select(
-      _database.messageDrafts,
-    )..where((r) => r.birthdayId.equals(birthdayId))).getSingleOrNull();
+    final birthday = await (_database.select(
+      _database.birthdays,
+    )..where((row) => row.id.equals(birthdayId))).getSingleOrNull();
+    if (birthday?.draftId != null) {
+      final linked = await (_database.select(
+        _database.messageDrafts,
+      )..where((row) => row.id.equals(birthday!.draftId!))).getSingleOrNull();
+      return linked == null ? null : _draftFromRow(linked);
+    }
+
+    // Legacy rows may predate birthday.draftId, but an immutable sent draft
+    // can never become the editable Studio draft for a replacement cycle.
+    final row =
+        await (_database.select(_database.messageDrafts)
+              ..where(
+                (r) =>
+                    r.birthdayId.equals(birthdayId) &
+                    r.status.equals(DraftStatus.confirmedSent.name).not(),
+              )
+              ..orderBy([
+                (r) => OrderingTerm.desc(r.updatedAt),
+                (r) => OrderingTerm.desc(r.id),
+              ])
+              ..limit(1))
+            .getSingleOrNull();
     return row == null ? null : _draftFromRow(row);
   }
 
   @override
-  Future<void> saveDraft(MessageDraft draft) async {
+  Future<void> saveDraft(MessageDraft draft) =>
+      _database.transaction(() => _saveDraft(draft));
+
+  @override
+  Future<bool> saveDraftAndUpdateBirthday(
+    MessageDraft draft,
+    BirthdayStatus birthdayStatus, {
+    bool requireUnchanged = false,
+    MessageDraft? expectedCurrentDraft,
+  }) {
+    return _database.transaction(() async {
+      if (requireUnchanged) {
+        final birthday = await (_database.select(
+          _database.birthdays,
+        )..where((row) => row.id.equals(draft.birthdayId))).getSingleOrNull();
+
+        db.MessageDraft? active;
+        if (birthday?.draftId != null) {
+          active =
+              await (_database.select(_database.messageDrafts)
+                    ..where((row) => row.id.equals(birthday!.draftId!)))
+                  .getSingleOrNull();
+        } else {
+          active =
+              await (_database.select(_database.messageDrafts)
+                    ..where(
+                      (row) =>
+                          row.birthdayId.equals(draft.birthdayId) &
+                          row.status
+                              .equals(DraftStatus.confirmedSent.name)
+                              .not(),
+                    )
+                    ..orderBy([
+                      (row) => OrderingTerm.desc(row.updatedAt),
+                      (row) => OrderingTerm.desc(row.id),
+                    ])
+                    ..limit(1))
+                  .getSingleOrNull();
+        }
+
+        final unchanged = expectedCurrentDraft == null
+            ? active == null
+            : active != null &&
+                  active.id == expectedCurrentDraft.id &&
+                  active.updatedAt.isAtSameMomentAs(
+                    expectedCurrentDraft.updatedAt,
+                  );
+        if (!unchanged) return false;
+      }
+
+      await _saveDraft(draft);
+      final updated =
+          await (_database.update(
+            _database.birthdays,
+          )..where((row) => row.id.equals(draft.birthdayId))).write(
+            db.BirthdaysCompanion(
+              status: Value(birthdayStatus.name),
+              draftId: Value(draft.id),
+              updatedAt: Value(draft.updatedAt),
+            ),
+          );
+      if (updated != 1) {
+        throw StateError('Cannot link a draft to a missing birthday.');
+      }
+      return true;
+    });
+  }
+
+  Future<void> _saveDraft(MessageDraft draft) async {
+    final existing = await (_database.select(
+      _database.messageDrafts,
+    )..where((row) => row.id.equals(draft.id))).getSingleOrNull();
+    if (existing != null &&
+        DraftStatus.fromString(existing.status) == DraftStatus.confirmedSent) {
+      throw StateError('A confirmed-sent draft is immutable. Save a revision.');
+    }
+
     await _database
         .into(_database.messageDrafts)
         .insertOnConflictUpdate(
@@ -361,31 +527,42 @@ class DriftDraftsRepository implements DraftsRepository {
         .toList();
 
     if (liveBirthdayIds.isEmpty) {
-      // No birthdays at all: every draft is orphaned.
-      await _database.delete(_database.messageDrafts).go();
+      await (_database.delete(_database.messageDrafts)..where(
+            (row) => row.status.equals(DraftStatus.confirmedSent.name).not(),
+          ))
+          .go();
     } else {
-      // Drafts whose birthday was deleted can never be applied again.
-      await (_database.delete(
-        _database.messageDrafts,
-      )..where((r) => r.birthdayId.isNotIn(liveBirthdayIds))).go();
+      // Mutable drafts whose birthday was deleted can never be applied again;
+      // confirmed-sent history remains immutable and visible in History.
+      await (_database.delete(_database.messageDrafts)..where(
+            (row) =>
+                row.birthdayId.isNotIn(liveBirthdayIds) &
+                row.status.equals(DraftStatus.confirmedSent.name).not(),
+          ))
+          .go();
     }
 
-    // Legacy rows keyed by their own id (`draft-…`) are shadowed duplicates
-    // once a canonical id == birthdayId row exists for the same birthday.
-    // Keep a legacy-only draft for a live birthday (the Studio still loads it
-    // by birthdayId) and remove only the shadow.
+    // Legacy non-terminal duplicates can be removed, but confirmed history
+    // and later editable revisions are intentionally append-only.
     final remaining = await _database.select(_database.messageDrafts).get();
-    final canonicalBirthdayIds = remaining
-        .where((r) => r.id == r.birthdayId)
-        .map((r) => r.birthdayId)
-        .toSet();
+    final canonicalRows = {
+      for (final row in remaining.where((r) => r.id == r.birthdayId))
+        row.birthdayId: row,
+    };
     final shadowedLegacyIds = remaining
-        .where(
-          (r) =>
-              r.id != r.birthdayId &&
-              canonicalBirthdayIds.contains(r.birthdayId),
-        )
-        .map((r) => r.id)
+        .where((row) {
+          if (row.id == row.birthdayId ||
+              DraftStatus.fromString(row.status) == DraftStatus.confirmedSent) {
+            return false;
+          }
+          final canonical = canonicalRows[row.birthdayId];
+          return canonical != null &&
+              canonical.body == row.body &&
+              canonical.tone == row.tone &&
+              canonical.length == row.length &&
+              canonical.status == row.status;
+        })
+        .map((row) => row.id)
         .toList();
     if (shadowedLegacyIds.isNotEmpty) {
       await (_database.delete(
@@ -428,21 +605,40 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
   DriftDeliveryEventsRepository(this._database);
 
   final db.AppDatabase _database;
+  int _eventSequence = 0;
 
   @override
   Future<void> recordHandoff({
     required String birthdayId,
     required DeliveryChannel channel,
     required DateTime at,
+    String? draftId,
+  }) => recordOutcome(
+    birthdayId: birthdayId,
+    draftId: draftId,
+    channel: channel,
+    outcome: DeliveryOutcome.launched,
+    at: at,
+  );
+
+  @override
+  Future<void> recordOutcome({
+    required String birthdayId,
+    required DeliveryChannel channel,
+    required DeliveryOutcome outcome,
+    required DateTime at,
+    String? draftId,
   }) async {
     final utc = at.toUtc();
     await _database
         .into(_database.deliveryEvents)
         .insert(
           db.DeliveryEventsCompanion.insert(
-            id: '$birthdayId-${utc.millisecondsSinceEpoch}',
+            id: '$birthdayId-${draftId ?? 'legacy'}-${channel.name}-${outcome.name}-${utc.microsecondsSinceEpoch}-${DateTime.now().microsecondsSinceEpoch}-${_eventSequence++}',
             birthdayId: birthdayId,
+            draftId: Value(draftId),
             channel: channel.name,
+            outcome: Value(outcome.name),
             handedOffAt: utc,
           ),
         );
@@ -453,16 +649,23 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
     required String birthdayId,
     required DeliveryChannel channel,
     required DateTime at,
+    String? draftId,
   }) {
     // One transaction: a failure part-way cannot leave a handed-off birthday
     // without its evidence row, or the reverse (audit F20).
     return _database.transaction(() async {
-      await recordHandoff(birthdayId: birthdayId, channel: channel, at: at);
+      await recordHandoff(
+        birthdayId: birthdayId,
+        draftId: draftId,
+        channel: channel,
+        at: at,
+      );
       await (_database.update(
         _database.birthdays,
       )..where((r) => r.id.equals(birthdayId))).write(
         db.BirthdaysCompanion(
           status: Value(BirthdayStatus.handedOff.name),
+          draftId: draftId != null ? Value(draftId) : const Value.absent(),
           updatedAt: Value(at.toUtc()),
         ),
       );
@@ -477,8 +680,18 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
   }) {
     return _database.transaction(() async {
       final handoff = await latestHandoffForBirthday(birthdayId);
-      if (handoff == null) {
-        throw StateError('Cannot confirm delivery without a handoff event.');
+      if (handoff == null ||
+          (handoff.draftId != null && handoff.draftId != draftId)) {
+        throw StateError('Cannot confirm delivery without a matching handoff.');
+      }
+      final draft = await (_database.select(
+        _database.messageDrafts,
+      )..where((row) => row.id.equals(draftId))).getSingleOrNull();
+      if (draft == null || draft.birthdayId != birthdayId) {
+        throw StateError('Cannot confirm a draft for another birthday.');
+      }
+      if (DraftStatus.fromString(draft.status) == DraftStatus.confirmedSent) {
+        return;
       }
       await (_database.update(
         _database.birthdays,
@@ -497,6 +710,13 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
           updatedAt: Value(at.toUtc()),
         ),
       );
+      await recordOutcome(
+        birthdayId: birthdayId,
+        draftId: draftId,
+        channel: handoff.channel,
+        outcome: DeliveryOutcome.confirmed,
+        at: at,
+      );
     });
   }
 
@@ -504,7 +724,11 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
   Future<DeliveryHandoff?> latestHandoffForBirthday(String birthdayId) async {
     final row =
         await (_database.select(_database.deliveryEvents)
-              ..where((r) => r.birthdayId.equals(birthdayId))
+              ..where(
+                (r) =>
+                    r.birthdayId.equals(birthdayId) &
+                    r.outcome.equals(DeliveryOutcome.launched.name),
+              )
               ..orderBy([(r) => OrderingTerm.desc(r.handedOffAt)])
               ..limit(1))
             .getSingleOrNull();
@@ -533,9 +757,10 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
           final latest = <String, DeliveryHandoff>{};
           for (final row in rows) {
             final handoff = _handoffFromRow(row);
-            final existing = latest[handoff.birthdayId];
+            final key = handoff.draftId ?? handoff.birthdayId;
+            final existing = latest[key];
             if (existing == null || handoff.at.isAfter(existing.at)) {
-              latest[handoff.birthdayId] = handoff;
+              latest[key] = handoff;
             }
           }
           return latest.values.toList();
@@ -545,7 +770,9 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
   static DeliveryHandoff _handoffFromRow(db.DeliveryEvent row) {
     return DeliveryHandoff(
       birthdayId: row.birthdayId,
+      draftId: row.draftId,
       channel: DeliveryChannel.fromString(row.channel),
+      outcome: DeliveryOutcome.fromString(row.outcome),
       at: row.handedOffAt.toUtc(),
     );
   }

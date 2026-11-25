@@ -54,15 +54,27 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  /// Resolves a birthday onto the calendar of [year] using the engine's
-  /// default Feb 29 → Feb 28 leap rule, matching [BirthdayEngine] exactly.
-  static int _resolvedDay(int month, int day, int year) {
-    if (month == BirthdayEngine.feb29Month &&
-        day == BirthdayEngine.feb29Day &&
-        !BirthdayEngine.isLeapYear(year)) {
-      return 28;
+  void _jumpToToday() {
+    HapticFeedback.lightImpact();
+    final now = (widget.now ?? DateTime.now)();
+    setState(() => _visibleMonth = DateTime(now.year, now.month));
+  }
+
+  static DateTime? _resolvedDate(Person person, int year) {
+    if (!person.hasBirthday) return null;
+    final month = person.birthdayMonth!;
+    final day = person.birthdayDay!;
+    if (person.isLeapDayBirthday) {
+      if (person.leapDayResolution == null) return null;
+      if (!BirthdayEngine.isLeapYear(year)) {
+        final resolved = const BirthdayEngine().resolveFeb29(
+          year,
+          resolution: person.leapDayResolution!,
+        );
+        return DateTime(year, resolved.month, resolved.day);
+      }
     }
-    return day;
+    return DateTime(year, month, day);
   }
 
   void _showDay(BuildContext context, DateTime date, List<Person> people) {
@@ -157,10 +169,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
     final birthdaysForDay = <int, List<Person>>{};
     for (final person in people) {
-      if (!person.hasBirthday) continue;
-      if (person.birthdayMonth != month) continue;
-      final day = _resolvedDay(month, person.birthdayDay!, year);
-      birthdaysForDay.putIfAbsent(day, () => []).add(person);
+      final resolved = _resolvedDate(person, year);
+      if (resolved == null || resolved.month != month) continue;
+      birthdaysForDay.putIfAbsent(resolved.day, () => []).add(person);
     }
 
     final first = DateTime(year, month, 1);
@@ -168,25 +179,32 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final daysInMonth = BirthdayEngine.daysInMonth(month, year);
     final totalCells = lead + daysInMonth;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
-          Row(
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              DateFormat('MMMM yyyy').format(first),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Wrap(
+            alignment: WrapAlignment.center,
             children: [
               IconButton(
                 tooltip: 'Previous month',
                 onPressed: () => _shiftMonth(-1),
                 icon: const Icon(Icons.chevron_left),
               ),
-              Expanded(
-                child: Text(
-                  DateFormat('MMMM yyyy').format(first),
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+              IconButton(
+                tooltip: 'Jump to today',
+                onPressed: _jumpToToday,
+                icon: const Icon(Icons.today_outlined),
               ),
               IconButton(
                 tooltip: 'Next month',
@@ -200,40 +218,42 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             children: [
               for (final label in _weekdays)
                 Expanded(
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 4),
-          Expanded(
-            child: Column(
-              children: [
-                for (var row = 0; row < (totalCells / 7).ceil(); row++)
-                  Expanded(
-                    child: Row(
-                      children: [
-                        for (var col = 0; col < 7; col++)
-                          Expanded(
-                            child: _cell(
-                              context,
-                              row * 7 + col,
-                              lead,
-                              daysInMonth,
-                              todayDay,
-                              birthdaysForDay,
-                            ),
+          Column(
+            children: [
+              for (var row = 0; row < (totalCells / 7).ceil(); row++)
+                SizedBox(
+                  height: 60,
+                  child: Row(
+                    children: [
+                      for (var col = 0; col < 7; col++)
+                        Expanded(
+                          child: _cell(
+                            context,
+                            row * 7 + col,
+                            lead,
+                            daysInMonth,
+                            todayDay,
+                            birthdaysForDay,
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ],
       ),
@@ -256,11 +276,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final isToday = day == todayDay;
     final people = birthdaysForDay[day];
 
-    final dayNumber = Text(
-      '$day',
-      style: theme.textTheme.bodyMedium?.copyWith(
-        fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-        color: isToday ? theme.colorScheme.primary : null,
+    final date = DateTime(_visibleMonth.year, _visibleMonth.month, day);
+    final dateLabel = DateFormat.yMMMMEEEEd().format(date);
+    final dayNumber = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        '$day',
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+          color: isToday ? theme.colorScheme.primary : null,
+        ),
       ),
     );
 
@@ -284,8 +309,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
     return Semantics(
       label: people == null || people.isEmpty
-          ? 'Day $day'
-          : 'Day $day, ${people.length} birthday${people.length == 1 ? '' : 's'}',
+          ? '$dateLabel${isToday ? ', today' : ''}'
+          : '$dateLabel${isToday ? ', today' : ''}, ${people.length} birthday${people.length == 1 ? '' : 's'}',
       button: people != null,
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -301,31 +326,37 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               },
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (isToday)
-                SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: theme.colorScheme.primary,
-                        width: 2,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isToday)
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: theme.colorScheme.primary,
+                          width: 2,
+                        ),
+                      ),
+                      child: Center(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: dayNumber,
+                        ),
                       ),
                     ),
-                    child: Center(
-                      child: FittedBox(fit: BoxFit.scaleDown, child: dayNumber),
-                    ),
-                  ),
-                )
-              else
-                dayNumber,
-              const SizedBox(height: 4),
-              SizedBox(height: 6, child: Center(child: dots)),
-            ],
+                  )
+                else
+                  dayNumber,
+                const SizedBox(height: 4),
+                SizedBox(height: 6, child: Center(child: dots)),
+              ],
+            ),
           ),
         ),
       ),

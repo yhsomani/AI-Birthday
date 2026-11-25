@@ -10,6 +10,17 @@ abstract interface class DeliveryEventsRepository {
     required String birthdayId,
     required DeliveryChannel channel,
     required DateTime at,
+    String? draftId,
+  });
+
+  /// Appends one truthful delivery action, including copy, failure and the
+  /// user's explicit not-sent choice. Existing rows are never updated.
+  Future<void> recordOutcome({
+    required String birthdayId,
+    required DeliveryChannel channel,
+    required DeliveryOutcome outcome,
+    required DateTime at,
+    String? draftId,
   });
 
   /// Records the handoff and moves the birthday to handed off in one
@@ -18,6 +29,7 @@ abstract interface class DeliveryEventsRepository {
     required String birthdayId,
     required DeliveryChannel channel,
     required DateTime at,
+    String? draftId,
   });
 
   /// Atomically marks the birthday completed and the exact draft confirmed.
@@ -34,9 +46,9 @@ abstract interface class DeliveryEventsRepository {
   /// (consumers resolve "latest per birthday" themselves).
   Stream<List<DeliveryHandoff>> watchHandoffs();
 
-  /// Live stream of the most recent handoff per birthday, restricted to
-  /// [birthdayIds] (query audit: "batched related data"). Consumers with a
-  /// bounded set of birthdays — e.g. History's draft list — use this instead
-  /// of materializing the full, unbounded event log.
+  /// Live stream of the most recent outcome per draft (or legacy birthday),
+  /// restricted to [birthdayIds]. Consumers with a bounded set of birthdays —
+  /// e.g. History's draft list — use this instead of materializing the full,
+  /// unbounded event log.
   Stream<List<DeliveryHandoff>> watchLatestHandoffs(Set<String> birthdayIds);
 }

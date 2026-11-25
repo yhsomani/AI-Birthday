@@ -59,6 +59,18 @@ class $PersonsTable extends Persons with TableInfo<$PersonsTable, Person> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _leapDayResolutionMeta = const VerificationMeta(
+    'leapDayResolution',
+  );
+  @override
+  late final GeneratedColumn<String> leapDayResolution =
+      GeneratedColumn<String>(
+        'leap_day_resolution',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _phoneNumberMeta = const VerificationMeta(
     'phoneNumber',
   );
@@ -243,6 +255,7 @@ class $PersonsTable extends Persons with TableInfo<$PersonsTable, Person> {
     birthdayMonth,
     birthdayDay,
     birthYear,
+    leapDayResolution,
     phoneNumber,
     email,
     relationship,
@@ -307,6 +320,15 @@ class $PersonsTable extends Persons with TableInfo<$PersonsTable, Person> {
       context.handle(
         _birthYearMeta,
         birthYear.isAcceptableOrUnknown(data['birth_year']!, _birthYearMeta),
+      );
+    }
+    if (data.containsKey('leap_day_resolution')) {
+      context.handle(
+        _leapDayResolutionMeta,
+        leapDayResolution.isAcceptableOrUnknown(
+          data['leap_day_resolution']!,
+          _leapDayResolutionMeta,
+        ),
       );
     }
     if (data.containsKey('phone_number')) {
@@ -481,6 +503,10 @@ class $PersonsTable extends Persons with TableInfo<$PersonsTable, Person> {
         DriftSqlType.int,
         data['${effectivePrefix}birth_year'],
       ),
+      leapDayResolution: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}leap_day_resolution'],
+      ),
       phoneNumber: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}phone_number'],
@@ -560,6 +586,7 @@ class Person extends DataClass implements Insertable<Person> {
   final int? birthdayMonth;
   final int? birthdayDay;
   final int? birthYear;
+  final String? leapDayResolution;
   final String? phoneNumber;
   final String? email;
   final String relationship;
@@ -582,6 +609,7 @@ class Person extends DataClass implements Insertable<Person> {
     this.birthdayMonth,
     this.birthdayDay,
     this.birthYear,
+    this.leapDayResolution,
     this.phoneNumber,
     this.email,
     required this.relationship,
@@ -612,6 +640,9 @@ class Person extends DataClass implements Insertable<Person> {
     }
     if (!nullToAbsent || birthYear != null) {
       map['birth_year'] = Variable<int>(birthYear);
+    }
+    if (!nullToAbsent || leapDayResolution != null) {
+      map['leap_day_resolution'] = Variable<String>(leapDayResolution);
     }
     if (!nullToAbsent || phoneNumber != null) {
       map['phone_number'] = Variable<String>(phoneNumber);
@@ -657,6 +688,9 @@ class Person extends DataClass implements Insertable<Person> {
       birthYear: birthYear == null && nullToAbsent
           ? const Value.absent()
           : Value(birthYear),
+      leapDayResolution: leapDayResolution == null && nullToAbsent
+          ? const Value.absent()
+          : Value(leapDayResolution),
       phoneNumber: phoneNumber == null && nullToAbsent
           ? const Value.absent()
           : Value(phoneNumber),
@@ -697,6 +731,9 @@ class Person extends DataClass implements Insertable<Person> {
       birthdayMonth: serializer.fromJson<int?>(json['birthdayMonth']),
       birthdayDay: serializer.fromJson<int?>(json['birthdayDay']),
       birthYear: serializer.fromJson<int?>(json['birthYear']),
+      leapDayResolution: serializer.fromJson<String?>(
+        json['leapDayResolution'],
+      ),
       phoneNumber: serializer.fromJson<String?>(json['phoneNumber']),
       email: serializer.fromJson<String?>(json['email']),
       relationship: serializer.fromJson<String>(json['relationship']),
@@ -728,6 +765,7 @@ class Person extends DataClass implements Insertable<Person> {
       'birthdayMonth': serializer.toJson<int?>(birthdayMonth),
       'birthdayDay': serializer.toJson<int?>(birthdayDay),
       'birthYear': serializer.toJson<int?>(birthYear),
+      'leapDayResolution': serializer.toJson<String?>(leapDayResolution),
       'phoneNumber': serializer.toJson<String?>(phoneNumber),
       'email': serializer.toJson<String?>(email),
       'relationship': serializer.toJson<String>(relationship),
@@ -755,6 +793,7 @@ class Person extends DataClass implements Insertable<Person> {
     Value<int?> birthdayMonth = const Value.absent(),
     Value<int?> birthdayDay = const Value.absent(),
     Value<int?> birthYear = const Value.absent(),
+    Value<String?> leapDayResolution = const Value.absent(),
     Value<String?> phoneNumber = const Value.absent(),
     Value<String?> email = const Value.absent(),
     String? relationship,
@@ -779,6 +818,9 @@ class Person extends DataClass implements Insertable<Person> {
         : this.birthdayMonth,
     birthdayDay: birthdayDay.present ? birthdayDay.value : this.birthdayDay,
     birthYear: birthYear.present ? birthYear.value : this.birthYear,
+    leapDayResolution: leapDayResolution.present
+        ? leapDayResolution.value
+        : this.leapDayResolution,
     phoneNumber: phoneNumber.present ? phoneNumber.value : this.phoneNumber,
     email: email.present ? email.value : this.email,
     relationship: relationship ?? this.relationship,
@@ -808,6 +850,9 @@ class Person extends DataClass implements Insertable<Person> {
           ? data.birthdayDay.value
           : this.birthdayDay,
       birthYear: data.birthYear.present ? data.birthYear.value : this.birthYear,
+      leapDayResolution: data.leapDayResolution.present
+          ? data.leapDayResolution.value
+          : this.leapDayResolution,
       phoneNumber: data.phoneNumber.present
           ? data.phoneNumber.value
           : this.phoneNumber,
@@ -853,6 +898,7 @@ class Person extends DataClass implements Insertable<Person> {
           ..write('birthdayMonth: $birthdayMonth, ')
           ..write('birthdayDay: $birthdayDay, ')
           ..write('birthYear: $birthYear, ')
+          ..write('leapDayResolution: $leapDayResolution, ')
           ..write('phoneNumber: $phoneNumber, ')
           ..write('email: $email, ')
           ..write('relationship: $relationship, ')
@@ -880,6 +926,7 @@ class Person extends DataClass implements Insertable<Person> {
     birthdayMonth,
     birthdayDay,
     birthYear,
+    leapDayResolution,
     phoneNumber,
     email,
     relationship,
@@ -906,6 +953,7 @@ class Person extends DataClass implements Insertable<Person> {
           other.birthdayMonth == this.birthdayMonth &&
           other.birthdayDay == this.birthdayDay &&
           other.birthYear == this.birthYear &&
+          other.leapDayResolution == this.leapDayResolution &&
           other.phoneNumber == this.phoneNumber &&
           other.email == this.email &&
           other.relationship == this.relationship &&
@@ -930,6 +978,7 @@ class PersonsCompanion extends UpdateCompanion<Person> {
   final Value<int?> birthdayMonth;
   final Value<int?> birthdayDay;
   final Value<int?> birthYear;
+  final Value<String?> leapDayResolution;
   final Value<String?> phoneNumber;
   final Value<String?> email;
   final Value<String> relationship;
@@ -953,6 +1002,7 @@ class PersonsCompanion extends UpdateCompanion<Person> {
     this.birthdayMonth = const Value.absent(),
     this.birthdayDay = const Value.absent(),
     this.birthYear = const Value.absent(),
+    this.leapDayResolution = const Value.absent(),
     this.phoneNumber = const Value.absent(),
     this.email = const Value.absent(),
     this.relationship = const Value.absent(),
@@ -977,6 +1027,7 @@ class PersonsCompanion extends UpdateCompanion<Person> {
     this.birthdayMonth = const Value.absent(),
     this.birthdayDay = const Value.absent(),
     this.birthYear = const Value.absent(),
+    this.leapDayResolution = const Value.absent(),
     this.phoneNumber = const Value.absent(),
     this.email = const Value.absent(),
     required String relationship,
@@ -1012,6 +1063,7 @@ class PersonsCompanion extends UpdateCompanion<Person> {
     Expression<int>? birthdayMonth,
     Expression<int>? birthdayDay,
     Expression<int>? birthYear,
+    Expression<String>? leapDayResolution,
     Expression<String>? phoneNumber,
     Expression<String>? email,
     Expression<String>? relationship,
@@ -1036,6 +1088,7 @@ class PersonsCompanion extends UpdateCompanion<Person> {
       if (birthdayMonth != null) 'birthday_month': birthdayMonth,
       if (birthdayDay != null) 'birthday_day': birthdayDay,
       if (birthYear != null) 'birth_year': birthYear,
+      if (leapDayResolution != null) 'leap_day_resolution': leapDayResolution,
       if (phoneNumber != null) 'phone_number': phoneNumber,
       if (email != null) 'email': email,
       if (relationship != null) 'relationship': relationship,
@@ -1064,6 +1117,7 @@ class PersonsCompanion extends UpdateCompanion<Person> {
     Value<int?>? birthdayMonth,
     Value<int?>? birthdayDay,
     Value<int?>? birthYear,
+    Value<String?>? leapDayResolution,
     Value<String?>? phoneNumber,
     Value<String?>? email,
     Value<String>? relationship,
@@ -1088,6 +1142,7 @@ class PersonsCompanion extends UpdateCompanion<Person> {
       birthdayMonth: birthdayMonth ?? this.birthdayMonth,
       birthdayDay: birthdayDay ?? this.birthdayDay,
       birthYear: birthYear ?? this.birthYear,
+      leapDayResolution: leapDayResolution ?? this.leapDayResolution,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       email: email ?? this.email,
       relationship: relationship ?? this.relationship,
@@ -1127,6 +1182,9 @@ class PersonsCompanion extends UpdateCompanion<Person> {
     }
     if (birthYear.present) {
       map['birth_year'] = Variable<int>(birthYear.value);
+    }
+    if (leapDayResolution.present) {
+      map['leap_day_resolution'] = Variable<String>(leapDayResolution.value);
     }
     if (phoneNumber.present) {
       map['phone_number'] = Variable<String>(phoneNumber.value);
@@ -1194,6 +1252,7 @@ class PersonsCompanion extends UpdateCompanion<Person> {
           ..write('birthdayMonth: $birthdayMonth, ')
           ..write('birthdayDay: $birthdayDay, ')
           ..write('birthYear: $birthYear, ')
+          ..write('leapDayResolution: $leapDayResolution, ')
           ..write('phoneNumber: $phoneNumber, ')
           ..write('email: $email, ')
           ..write('relationship: $relationship, ')
@@ -2803,6 +2862,17 @@ class $DeliveryEventsTable extends DeliveryEvents
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _draftIdMeta = const VerificationMeta(
+    'draftId',
+  );
+  @override
+  late final GeneratedColumn<String> draftId = GeneratedColumn<String>(
+    'draft_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _channelMeta = const VerificationMeta(
     'channel',
   );
@@ -2813,6 +2883,18 @@ class $DeliveryEventsTable extends DeliveryEvents
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _outcomeMeta = const VerificationMeta(
+    'outcome',
+  );
+  @override
+  late final GeneratedColumn<String> outcome = GeneratedColumn<String>(
+    'outcome',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('launched'),
   );
   static const VerificationMeta _handedOffAtMeta = const VerificationMeta(
     'handedOffAt',
@@ -2826,7 +2908,14 @@ class $DeliveryEventsTable extends DeliveryEvents
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, birthdayId, channel, handedOffAt];
+  List<GeneratedColumn> get $columns => [
+    id,
+    birthdayId,
+    draftId,
+    channel,
+    outcome,
+    handedOffAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2852,6 +2941,12 @@ class $DeliveryEventsTable extends DeliveryEvents
     } else if (isInserting) {
       context.missing(_birthdayIdMeta);
     }
+    if (data.containsKey('draft_id')) {
+      context.handle(
+        _draftIdMeta,
+        draftId.isAcceptableOrUnknown(data['draft_id']!, _draftIdMeta),
+      );
+    }
     if (data.containsKey('channel')) {
       context.handle(
         _channelMeta,
@@ -2859,6 +2954,12 @@ class $DeliveryEventsTable extends DeliveryEvents
       );
     } else if (isInserting) {
       context.missing(_channelMeta);
+    }
+    if (data.containsKey('outcome')) {
+      context.handle(
+        _outcomeMeta,
+        outcome.isAcceptableOrUnknown(data['outcome']!, _outcomeMeta),
+      );
     }
     if (data.containsKey('handed_off_at')) {
       context.handle(
@@ -2888,9 +2989,17 @@ class $DeliveryEventsTable extends DeliveryEvents
         DriftSqlType.string,
         data['${effectivePrefix}birthday_id'],
       )!,
+      draftId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}draft_id'],
+      ),
       channel: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}channel'],
+      )!,
+      outcome: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}outcome'],
       )!,
       handedOffAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -2908,12 +3017,16 @@ class $DeliveryEventsTable extends DeliveryEvents
 class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
   final String id;
   final String birthdayId;
+  final String? draftId;
   final String channel;
+  final String outcome;
   final DateTime handedOffAt;
   const DeliveryEvent({
     required this.id,
     required this.birthdayId,
+    this.draftId,
     required this.channel,
+    required this.outcome,
     required this.handedOffAt,
   });
   @override
@@ -2921,7 +3034,11 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['birthday_id'] = Variable<String>(birthdayId);
+    if (!nullToAbsent || draftId != null) {
+      map['draft_id'] = Variable<String>(draftId);
+    }
     map['channel'] = Variable<String>(channel);
+    map['outcome'] = Variable<String>(outcome);
     map['handed_off_at'] = Variable<DateTime>(handedOffAt);
     return map;
   }
@@ -2930,7 +3047,11 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
     return DeliveryEventsCompanion(
       id: Value(id),
       birthdayId: Value(birthdayId),
+      draftId: draftId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(draftId),
       channel: Value(channel),
+      outcome: Value(outcome),
       handedOffAt: Value(handedOffAt),
     );
   }
@@ -2943,7 +3064,9 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
     return DeliveryEvent(
       id: serializer.fromJson<String>(json['id']),
       birthdayId: serializer.fromJson<String>(json['birthdayId']),
+      draftId: serializer.fromJson<String?>(json['draftId']),
       channel: serializer.fromJson<String>(json['channel']),
+      outcome: serializer.fromJson<String>(json['outcome']),
       handedOffAt: serializer.fromJson<DateTime>(json['handedOffAt']),
     );
   }
@@ -2953,7 +3076,9 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'birthdayId': serializer.toJson<String>(birthdayId),
+      'draftId': serializer.toJson<String?>(draftId),
       'channel': serializer.toJson<String>(channel),
+      'outcome': serializer.toJson<String>(outcome),
       'handedOffAt': serializer.toJson<DateTime>(handedOffAt),
     };
   }
@@ -2961,12 +3086,16 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
   DeliveryEvent copyWith({
     String? id,
     String? birthdayId,
+    Value<String?> draftId = const Value.absent(),
     String? channel,
+    String? outcome,
     DateTime? handedOffAt,
   }) => DeliveryEvent(
     id: id ?? this.id,
     birthdayId: birthdayId ?? this.birthdayId,
+    draftId: draftId.present ? draftId.value : this.draftId,
     channel: channel ?? this.channel,
+    outcome: outcome ?? this.outcome,
     handedOffAt: handedOffAt ?? this.handedOffAt,
   );
   DeliveryEvent copyWithCompanion(DeliveryEventsCompanion data) {
@@ -2975,7 +3104,9 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
       birthdayId: data.birthdayId.present
           ? data.birthdayId.value
           : this.birthdayId,
+      draftId: data.draftId.present ? data.draftId.value : this.draftId,
       channel: data.channel.present ? data.channel.value : this.channel,
+      outcome: data.outcome.present ? data.outcome.value : this.outcome,
       handedOffAt: data.handedOffAt.present
           ? data.handedOffAt.value
           : this.handedOffAt,
@@ -2987,41 +3118,52 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
     return (StringBuffer('DeliveryEvent(')
           ..write('id: $id, ')
           ..write('birthdayId: $birthdayId, ')
+          ..write('draftId: $draftId, ')
           ..write('channel: $channel, ')
+          ..write('outcome: $outcome, ')
           ..write('handedOffAt: $handedOffAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, birthdayId, channel, handedOffAt);
+  int get hashCode =>
+      Object.hash(id, birthdayId, draftId, channel, outcome, handedOffAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is DeliveryEvent &&
           other.id == this.id &&
           other.birthdayId == this.birthdayId &&
+          other.draftId == this.draftId &&
           other.channel == this.channel &&
+          other.outcome == this.outcome &&
           other.handedOffAt == this.handedOffAt);
 }
 
 class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
   final Value<String> id;
   final Value<String> birthdayId;
+  final Value<String?> draftId;
   final Value<String> channel;
+  final Value<String> outcome;
   final Value<DateTime> handedOffAt;
   final Value<int> rowid;
   const DeliveryEventsCompanion({
     this.id = const Value.absent(),
     this.birthdayId = const Value.absent(),
+    this.draftId = const Value.absent(),
     this.channel = const Value.absent(),
+    this.outcome = const Value.absent(),
     this.handedOffAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DeliveryEventsCompanion.insert({
     required String id,
     required String birthdayId,
+    this.draftId = const Value.absent(),
     required String channel,
+    this.outcome = const Value.absent(),
     required DateTime handedOffAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -3031,14 +3173,18 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
   static Insertable<DeliveryEvent> custom({
     Expression<String>? id,
     Expression<String>? birthdayId,
+    Expression<String>? draftId,
     Expression<String>? channel,
+    Expression<String>? outcome,
     Expression<DateTime>? handedOffAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (birthdayId != null) 'birthday_id': birthdayId,
+      if (draftId != null) 'draft_id': draftId,
       if (channel != null) 'channel': channel,
+      if (outcome != null) 'outcome': outcome,
       if (handedOffAt != null) 'handed_off_at': handedOffAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -3047,14 +3193,18 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
   DeliveryEventsCompanion copyWith({
     Value<String>? id,
     Value<String>? birthdayId,
+    Value<String?>? draftId,
     Value<String>? channel,
+    Value<String>? outcome,
     Value<DateTime>? handedOffAt,
     Value<int>? rowid,
   }) {
     return DeliveryEventsCompanion(
       id: id ?? this.id,
       birthdayId: birthdayId ?? this.birthdayId,
+      draftId: draftId ?? this.draftId,
       channel: channel ?? this.channel,
+      outcome: outcome ?? this.outcome,
       handedOffAt: handedOffAt ?? this.handedOffAt,
       rowid: rowid ?? this.rowid,
     );
@@ -3069,8 +3219,14 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
     if (birthdayId.present) {
       map['birthday_id'] = Variable<String>(birthdayId.value);
     }
+    if (draftId.present) {
+      map['draft_id'] = Variable<String>(draftId.value);
+    }
     if (channel.present) {
       map['channel'] = Variable<String>(channel.value);
+    }
+    if (outcome.present) {
+      map['outcome'] = Variable<String>(outcome.value);
     }
     if (handedOffAt.present) {
       map['handed_off_at'] = Variable<DateTime>(handedOffAt.value);
@@ -3086,7 +3242,9 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
     return (StringBuffer('DeliveryEventsCompanion(')
           ..write('id: $id, ')
           ..write('birthdayId: $birthdayId, ')
+          ..write('draftId: $draftId, ')
           ..write('channel: $channel, ')
+          ..write('outcome: $outcome, ')
           ..write('handedOffAt: $handedOffAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -3943,6 +4101,7 @@ typedef $$PersonsTableCreateCompanionBuilder =
       Value<int?> birthdayMonth,
       Value<int?> birthdayDay,
       Value<int?> birthYear,
+      Value<String?> leapDayResolution,
       Value<String?> phoneNumber,
       Value<String?> email,
       required String relationship,
@@ -3968,6 +4127,7 @@ typedef $$PersonsTableUpdateCompanionBuilder =
       Value<int?> birthdayMonth,
       Value<int?> birthdayDay,
       Value<int?> birthYear,
+      Value<String?> leapDayResolution,
       Value<String?> phoneNumber,
       Value<String?> email,
       Value<String> relationship,
@@ -4018,6 +4178,11 @@ class $$PersonsTableFilterComposer
 
   ColumnFilters<int> get birthYear => $composableBuilder(
     column: $table.birthYear,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get leapDayResolution => $composableBuilder(
+    column: $table.leapDayResolution,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4136,6 +4301,11 @@ class $$PersonsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get leapDayResolution => $composableBuilder(
+    column: $table.leapDayResolution,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get phoneNumber => $composableBuilder(
     column: $table.phoneNumber,
     builder: (column) => ColumnOrderings(column),
@@ -4245,6 +4415,11 @@ class $$PersonsTableAnnotationComposer
   GeneratedColumn<int> get birthYear =>
       $composableBuilder(column: $table.birthYear, builder: (column) => column);
 
+  GeneratedColumn<String> get leapDayResolution => $composableBuilder(
+    column: $table.leapDayResolution,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get phoneNumber => $composableBuilder(
     column: $table.phoneNumber,
     builder: (column) => column,
@@ -4345,6 +4520,7 @@ class $$PersonsTableTableManager
                 Value<int?> birthdayMonth = const Value.absent(),
                 Value<int?> birthdayDay = const Value.absent(),
                 Value<int?> birthYear = const Value.absent(),
+                Value<String?> leapDayResolution = const Value.absent(),
                 Value<String?> phoneNumber = const Value.absent(),
                 Value<String?> email = const Value.absent(),
                 Value<String> relationship = const Value.absent(),
@@ -4368,6 +4544,7 @@ class $$PersonsTableTableManager
                 birthdayMonth: birthdayMonth,
                 birthdayDay: birthdayDay,
                 birthYear: birthYear,
+                leapDayResolution: leapDayResolution,
                 phoneNumber: phoneNumber,
                 email: email,
                 relationship: relationship,
@@ -4393,6 +4570,7 @@ class $$PersonsTableTableManager
                 Value<int?> birthdayMonth = const Value.absent(),
                 Value<int?> birthdayDay = const Value.absent(),
                 Value<int?> birthYear = const Value.absent(),
+                Value<String?> leapDayResolution = const Value.absent(),
                 Value<String?> phoneNumber = const Value.absent(),
                 Value<String?> email = const Value.absent(),
                 required String relationship,
@@ -4416,6 +4594,7 @@ class $$PersonsTableTableManager
                 birthdayMonth: birthdayMonth,
                 birthdayDay: birthdayDay,
                 birthYear: birthYear,
+                leapDayResolution: leapDayResolution,
                 phoneNumber: phoneNumber,
                 email: email,
                 relationship: relationship,
@@ -5254,7 +5433,9 @@ typedef $$DeliveryEventsTableCreateCompanionBuilder =
     DeliveryEventsCompanion Function({
       required String id,
       required String birthdayId,
+      Value<String?> draftId,
       required String channel,
+      Value<String> outcome,
       required DateTime handedOffAt,
       Value<int> rowid,
     });
@@ -5262,7 +5443,9 @@ typedef $$DeliveryEventsTableUpdateCompanionBuilder =
     DeliveryEventsCompanion Function({
       Value<String> id,
       Value<String> birthdayId,
+      Value<String?> draftId,
       Value<String> channel,
+      Value<String> outcome,
       Value<DateTime> handedOffAt,
       Value<int> rowid,
     });
@@ -5286,8 +5469,18 @@ class $$DeliveryEventsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get draftId => $composableBuilder(
+    column: $table.draftId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get channel => $composableBuilder(
     column: $table.channel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get outcome => $composableBuilder(
+    column: $table.outcome,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5316,8 +5509,18 @@ class $$DeliveryEventsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get draftId => $composableBuilder(
+    column: $table.draftId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get channel => $composableBuilder(
     column: $table.channel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get outcome => $composableBuilder(
+    column: $table.outcome,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -5344,8 +5547,14 @@ class $$DeliveryEventsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get draftId =>
+      $composableBuilder(column: $table.draftId, builder: (column) => column);
+
   GeneratedColumn<String> get channel =>
       $composableBuilder(column: $table.channel, builder: (column) => column);
+
+  GeneratedColumn<String> get outcome =>
+      $composableBuilder(column: $table.outcome, builder: (column) => column);
 
   GeneratedColumn<DateTime> get handedOffAt => $composableBuilder(
     column: $table.handedOffAt,
@@ -5388,13 +5597,17 @@ class $$DeliveryEventsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> birthdayId = const Value.absent(),
+                Value<String?> draftId = const Value.absent(),
                 Value<String> channel = const Value.absent(),
+                Value<String> outcome = const Value.absent(),
                 Value<DateTime> handedOffAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DeliveryEventsCompanion(
                 id: id,
                 birthdayId: birthdayId,
+                draftId: draftId,
                 channel: channel,
+                outcome: outcome,
                 handedOffAt: handedOffAt,
                 rowid: rowid,
               ),
@@ -5402,13 +5615,17 @@ class $$DeliveryEventsTableTableManager
               ({
                 required String id,
                 required String birthdayId,
+                Value<String?> draftId = const Value.absent(),
                 required String channel,
+                Value<String> outcome = const Value.absent(),
                 required DateTime handedOffAt,
                 Value<int> rowid = const Value.absent(),
               }) => DeliveryEventsCompanion.insert(
                 id: id,
                 birthdayId: birthdayId,
+                draftId: draftId,
                 channel: channel,
+                outcome: outcome,
                 handedOffAt: handedOffAt,
                 rowid: rowid,
               ),

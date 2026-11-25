@@ -83,6 +83,29 @@ void main() {
       expect(c3.parseBirthday(), isNull);
     });
 
+    test('missing birthday is explicitly invalid and repairable', () {
+      const contact = DeviceContact(id: 'missing', name: 'Needs Repair');
+
+      final candidate = contact.toCandidate();
+
+      expect(candidate.hasBirthday, isFalse);
+      expect(candidate.isImportable, isFalse);
+      expect(candidate.invalidReason, contains('Birthday missing'));
+    });
+
+    test('leap-day device contact requires an explicit policy', () {
+      const contact = DeviceContact(
+        id: 'leap',
+        name: 'Leap',
+        birthdayString: '2000-02-29',
+      );
+
+      final candidate = contact.toCandidate();
+      expect(candidate.hasBirthday, isTrue);
+      expect(candidate.isImportable, isFalse);
+      expect(candidate.invalidReason, contains('February 28 or March 1'));
+    });
+
     test('candidate conversion defaults autoPrepare to false', () {
       const contact = DeviceContact(
         id: '1',

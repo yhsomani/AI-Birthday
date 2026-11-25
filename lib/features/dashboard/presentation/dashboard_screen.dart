@@ -86,7 +86,12 @@ class DashboardScreen extends ConsumerWidget {
                   final celebrateToday = <Birthday>[];
 
                   for (final b in birthdays) {
-                    if (!peopleMap.containsKey(b.personId)) continue;
+                    final person = peopleMap[b.personId];
+                    if (person == null) continue;
+                    if (person.isLeapDayBirthday &&
+                        person.leapDayResolution == null) {
+                      continue;
+                    }
                     final days = b.daysUntil(now);
                     if (days == 0) {
                       todayBirthdays.add(b);

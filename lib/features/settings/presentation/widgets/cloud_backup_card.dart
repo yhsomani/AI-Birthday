@@ -10,6 +10,8 @@ class CloudBackupCard extends StatelessWidget {
     super.key,
     required this.lastSyncTime,
     required this.cloudError,
+    this.restoreReport,
+    this.restoreDetails = const [],
     required this.isSyncing,
     required this.onBackup,
     required this.onRestore,
@@ -17,6 +19,8 @@ class CloudBackupCard extends StatelessWidget {
 
   final DateTime? lastSyncTime;
   final String? cloudError;
+  final String? restoreReport;
+  final List<String> restoreDetails;
   final bool isSyncing;
   final VoidCallback onBackup;
   final VoidCallback onRestore;
@@ -111,6 +115,41 @@ class CloudBackupCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (restoreReport != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                restoreReport!,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: context.colors.success,
+                ),
+              ),
+              if (restoreDetails.isNotEmpty)
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: Text(
+                    'Restore details (${restoreDetails.length})',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  children: [
+                    for (final detail in restoreDetails)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            detail,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.colors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+            ],
             // Durable failure status: the job row remembers that the
             // last backup/restore failed, even after this screen was
             // closed and reopened. Tapping the button again retries.

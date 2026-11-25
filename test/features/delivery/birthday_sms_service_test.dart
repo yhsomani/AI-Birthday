@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_birthday/core/logging/app_logger.dart';
+import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/delivery/application/birthday_sms_service.dart';
 import 'package:ai_birthday/features/delivery/data/native_sms_gateway.dart';
@@ -79,7 +80,7 @@ void main() {
       final sendTime = service.computeSendTime(
         person: person,
         reference: reference,
-      );
+      )!;
 
       expect(sendTime.year, 2026);
       expect(sendTime.month, 10);
@@ -108,7 +109,7 @@ void main() {
         final sendTime = service.computeSendTime(
           person: person,
           reference: reference,
-        );
+        )!;
 
         expect(sendTime.year, 2027);
         expect(sendTime.month, 5);
@@ -124,6 +125,7 @@ void main() {
         name: 'Leap Baby',
         birthdayMonth: 2,
         birthdayDay: 29,
+        leapDayResolution: LeapDayResolution.mar1,
         phoneNumber: '+15550001111',
         autoSendPolicy: AutoSendPolicy.automaticSmsApproved,
         createdAt: DateTime(2024, 1, 1),
@@ -135,12 +137,32 @@ void main() {
       final sendTime = service.computeSendTime(
         person: person,
         reference: reference,
-      );
+      )!;
 
       expect(sendTime.year, 2027);
       expect(sendTime.hour, 0);
       expect(sendTime.minute, 0);
-      expect(sendTime.month == 2 || sendTime.month == 3, isTrue);
+      expect(sendTime.month, 3);
+      expect(sendTime.day, 1);
+    });
+
+    test('returns null for an unresolved legacy leap-day policy', () {
+      final person = Person(
+        id: 'p-unresolved',
+        name: 'Unresolved Leap',
+        birthdayMonth: 2,
+        birthdayDay: 29,
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+      );
+
+      expect(
+        service.computeSendTime(
+          person: person,
+          reference: DateTime(2027, 1, 1),
+        ),
+        isNull,
+      );
     });
   });
 
@@ -193,6 +215,26 @@ void main() {
         expect(gateway.cancelledJobs, contains('sms_b-100'));
       },
     );
+
+    test('cancels SMS for an unresolved leap-day policy', () async {
+      final unresolved = personEligible.copyWith(
+        birthdayMonth: 2,
+        birthdayDay: 29,
+        clearLeapDayResolution: true,
+      );
+
+      final scheduled = await service.reconcileRecipientSms(
+        person: unresolved,
+        birthday: birthday,
+        draft: draftApproved,
+        globalSmsEnabled: true,
+        reference: now,
+      );
+
+      expect(scheduled, isFalse);
+      expect(gateway.scheduledJobs, isEmpty);
+      expect(gateway.cancelledJobs, contains('sms_b-100'));
+    });
 
     test('rejects scheduling if person is manualOnly', () async {
       final personManual = personEligible.copyWith(

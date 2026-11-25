@@ -54,7 +54,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isSyncing = false;
   String? _cloudError;
   DateTime? _lastSyncTime;
+  String? _restoreReport;
+  List<String> _restoreDetails = const [];
   NanoState _nanoState = NanoState.unavailable;
+  bool _isStartingNanoDownload = false;
 
   // Durable job bookkeeping for the signed-in account's cloud_sync job.
   StreamSubscription<JobRecord?>? _cloudJobSub;
@@ -63,7 +66,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // Set when THIS screen visit enqueues a job: gates the success/failure
   // snackbar and picks backup- vs restore-specific copy.
   String? _lastEnqueuedCloudJobId;
-  String? _pendingCloudOperation;
 
   // Bumped after a notification re-enable attempt so the revoked-state
   // FutureBuilder below re-queries OS permission (audit Scenario T).
@@ -118,7 +120,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _lastHandledCloudJobStatus = job.status;
 
     final ours = job.id == _lastEnqueuedCloudJobId;
-    final operation = _pendingCloudOperation ?? CloudJobPayload.backup;
+    final operation = CloudJobPayload.fromJson(job.payload).operation;
 
     switch (job.status) {
       case JobStatus.queued || JobStatus.running || JobStatus.retrying:
@@ -127,9 +129,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _cloudError = null;
         });
       case JobStatus.succeeded:
+        String? report;
+        final details = <String>[];
+        if (operation == CloudJobPayload.restore && job.resultRef != null) {
+          try {
+            final raw = jsonDecode(job.resultRef!);
+            if (raw is Map<String, dynamic>) {
+              final restored = raw['restored'] as int? ?? 0;
+              final skipped = raw['skipped'] as int? ?? 0;
+              final conflicts = raw['conflicts'] as int? ?? 0;
+              report =
+                  'Restored $restored • Skipped $skipped • Conflicts $conflicts';
+              details.addAll(
+                (raw['skippedDetails'] as List<dynamic>? ?? const [])
+                    .whereType<String>(),
+              );
+              details.addAll(
+                (raw['conflictDetails'] as List<dynamic>? ?? const [])
+                    .whereType<String>(),
+              );
+            }
+          } catch (_) {}
+        }
         setState(() {
           _isSyncing = false;
           _cloudError = null;
+          if (report != null) _restoreReport = report;
+          if (report != null) _restoreDetails = details;
         });
         _loadLastSyncTime(); // Refresh the LAST SUCCESSFUL chip.
         if (ours) {
@@ -137,7 +163,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             SnackBar(
               content: Text(
                 operation == CloudJobPayload.restore
-                    ? 'Cloud restore complete!'
+                    ? (report ?? 'Cloud restore complete!')
                     : 'Cloud backup complete.',
               ),
             ),
@@ -198,6 +224,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } catch (_) {}
   }
 
+  Future<void> _startNanoDownload() async {
+    setState(() {
+      _isStartingNanoDownload = true;
+      _nanoState = NanoState.downloading;
+    });
+    try {
+      final next = await ref.read(geminiNanoPlatformProvider).startDownload();
+      if (mounted) setState(() => _nanoState = next);
+    } finally {
+      if (mounted) setState(() => _isStartingNanoDownload = false);
+    }
+    await _checkNanoState();
+  }
+
   Future<void> _loadLastSyncTime() async {
     try {
       final auth = ref.read(authControllerProvider).valueOrNull;
@@ -213,6 +253,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } catch (_) {}
   }
 
+  Future<bool> _confirmLocalDataOwnership(
+    String accountId,
+    String accountLabel,
+  ) async {
+    final service = ref.read(cloudSyncServiceProvider);
+    final owner = await service.getLocalDataOwner();
+    if (owner == null || owner.isEmpty) {
+      await service.assignLocalDataOwner(accountId);
+      return true;
+    }
+    if (owner == accountId) return true;
+    if (!mounted) return false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Who owns the data on this device?'),
+        content: Text(
+          'This device already has a cloud-data owner. Using $accountLabel would make the current local people, birthdays, drafts, and settings eligible to upload to that account. Nothing has been uploaded. Confirm only if these records belong to $accountLabel; otherwise cancel and sign back in to the original account.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Use with this account'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return false;
+    await service.assignLocalDataOwner(accountId);
+    return true;
+  }
+
   Future<void> _handleCloudSync() async {
     HapticFeedback.lightImpact();
     final auth = ref.read(authControllerProvider).valueOrNull;
@@ -224,6 +300,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         auth.identity!.firebaseUid ?? auth.identity!.googleSubject;
     if (accountId.isEmpty) {
       AuthBottomSheet.show(context);
+      return;
+    }
+    if (!await _confirmLocalDataOwnership(accountId, auth.identity!.email)) {
       return;
     }
 
@@ -245,7 +324,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _isSyncing = true;
       _cloudError = null;
       _lastEnqueuedCloudJobId = job.id;
-      _pendingCloudOperation = CloudJobPayload.backup;
     });
   }
 
@@ -262,6 +340,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       AuthBottomSheet.show(context);
       return;
     }
+
+    if (!await _confirmLocalDataOwnership(accountId, auth.identity!.email)) {
+      return;
+    }
+    if (!mounted) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -303,7 +386,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _isSyncing = true;
       _cloudError = null;
       _lastEnqueuedCloudJobId = job.id;
-      _pendingCloudOperation = CloudJobPayload.restore;
     });
   }
 
@@ -644,6 +726,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final theme = Theme.of(context);
     final reminderSettings = ref.watch(reminderSettingsProvider);
     final entitlement = ref.watch(entitlementProvider);
+    final entitlementNotifier = ref.read(subscriptionNotifierProvider.notifier);
+    final entitlementCheckState = entitlementNotifier.checkState;
+    final entitlementSummary = switch (entitlementCheckState) {
+      EntitlementCheckState.checking =>
+        'Checking your saved entitlement and Google Play purchase… AI access stays closed until a usable verification is available.',
+      EntitlementCheckState.verified =>
+        'Verified with Google Play for this account. AI features are active.',
+      EntitlementCheckState.cached =>
+        'Using a recent server-verified entitlement while Google Play is rechecked. It expires automatically after 24 hours or the subscription expiry.',
+      EntitlementCheckState.stale =>
+        'The last server verification is more than 24 hours old. AI is locked until Google Play verification succeeds.',
+      EntitlementCheckState.expired =>
+        'This subscription has expired. AI is locked until an active entitlement is verified.',
+      EntitlementCheckState.unavailable =>
+        'No usable verified Pro entitlement is available. Birthday tracking and manual drafting remain available.',
+    };
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -903,6 +1001,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           CloudBackupCard(
             lastSyncTime: _lastSyncTime,
             cloudError: _cloudError,
+            restoreReport: _restoreReport,
+            restoreDetails: _restoreDetails,
             isSyncing: _isSyncing,
             onBackup: _handleCloudSync,
             onRestore: _handleCloudRestore,
@@ -928,20 +1028,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             : context.colors.textSecondary,
                       ),
                       const SizedBox(width: 10),
-                      Text(
-                        entitlement.status.displayName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      Expanded(
+                        child: Text(
+                          entitlementCheckState ==
+                                  EntitlementCheckState.checking
+                              ? 'Checking entitlement…'
+                              : switch (entitlementCheckState) {
+                                  EntitlementCheckState.cached =>
+                                    'Pro (cached verification)',
+                                  EntitlementCheckState.stale =>
+                                    'Pro verification stale',
+                                  EntitlementCheckState.expired =>
+                                    'Subscription expired',
+                                  _ => entitlement.status.displayName,
+                                },
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    entitlement.canUseAi
-                        ? 'Full AI draft generation, rewrite variations, and personalized message studio are active.'
-                        : 'Application AI features require an active subscription entitlement. Birthday tracking and manual drafting remain free forever.',
+                    entitlementSummary,
                     style: TextStyle(
                       fontSize: 13,
                       color: context.colors.textSecondary,
@@ -1236,9 +1347,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     }),
                     trailing: Chip(
                       label: Text(
-                        _nanoState == NanoState.available
-                            ? 'AVAILABLE'
-                            : 'NOT AVAILABLE',
+                        switch (_nanoState) {
+                          NanoState.available => 'AVAILABLE',
+                          NanoState.downloadable => 'DOWNLOADABLE',
+                          NanoState.downloading => 'DOWNLOADING',
+                          _ => 'NOT AVAILABLE',
+                        },
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
@@ -1253,6 +1367,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       visualDensity: VisualDensity.compact,
                     ),
                   ),
+                  if (_nanoState == NanoState.downloadable ||
+                      _nanoState == NanoState.downloading)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          if (_nanoState == NanoState.downloadable)
+                            FilledButton.tonalIcon(
+                              onPressed: _isStartingNanoDownload
+                                  ? null
+                                  : _startNanoDownload,
+                              icon: _isStartingNanoDownload
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.download_outlined,
+                                      size: 18,
+                                    ),
+                              label: Text(
+                                _isStartingNanoDownload
+                                    ? 'Starting download…'
+                                    : 'Download model',
+                              ),
+                            ),
+                          OutlinedButton.icon(
+                            onPressed: _isStartingNanoDownload
+                                ? null
+                                : _checkNanoState,
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: const Text('Refresh status'),
+                          ),
+                        ],
+                      ),
+                    ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                     child: Text(

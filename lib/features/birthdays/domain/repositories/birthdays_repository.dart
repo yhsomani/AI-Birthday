@@ -15,6 +15,7 @@ abstract interface class BirthdaysRepository {
     String? draftId,
   });
   Future<void> deleteBirthday(String id);
+  Future<void> disableBirthdayForPerson(String personId);
 }
 
 /// In-memory implementation of [BirthdaysRepository] for testing and rapid startup.
@@ -80,6 +81,12 @@ class InMemoryBirthdaysRepository implements BirthdaysRepository {
   @override
   Future<void> deleteBirthday(String id) async {
     _store.remove(id);
+    _controller.add(_sortedBirthdays());
+  }
+
+  @override
+  Future<void> disableBirthdayForPerson(String personId) async {
+    _store.removeWhere((_, birthday) => birthday.personId == personId);
     _controller.add(_sortedBirthdays());
   }
 

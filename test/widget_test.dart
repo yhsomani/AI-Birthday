@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_birthday/app/app.dart';
 import 'package:ai_birthday/app/providers.dart';
+import 'package:ai_birthday/core/core_providers.dart';
 import 'package:ai_birthday/core/security/credential_storage.dart';
 
 class _FakeStoreDriver implements SecureStoreDriver {
@@ -17,6 +18,32 @@ class _FakeStoreDriver implements SecureStoreDriver {
 }
 
 void main() {
+  testWidgets(
+    'database initialization failure shows bounded recovery diagnostics',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            databaseStartupProvider.overrideWith(
+              (ref) async => throw StateError('unreadable database'),
+            ),
+          ],
+          child: const AiBirthdayApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Local data recovery needed'), findsOneWidget);
+      expect(
+        find.textContaining('No cloud upload or local write'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('StateError'), findsOneWidget);
+      expect(find.text('Retry database initialization'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('App root redirects to onboarding on first run', (
     WidgetTester tester,
   ) async {

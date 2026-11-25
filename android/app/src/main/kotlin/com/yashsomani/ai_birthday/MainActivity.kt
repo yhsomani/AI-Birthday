@@ -169,16 +169,23 @@ class MainActivity : FlutterActivity() {
                                     FeatureStatus.AVAILABLE -> result.success("ready")
                                     FeatureStatus.DOWNLOADING -> result.success("downloading")
                                     FeatureStatus.DOWNLOADABLE -> {
-                                        generativeModel.download().collect { status ->
-                                            when (status) {
-                                                is DownloadStatus.DownloadStarted,
-                                                is DownloadStatus.DownloadProgress,
-                                                DownloadStatus.DownloadCompleted,
-                                                is DownloadStatus.DownloadFailed -> Unit
-                                                else -> Unit
+                                        result.success("downloading")
+                                        nativeScope.launch {
+                                            try {
+                                                generativeModel.download().collect { status ->
+                                                    when (status) {
+                                                        is DownloadStatus.DownloadStarted,
+                                                        is DownloadStatus.DownloadProgress,
+                                                        DownloadStatus.DownloadCompleted,
+                                                        is DownloadStatus.DownloadFailed -> Unit
+                                                        else -> Unit
+                                                    }
+                                                }
+                                            } catch (_: Exception) {
+                                                // currentState remains authoritative; the next
+                                                // refresh reports the concrete terminal state.
                                             }
                                         }
-                                        result.success(mapFeatureStatus(generativeModel.checkStatus()))
                                     }
                                     FeatureStatus.UNAVAILABLE -> result.success("unavailable")
                                     else -> result.success("error")

@@ -75,7 +75,11 @@ void main() {
 
       expect(find.text('Bring in your birthdays'), findsOneWidget);
       expect(find.text('Add Birthday Manually'), findsOneWidget);
-      expect(find.text('Import from Phone Contacts'), findsOneWidget);
+      expect(find.text('Open Phone Contact Import'), findsOneWidget);
+      expect(
+        find.textContaining('asks for contacts permission'),
+        findsOneWidget,
+      );
 
       // Page 2 -> Page 3
       await tester.tap(find.text('Next'));
@@ -138,7 +142,7 @@ void main() {
         await tester.tap(find.text('Next'));
         await tester.pumpAndSettle();
 
-        await tester.tap(find.text('Import from Phone Contacts'));
+        await tester.tap(find.text('Open Phone Contact Import'));
         await tester.pumpAndSettle();
 
         expect(await fakeStorage.hasCompletedOnboarding(), isTrue);

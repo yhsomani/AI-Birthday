@@ -111,6 +111,35 @@ void main() {
   }
 
   test(
+    'unresolved leap policy blocks generation without deleting the job',
+    () async {
+      final person = Person(
+        id: 'p1',
+        name: 'Legacy Leap',
+        birthdayMonth: 2,
+        birthdayDay: 29,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await peopleRepo.savePerson(person);
+      final birthday = await seedBirthday();
+      final payload = AiJobPayload(
+        birthdayId: birthday.id,
+        personId: person.id,
+        tone: MessageTone.warm,
+        length: MessageLength.standard,
+      );
+      final job = await claimedJob(payload: payload);
+
+      final outcome = await handler().run(job);
+
+      expect(outcome, isA<JobFailed>());
+      expect(generateCalls, 0);
+      expect(await jobsRepo.getById(job.id), isNotNull);
+    },
+  );
+
+  test(
     'applies the generated message idempotently onto the stable draft row',
     () async {
       await seedPerson();
@@ -139,6 +168,60 @@ void main() {
       final birthday = (await birthdaysRepo.getBirthday('b1'))!;
       expect(birthday.status, BirthdayStatus.messageDrafted);
       expect(birthday.draftId, 'b1');
+    },
+  );
+
+  test(
+    'rollover with null draft link preserves confirmed canonical row',
+    () async {
+      await seedPerson();
+      final birthday = await seedBirthday();
+      final confirmedAt = DateTime.fromMillisecondsSinceEpoch(
+        now.subtract(const Duration(days: 365)).millisecondsSinceEpoch ~/
+            1000 *
+            1000,
+        isUtc: true,
+      );
+      final confirmed = MessageDraft(
+        id: birthday.id,
+        birthdayId: birthday.id,
+        personId: birthday.personId,
+        body: 'Last cycle confirmed message',
+        status: DraftStatus.confirmedSent,
+        createdAt: confirmedAt,
+        updatedAt: confirmedAt,
+      );
+      await draftsRepo.saveDraft(confirmed);
+      // Rollover/new-cycle state intentionally has no active draft link while
+      // retaining prior immutable history at the canonical id.
+      await birthdaysRepo.saveBirthday(birthday.copyWith(clearDraftId: true));
+
+      final outcome = await handler().run(
+        await claimedJob(
+          payload: AiJobPayload(
+            birthdayId: birthday.id,
+            personId: birthday.personId,
+            tone: MessageTone.warm,
+            length: MessageLength.standard,
+            draftUpdatedAt: confirmedAt.toUtc().toIso8601String(),
+          ),
+        ),
+      );
+
+      expect(outcome, isA<JobSucceeded>());
+      final resultId = (outcome as JobSucceeded).resultRef;
+      expect(resultId, isNotNull, reason: 'AI result must not be discarded');
+      expect(resultId, isNot(birthday.id));
+      final drafts = await draftsRepo.getAllDrafts();
+      expect(drafts, hasLength(2));
+      final canonical = drafts.singleWhere((draft) => draft.id == birthday.id);
+      expect(canonical.body, 'Last cycle confirmed message');
+      expect(canonical.status, DraftStatus.confirmedSent);
+      expect(
+        drafts.singleWhere((draft) => draft.id == resultId).body,
+        'AI drafted message',
+      );
+      expect((await birthdaysRepo.getBirthday(birthday.id))?.draftId, resultId);
     },
   );
 

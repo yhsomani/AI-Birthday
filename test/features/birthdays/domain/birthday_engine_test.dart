@@ -65,7 +65,7 @@ void main() {
         month: 1,
         day: 15,
         reference: DateTime(2025, 1, 10),
-      );
+      )!;
       expect(next.year, 2025);
       expect(next.daysUntil, 5);
       expect(next.isToday, isFalse);
@@ -77,7 +77,7 @@ void main() {
         month: 1,
         day: 15,
         reference: DateTime(2025, 1, 20),
-      );
+      )!;
       expect(next.year, 2026);
       expect(next.daysUntil, 360); // Jan 20 2025 -> Jan 15 2026
     });
@@ -87,18 +87,26 @@ void main() {
         month: 3,
         day: 15,
         reference: DateTime(2025, 3, 15),
-      );
+      )!;
       expect(next.isToday, isTrue);
       expect(next.daysUntil, 0);
       expect(next.year, 2025);
     });
 
-    test('Feb 29 resolves to Feb 28 by default and Mar 1 when chosen', () {
+    test('Feb 29 resolves only after an explicit policy is chosen', () {
+      final unresolved = engine.computeNext(
+        month: 2,
+        day: 29,
+        reference: DateTime(2025, 1, 5),
+      );
+      expect(unresolved, isNull);
+
       final feb28 = engine.computeNext(
         month: 2,
         day: 29,
+        leapDay: LeapDayResolution.feb28,
         reference: DateTime(2025, 1, 5), // non-leap year
-      );
+      )!;
       expect(feb28.isLeapDayAdjusted, isTrue);
       expect(feb28.nextDate.month, 2);
       expect(feb28.nextDate.day, 28);
@@ -109,7 +117,7 @@ void main() {
         day: 29,
         reference: DateTime(2025, 1, 5),
         leapDay: LeapDayResolution.mar1,
-      );
+      )!;
       expect(mar1.nextDate.month, 3);
       expect(mar1.nextDate.day, 1);
     });
@@ -118,8 +126,9 @@ void main() {
       final next = engine.computeNext(
         month: 2,
         day: 29,
+        leapDay: LeapDayResolution.feb28,
         reference: DateTime(2024, 2, 28),
-      );
+      )!;
       expect(next.nextDate.day, 29);
       expect(next.daysUntil, 1);
       expect(next.isLeapDayAdjusted, isFalse);
@@ -127,8 +136,9 @@ void main() {
       final sameDay = engine.computeNext(
         month: 2,
         day: 29,
+        leapDay: LeapDayResolution.feb28,
         reference: DateTime(2024, 2, 29, 12),
-      );
+      )!;
       expect(sameDay.isToday, isTrue);
     });
 
@@ -146,7 +156,7 @@ void main() {
         month: local.month,
         day: local.day,
         reference: instant,
-      );
+      )!;
       expect(next.isToday, isTrue);
       expect(next.daysUntil, 0);
     });
@@ -162,7 +172,7 @@ void main() {
         day: 8,
         timezoneName: 'Asia/Kolkata',
         reference: DateTime.utc(2025, 3, 5, 22, 30),
-      );
+      )!;
       expect(next.daysUntil, 2);
       expect(next.isToday, isFalse);
     });
@@ -174,7 +184,7 @@ void main() {
         day: 8,
         timezoneName: 'Asia/Kolkata',
         reference: DateTime.utc(2025, 3, 7, 20, 0),
-      );
+      )!;
       expect(next.isToday, isTrue);
       expect(next.daysUntil, 0);
     });
@@ -185,13 +195,13 @@ void main() {
         day: 9,
         timezoneName: 'Asia/Kolkata',
         reference: DateTime.utc(2025, 3, 8, 20, 0),
-      );
+      )!;
       final utc = engine.computeNext(
         month: 3,
         day: 9,
         timezoneName: 'UTC',
         reference: DateTime.utc(2025, 3, 8, 20, 0),
-      );
+      )!;
       // IST is already Mar 9; UTC is still Mar 8 (past the 9th's midnight).
       expect(kolkata.isToday, isTrue);
       expect(utc.daysUntil, 1);
@@ -201,9 +211,10 @@ void main() {
       final next = engine.computeNext(
         month: 2,
         day: 29,
+        leapDay: LeapDayResolution.feb28,
         timezoneName: 'Pacific/Auckland', // 2025 is not a leap year
         reference: DateTime.utc(2025, 2, 20),
-      );
+      )!;
       expect(next.isLeapDayAdjusted, isTrue);
       expect(next.nextDate.day, 28);
     });

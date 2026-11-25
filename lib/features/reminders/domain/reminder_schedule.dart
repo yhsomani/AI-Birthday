@@ -88,8 +88,10 @@ class ReminderScheduler {
         day: person.birthdayDay!,
         birthYear: person.birthYear,
         timezoneName: person.timezone ?? fallbackTimezone,
+        leapDay: person.leapDayResolution,
         reference: reference,
       );
+      if (next == null) continue;
       final frameTimezone = person.timezone ?? fallbackTimezone;
 
       for (final kind in enabled) {

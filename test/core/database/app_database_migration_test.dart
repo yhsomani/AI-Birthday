@@ -1,4 +1,4 @@
-/// Drift schema migration verification (background-jobs audit).
+/// Drift schema migration verification.
 ///
 /// schemaVersion 5 adds the durable `jobs` table via `createTable` with no
 /// destructive operations. This test reproduces a genuine v4 database — the
@@ -22,7 +22,11 @@ void main() {
   late File dbFile;
 
   setUp(() {
-    tempDir = Directory.systemTemp.createTempSync('ai_birthday_migration_');
+    final root = Directory('.dart_tool/ai_birthday_migration_tests');
+    root.createSync(recursive: true);
+    tempDir = Directory(
+      '${root.path}/run-${DateTime.now().microsecondsSinceEpoch}',
+    )..createSync(recursive: true);
     dbFile = File('${tempDir.path}/migration_test.db');
   });
 
@@ -32,7 +36,7 @@ void main() {
     }
   });
 
-  test('v4 -> v5 adds the jobs table and preserves existing data', () async {
+  test('v4 -> v6 adds missing tables and preserves existing data', () async {
     // Phase 1: build a genuine v4 database. v4's createAll produced the same
     // DDL for every pre-existing table; only `jobs` did not exist back then,
     // so drop it and pin user_version at 4 to reproduce that exact state.
@@ -61,13 +65,13 @@ void main() {
     await v4.close();
 
     // Phase 2: reopen with the current schema. Drift sees user_version 4 and
-    // runs onUpgrade(4 -> 5), which must only create the jobs table.
+    // runs onUpgrade(4 -> 6), including the idempotent delivery migration.
     final db = appdb.AppDatabase(NativeDatabase(dbFile));
     expect(
       (await db.customSelect('PRAGMA user_version').get()).single.read<int>(
         'user_version',
       ),
-      5,
+      6,
     );
 
     // The jobs table is functional end-to-end through the repository.
@@ -105,4 +109,45 @@ void main() {
 
     await db.close();
   });
+
+  test(
+    'v5 -> v6 preserves delivery history and defaults new outcome',
+    () async {
+      final v5 = appdb.AppDatabase(NativeDatabase(dbFile));
+      await v5.customStatement(
+        'ALTER TABLE delivery_events RENAME TO delivery_events_v6',
+      );
+      await v5.customStatement('''
+      CREATE TABLE delivery_events (
+        id TEXT NOT NULL PRIMARY KEY,
+        birthday_id TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        handed_off_at INTEGER NOT NULL
+      )
+    ''');
+      await v5.customStatement('''
+      INSERT INTO delivery_events (id, birthday_id, channel, handed_off_at)
+      VALUES ('event-keep', 'b-keep', 'whatsapp', 1767225600000)
+    ''');
+      await v5.customStatement('DROP TABLE delivery_events_v6');
+      await v5.customStatement('PRAGMA user_version = 5');
+      await v5.close();
+
+      final db = appdb.AppDatabase(NativeDatabase(dbFile));
+      final columns = await db
+          .customSelect('PRAGMA table_info(delivery_events)')
+          .get();
+      final names = columns.map((row) => row.read<String>('name')).toSet();
+      expect(names, containsAll(['draft_id', 'outcome']));
+
+      final event = await (db.select(
+        db.deliveryEvents,
+      )..where((row) => row.id.equals('event-keep'))).getSingle();
+      expect(event.birthdayId, 'b-keep');
+      expect(event.channel, 'whatsapp');
+      expect(event.draftId, isNull);
+      expect(event.outcome, 'launched');
+      await db.close();
+    },
+  );
 }

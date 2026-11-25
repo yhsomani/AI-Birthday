@@ -2,6 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:in_app_purchase/in_app_purchase.dart' as iap;
+import 'dart:convert';
+
+import 'package:ai_birthday/core/security/credential_storage.dart';
 import 'package:ai_birthday/features/subscription/application/subscription_service.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 
@@ -53,6 +56,16 @@ class CountingIap extends FakeUnavailableIap {
   }
 }
 
+class InMemorySecureStore implements SecureStoreDriver {
+  final values = <String, String>{};
+  @override
+  Future<void> delete(String key) async => values.remove(key);
+  @override
+  Future<String?> read(String key) async => values[key];
+  @override
+  Future<void> write(String key, String value) async => values[key] = value;
+}
+
 class FakeEmptyProductsIap extends FakeUnavailableIap {
   @override
   Future<bool> isAvailable() async => true;
@@ -69,6 +82,55 @@ class FakeEmptyProductsIap extends FakeUnavailableIap {
 }
 
 void main() {
+  group('durable entitlement cache', () {
+    Future<SubscriptionNotifier> notifierWithCache(DateTime verifiedAt) async {
+      final store = InMemorySecureStore();
+      await store.write(
+        'verified_entitlement_v1',
+        jsonEncode({
+          'accountId': 'account-a',
+          'status': 'active',
+          'productId': 'ai_birthday_pro_monthly',
+          'expiryDate': DateTime.now()
+              .add(const Duration(days: 20))
+              .toUtc()
+              .toIso8601String(),
+          'isAutoRenewing': true,
+          'verifiedAt': verifiedAt.toUtc().toIso8601String(),
+        }),
+      );
+      final notifier = SubscriptionNotifier(
+        store: store,
+        inAppPurchase: FakeUnavailableIap(),
+        accountIdProvider: () async => 'account-a',
+      );
+      await notifier.initializationComplete;
+      return notifier;
+    }
+
+    test(
+      'recent server verification survives cold start but is labelled cached',
+      () async {
+        final notifier = await notifierWithCache(
+          DateTime.now().subtract(const Duration(hours: 1)),
+        );
+        expect(notifier.state.canUseAi, isTrue);
+        expect(notifier.checkState, EntitlementCheckState.cached);
+        notifier.dispose();
+      },
+    );
+
+    test('cache over 24 hours is stale and fail-closed', () async {
+      final notifier = await notifierWithCache(
+        DateTime.now().subtract(const Duration(hours: 25)),
+      );
+      expect(notifier.state.status, EntitlementStatus.active);
+      expect(notifier.state.canUseAi, isFalse);
+      expect(notifier.checkState, EntitlementCheckState.stale);
+      notifier.dispose();
+    });
+  });
+
   group('SubscriptionNotifier Truthfulness Tests (P0)', () {
     test(
       'does NOT grant Pro entitlement when Play Store is unavailable',

@@ -16,11 +16,18 @@ class HistoryScreen extends ConsumerWidget {
 
   /// "Opened in" is only honest for channels that actually opened (WhatsApp /
   /// SMS); clipboard and share sheet handoffs are labelled by what they did.
-  String _handoffLabel(DeliveryHandoff handoff) => switch (handoff.channel) {
-    DeliveryChannel.whatsapp ||
-    DeliveryChannel.sms => 'Opened in ${handoff.channel.displayName}',
-    DeliveryChannel.clipboard => 'Copied to Clipboard',
-    DeliveryChannel.share => 'Shared',
+  String _handoffLabel(DeliveryHandoff handoff) => switch (handoff.outcome) {
+    DeliveryOutcome.copied => 'Copied to Clipboard',
+    DeliveryOutcome.launchFailed =>
+      '${handoff.channel.displayName} could not be opened',
+    DeliveryOutcome.notSent => 'Not Sent Yet',
+    DeliveryOutcome.confirmed => 'User Confirmed Sent',
+    DeliveryOutcome.launched => switch (handoff.channel) {
+      DeliveryChannel.whatsapp ||
+      DeliveryChannel.sms => 'Opened in ${handoff.channel.displayName}',
+      DeliveryChannel.clipboard => 'Copied to Clipboard',
+      DeliveryChannel.share => 'Share Sheet Opened',
+    },
   };
 
   @override
@@ -62,19 +69,59 @@ class HistoryScreen extends ConsumerWidget {
             );
           }
 
-          final people = peopleAsync.asData?.value ?? [];
+          if (peopleAsync.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (peopleAsync.hasError) {
+            return EmptyState(
+              icon: Icons.people_outline,
+              title: 'Could not load contacts',
+              message: 'History is waiting for contact details.',
+              action: TextButton.icon(
+                onPressed: () => ref.invalidate(peopleStreamProvider),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try again'),
+              ),
+            );
+          }
+          if (handoffsAsync.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (handoffsAsync.hasError) {
+            return EmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: 'Could not load delivery activity',
+              message: 'Your saved messages are still available.',
+              action: TextButton.icon(
+                onPressed: () =>
+                    ref.invalidate(latestHandoffsForDraftsProvider),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try again'),
+              ),
+            );
+          }
+
+          final people = peopleAsync.requireValue;
           final peopleMap = {for (final p in people) p.id: p};
 
           // Resolve the latest persisted handoff per birthday (audit 03 P1-1):
           // "Opened in <channel>" is evidence-driven, never inferred from
           // draft status.
-          final handoffs =
-              handoffsAsync.asData?.value ?? const <DeliveryHandoff>[];
-          final latestHandoffByBirthday = <String, DeliveryHandoff>{};
+          final handoffs = handoffsAsync.requireValue;
+          final draftCountsByBirthday = <String, int>{};
+          for (final draft in drafts) {
+            draftCountsByBirthday.update(
+              draft.birthdayId,
+              (count) => count + 1,
+              ifAbsent: () => 1,
+            );
+          }
+          final latestHandoffByDraft = <String, DeliveryHandoff>{};
           for (final h in handoffs) {
-            final existing = latestHandoffByBirthday[h.birthdayId];
+            final key = h.draftId ?? h.birthdayId;
+            final existing = latestHandoffByDraft[key];
             if (existing == null || h.at.isAfter(existing.at)) {
-              latestHandoffByBirthday[h.birthdayId] = h;
+              latestHandoffByDraft[key] = h;
             }
           }
 
@@ -93,12 +140,17 @@ class HistoryScreen extends ConsumerWidget {
               // The contact may have been deleted; say so instead of showing
               // a placeholder name that reads like a real recipient.
               final recipientName = person?.name ?? 'Removed contact';
-              final handoff = latestHandoffByBirthday[draft.birthdayId];
+              final handoff =
+                  latestHandoffByDraft[draft.id] ??
+                  (draftCountsByBirthday[draft.birthdayId] == 1
+                      ? latestHandoffByDraft[draft.birthdayId]
+                      : null);
               final sent = draft.status == DraftStatus.confirmedSent;
               // Status chips use the palette's contrast-tested tone pairs so
               // they stay legible in dark mode (audit 05 P1-3).
               final colors = context.colors;
-              final statusTone = sent
+              final statusTone =
+                  sent || handoff?.outcome == DeliveryOutcome.confirmed
                   ? AppTone.success
                   : handoff != null
                   ? AppTone.warning
@@ -231,30 +283,54 @@ class HistoryScreen extends ConsumerWidget {
                         runSpacing: 4,
                         children: [
                           TextButton.icon(
-                            onPressed: () {
-                              Clipboard.setData(
-                                ClipboardData(text: draft.body),
-                              );
-                              HapticFeedback.lightImpact();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Message copied to clipboard!'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
+                            onPressed: () async {
+                              try {
+                                await Clipboard.setData(
+                                  ClipboardData(text: draft.body),
+                                );
+                                await ref
+                                    .read(deliveryEventsRepositoryProvider)
+                                    .recordOutcome(
+                                      birthdayId: draft.birthdayId,
+                                      draftId: draft.id,
+                                      channel: DeliveryChannel.clipboard,
+                                      outcome: DeliveryOutcome.copied,
+                                      at: DateTime.now(),
+                                    );
+                                if (!context.mounted) return;
+                                HapticFeedback.lightImpact();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Message copied to clipboard!',
+                                    ),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              } catch (_) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'The message could not be recorded as copied.',
+                                    ),
+                                  ),
+                                );
+                              }
                             },
                             icon: const Icon(Icons.copy, size: 16),
                             label: const Text('Copy'),
                           ),
-                          FilledButton.tonalIcon(
-                            onPressed: () {
-                              context.push(
-                                '/message-studio/${draft.birthdayId}',
-                              );
-                            },
-                            icon: const Icon(Icons.open_in_new, size: 16),
-                            label: const Text('Studio'),
-                          ),
+                          if (person != null)
+                            FilledButton.tonalIcon(
+                              onPressed: () {
+                                context.push(
+                                  '/message-studio/${draft.birthdayId}',
+                                );
+                              },
+                              icon: const Icon(Icons.open_in_new, size: 16),
+                              label: const Text('Studio'),
+                            ),
                         ],
                       ),
                     ],

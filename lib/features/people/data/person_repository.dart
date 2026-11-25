@@ -5,7 +5,9 @@ import 'package:drift/drift.dart' as drift;
 
 import '../../../core/database/app_database.dart' as db;
 import '../../birthdays/domain/models/birthday.dart';
+import '../../birthdays/domain/birthday_engine.dart';
 import '../../delivery/domain/models/delivery_channel.dart';
+import '../../message_studio/domain/models/message_draft.dart';
 import '../domain/models/relationship.dart';
 import '../domain/models/tone.dart';
 import '../domain/person.dart';
@@ -21,6 +23,8 @@ abstract class PeopleStore {
   Stream<List<Person>> watchAll({bool includeDeleted = false});
   Future<Person?> getById(String id);
   Future<void> save(Person person);
+  Future<void> saveAggregate(Person person, {Birthday? birthday});
+  Future<Birthday?> getBirthdayForPerson(String personId);
   Future<void> softDelete(String id);
   Future<void> softDeleteAggregate(String id);
   Future<void> restore(String id);
@@ -78,6 +82,48 @@ class DriftPeopleStore implements PeopleStore {
     await _database
         .into(_database.persons)
         .insertOnConflictUpdate(_toRow(person));
+  }
+
+  @override
+  Future<void> saveAggregate(Person person, {Birthday? birthday}) async {
+    await _database.transaction(() async {
+      if (birthday != null) {
+        final previous = await (_database.select(
+          _database.birthdays,
+        )..where((row) => row.id.equals(birthday.id))).getSingleOrNull();
+        final occurrenceChanged =
+            previous != null &&
+            (previous.cycleYear != birthday.cycleYear ||
+                previous.date.year != birthday.date.year ||
+                previous.date.month != birthday.date.month ||
+                previous.date.day != birthday.date.day);
+        if (occurrenceChanged) {
+          await (_database.delete(_database.messageDrafts)..where(
+                (row) =>
+                    row.birthdayId.equals(birthday.id) &
+                    row.status.equals(DraftStatus.confirmedSent.name).not(),
+              ))
+              .go();
+          await (_database.delete(
+            _database.jobs,
+          )..where((row) => row.subjectId.equals(birthday.id))).go();
+        }
+      }
+      await save(person);
+      if (birthday != null) {
+        await _database
+            .into(_database.birthdays)
+            .insertOnConflictUpdate(_birthdayRow(birthday));
+      }
+    });
+  }
+
+  @override
+  Future<Birthday?> getBirthdayForPerson(String personId) async {
+    final row = await (_database.select(
+      _database.birthdays,
+    )..where((r) => r.personId.equals(personId))).getSingleOrNull();
+    return row == null ? null : _birthdayFromRow(row);
   }
 
   @override
@@ -178,6 +224,7 @@ class DriftPeopleStore implements PeopleStore {
     birthdayMonth: row.birthdayMonth,
     birthdayDay: row.birthdayDay,
     birthYear: row.birthYear,
+    leapDayResolution: LeapDayResolution.fromString(row.leapDayResolution),
     phoneNumber: row.phoneNumber,
     email: row.email,
     relationship: RelationshipCategory.fromString(row.relationship),
@@ -202,12 +249,36 @@ class DriftPeopleStore implements PeopleStore {
     deletedAt: row.deletedAt?.toUtc(),
   );
 
+  static db.BirthdaysCompanion _birthdayRow(Birthday birthday) =>
+      db.BirthdaysCompanion(
+        id: drift.Value(birthday.id),
+        personId: drift.Value(birthday.personId),
+        cycleYear: drift.Value(birthday.cycleYear),
+        date: drift.Value(birthday.date),
+        status: drift.Value(birthday.status.name),
+        draftId: drift.Value(birthday.draftId),
+        createdAt: drift.Value(birthday.createdAt),
+        updatedAt: drift.Value(birthday.updatedAt),
+      );
+
+  static Birthday _birthdayFromRow(db.Birthday row) => Birthday(
+    id: row.id,
+    personId: row.personId,
+    cycleYear: row.cycleYear,
+    date: row.date,
+    status: BirthdayStatus.fromString(row.status),
+    draftId: row.draftId,
+    createdAt: row.createdAt.toUtc(),
+    updatedAt: row.updatedAt.toUtc(),
+  );
+
   static db.Person _toRow(Person p) => db.Person(
     id: p.id,
     name: p.name,
     birthdayMonth: p.birthdayMonth,
     birthdayDay: p.birthdayDay,
     birthYear: p.birthYear,
+    leapDayResolution: p.leapDayResolution?.name,
     phoneNumber: p.phoneNumber,
     email: p.email,
     relationship: p.relationship.name,

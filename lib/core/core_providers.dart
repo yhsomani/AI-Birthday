@@ -18,3 +18,12 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   ref.onDispose(db.close);
   return db;
 });
+
+/// Bounded startup preflight. A Drift connection is lazy, so opening the
+/// object alone does not prove SQLite is usable. The first real query is
+/// allowed ten seconds; failure is surfaced by the app recovery shell instead
+/// of escaping through the Flutter framework error handler.
+final databaseStartupProvider = FutureProvider<void>((ref) async {
+  final db = ref.watch(databaseProvider);
+  await db.customSelect('SELECT 1').get().timeout(const Duration(seconds: 10));
+});

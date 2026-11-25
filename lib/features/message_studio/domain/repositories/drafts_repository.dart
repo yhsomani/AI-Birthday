@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 
 abstract interface class DraftsRepository {
@@ -8,6 +9,15 @@ abstract interface class DraftsRepository {
   Future<MessageDraft?> getDraft(String id);
   Future<MessageDraft?> getDraftForBirthday(String birthdayId);
   Future<void> saveDraft(MessageDraft draft);
+
+  /// Persists a draft and its active birthday link/status as one aggregate.
+  Future<bool> saveDraftAndUpdateBirthday(
+    MessageDraft draft,
+    BirthdayStatus birthdayStatus, {
+    bool requireUnchanged = false,
+    MessageDraft? expectedCurrentDraft,
+  });
+
   Future<int> deleteDraftsForBirthday(String birthdayId);
 
   /// Removes unreachable draft rows and returns how many were deleted: drafts
@@ -46,16 +56,30 @@ class InMemoryDraftsRepository implements DraftsRepository {
 
   @override
   Future<MessageDraft?> getDraftForBirthday(String birthdayId) async {
-    return _store.values.cast<MessageDraft?>().firstWhere(
-      (d) => d?.birthdayId == birthdayId,
-      orElse: () => null,
-    );
+    final matches =
+        _store.values.where((draft) => draft.birthdayId == birthdayId).toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return matches.isEmpty ? null : matches.first;
   }
 
   @override
   Future<void> saveDraft(MessageDraft draft) async {
+    if (_store[draft.id]?.status == DraftStatus.confirmedSent) {
+      throw StateError('A confirmed-sent draft is immutable. Save a revision.');
+    }
     _store[draft.id] = draft;
     _controller.add(_sortedDrafts());
+  }
+
+  @override
+  Future<bool> saveDraftAndUpdateBirthday(
+    MessageDraft draft,
+    BirthdayStatus birthdayStatus, {
+    bool requireUnchanged = false,
+    MessageDraft? expectedCurrentDraft,
+  }) async {
+    await saveDraft(draft);
+    return true;
   }
 
   @override

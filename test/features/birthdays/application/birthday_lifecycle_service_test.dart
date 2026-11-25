@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_birthday/features/birthdays/application/birthday_lifecycle_service.dart';
+import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
@@ -9,13 +10,18 @@ void main() {
   group('BirthdayLifecycleService', () {
     const service = BirthdayLifecycleService(now: _fixedNow);
 
-    Person person({int month = 10, int day = 25}) {
+    Person person({
+      int month = 10,
+      int day = 25,
+      LeapDayResolution? leapDayResolution,
+    }) {
       final timestamp = _fixedNow();
       return Person(
         id: 'person-1',
         name: 'Priya',
         birthdayMonth: month,
         birthdayDay: day,
+        leapDayResolution: leapDayResolution,
         createdAt: timestamp,
         updatedAt: timestamp,
       );
@@ -123,16 +129,45 @@ void main() {
       expect(birthday.draftId, 'draft-1');
     });
 
-    test('resolves Feb 29 consistently through the BirthdayEngine', () async {
+    test('uses the explicitly persisted Feb 29 policy', () async {
       final repo = InMemoryBirthdaysRepository();
+
+      await service.refresh(
+        people: [
+          person(month: 2, day: 29, leapDayResolution: LeapDayResolution.mar1),
+        ],
+        birthdaysRepository: repo,
+      );
+
+      final birthday = await repo.getBirthdayForPerson('person-1');
+      expect(birthday!.date, DateTime(2027, 3, 1));
+    });
+
+    test('legacy Feb 29 refresh preserves the cycle until repaired', () async {
+      final existing = Birthday(
+        id: 'birthday-person-1',
+        personId: 'person-1',
+        cycleYear: 2026,
+        date: DateTime(2026, 2, 28),
+        draftId: 'draft-active',
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+      );
+      final repo = InMemoryBirthdaysRepository(initialBirthdays: [existing]);
 
       await service.refresh(
         people: [person(month: 2, day: 29)],
         birthdaysRepository: repo,
       );
+      expect(await repo.getBirthdayForPerson('person-1'), same(existing));
 
-      final birthday = await repo.getBirthdayForPerson('person-1');
-      expect(birthday!.date, DateTime(2027, 2, 28));
+      await service.refresh(
+        people: [
+          person(month: 2, day: 29, leapDayResolution: LeapDayResolution.feb28),
+        ],
+        birthdaysRepository: repo,
+      );
+      expect(await repo.getBirthdayForPerson('person-1'), isNotNull);
     });
 
     test(
@@ -256,6 +291,10 @@ class _RecordingBirthdaysRepository implements BirthdaysRepository {
 
   @override
   Future<void> deleteBirthday(String id) => _inner.deleteBirthday(id);
+
+  @override
+  Future<void> disableBirthdayForPerson(String personId) =>
+      _inner.disableBirthdayForPerson(personId);
 }
 
 DateTime _fixedNow() => DateTime(2026, 10, 5);

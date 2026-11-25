@@ -233,11 +233,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   color: AppColors.accentForest,
                 ),
                 title: const Text(
-                  'Import from Phone Contacts',
+                  'Open Phone Contact Import',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: const Text(
-                  'Quickly scan phone contacts to import existing birthdays.',
+                  'Opens People, where Import from Phone asks for contacts permission and reviews matches before saving.',
                 ),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () => _finishTo('/people'),

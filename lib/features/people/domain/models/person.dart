@@ -1,6 +1,7 @@
 /// Recipient model representing a person whose birthday is tracked (SSOT §7).
 library;
 
+import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
@@ -15,6 +16,7 @@ class Person {
     this.birthdayMonth,
     this.birthdayDay,
     this.birthYear,
+    this.leapDayResolution,
     this.phoneNumber,
     this.email,
     this.relationship = RelationshipCategory.friend,
@@ -44,6 +46,10 @@ class Person {
 
   /// Optional birth year (used for calculating milestone ages).
   final int? birthYear;
+
+  /// Explicit non-leap-year policy for a Feb 29 birthday. Null is a legacy
+  /// repair state and must be resolved by the user before saving/importing.
+  final LeapDayResolution? leapDayResolution;
 
   /// Normalized phone number used for WhatsApp / SMS delivery.
   final String? phoneNumber;
@@ -97,6 +103,9 @@ class Person {
   /// Returns true if this person's birthday is on Leap Day (Feb 29).
   bool get isLeapDayBirthday => birthdayMonth == 2 && birthdayDay == 29;
 
+  bool get hasResolvableBirthday =>
+      hasBirthday && (!isLeapDayBirthday || leapDayResolution != null);
+
   Person copyWith({
     String? id,
     String? name,
@@ -105,6 +114,8 @@ class Person {
     bool clearBirthday = false,
     int? birthYear,
     bool clearBirthYear = false,
+    LeapDayResolution? leapDayResolution,
+    bool clearLeapDayResolution = false,
     String? phoneNumber,
     String? email,
     RelationshipCategory? relationship,
@@ -132,6 +143,9 @@ class Person {
           : (birthdayMonth ?? this.birthdayMonth),
       birthdayDay: clearBirthday ? null : (birthdayDay ?? this.birthdayDay),
       birthYear: clearBirthYear ? null : (birthYear ?? this.birthYear),
+      leapDayResolution: clearLeapDayResolution
+          ? null
+          : (leapDayResolution ?? this.leapDayResolution),
       phoneNumber: phoneNumber ?? this.phoneNumber,
       email: email ?? this.email,
       relationship: relationship ?? this.relationship,
@@ -159,6 +173,7 @@ class Person {
     if (birthdayMonth != null) 'birthdayMonth': birthdayMonth,
     if (birthdayDay != null) 'birthdayDay': birthdayDay,
     if (birthYear != null) 'birthYear': birthYear,
+    if (leapDayResolution != null) 'leapDayResolution': leapDayResolution!.name,
     if (phoneNumber != null) 'phoneNumber': phoneNumber,
     if (email != null) 'email': email,
     'relationship': relationship.name,
@@ -184,6 +199,9 @@ class Person {
       birthdayMonth: json['birthdayMonth'] as int?,
       birthdayDay: json['birthdayDay'] as int?,
       birthYear: json['birthYear'] as int?,
+      leapDayResolution: LeapDayResolution.fromString(
+        json['leapDayResolution'] as String?,
+      ),
       phoneNumber: json['phoneNumber'] as String?,
       email: json['email'] as String?,
       relationship: RelationshipCategory.fromString(

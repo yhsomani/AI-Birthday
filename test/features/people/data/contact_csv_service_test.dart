@@ -177,10 +177,20 @@ Dr. Brown,1955-11-05
 
     test('rejects impossible calendar days but accepts Feb 29 (F19)', () {
       final result = service.parseCsvWithResult(
-        'Name,Month,Day\nApril Thirty-One,4,31\nLeap Day,2,29',
+        'Name,Month,Day,Leap Day Policy\n'
+        'April Thirty-One,4,31,\n'
+        'Leap No Policy,2,29,\n'
+        'Leap Day,2,29,mar1',
       );
 
-      expect(result.candidates.map((c) => c.name), ['Leap Day']);
+      expect(result.candidates.map((c) => c.name), [
+        'Leap No Policy',
+        'Leap Day',
+      ]);
+      final repairable = result.candidates.first;
+      expect(repairable.isImportable, isFalse);
+      expect(repairable.invalidReason, contains('February 28 or March 1'));
+      expect(result.candidates.last.leapDayResolution?.name, 'mar1');
       expect(result.invalidRows, hasLength(1));
       expect(result.invalidRows.single, contains('April Thirty-One'));
     });
@@ -289,6 +299,25 @@ Row Three,8,12,1988,+14150001111
         );
       },
     );
+
+    test('reports size bounds and complete mapping/result counts', () {
+      final overLimit = List.filled(
+        ContactCsvService.maxRows + 2,
+        'A,1,2',
+      ).join('\n');
+      final result = service.parseCsvWithResult(overLimit);
+
+      expect(result.candidates, isEmpty);
+      expect(result.totalRows, ContactCsvService.maxRows + 2);
+      expect(result.invalidRows.single, contains('at most 1000 rows'));
+
+      final mapped = service.parseCsvWithResult(
+        'Name,Birthday Month,Birthday Day\nAlice,5,15\n,6,2',
+      );
+      expect(mapped.totalRows, 2);
+      expect(mapped.mappedColumns, containsAll(['name', 'month', 'day']));
+      expect(mapped.invalidRows.single, 'Row 3: Name is missing');
+    });
 
     test('CSV rows default autoPrepare to false when column is absent', () {
       final result = service.parseCsvWithResult(

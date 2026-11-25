@@ -221,7 +221,7 @@ void main() {
       'a preserved grant is kept within the TTL and de-grades after it',
       () async {
         final iap = FakePurchasingIap();
-        final base = DateTime.utc(2026, 1, 1, 12);
+        final base = DateTime.now();
         var nowValue = base;
         var fail = true;
         // The verify call is gated on REAL now, so the granted expiry must

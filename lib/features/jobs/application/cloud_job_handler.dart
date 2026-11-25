@@ -83,7 +83,7 @@ class CloudSyncJobHandler implements JobHandler {
       if (payload.operation == CloudJobPayload.restore) {
         await onRestored?.call();
       }
-      return JobSucceeded(result.timestamp.toIso8601String());
+      return JobSucceeded(result.toResultRef());
     }
     return JobFailed(
       retryable: result.retryable,

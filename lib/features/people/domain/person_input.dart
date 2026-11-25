@@ -1,3 +1,4 @@
+import '../../birthdays/domain/birthday_engine.dart';
 import '../../delivery/domain/models/delivery_channel.dart';
 import 'models/relationship.dart';
 import 'models/tone.dart';
@@ -14,6 +15,7 @@ class PersonDraft {
     this.birthdayMonth,
     this.birthdayDay,
     this.birthYear,
+    this.leapDayResolution,
     this.phoneNumber,
     this.email,
     this.relationship = RelationshipCategory.friend,
@@ -32,6 +34,7 @@ class PersonDraft {
   final int? birthdayMonth;
   final int? birthdayDay;
   final int? birthYear;
+  final LeapDayResolution? leapDayResolution;
   final String? phoneNumber;
   final String? email;
   final RelationshipCategory relationship;
@@ -51,6 +54,8 @@ class PersonDraft {
     int? birthdayDay,
     int? birthYear,
     bool clearBirthYear = false,
+    LeapDayResolution? leapDayResolution,
+    bool clearLeapDayResolution = false,
     String? phoneNumber,
     String? email,
     RelationshipCategory? relationship,
@@ -70,6 +75,9 @@ class PersonDraft {
       birthdayMonth: birthdayMonth ?? this.birthdayMonth,
       birthdayDay: birthdayDay ?? this.birthdayDay,
       birthYear: clearBirthYear ? null : (birthYear ?? this.birthYear),
+      leapDayResolution: clearLeapDayResolution
+          ? null
+          : (leapDayResolution ?? this.leapDayResolution),
       phoneNumber: phoneNumber ?? this.phoneNumber,
       email: email ?? this.email,
       relationship: relationship ?? this.relationship,
@@ -96,6 +104,7 @@ class PersonDraft {
       birthdayMonth: birthdayMonth,
       birthdayDay: birthdayDay,
       birthYear: birthYear,
+      leapDayResolution: leapDayResolution,
       phoneNumber: phoneNumber,
       email: email,
       relationship: relationship,
@@ -121,6 +130,7 @@ class PersonDraft {
       birthdayMonth: p.birthdayMonth,
       birthdayDay: p.birthdayDay,
       birthYear: p.birthYear,
+      leapDayResolution: p.leapDayResolution,
       phoneNumber: p.phoneNumber,
       email: p.email,
       relationship: p.relationship,
@@ -145,6 +155,8 @@ class PersonDraft {
       birthdayDay: birthdayDay,
       birthYear: birthYear,
       clearBirthYear: birthYear == null,
+      leapDayResolution: leapDayResolution,
+      clearLeapDayResolution: leapDayResolution == null,
       phoneNumber: phoneNumber,
       email: email,
       relationship: relationship,

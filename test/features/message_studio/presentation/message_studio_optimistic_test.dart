@@ -9,6 +9,9 @@ import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/delivery/data/sms_delivery_service.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
+import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dart';
+import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
+import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_repository.dart';
 import 'package:ai_birthday/features/message_studio/presentation/message_studio_screen.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
@@ -19,11 +22,22 @@ import '../../../e2e/harness/test_harness.dart';
 
 /// SMS service that records invocation count and can hold the launch in
 /// flight to simulate the real slow window between tap and app open.
+class ControllableDraftsRepository extends InMemoryDraftsRepository {
+  bool failSaves = true;
+
+  @override
+  Future<void> saveDraft(MessageDraft draft) async {
+    if (failSaves) throw StateError('storage unavailable');
+    await super.saveDraft(draft);
+  }
+}
+
 class RecordingSmsService extends SmsDeliveryService {
   RecordingSmsService();
 
   int sendCount = 0;
   Completer<void>? gate;
+  bool result = true;
 
   @override
   Future<bool> sendSms({
@@ -33,9 +47,9 @@ class RecordingSmsService extends SmsDeliveryService {
     sendCount++;
     final g = gate;
     if (g != null) {
-      return g.future.then((_) => true);
+      return g.future.then((_) => result);
     }
-    return Future.value(true);
+    return Future.value(result);
   }
 }
 
@@ -182,6 +196,65 @@ void main() {
         final birthday = await harness.birthdaysRepo.getBirthday('b-test');
         expect(birthday!.status, BirthdayStatus.handedOff);
         expect(find.text('Did you send the message?'), findsOneWidget);
+      },
+    );
+
+    testWidgets('failed SMS launch records a truthful persistent event', (
+      tester,
+    ) async {
+      final sms = RecordingSmsService()..result = false;
+      await pumpStudio(
+        tester,
+        phone: '+14155552671',
+        extraOverrides: [smsDeliveryServiceProvider.overrideWithValue(sms)],
+      );
+
+      await tester.ensureVisible(editorFinder());
+      await tester.enterText(editorFinder(), 'Happy birthday!');
+      await tester.ensureVisible(find.text('Send via SMS'));
+      await tester.tap(find.text('Send via SMS'));
+      await tester.pumpAndSettle();
+
+      final events = await harness.db.select(harness.db.deliveryEvents).get();
+      expect(events, hasLength(1));
+      expect(events.single.channel, DeliveryChannel.sms.name);
+      expect(events.single.outcome, DeliveryOutcome.launchFailed.name);
+    });
+
+    testWidgets(
+      'autosave failure keeps the screen and offers save-only retry',
+      (tester) async {
+        final drafts = ControllableDraftsRepository();
+        await pumpStudio(
+          tester,
+          phone: '+14155552671',
+          extraOverrides: [draftsRepositoryProvider.overrideWithValue(drafts)],
+        );
+
+        await tester.ensureVisible(editorFinder());
+        await tester.enterText(editorFinder(), 'Do not lose this edit');
+        await tester.pump(const Duration(milliseconds: 900));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Save now'), findsOneWidget);
+        expect(find.text('Retry'), findsNothing);
+        final before = tester
+            .widget<TextField>(editorFinder())
+            .controller!
+            .text;
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(MessageStudioScreen), findsOneWidget);
+        expect(
+          tester.widget<TextField>(editorFinder()).controller!.text,
+          before,
+        );
+
+        drafts.failSaves = false;
+        await tester.tap(find.text('Save now'));
+        await tester.pumpAndSettle();
+        expect(find.text('Saved'), findsOneWidget);
+        expect((await drafts.getDraftForBirthday('b-test'))?.body, before);
       },
     );
 

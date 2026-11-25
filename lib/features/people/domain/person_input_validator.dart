@@ -22,6 +22,7 @@ enum InputError {
   birthdayRequired,
   invalidBirthday,
   invalidBirthYear,
+  leapDayPolicyRequired,
   invalidPhone,
   invalidEmail,
   relationshipTooLong,
@@ -39,6 +40,8 @@ extension InputErrorLabel on InputError {
     InputError.birthdayRequired => 'Pick a birthday (month and day)',
     InputError.invalidBirthday => 'That date does not exist',
     InputError.invalidBirthYear => 'Birth year should be a valid 4-digit year',
+    InputError.leapDayPolicyRequired =>
+      'Choose February 28 or March 1 for non-leap years',
     InputError.invalidPhone => 'Phone number looks incorrect',
     InputError.invalidEmail => 'Email address looks incorrect',
     InputError.relationshipTooLong =>
@@ -95,6 +98,10 @@ class PersonInputValidator {
       }
     } else if (!engine.isValidMonthDay(month, day, year: d.birthYear)) {
       errors[PersonField.birthday] = InputError.invalidBirthday;
+    }
+
+    if (month == 2 && day == 29 && d.leapDayResolution == null) {
+      errors[PersonField.birthday] = InputError.leapDayPolicyRequired;
     }
 
     final year = d.birthYear;
