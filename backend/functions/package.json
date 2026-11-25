@@ -33,7 +33,7 @@
     "@typescript-eslint/parser": "8.63.0",
     "@vitest/coverage-v8": "^4.1.12",
     "eslint": "10.7.0",
-    "fast-check": "4.9.0",
+    "fast-check": "4.11.0",
     "firebase": "^10.14.1",
     "firebase-tools": "^15.34.1",
     "typescript": "5.9.3",
