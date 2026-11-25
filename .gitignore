@@ -56,9 +56,8 @@ node_modules/
 
 # Test and capture screenshots
 screen_*.png
+*.png
 .agents/
 .env
 .env.*
 
-# Dont commit pngs
-*.png
