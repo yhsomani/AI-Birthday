@@ -1,4 +1,4 @@
-/// Root application widget for AI-Birthday (SSOT §3, §24).
+/// Root application widget for AI-Birthday (legacy SSOT §3, §24 (PRODUCT.md §16.7)).
 library;
 
 import 'dart:async';
@@ -12,6 +12,7 @@ import 'package:ai_birthday/core/core_providers.dart' as core;
 import 'package:ai_birthday/app/theme/app_theme.dart';
 import 'package:ai_birthday/features/auth/application/auth_controller.dart';
 import 'package:ai_birthday/features/auth/domain/auth_state.dart';
+import 'package:ai_birthday/features/reminders/application/reminder_bootstrap.dart';
 import 'package:ai_birthday/l10n/app_localizations.dart';
 
 class AiBirthdayApp extends ConsumerWidget {
@@ -56,6 +57,7 @@ class AiBirthdayApp extends ConsumerWidget {
     ref.watch(authControllerProvider);
     ref.watch(jobWorkerProvider);
     ref.watch(draftPruneProvider);
+    ref.watch(reminderBootstrapProvider);
 
     return MaterialApp.router(
       title: 'AI-Birthday',

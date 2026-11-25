@@ -25,6 +25,8 @@ class _FakeDeliveryEventsRepository implements DeliveryEventsRepository {
     required DeliveryChannel channel,
     required DateTime at,
     String? draftId,
+    int? draftRevision,
+    String? bodyHash,
   }) async {}
 
   @override
@@ -34,6 +36,8 @@ class _FakeDeliveryEventsRepository implements DeliveryEventsRepository {
     required DeliveryOutcome outcome,
     required DateTime at,
     String? draftId,
+    int? draftRevision,
+    String? bodyHash,
   }) async {}
 
   @override
@@ -42,12 +46,16 @@ class _FakeDeliveryEventsRepository implements DeliveryEventsRepository {
     required DeliveryChannel channel,
     required DateTime at,
     String? draftId,
+    int? draftRevision,
+    String? bodyHash,
   }) async {}
 
   @override
   Future<void> confirmHandoff({
     required String birthdayId,
     required String draftId,
+    required String expectedBodyHash,
+    required int expectedDraftRevision,
     required DateTime at,
   }) async {}
 

@@ -1,4 +1,4 @@
-/// Recipient model representing a person whose birthday is tracked (SSOT §7).
+/// Recipient model representing a person whose birthday is tracked (legacy SSOT §7 (PRODUCT.md §16.7)).
 library;
 
 import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
@@ -69,7 +69,7 @@ class Person {
   /// Desired message tone.
   final MessageTone preferredTone;
 
-  /// Verified facts provided strictly by the user (SSOT §2, §7, §21).
+  /// Verified facts provided strictly by the user (legacy SSOT §2, §7, §21 (PRODUCT.md §16.7)).
   /// AI must NEVER invent facts beyond what is stored here.
   final List<String> importantFacts;
 
@@ -117,13 +117,16 @@ class Person {
     LeapDayResolution? leapDayResolution,
     bool clearLeapDayResolution = false,
     String? phoneNumber,
+    bool clearPhoneNumber = false,
     String? email,
+    bool clearEmail = false,
     RelationshipCategory? relationship,
     RelationshipCloseness? relationshipCloseness,
     String? preferredLanguage,
     MessageTone? preferredTone,
     List<String>? importantFacts,
     String? notes,
+    bool clearNotes = false,
     DeliveryChannel? preferredDeliveryChannel,
     String? timezone,
     bool clearTimezone = false,
@@ -146,15 +149,15 @@ class Person {
       leapDayResolution: clearLeapDayResolution
           ? null
           : (leapDayResolution ?? this.leapDayResolution),
-      phoneNumber: phoneNumber ?? this.phoneNumber,
-      email: email ?? this.email,
+      phoneNumber: clearPhoneNumber ? null : (phoneNumber ?? this.phoneNumber),
+      email: clearEmail ? null : (email ?? this.email),
       relationship: relationship ?? this.relationship,
       relationshipCloseness:
           relationshipCloseness ?? this.relationshipCloseness,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       preferredTone: preferredTone ?? this.preferredTone,
       importantFacts: importantFacts ?? this.importantFacts,
-      notes: notes ?? this.notes,
+      notes: clearNotes ? null : (notes ?? this.notes),
       preferredDeliveryChannel:
           preferredDeliveryChannel ?? this.preferredDeliveryChannel,
       timezone: clearTimezone ? null : (timezone ?? this.timezone),
@@ -219,7 +222,8 @@ class Person {
           const [],
       notes: json['notes'] as String?,
       preferredDeliveryChannel: DeliveryChannel.fromString(
-        json['preferredDeliveryChannel'] as String?,
+        json['preferredDeliveryChannel'] as String? ??
+            DeliveryChannel.whatsapp.name,
       ),
       timezone: json['timezone'] as String?,
       autoPrepare: (json['autoPrepare'] as bool?) ?? false,

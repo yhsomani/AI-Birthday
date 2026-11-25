@@ -1,4 +1,4 @@
-/// Birthday tracking and lifecycle model (SSOT §8, §14).
+/// Birthday tracking and lifecycle model (legacy SSOT §8, §14 (PRODUCT.md §16.7)).
 library;
 
 import '../birthday_engine.dart';
@@ -67,8 +67,17 @@ class Birthday {
   /// The calendar year of this celebration cycle (e.g. 2026).
   final int cycleYear;
 
-  /// The exact resolved date for this cycle.
+  /// The resolved calendar date for this cycle.
+  ///
+  /// Only the year/month/day fields are meaningful; the time-of-day, zone and
+  /// instant are ignored everywhere (persistence, comparison, [daysUntil]).
   final DateTime date;
+
+  /// Whether [other] falls on the same calendar day as [date].
+  bool isSameCalendarDate(DateTime other) =>
+      date.year == other.year &&
+      date.month == other.month &&
+      date.day == other.day;
 
   /// Current lifecycle status.
   final BirthdayStatus status;
@@ -79,16 +88,19 @@ class Birthday {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// Orders birthdays by calendar date (never by instant).
+  static int compareByDate(Birthday a, Birthday b) {
+    final byYear = a.date.year.compareTo(b.date.year);
+    if (byYear != 0) return byYear;
+    final byMonth = a.date.month.compareTo(b.date.month);
+    return byMonth != 0 ? byMonth : a.date.day.compareTo(b.date.day);
+  }
+
   /// Days remaining until the birthday from [referenceDate].
   /// Returns 0 if today, positive if in future, negative if passed.
   int daysUntil(DateTime referenceDate) {
     final ref = referenceDate.isUtc ? referenceDate : referenceDate.toLocal();
-    final normalized = referenceDate.isUtc ? date.toUtc() : date.toLocal();
-    final targetUtc = DateTime.utc(
-      normalized.year,
-      normalized.month,
-      normalized.day,
-    );
+    final targetUtc = DateTime.utc(date.year, date.month, date.day);
     final refUtc = DateTime.utc(ref.year, ref.month, ref.day);
     return targetUtc.difference(refUtc).inDays;
   }
@@ -96,7 +108,7 @@ class Birthday {
   /// Whether the birthday is today relative to [referenceDate].
   bool isToday(DateTime referenceDate) => daysUntil(referenceDate) == 0;
 
-  /// Resolves the next birthday date according to SSOT §14 (Leap Day rules).
+  /// Resolves the next birthday date according to legacy SSOT §14 (PRODUCT.md §16.7) (Leap Day rules).
   ///
   /// For Feb 29:
   /// - On leap years, returns Feb 29.
@@ -176,7 +188,7 @@ class Birthday {
     'id': id,
     'personId': personId,
     'cycleYear': cycleYear,
-    'date': date.toIso8601String(),
+    'date': _calendarDateString(date),
     'status': status.name,
     if (draftId != null) 'draftId': draftId,
     'createdAt': createdAt.toIso8601String(),
@@ -188,11 +200,25 @@ class Birthday {
       id: json['id'] as String,
       personId: json['personId'] as String,
       cycleYear: json['cycleYear'] as int,
-      date: DateTime.parse(json['date'] as String),
+      date: _parseCalendarDate(json['date'] as String),
       status: BirthdayStatus.fromString(json['status'] as String?),
       draftId: json['draftId'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
+  }
+
+  static String _calendarDateString(DateTime value) {
+    final y = value.year.toString().padLeft(4, '0');
+    final m = value.month.toString().padLeft(2, '0');
+    final d = value.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  /// Accepts both `yyyy-MM-dd` and legacy ISO-8601 timestamps; the written
+  /// calendar day is kept as-is instead of converting the instant to UTC.
+  static DateTime _parseCalendarDate(String raw) {
+    final parsed = DateTime.parse(raw.length > 10 ? raw.substring(0, 10) : raw);
+    return DateTime(parsed.year, parsed.month, parsed.day);
   }
 }

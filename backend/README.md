@@ -1,22 +1,44 @@
 # Birthday Autopilot Firebase control plane
 
-This directory is an isolated, server-only coordination foundation. It does not
-store contacts or messages and it does not grant a mobile client direct
-Firestore access. Android and iOS call authenticated second-generation callable
-Functions; Firestore rules deny every direct client read and write.
+**Scope.** This is a package README for `backend/` (the Firebase control plane
+in `functions/`, rules, indexes, TTL policy list, and the Hosting package in
+`hosting/`). It says what this package is, how to run, test, build, and deploy
+it, and which package-specific gates apply. It is maintained independently of,
+and defers to, the canonical documents at the repository root:
+[PRODUCT.md](../PRODUCT.md), [ARCHITECTURE.md](../ARCHITECTURE.md) (API surface
+§8, data §7, deployment §11), [SECURITY.md](../SECURITY.md),
+[IMPLEMENTATION.md](../IMPLEMENTATION.md), [OPERATIONS.md](../OPERATIONS.md)
+(deployment §7, retention §10.5), and [PROJECT_MINDMAP.md](../PROJECT_MINDMAP.md).
 
-This code has **not** been deployed. App Check enforcement, IAM, Secret Manager,
-TTL, deletion, backup/PITR, quota, regional, and production-race evidence remain
-cloud provisioning gates.
+This directory is a server-side coordination foundation plus the opt-in cloud
+backup/entitlement rules. The coordination ledger never stores contact names,
+phone numbers, or message text. Firestore rules deny every direct client access
+to the coordination ledger and unknown collections; the only direct client
+access is owner-scoped: read/write of the validated
+`users/{uid}/backup/current` pointer, immutable `users/{uid}/generations`
+manifests and their validated `people`/`birthdays`/`drafts`/`reminderSettings`
+rows, and read/write of the same validated legacy collections. Unknown fields,
+oversized values, and deeper nested paths are denied. `users/{uid}/entitlement`
+remains read-only. Owner writes are also denied while the account is
+fenced for deletion, that is, when `coordinationPresence/{uid}` says `DELETING`
+or `deletionTombstones/{uid}` exists. Callable Functions are second generation;
+the Android app calls only `verifyPurchase` today. There is no `ios/`
+application in this repository, so the iOS-facing callables below
+(`companionStatus`, iOS-only deletion paths) have no caller here. See
+[ARCHITECTURE.md §8.7](../ARCHITECTURE.md).
 
-The public Hosting implementation lives in `hosting/` and exposes the frozen
-route contract `/`, `/delete/`, `/privacy/`, `/terms/`, and `/support/`. It uses
+Deployment is not evidenced in this repository. App Check enforcement, IAM,
+Secret Manager, TTL, deletion, backup/PITR, quota, regional, and
+production-race evidence remain cloud provisioning gates
+([OPERATIONS.md §7.6](../OPERATIONS.md)).
+
+The public Hosting implementation lives in `hosting/` and exposes the route
+contract `/`, `/delete/`, `/privacy/`, `/terms/`, and `/support/`. It uses
 in-memory Firebase Auth, fresh Google reauthentication, reCAPTCHA Enterprise App
-Check, and a limited-use callable token to start this same deletion saga. The
-site is deliberately undeployable until an out-of-repository release config
-proves public developer identity, legal and Hindi review, the final HTTPS base
-URL, and the separately protected disabled/lost-account admin workflow. See
-`hosting/README.md` for the exact runtime-config and release-evidence contract.
+Check, and a limited-use callable token to start the deletion saga. It is
+deliberately undeployable until an out-of-repository release config supplies the
+required identity, approvals, and HTTPS base URL. See `hosting/README.md` and
+[OPERATIONS.md §7.3](../OPERATIONS.md).
 
 ## What is implemented
 
@@ -42,7 +64,8 @@ URL, and the separately protected disabled/lost-account admin workflow. See
 - two-transaction sender transfer with a strict `now > drainUntil` completion
   rule;
 - deletion tombstones, no-new-child `DELETING` fencing, drain, recursive UID
-  deletion, Auth deletion verification, and delayed tombstone removal;
+  deletion (including `users/{uid}` and `subscriptionPurchaseOwnership` documents
+  owned by the UID), Auth deletion verification, and delayed tombstone removal;
 - account-global contact-derived reset that first advances sender epoch and
   destructive reset generation, enters `PAUSED_REPAIR`, installs the 24-hour
   Birthday fence, strictly drains any previously issued submit permit, then
@@ -51,26 +74,36 @@ URL, and the separately protected disabled/lost-account admin workflow. See
 - Android sender release that freezes every mutation, strictly drains the last
   issued permit, revokes the active epoch, recursively deletes and verifies the
   complete Android coordination tree and presence marker, and preserves the
-  Firebase Auth user;
+  Firebase Auth user and `users/{uid}` cloud backup/entitlement tree. Full account
+  deletion uses a separate purge path that removes both trees. Release remains
+  unreachable today because no client calls `releaseAndroidSender`; see
+  [OPERATIONS.md §10.4](../OPERATIONS.md);
 - top-level active-operation fences plus 30-day, per-request, content-free
   completion receipts. An interrupted operation remains fail-closed and is
   resumed by exact-request replay or the scheduled repair worker;
 - an iOS-only deletion tombstone that transactionally races first Android
-  registration;
-- a read-only, content-free, account-global iOS companion status. Any Android
+  registration (server capability; no iOS client exists in this repository);
+- a read-only, content-free, account-global companion status (server
+  capability; no iOS client exists in this repository). Any Android
   account state, deletion state, orphan marker, missing continuity, or unknown
   state suppresses every in-app composer action;
 - strict callable request schemas. No request accepts a raw name, People ID,
   birthday, phone number, message, prompt, or approval hash;
-- no application logger, request-body logger, service-account key, provider key,
-  or pepper value in source control.
+- no request-body logging, service-account key, provider key, or pepper value in
+  source control. Application logs contain only the scheduled sweeps'
+  `logger.info` summaries (`deletion_sweep_completed`,
+  `coordination_operation_sweep_completed`) and a generic callable failure event
+  with a sanitized error category; expected callable errors are not logged.
 
 ## Package and runtime
 
-The package is in `functions/` and uses exact dependency versions and an npm
-lockfile. `firebase.json` pins the deployed Functions runtime to Node.js 22.
-Local verification accepts Node.js 22 through 24 so the repository's Node
-24.18.0 toolchain can run it; the deployed runtime is still Node 22.
+The package is in `functions/` and uses caret-ranged dependencies
+(`firebase-admin ^14.5.0`, `firebase-functions ^7.4.0`, `zod ^4.6.7`) pinned by an
+npm lockfile. `firebase.json` pins the deployed Functions runtime to Node.js 22;
+`package.json` `engines` accepts Node.js `>=22 <25` for local verification. CI
+runs the Functions job on Node 22 with Java 21 for the emulator
+([OPERATIONS.md §6.4](../OPERATIONS.md)). Stack versions:
+[ARCHITECTURE.md §2.3](../ARCHITECTURE.md).
 
 Firebase currently documents Node.js 22 and 20 as supported Functions runtimes,
 and says the `firebase.json` runtime takes precedence over the package engine:
@@ -78,20 +111,24 @@ and says the `firebase.json` runtime takes precedence over the package engine:
 
 ```sh
 cd backend/functions
-PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" npm ci
-PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" npm run check
-PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" npm run build
-PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" npm run test:coverage
+npm ci
+npm run check          # typecheck + lint + unit tests
+npm run build
+npm run test:coverage
+npm run audit:ci       # npm audit --audit-level=high
 ```
 
-The emulator requires Java 21. On this workstation, the corporate CA must also
-be supplied to Node for the first official emulator download:
+`npm test` runs the unit and static-contract suites; `npm run test:emulator`
+runs the rules and control-plane emulator suites. Test counts are intentionally
+not duplicated here because they change as focused coverage is added. The
+emulator requires Java 21 (any JDK 21 on `PATH`, or
+`JAVA_HOME`) and downloads the Firestore emulator on first use. On a network
+with TLS interception, point Node at your organisation's CA bundle, for example
+`NODE_EXTRA_CA_CERTS=/path/to/ca-bundle.pem` (example only; the path is
+machine-specific):
 
 ```sh
 cd backend/functions
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 \
-NODE_EXTRA_CA_CERTS=/opt/homebrew/etc/openssl@3/cert.pem \
-PATH="/opt/homebrew/opt/openjdk@21:$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" \
 npm run test:emulator
 ```
 
@@ -100,34 +137,42 @@ accidental non-emulated call cannot mutate a live Firebase project. Firebase
 recommends demo projects for this safety property and notes that emulator
 transactions, indexes, and limits are not a complete production substitute:
 [Connect the Firestore emulator](https://firebase.google.com/docs/emulator-suite/connect_firestore).
+Test commands overall: [OPERATIONS.md §4.2](../OPERATIONS.md).
 
 ## Callable surface
 
-All callable Functions require Firebase Auth and enforced App Check with token
-consumption enabled. The mobile SDK must request limited-use App Check tokens.
-Firebase documents that consumption is replay protection and currently a beta
-Node.js capability:
+`functions/src/functions/index.ts` exports 20 functions in `asia-south1`: 18
+callables and 2 scheduled sweeps. Every callable enforces App Check with token
+consumption (the mobile/web SDK must request limited-use tokens). All callables
+except `accountDeletionReceipt` require Firebase Auth; destructive and transfer
+callables additionally require recent Google reauthentication.
+`accountDeletionReceipt` is the exception: it requires a signed-out caller with
+App Check. The authoritative export inventory, per-callable auth level, request
+schemas, error tokens, and caller matrix are in
+[ARCHITECTURE.md §8.1–§8.7](../ARCHITECTURE.md); the purchase contract is §8.6.
+Firebase documents App Check consumption as replay protection and currently a
+beta Node.js capability:
 [App Check for callable Functions](https://firebase.google.com/docs/app-check/cloud-functions#replay-protection).
 
-- `registerAndroidInstallation`
-- `renewSenderLease`
-- `changeAccountMode`
-- `claimOccurrence`
-- `claimTest`
-- `armAttempt`
-- `getArmStatus`
-- `reportTestOutcome`
-- `authorizeSafeRetry`
-- `beginSenderTransfer`
-- `completeSenderTransfer`
-- `requestAccountDeletion`
-- `accountDeletionReceipt`
-- `resetContactDerivedState`
-- `releaseAndroidSender`
-- `coordinationLifecycleStatus`
-- `companionStatus`
-- scheduled `sweepDeletionDrains`
-- scheduled `sweepCoordinationOperations`
+Callables: `registerAndroidInstallation`, `renewSenderLease`,
+`changeAccountMode`, `claimOccurrence`, `claimTest`, `armAttempt`, `getArmStatus`,
+`reportTestOutcome`, `authorizeSafeRetry`, `beginSenderTransfer`,
+`completeSenderTransfer`, `requestAccountDeletion`, `accountDeletionReceipt`,
+`resetContactDerivedState`, `releaseAndroidSender`,
+`coordinationLifecycleStatus`, `companionStatus`, `verifyPurchase`. Scheduled:
+`sweepDeletionDrains`, `sweepCoordinationOperations`.
+Each sweep caps its query at 20 due records and processes up to four distinct
+accounts concurrently. Query-based cleanup is capped at five 400-document pages
+per invocation and resumes through the repair worker; recursive tree deletion
+remains Admin SDK-managed. Production queue-depth, contention, and timeout testing
+is still required before deployment.
+
+`verifyPurchase` refuses with `ACCOUNT_DELETION_IN_PROGRESS` while the account is
+fenced for deletion, tolerates a Play account-binding mismatch only when the
+purchase-token hash is already owned by the same UID, and writes its ownership
+claim and entitlement in one fenced transaction. Account deletion purges
+`subscriptionPurchaseOwnership` documents by `uid`. Details:
+[ARCHITECTURE.md §8.6](../ARCHITECTURE.md).
 
 An exception, timeout, cancellation, or unavailable status is returned only as
 `COORDINATION_UNAVAILABLE`. It is never translated into `armWritten=false` or
@@ -135,8 +180,13 @@ another no-write proof.
 
 ### Destructive reset/release wire contracts
 
-`resetContactDerivedState` is account-global and can be called by Android or
-iOS. Its exact request is:
+These coordination contracts are documented here only; they have no client in
+this repository and ARCHITECTURE.md §8.4 treats them as not frozen public
+contracts. `resetContactDerivedState` and `releaseAndroidSender` are classified
+A+R in [ARCHITECTURE.md §8.2](../ARCHITECTURE.md).
+
+`resetContactDerivedState` is account-global and is designed to be callable by
+an Android or an iOS client. Its exact request is:
 
 ```json
 {
@@ -181,8 +231,9 @@ A reset may return either:
 ```
 
 or `stage: "RESET_PURGING"` with the same fields except `drainUntilMs`; an
-iOS-only account has `androidStateExisted: false` and no epoch, generation,
-Birthday fence, or drain fields. Terminal reset evidence is:
+account with no Android state (the iOS-only case) has
+`androidStateExisted: false` and no epoch, generation, Birthday fence, or drain
+fields. Terminal reset evidence is:
 
 ```json
 {
@@ -384,8 +435,10 @@ has a `cleanupAt` TTL exactly 365 days after completion; an unresolved
 `IN_PROGRESS` receipt has no TTL.
 
 `accountDeletionReceipt` intentionally requires no Firebase Auth, because the
-account is absent on success. It still uses the shared `commonOptions`, so App
-Check is enforced and its limited-use token is consumed. Its exact request is:
+account is absent on success; a signed-in caller is rejected with
+`failed-precondition: SIGNED_OUT_REQUIRED`. It still uses the shared
+`commonOptions`, so App Check is enforced and its limited-use token is consumed.
+Its exact request is:
 
 ```json
 {
@@ -436,6 +489,10 @@ deletion instead of leaving a permanent tombstone.
 
 ## Required cloud configuration before any deployment
 
+Deploy commands, parameters, and the TTL group list are summarised in
+[OPERATIONS.md §7.2](../OPERATIONS.md); the checklist below adds the
+provisioning steps that document does not carry.
+
 1. Create distinct Firebase/Google Cloud projects for every used tier and select
    the final Firestore/Functions region through change control. The source
    currently fixes `asia-south1`; this is not evidence that production residency,
@@ -467,16 +524,21 @@ deletion instead of leaving a permanent tombstone.
 4. Provision `globalControl/current` through reviewed admin/IaC with schema 1, a
    reviewed ledger generation, `HEALTHY` continuity, minimum build/policy,
    signed-channel allowlist, and kill-switch state. Missing, malformed, frozen,
-   recovering, or generation-mismatched control fails claims/arms and iOS status
-   closed. Disaster recovery must create a reviewed new generation; never seed an
+   recovering, or generation-mismatched control fails claims/arms and companion
+   status closed. Disaster recovery must create a reviewed new generation; never seed an
    empty ledger as proof of no prior submission.
-5. Deploy `firestore.rules` and `firestore.indexes.json`, then prove every direct
-   authenticated and unauthenticated mobile path is denied in each real tier.
+5. Deploy `firestore.rules` and `firestore.indexes.json`, then prove in each
+   real tier that every unauthenticated path and every authenticated path other
+   than the owner-scoped access listed in the introduction is denied, malformed
+   and oversized owner backup rows and deeper nested paths are rejected, and
+   owner writes are refused once `deletionTombstones/{uid}` or a `DELETING`
+   presence exists.
    Firestore transactions retry on concurrent changes and apply all writes
    atomically, but production contention and service limits must still be tested:
    [Firestore transactions](https://firebase.google.com/docs/firestore/manage-data/transactions).
-6. Enable a TTL policy on `cleanupAt` for every collection group in
-   `ttl-policies.json`, and verify it. Example for each listed group:
+6. Deploy `firestore.indexes.json`; each cleanup field override declares
+   `ttl: true` for the collection groups listed in `ttl-policies.json`. Verify
+   the policy in each project. A manual equivalent for a group is:
 
    ```sh
    gcloud firestore fields ttls update cleanupAt \
@@ -489,9 +551,12 @@ deletion instead of leaving a permanent tombstone.
    authorization and rolling-budget check in this package therefore evaluates
    logical time inside the transaction.
 
-7. Explicitly disable managed Firestore backups and PITR for this minimal ledger
-   and retain evidence. This repository does not claim that console-side setting
-   is configured.
+7. Decide the managed Firestore backup/PITR policy explicitly and retain
+   evidence. Backup/PITR is a per-database setting and the same database holds
+   user cloud backups, entitlements, and the purchase-ownership ledger, so
+   disabling it for a "minimal ledger" is ambiguous; see
+   [OPERATIONS.md §10.3](../OPERATIONS.md) (OPS-OPEN-05). This repository does
+   not claim any console-side setting is configured.
 8. Configure the scheduled deletion function, Auth deletion permission, the
    coordination-operation repair schedule, stuck-fence alerts,
    dead-letter/repair runbook, and external verified-admin deletion path. A
@@ -500,7 +565,7 @@ deletion instead of leaving a permanent tombstone.
    deletion:
    [Delete Firestore data](https://firebase.google.com/docs/firestore/manage-data/delete-data#delete_collections).
 9. Register and enforce the approved production App Check providers for every
-   signed Android/iOS channel, grant the service identity the Firebase App Check
+   signed distribution channel (this repository ships an Android app only), grant the service identity the Firebase App Check
    Token Verifier role, and collect real limited-use-token replay evidence. No
    debug provider may ship.
 10. Add Cloud Logging exclusions/redaction tests, IAM review, quotas, budget
@@ -510,41 +575,41 @@ deletion instead of leaving a permanent tombstone.
 
 ## Retention model
 
-- never-Armed authorization: ten minutes; physical cleanup eligible after 24
-  hours;
+Server-data retention windows (400 days for Birthday guards/aliases, 30 days for
+TEST records and operation receipts, 90/30 days for STANDBY/REVOKED
+installations, 365 days for a `COMPLETED` deletion receipt, never-armed
+authorization) are tabulated in [OPERATIONS.md §10.5](../OPERATIONS.md). Not
+listed there, so kept here:
+
 - NO_WRITE outcome: later of authorization expiry and 24 hours after resolution;
 - rolling budget entry/document: logically ignored after 24 hours and TTL-eligible
   from its newest entry plus 24 hours;
-- Birthday Armed/outcome/guards/aliases: 400 days;
-- TEST Armed/outcome: 30 days;
-- STANDBY installation: 90 days; REVOKED installation: 30 days;
-- completed reset/release operation receipt: 30 days; an active operation fence
-  has no TTL and remains fail-closed until verified completion or reviewed
-  operator repair;
+- an active reset/release operation fence has no TTL and remains fail-closed
+  until verified completion or reviewed operator repair;
 - deletion tombstone: held through drain, recursive absence, Auth deletion, and
-  a final verification delay before removal.
-- signed-out account-deletion receipt: `IN_PROGRESS` has no TTL while unresolved;
-  exact `COMPLETED` becomes TTL-eligible 365 days after completion.
+  a final verification delay before removal;
+- `IN_PROGRESS` signed-out deletion receipt: no TTL while unresolved.
 
 These values are encoded in deterministic policy functions and tested without
 cloud credentials. TTL activation and retention evidence in a real project are
-still mandatory.
+still mandatory ([OPERATIONS.md §7.2](../OPERATIONS.md)).
 
 ## Dependency audit status
 
-As of 2026-07-12, `npm audit` reports no high or critical findings and 12 moderate
-findings overall; `npm audit --omit=dev` reports eight moderate runtime findings.
-The runtime findings are the `uuid` bounds-check advisory in the Firebase Admin
-13.x Firestore/Storage chain;
-the advisory service proposes Firebase Admin 14.1.0, but Firebase Functions 7.2.5
-currently declares official peer support only through Admin 13.x. The remaining
-findings include an OpenTelemetry baggage-allocation advisory in Firebase CLI
-development tooling. This package intentionally does
-not use `--force`, `--legacy-peer-deps`, or unsupported major overrides. Production
-release remains blocked until upstream publishes a compatible patched set or a
-reviewed supported migration removes the findings.
+Dated historical snapshot (2026-07-12, now superseded): `npm audit` reported no
+high or critical findings and eight moderate runtime findings (a `uuid`
+bounds-check advisory in the Firebase Admin 13.x Firestore/Storage chain), plus
+an OpenTelemetry advisory in Firebase CLI development tooling. The manifest now
+declares `firebase-admin ^14.5.0` and `firebase-functions ^7.4.0`; the lockfile
+resolves Admin SDK 14.5.0, not 13.x. **No audit result for the current tree is
+recorded in this repository** (see
+[OPERATIONS.md §6.6 and Appendix B OPS-OPEN-13](../OPERATIONS.md),
+[IMPLEMENTATION.md §8](../IMPLEMENTATION.md)). This package intentionally does not
+use `--force`, `--legacy-peer-deps`, or unsupported major overrides. Production
+release remains blocked until an audit of the current tree is reviewed.
 
-Run both views during every update:
+Run both views during every update (CI runs `npm audit --omit=dev
+--audit-level=high` for Functions only):
 
 ```sh
 npm audit --audit-level=high

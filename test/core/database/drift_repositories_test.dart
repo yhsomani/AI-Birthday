@@ -380,6 +380,25 @@ void main() {
         expect(row.status, 'handedOff');
       },
     );
+
+    test(
+      'handoff evidence binds the exact draft revision and body hash',
+      () async {
+        await repo.recordHandoff(
+          birthdayId: 'b-bound',
+          draftId: 'draft-4',
+          draftRevision: 4,
+          bodyHash: 'body-sha256',
+          channel: DeliveryChannel.whatsapp,
+          at: DateTime.utc(2026, 1, 5),
+        );
+
+        final handoff = await repo.latestHandoffForBirthday('b-bound');
+        expect(handoff?.draftId, 'draft-4');
+        expect(handoff?.draftRevision, 4);
+        expect(handoff?.bodyHash, 'body-sha256');
+      },
+    );
   });
 
   group('DriftDraftsRepository (stable ordering)', () {
@@ -394,6 +413,78 @@ void main() {
     tearDown(() async {
       await db.close();
     });
+
+    test(
+      'revision increments on every save and rejects stale writes',
+      () async {
+        final t = DateTime.utc(2026, 1, 1, 9);
+        await db
+            .into(db.birthdays)
+            .insert(
+              BirthdaysCompanion.insert(
+                id: 'b-rev',
+                personId: 'p-rev',
+                cycleYear: 2026,
+                date: DateTime(2026, 10, 15),
+                status: BirthdayStatus.upcoming.name,
+                createdAt: t,
+                updatedAt: t,
+              ),
+            );
+        MessageDraft draftWith(String body) => MessageDraft(
+          id: 'b-rev',
+          birthdayId: 'b-rev',
+          personId: 'p-rev',
+          body: body,
+          // Same wall-clock second for every write: updatedAt cannot tell them
+          // apart, only the revision can.
+          createdAt: t,
+          updatedAt: t,
+        );
+
+        expect(await repo.getDraft('b-rev'), isNull);
+        expect(
+          await repo.saveDraftAndUpdateBirthday(
+            draftWith('v1'),
+            BirthdayStatus.messageDrafted,
+          ),
+          isTrue,
+        );
+        final first = (await repo.getDraft('b-rev'))!;
+        expect(first.revision, 1);
+
+        expect(
+          await repo.saveDraftAndUpdateBirthday(
+            draftWith('v2'),
+            BirthdayStatus.messageDrafted,
+            requireUnchanged: true,
+            expectedCurrentDraft: first,
+          ),
+          isTrue,
+        );
+        final second = (await repo.getDraft('b-rev'))!;
+        expect(second.revision, 2);
+        expect(second.updatedAt, first.updatedAt);
+
+        // A writer still holding revision 1 (same updatedAt!) must be rejected.
+        expect(
+          await repo.saveDraftAndUpdateBirthday(
+            draftWith('stale'),
+            BirthdayStatus.messageDrafted,
+            requireUnchanged: true,
+            expectedCurrentDraft: first,
+          ),
+          isFalse,
+        );
+        expect((await repo.getDraft('b-rev'))!.body, 'v2');
+        expect((await repo.getDraft('b-rev'))!.revision, 2);
+
+        // The revision on the incoming model never lowers the stored counter,
+        // and a plain saveDraft also bumps it.
+        await repo.saveDraft(draftWith('v3').copyWith(revision: 0));
+        expect((await repo.getDraft('b-rev'))!.revision, 3);
+      },
+    );
 
     test('drafts sort by updatedAt desc with id desc tie-breaker', () async {
       final t = DateTime.utc(2026, 1, 1, 9);
@@ -729,13 +820,18 @@ void main() {
     );
 
     test(
-      'batch read throws on duplicate personId like getSingleOrNull',
+      'batch read self-heals duplicate personId rows (legacy data, no unique index)',
       () async {
         final db = AppDatabase(NativeDatabase.memory());
         addTearDown(db.close);
         final birthdaysRepo = DriftBirthdaysRepository(db);
         final now = DateTime.utc(2025, 1, 1, 8);
 
+        // The composite unique index rejects same-cycle duplicates; drop it to
+        // simulate legacy rows.
+        await db.customStatement(
+          'DROP INDEX idx_birthdays_person_cycle_year_unique',
+        );
         for (final id in ['b-1', 'b-2']) {
           await db
               .into(db.birthdays)
@@ -752,23 +848,55 @@ void main() {
               );
         }
 
-        await expectLater(
-          const BirthdayLifecycleService().refresh(
-            people: [
-              domain.Person(
-                id: 'p-1',
-                name: 'Ana',
-                birthdayMonth: 10,
-                birthdayDay: 15,
-                createdAt: now,
-                updatedAt: now,
-                version: 1,
-              ),
-            ],
-            birthdaysRepository: birthdaysRepo,
-          ),
-          throwsStateError,
+        await BirthdayLifecycleService(now: () => DateTime(2025, 3, 1)).refresh(
+          people: [
+            domain.Person(
+              id: 'p-1',
+              name: 'Ana',
+              birthdayMonth: 10,
+              birthdayDay: 15,
+              createdAt: now,
+              updatedAt: now,
+              version: 1,
+            ),
+          ],
+          birthdaysRepository: birthdaysRepo,
         );
+
+        final rows = await birthdaysRepo.getBirthdays();
+        expect(rows, hasLength(1));
+        expect(rows.single.personId, 'p-1');
+      },
+    );
+
+    test(
+      'unique index rejects same-cycle duplicates but retains other cycles',
+      () async {
+        final db = AppDatabase(NativeDatabase.memory());
+        addTearDown(db.close);
+        final repo = DriftBirthdaysRepository(db);
+        final now = DateTime.utc(2025, 1, 1, 8);
+        Birthday birthday(String id) => Birthday(
+          id: id,
+          personId: 'p-1',
+          cycleYear: 2025,
+          date: DateTime(2025, 10, 15),
+          createdAt: now,
+          updatedAt: now,
+        );
+        await repo.saveBirthday(birthday('b-1'));
+        await expectLater(
+          repo.saveBirthday(birthday('b-2')),
+          throwsA(anything),
+        );
+        await repo.saveBirthday(
+          birthday('b-next-cycle').copyWith(cycleYear: 2026),
+        );
+        expect(await repo.getBirthdayForPerson('p-1'), isNotNull);
+        expect((await repo.getBirthdays()).map((b) => b.cycleYear), [
+          2025,
+          2026,
+        ]);
       },
     );
   });
@@ -833,6 +961,8 @@ void main() {
           repo.confirmHandoff(
             birthdayId: 'b-requested',
             draftId: 'draft-other',
+            expectedBodyHash: 'hash-other',
+            expectedDraftRevision: 1,
             at: now.add(const Duration(minutes: 1)),
           ),
           throwsStateError,
@@ -893,19 +1023,28 @@ void main() {
           repo.confirmHandoff(
             birthdayId: 'b-confirm',
             draftId: 'draft-confirm',
+            expectedBodyHash: 'hash-confirm',
+            expectedDraftRevision: 1,
             at: now,
           ),
           throwsStateError,
         );
 
+        const confirmHash =
+            '041ed57d3a0deefb20c55bd180b7d3733a936434ab5f1c8ac79cf0b7c626a092';
         await repo.recordHandoffAndMarkHandedOff(
           birthdayId: 'b-confirm',
           channel: DeliveryChannel.whatsapp,
           at: now,
+          draftId: 'draft-confirm',
+          draftRevision: 0,
+          bodyHash: confirmHash,
         );
         await repo.confirmHandoff(
           birthdayId: 'b-confirm',
           draftId: 'draft-confirm',
+          expectedBodyHash: confirmHash,
+          expectedDraftRevision: 0,
           at: now.add(const Duration(minutes: 1)),
         );
 

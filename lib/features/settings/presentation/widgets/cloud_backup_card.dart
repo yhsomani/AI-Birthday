@@ -13,6 +13,7 @@ class CloudBackupCard extends StatelessWidget {
     this.restoreReport,
     this.restoreDetails = const [],
     required this.isSyncing,
+    this.isRestoring = false,
     required this.onBackup,
     required this.onRestore,
   });
@@ -22,6 +23,7 @@ class CloudBackupCard extends StatelessWidget {
   final String? restoreReport;
   final List<String> restoreDetails;
   final bool isSyncing;
+  final bool isRestoring;
   final VoidCallback onBackup;
   final VoidCallback onRestore;
 
@@ -110,7 +112,11 @@ class CloudBackupCard extends StatelessWidget {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.cloud_upload, size: 18),
-                    label: Text(isSyncing ? 'Backing up...' : 'Back Up Now'),
+                    label: Text(
+                      isSyncing
+                          ? (isRestoring ? 'Restoring...' : 'Backing up...')
+                          : 'Back Up Now',
+                    ),
                   ),
                 ],
               ),

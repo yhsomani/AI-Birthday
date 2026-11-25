@@ -12,11 +12,15 @@ class DeliveryHandoff {
     required this.channel,
     required this.at,
     this.draftId,
+    this.draftRevision,
+    this.bodyHash,
     this.outcome = DeliveryOutcome.launched,
   });
 
   final String birthdayId;
   final String? draftId;
+  final int? draftRevision;
+  final String? bodyHash;
   final DeliveryChannel channel;
   final DateTime at;
   final DeliveryOutcome outcome;
@@ -30,9 +34,12 @@ enum DeliveryOutcome {
   confirmed;
 
   static DeliveryOutcome fromString(String? value) {
-    return DeliveryOutcome.values.firstWhere(
-      (outcome) => outcome.name.toLowerCase() == value?.toLowerCase(),
-      orElse: () => DeliveryOutcome.launched,
-    );
+    if (value == null) {
+      throw const FormatException('Delivery outcome cannot be null.');
+    }
+    for (final outcome in DeliveryOutcome.values) {
+      if (outcome.name.toLowerCase() == value.toLowerCase()) return outcome;
+    }
+    throw FormatException('Unknown delivery outcome: $value');
   }
 }

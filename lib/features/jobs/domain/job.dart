@@ -18,14 +18,20 @@ enum JobStatus {
   canceled;
 
   static JobStatus fromString(String? value) {
-    return JobStatus.values.firstWhere(
-      (e) => e.name == value,
-      orElse: () => JobStatus.queued,
-    );
+    if (value == null) {
+      throw const FormatException('Job status cannot be null.');
+    }
+    for (final status in JobStatus.values) {
+      if (status.name == value) return status;
+    }
+    throw FormatException('Unknown job status: $value');
   }
 
   /// Whether the job is still eligible to run now or later.
-  bool get isActive => this == JobStatus.queued || this == JobStatus.running;
+  bool get isActive =>
+      this == JobStatus.queued ||
+      this == JobStatus.running ||
+      this == JobStatus.retrying;
 
   /// Whether the job has reached an end state and will not run again.
   bool get isTerminal =>
@@ -38,6 +44,14 @@ enum JobStatus {
 abstract final class JobTypes {
   static const String aiGenerate = 'ai_generate';
   static const String cloudSync = 'cloud_sync';
+}
+
+/// Fences a durable effect to the exact handler attempt that owns it.
+class JobAttemptFence {
+  const JobAttemptFence({required this.jobId, required this.attempt});
+
+  final String jobId;
+  final int attempt;
 }
 
 /// A durable background job.
@@ -90,6 +104,15 @@ class JobRecord {
 
   /// Earliest time a retrying job may be claimed again.
   final DateTime? nextRetryAt;
+
+  /// Prefix of [resultRef] for a job that finished without applying its effect
+  /// (stale draft, cycle change, lost race). Still `succeeded`: nothing failed.
+  static const String droppedResultPrefix = 'dropped:';
+
+  /// Whether the job completed but its result was deliberately not applied.
+  bool get wasDropped =>
+      status == JobStatus.succeeded &&
+      (resultRef?.startsWith(droppedResultPrefix) ?? false);
 
   JobRecord copyWith({
     JobStatus? status,

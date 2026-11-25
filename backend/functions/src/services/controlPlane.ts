@@ -345,11 +345,11 @@ export class ControlPlaneService {
     return this.keyRing;
   }
 
-  private async deleteQuery(query: Query): Promise<void> {
-    for (;;) {
+  private async deleteQuery(query: Query): Promise<boolean> {
+    for (let page = 0; page < 5; page += 1) {
       const snapshot = await query.limit(400).get();
       if (snapshot.empty) {
-        return;
+        return true;
       }
       const batch = this.db.batch();
       for (const document of snapshot.docs) {
@@ -357,19 +357,31 @@ export class ControlPlaneService {
       }
       await batch.commit();
     }
+    return false;
   }
 
-  private async purgeContactDerivedState(uid: string): Promise<void> {
+  private async purgeContactDerivedState(uid: string): Promise<boolean> {
     const paths = accountPaths(this.db, uid);
-    await this.deleteQuery(paths.occurrenceClaims);
-    await this.deleteQuery(paths.occurrenceKeys);
-    await this.deleteQuery(paths.destinationGuards);
-    await this.deleteQuery(
+    if (!(await this.deleteQuery(paths.occurrenceClaims))) {
+      return false;
+    }
+    if (!(await this.deleteQuery(paths.occurrenceKeys))) {
+      return false;
+    }
+    if (!(await this.deleteQuery(paths.destinationGuards))) {
+      return false;
+    }
+    if (!(await this.deleteQuery(
       paths.claimRequests.where('purpose', '==', 'BIRTHDAY'),
-    );
-    await this.deleteQuery(
+    ))) {
+      return false;
+    }
+    if (!(await this.deleteQuery(
       paths.armOutcomes.where('purpose', '==', 'BIRTHDAY'),
-    );
+    ))) {
+      return false;
+    }
+    return true;
   }
 
   private async contactDerivedStateIsAbsent(uid: string): Promise<boolean> {
@@ -394,19 +406,18 @@ export class ControlPlaneService {
     await this.db.recursiveDelete(this.db.collection('users').doc(uid));
   }
 
-  private async accountTreeIsAbsent(uid: string): Promise<boolean> {
-    const roots = [
-      accountPaths(this.db, uid).account,
-      this.db.collection('users').doc(uid),
-    ];
-    for (const root of roots) {
-      if ((await root.get()).exists) {
+  private async purgeCoordinationTree(uid: string): Promise<void> {
+    await this.db.recursiveDelete(accountPaths(this.db, uid).account);
+  }
+
+  private async coordinationTreeIsAbsent(uid: string): Promise<boolean> {
+    const root = accountPaths(this.db, uid).account;
+    if ((await root.get()).exists) {
+      return false;
+    }
+    for (const collection of await root.listCollections()) {
+      if (!(await collection.limit(1).get()).empty) {
         return false;
-      }
-      for (const collection of await root.listCollections()) {
-        if (!(await collection.limit(1).get()).empty) {
-          return false;
-        }
       }
     }
     return true;
@@ -798,7 +809,9 @@ export class ControlPlaneService {
       }
     }
     if (operation.stage === 'RESET_PURGING') {
-      await this.purgeContactDerivedState(uid);
+      if (!(await this.purgeContactDerivedState(uid))) {
+        return inProgressResponse(operation);
+      }
       if (!(await this.contactDerivedStateIsAbsent(uid))) {
         return inProgressResponse(operation);
       }
@@ -816,8 +829,8 @@ export class ControlPlaneService {
     if (operation.stage !== 'RELEASE_PURGING') {
       throw new LedgerCorruptError();
     }
-    await this.purgeAccountTrees(uid);
-    if (!(await this.accountTreeIsAbsent(uid))) {
+    await this.purgeCoordinationTree(uid);
+    if (!(await this.coordinationTreeIsAbsent(uid))) {
       return inProgressResponse(operation);
     }
     return completedResponse(await this.finalizeSenderRelease(uid, operation));
@@ -1979,13 +1992,24 @@ export class ControlPlaneService {
       return 'WAIT';
     }
     await this.purgeAccountTrees(uid);
+    // Ownership docs are keyed by purchase-token hash, so they are found by
+    // their uid field. Docs written before this purge existed carry the field.
+    const ownershipQuery = this.db
+      .collection('subscriptionPurchaseOwnership')
+      .where('uid', '==', uid);
+    if (!(await this.deleteQuery(ownershipQuery))) {
+      return 'WAIT';
+    }
     const receiptQuery = this.db
       .collection('coordinationOperationReceipts')
       .where('accountKey', '==', deriveOperationAccountKey(uid));
-    await this.deleteQuery(receiptQuery);
+    if (!(await this.deleteQuery(receiptQuery))) {
+      return 'WAIT';
+    }
     await paths.latestOperationReceipt.delete();
     if (
       !(await receiptQuery.limit(1).get()).empty ||
+      !(await ownershipQuery.limit(1).get()).empty ||
       (await paths.latestOperationReceipt.get()).exists
     ) {
       throw new LedgerCorruptError();

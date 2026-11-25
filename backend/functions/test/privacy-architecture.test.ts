@@ -46,13 +46,22 @@ describe('privacy and server-boundary architecture', () => {
       }
     }
 
-    expect(loggerSites).toHaveLength(2);
     const allowList = [
       'deletion_sweep_completed',
       'coordination_operation_sweep_completed',
+      'callable_internal_failure',
+      'deletion_sweep_item_failed',
+      'deletion_sweep_defer_failed',
+      'coordination_operation_sweep_item_failed',
     ];
+    expect(loggerSites).toHaveLength(allowList.length);
     expect(
       allowList.every(event => loggerSites.some(site => site.includes(event))),
     ).toBe(true);
+    for (const site of loggerSites) {
+      expect(site).not.toMatch(
+        /error\.message|uid|requestId|receiptId|purchaseToken/iu,
+      );
+    }
   });
 });

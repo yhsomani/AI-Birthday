@@ -20,7 +20,7 @@ import 'package:ai_birthday/features/people/domain/person_enums.dart';
 import 'package:ai_birthday/features/delivery/application/birthday_sms_service.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 
-/// Add / edit recipient form with Progressive Disclosure (SSOT §7, §14).
+/// Add / edit recipient form with Progressive Disclosure (legacy SSOT §7, §14 (PRODUCT.md §16.7)).
 ///
 /// Designed to minimize initial cognitive overload: Essentials (Name & Birthday)
 /// are immediately front-and-center, while Relationship, Contact/Delivery, and
@@ -54,7 +54,6 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
   final _birthYear = TextEditingController();
   final _phone = TextEditingController();
   final _email = TextEditingController();
-  final _relationship = TextEditingController();
   final _notes = TextEditingController();
   final _timezone = TextEditingController();
   final List<TextEditingController> _facts = [];
@@ -63,6 +62,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
   int? _day;
   MessageTone _tone = MessageTone.warm;
   Person? _existingPerson;
+  p_rel.RelationshipCategory _relationship = p_rel.RelationshipCategory.other;
   p_rel.RelationshipCloseness _closeness = p_rel.RelationshipCloseness.casual;
   String _preferredLanguage = 'en';
   d_chan.DeliveryChannel _deliveryChannel = d_chan.DeliveryChannel.whatsapp;
@@ -133,7 +133,6 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
     _birthYear.dispose();
     _phone.dispose();
     _email.dispose();
-    _relationship.dispose();
     _notes.dispose();
     _timezone.dispose();
     for (final c in _facts) {
@@ -151,7 +150,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
     _leapDayResolution = person.leapDayResolution;
     _phone.text = person.phoneNumber ?? '';
     _email.text = person.email ?? '';
-    _relationship.text = person.relationship.displayName;
+    _relationship = person.relationship;
     _notes.text = person.notes ?? '';
     _timezone.text = person.timezone ?? '';
     _tone = person.preferredTone;
@@ -231,9 +230,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
       leapDayResolution: _month == 2 && _day == 29 ? _leapDayResolution : null,
       phoneNumber: emptyToNull(_phone.text),
       email: emptyToNull(_email.text),
-      relationship: p_rel.RelationshipCategory.fromString(
-        _relationship.text.trim(),
-      ),
+      relationship: _relationship,
       relationshipCloseness: _closeness,
       preferredLanguage: _preferredLanguage,
       preferredTone: _tone,
@@ -285,7 +282,17 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
           birthday: birthday,
           draft: draft,
         );
-      } catch (_) {}
+      } catch (error, stackTrace) {
+        ref
+            .read(loggerProvider)
+            .warning(
+              'people',
+              'Automatic SMS schedule reconciliation failed after saving a contact.',
+              params: {'personId': saved.id},
+              error: error,
+              stackTrace: stackTrace,
+            );
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -458,7 +465,7 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
               Card(
                 clipBehavior: Clip.antiAlias,
                 child: ExpansionTile(
-                  initiallyExpanded: _relationship.text.isNotEmpty,
+                  initiallyExpanded: _isEditing,
                   title: const Text(
                     'Relationship & Tone',
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
@@ -475,13 +482,23 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: Column(
                         children: [
-                          TextField(
-                            controller: _relationship,
-                            maxLength: 60,
-                            onChanged: (_) => _markDirty(),
+                          DropdownButtonFormField<p_rel.RelationshipCategory>(
+                            initialValue: _relationship,
+                            items: [
+                              for (final category
+                                  in p_rel.RelationshipCategory.values)
+                                DropdownMenuItem(
+                                  value: category,
+                                  child: Text(category.displayName),
+                                ),
+                            ],
+                            onChanged: (value) => setState(() {
+                              _dirty = true;
+                              _relationship =
+                                  value ?? p_rel.RelationshipCategory.other;
+                            }),
                             decoration: InputDecoration(
-                              labelText: 'Relationship (optional)',
-                              hintText: 'e.g. Best friend, Cousin, Colleague',
+                              labelText: 'Relationship',
                               errorText: _errorFor(PersonField.relationship),
                             ),
                           ),
@@ -524,36 +541,17 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          DropdownButtonFormField<String>(
+                          TextFormField(
                             initialValue: _preferredLanguage,
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'en',
-                                child: Text('English'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'hi',
-                                child: Text('Hindi'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'es',
-                                child: Text('Spanish'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'fr',
-                                child: Text('French'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'de',
-                                child: Text('German'),
-                              ),
-                            ],
+                            maxLength: 10,
                             onChanged: (value) => setState(() {
                               _dirty = true;
-                              _preferredLanguage = value ?? 'en';
+                              _preferredLanguage = value;
                             }),
-                            decoration: const InputDecoration(
-                              labelText: 'Preferred language',
+                            decoration: InputDecoration(
+                              labelText: 'Preferred language code',
+                              hintText: 'e.g. en, es-MX',
+                              errorText: _errorFor(PersonField.language),
                             ),
                           ),
                         ],

@@ -5,10 +5,10 @@ import '../domain/repositories/birthdays_repository.dart';
 
 /// Keeps the stored birthday event aligned with the next real calendar cycle.
 ///
-/// The database stores one active occurrence per person for dashboard,
-/// reminder and message workflows. On app/provider startup this service moves
-/// an elapsed occurrence to the next cycle instead of leaving the previous
-/// year's date visible indefinitely.
+/// The database stores one occurrence per person and cycle. On app/provider
+/// startup this service aligns the current occurrence for dashboard, reminder
+/// and message workflows while keeping older cycles attached to their own
+/// dependent records.
 class BirthdayLifecycleService {
   const BirthdayLifecycleService({
     this.engine = const BirthdayEngine(),
@@ -26,16 +26,52 @@ class BirthdayLifecycleService {
 
     // Performance audit: previously this loop issued one SELECT per person
     // (`getBirthdayForPerson`), an N+1 that ran on every `birthdaysStreamProvider`
-    // build. Load all events once and index by person; a duplicate personId
-    // throws StateError, matching drift's `getSingleOrNull` contract.
-    final existingByPerson = <String, Birthday>{};
+    // build. Load all events once and index by person. Duplicate rows for one
+    // person (restore/sync/legacy bugs) must never blank the dashboard. Merge
+    // duplicate rows only when they represent the same cycle;
+    // drafts and delivery evidence from another cycle must retain their owner.
+    final birthdaysByPerson = <String, List<Birthday>>{};
     for (final birthday in await birthdaysRepository.getBirthdays()) {
-      if (existingByPerson.containsKey(birthday.personId)) {
-        throw StateError(
-          'Multiple birthdays exist for person ${birthday.personId}.',
-        );
+      birthdaysByPerson.putIfAbsent(birthday.personId, () => []).add(birthday);
+    }
+    final existingByPerson = <String, List<Birthday>>{};
+    for (final entry in birthdaysByPerson.entries) {
+      final eventsByCycle = <int, List<Birthday>>{};
+      for (final event in entry.value) {
+        eventsByCycle.putIfAbsent(event.cycleYear, () => []).add(event);
       }
-      existingByPerson[birthday.personId] = birthday;
+
+      final canonicalEvents = <Birthday>[];
+      for (final events in eventsByCycle.values) {
+        var canonical = events.reduce(
+          (current, candidate) =>
+              _isNewer(candidate, current) ? candidate : current,
+        );
+        if (events.length > 1) {
+          final linked = events
+              .where((event) => event.draftId != null)
+              .toList();
+          if (canonical.draftId == null && linked.isNotEmpty) {
+            final draftOwner = linked.reduce(
+              (current, candidate) =>
+                  _isNewer(candidate, current) ? candidate : current,
+            );
+            canonical = canonical.copyWith(
+              draftId: draftOwner.draftId,
+              status: draftOwner.status,
+            );
+          }
+          await birthdaysRepository.mergeDuplicateBirthdays(
+            canonical,
+            duplicateIds: events
+                .where((event) => event.id != canonical.id)
+                .map((event) => event.id)
+                .toList(),
+          );
+        }
+        canonicalEvents.add(canonical);
+      }
+      existingByPerson[entry.key] = canonicalEvents;
     }
 
     for (final person in people) {
@@ -56,7 +92,21 @@ class BirthdayLifecycleService {
       );
       if (next == null) continue;
 
-      final existing = existingByPerson[person.id];
+      final storedEvents = existingByPerson[person.id] ?? const <Birthday>[];
+      Birthday? existing;
+      for (final event in storedEvents) {
+        if (event.cycleYear == next.year &&
+            event.isSameCalendarDate(next.nextDate)) {
+          existing = event;
+          break;
+        }
+      }
+      existing ??= storedEvents.isEmpty
+          ? null
+          : storedEvents.reduce(
+              (current, candidate) =>
+                  _isNewer(candidate, current) ? candidate : current,
+            );
       final targetStatus = next.isToday
           ? BirthdayStatus.reminderDue
           : BirthdayStatus.upcoming;
@@ -79,9 +129,7 @@ class BirthdayLifecycleService {
 
       final cycleMatches =
           existing.cycleYear == next.year &&
-          existing.date.year == next.nextDate.year &&
-          existing.date.month == next.nextDate.month &&
-          existing.date.day == next.nextDate.day;
+          existing.isSameCalendarDate(next.nextDate);
 
       if (cycleMatches) {
         final needsTodayStatus =
@@ -108,5 +156,13 @@ class BirthdayLifecycleService {
         ),
       );
     }
+  }
+
+  static bool _isNewer(Birthday candidate, Birthday current) {
+    final byUpdated = candidate.updatedAt.compareTo(current.updatedAt);
+    if (byUpdated != 0) return byUpdated > 0;
+    final byCreated = candidate.createdAt.compareTo(current.createdAt);
+    if (byCreated != 0) return byCreated > 0;
+    return candidate.id.compareTo(current.id) > 0;
   }
 }

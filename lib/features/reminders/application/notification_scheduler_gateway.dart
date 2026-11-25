@@ -1,6 +1,6 @@
 import '../domain/reminder_schedule.dart';
 
-/// Platform boundary for scheduling local notifications (SSOT §17).
+/// Platform boundary for scheduling local notifications (legacy SSOT §17 (PRODUCT.md §16.7)).
 ///
 /// Deliberately an interface: the device implementation
 /// (`flutter_local_notifications` + Android permission flow) is delivered in a

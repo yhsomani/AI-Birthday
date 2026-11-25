@@ -6,7 +6,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import android.content.BroadcastReceiver
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.ContactsContract
@@ -43,6 +45,39 @@ class MainActivity : FlutterActivity() {
     private var notificationsChannel: MethodChannel? = null
     private val nativeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val generativeModel by lazy { Generation.getClient() }
+    private var scheduleChangeReceiverRegistered = false
+    private val scheduleChangeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            BirthdayNotificationReceiver().onReceive(context, intent)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (scheduleChangeReceiverRegistered) return
+
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+            addAction(Intent.ACTION_DATE_CHANGED)
+            addAction("android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED")
+        }
+        ContextCompat.registerReceiver(
+            this,
+            scheduleChangeReceiver,
+            filter,
+            ContextCompat.RECEIVER_EXPORTED
+        )
+        scheduleChangeReceiverRegistered = true
+    }
+
+    override fun onPause() {
+        if (scheduleChangeReceiverRegistered) {
+            unregisterReceiver(scheduleChangeReceiver)
+            scheduleChangeReceiverRegistered = false
+        }
+        super.onPause()
+    }
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
@@ -260,7 +295,7 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-        // Setup Contacts MethodChannel (SSOT §18)
+        // Setup Contacts MethodChannel (legacy SSOT §18 (PRODUCT.md §16.7))
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CONTACTS_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -572,6 +607,7 @@ class MainActivity : FlutterActivity() {
             val intent = Intent(this, BirthdayNotificationReceiver::class.java).apply {
                 action = BirthdayNotificationReceiver.ACTION_BIRTHDAY_REMINDER
                 putExtra(BirthdayNotificationReceiver.EXTRA_ID, id)
+                putExtra(BirthdayNotificationReceiver.EXTRA_TIMESTAMP_MS, timestampMs)
                 putExtra(BirthdayNotificationReceiver.EXTRA_TITLE, title)
                 putExtra(BirthdayNotificationReceiver.EXTRA_BODY, body)
                 putExtra(BirthdayNotificationReceiver.EXTRA_PERSON_ID, personId)

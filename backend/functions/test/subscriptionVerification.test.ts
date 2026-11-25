@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type {
   DocumentReference,
   DocumentSnapshot,
@@ -18,6 +20,18 @@ import {
 import { verifyPurchaseSchema } from '../src/transport/schemas.js';
 
 const ACCOUNT_BINDING = 'acct-binding-test-123456';
+
+const ownershipPath = (token: string): string =>
+  'subscriptionPurchaseOwnership/' +
+  createHash('sha256').update(token, 'utf8').digest('hex');
+
+const purchaseRequest = (purchaseToken: string) => ({
+  contractVersion: 1 as const,
+  purchaseToken,
+  productId: PRO_PRODUCT_ID,
+  packageName: EXPECTED_PACKAGE_NAME,
+  accountBinding: ACCOUNT_BINDING,
+});
 
 function mockDb(
   sink: (path: string, data: Record<string, unknown>) => void,
@@ -56,7 +70,19 @@ function mockDb(
       },
     }) as unknown as DocumentReference;
 
-  return { doc } as unknown as Firestore;
+  // Writes apply immediately; the tests only need the transaction API shape.
+  const runTransaction = async <T>(
+    update: (transaction: unknown) => Promise<T>,
+  ): Promise<T> =>
+    update({
+      get: (ref: DocumentReference) => ref.get(),
+      create: (ref: DocumentReference, data: Record<string, unknown>) =>
+        void ref.create(data),
+      set: (ref: DocumentReference, data: Record<string, unknown>) =>
+        void ref.set(data),
+    });
+
+  return { doc, runTransaction } as unknown as Firestore;
 }
 
 function verifier(
@@ -155,6 +181,88 @@ describe('Subscription Verification Service', () => {
 
     expect(result.status).toBe('expired');
     expect(result.canUseAi).toBe(false);
+  });
+
+  it('does not report grace-period entitlement when expiry is already past', async () => {
+    const snapshot: GooglePlaySubscriptionSnapshot = {
+      ...activeSnapshot(),
+      subscriptionState: 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+      lineItems: [
+        {
+          productId: PRO_PRODUCT_ID,
+          expiryTime: new Date(Date.now() - 60_000).toISOString(),
+        },
+      ],
+    };
+    let savedData: Record<string, unknown> = {};
+    const result = await new SubscriptionVerificationService(
+      mockDb((_, data) => {
+        savedData = data;
+      }),
+      verifier(snapshot),
+    ).verifyPurchase('user-grace', purchaseRequest('grace-token'));
+
+    expect(result.status).toBe('expired');
+    expect(result.canUseAi).toBe(false);
+    expect(result.expiryDateMs).toBeLessThan(Date.now());
+    expect(savedData.status).toBe('expired');
+    expect(savedData.canUseAi).toBe(false);
+  });
+
+  it('preserves a different usable entitlement when grace-period expiry is past', async () => {
+    const docs = new Map<string, Record<string, unknown>>();
+    const activeExpiry = Date.now() + 15 * 24 * 60 * 60 * 1000;
+    const existing = {
+      status: 'active',
+      productId: PRO_PRODUCT_ID,
+      expiryDateMs: activeExpiry,
+      canUseAi: true,
+      isAutoRenewing: true,
+      purchaseTokenHash: 'existing_valid_token_hash',
+    };
+    docs.set('users/user-abc/entitlement/status', existing);
+    const snapshot: GooglePlaySubscriptionSnapshot = {
+      ...activeSnapshot(),
+      subscriptionState: 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+      lineItems: [
+        {
+          productId: PRO_PRODUCT_ID,
+          expiryTime: new Date(Date.now() - 60_000).toISOString(),
+        },
+      ],
+    };
+
+    const result = await new SubscriptionVerificationService(
+      mockDb(() => undefined, new Map(), docs),
+      verifier(snapshot),
+    ).verifyPurchase('user-abc', purchaseRequest('different-grace-token'));
+
+    expect(result.status).toBe('active');
+    expect(result.canUseAi).toBe(true);
+    expect(result.expiryDateMs).toBe(activeExpiry);
+    expect(docs.get('users/user-abc/entitlement/status')).toEqual(existing);
+  });
+
+  it('accepts grace-period entitlement when Play reports a future expiry', async () => {
+    const futureExpiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
+    const snapshot: GooglePlaySubscriptionSnapshot = {
+      ...activeSnapshot(),
+      subscriptionState: 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+      lineItems: [
+        {
+          productId: PRO_PRODUCT_ID,
+          expiryTime: new Date(futureExpiry).toISOString(),
+        },
+      ],
+    };
+    const result = await new SubscriptionVerificationService(
+      mockDb(() => undefined),
+      verifier(snapshot),
+    ).verifyPurchase('user-grace-future', purchaseRequest('grace-future-token'));
+
+    expect(result.status).toBe('active');
+    expect(result.canUseAi).toBe(true);
+    expect(result.expiryDateMs).toBeGreaterThan(Date.now());
   });
 
   it('binds a verified purchase token to the first authenticated account', async () => {
@@ -351,5 +459,188 @@ describe('Subscription Verification Service', () => {
     expect(result.status).toBe('active');
     expect(result.canUseAi).toBe(true);
     expect(result.expiryDateMs).toBe(activeExpiry);
+  });
+
+  describe('account binding relaxation', () => {
+    const mismatched = (): GooglePlaySubscriptionSnapshot => ({
+      ...activeSnapshot(),
+      obfuscatedExternalAccountId: 'different-account-binding',
+    });
+
+    it('denies a first-time claim with a binding mismatch and writes nothing', async () => {
+      const owners = new Map<string, string>();
+      const writes: string[] = [];
+      const service = new SubscriptionVerificationService(
+        mockDb(path => writes.push(path), owners),
+        verifier(mismatched()),
+      );
+
+      await expect(
+        service.verifyPurchase('user-abc', purchaseRequest('tok-first')),
+      ).rejects.toThrow('PURCHASE_ACCOUNT_MISMATCH');
+      expect(owners.size).toBe(0);
+      expect(writes).toEqual([]);
+    });
+
+    it('accepts a binding mismatch when the same uid already owns the token', async () => {
+      const owners = new Map<string, string>([
+        [ownershipPath('tok-owned'), 'user-abc'],
+      ]);
+      const writes: string[] = [];
+      const service = new SubscriptionVerificationService(
+        mockDb(path => writes.push(path), owners),
+        verifier(mismatched()),
+      );
+
+      const result = await service.verifyPurchase(
+        'user-abc',
+        purchaseRequest('tok-owned'),
+      );
+
+      expect(result.status).toBe('active');
+      expect(result.canUseAi).toBe(true);
+      expect(writes).toEqual(['users/user-abc/entitlement/status']);
+    });
+
+    it('denies a binding mismatch when another uid owns the token', async () => {
+      const owners = new Map<string, string>([
+        [ownershipPath('tok-other'), 'user-other'],
+      ]);
+      const writes: string[] = [];
+      const service = new SubscriptionVerificationService(
+        mockDb(path => writes.push(path), owners),
+        verifier(mismatched()),
+      );
+
+      await expect(
+        service.verifyPurchase('user-abc', purchaseRequest('tok-other')),
+      ).rejects.toThrow('PURCHASE_ACCOUNT_MISMATCH');
+      expect(writes).toEqual([]);
+    });
+
+    it('still denies another uid when the binding matches', async () => {
+      const owners = new Map<string, string>([
+        [ownershipPath('tok-other-match'), 'user-other'],
+      ]);
+      const service = new SubscriptionVerificationService(
+        mockDb(() => undefined, owners),
+        verifier({
+          ...activeSnapshot(),
+          obfuscatedExternalAccountId: ACCOUNT_BINDING,
+        }),
+      );
+
+      await expect(
+        service.verifyPurchase('user-abc', purchaseRequest('tok-other-match')),
+      ).rejects.toThrow('PURCHASE_ACCOUNT_MISMATCH');
+    });
+
+    it('records ownership on a matching first-time claim', async () => {
+      const owners = new Map<string, string>();
+      const service = new SubscriptionVerificationService(
+        mockDb(() => undefined, owners),
+        verifier({
+          ...activeSnapshot(),
+          obfuscatedExternalAccountId: ACCOUNT_BINDING,
+        }),
+      );
+
+      await service.verifyPurchase('user-abc', purchaseRequest('tok-match'));
+
+      expect(owners.get(ownershipPath('tok-match'))).toBe('user-abc');
+    });
+  });
+
+  describe('deletion fence', () => {
+    const fences: [string, string, Record<string, unknown>][] = [
+      ['a deletion tombstone', 'deletionTombstones/user-abc', { stage: 'DRAINING' }],
+      [
+        'a DELETING presence document',
+        'coordinationPresence/user-abc',
+        { state: 'DELETING' },
+      ],
+    ];
+
+    for (const [label, fencePath, fenceData] of fences) {
+      it('refuses verification and writes nothing when ' + label + ' exists', async () => {
+        const owners = new Map<string, string>();
+        const docs = new Map<string, Record<string, unknown>>([
+          [fencePath, fenceData],
+        ]);
+        const writes: string[] = [];
+        let playCalled = false;
+        const service = new SubscriptionVerificationService(
+          mockDb(path => writes.push(path), owners, docs),
+          {
+            getSubscription: () => {
+              playCalled = true;
+              return Promise.resolve(activeSnapshot());
+            },
+          },
+        );
+
+        await expect(
+          service.verifyPurchase('user-abc', purchaseRequest('tok-deleting')),
+        ).rejects.toThrow('ACCOUNT_DELETION_IN_PROGRESS');
+        expect(playCalled).toBe(false);
+        expect(owners.size).toBe(0);
+        expect(writes).toEqual([]);
+      });
+    }
+
+    it('refuses the invalid-token write path while deleting', async () => {
+      const docs = new Map<string, Record<string, unknown>>([
+        ['deletionTombstones/user-abc', { stage: 'PURGING' }],
+      ]);
+      const writes: string[] = [];
+      const service = new SubscriptionVerificationService(
+        mockDb(path => writes.push(path), new Map(), docs),
+        {
+          getSubscription: () =>
+            Promise.reject(new GooglePlayApiError('LOOKUP_FAILED', 404)),
+        },
+      );
+
+      await expect(
+        service.verifyPurchase('user-abc', purchaseRequest('tok-gone')),
+      ).rejects.toThrow('ACCOUNT_DELETION_IN_PROGRESS');
+      expect(writes).toEqual([]);
+    });
+
+    it('re-checks the fence inside the write transaction', async () => {
+      const docs = new Map<string, Record<string, unknown>>();
+      const owners = new Map<string, string>();
+      const writes: string[] = [];
+      const db = mockDb(path => writes.push(path), owners, docs);
+      // The fence appears while the Play lookup is in flight.
+      const service = new SubscriptionVerificationService(db, {
+        getSubscription: () => {
+          docs.set('deletionTombstones/user-abc', { stage: 'DRAINING' });
+          return Promise.resolve(activeSnapshot());
+        },
+      });
+
+      await expect(
+        service.verifyPurchase('user-abc', purchaseRequest('tok-race')),
+      ).rejects.toThrow('ACCOUNT_DELETION_IN_PROGRESS');
+      expect(owners.size).toBe(0);
+      expect(writes).toEqual([]);
+    });
+
+    it('does not fence other accounts', async () => {
+      const docs = new Map<string, Record<string, unknown>>([
+        ['deletionTombstones/someone-else', { stage: 'DRAINING' }],
+      ]);
+      const service = new SubscriptionVerificationService(
+        mockDb(() => undefined, new Map(), docs),
+        verifier(activeSnapshot()),
+      );
+
+      const result = await service.verifyPurchase(
+        'user-abc',
+        purchaseRequest('tok-fine'),
+      );
+      expect(result.status).toBe('active');
+    });
   });
 });

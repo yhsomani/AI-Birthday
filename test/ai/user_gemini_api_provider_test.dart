@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:ai_birthday/core/errors/app_failure.dart';
@@ -247,6 +248,26 @@ void main() {
         );
       },
     );
+
+    test('maps an HTTP request timeout to aiTimeout', () async {
+      final provider = UserGeminiApiProvider(
+        credentialStorage: storage,
+        httpSender: (uri, headers, body) async {
+          throw TimeoutException('network detail');
+        },
+      );
+
+      await expectLater(
+        provider.generateMessage(AiGenerationRequest(person: testPerson)),
+        throwsA(
+          isA<AppFailure>().having(
+            (failure) => failure.code,
+            'code',
+            AppFailureCode.aiTimeout,
+          ),
+        ),
+      );
+    });
 
     test('parses clean valid candidate text properly', () async {
       final provider = UserGeminiApiProvider(

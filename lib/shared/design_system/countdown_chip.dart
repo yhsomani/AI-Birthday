@@ -51,7 +51,7 @@ class CountdownChip extends StatelessWidget {
 
     if (isToday || daysUntil == 0) {
       bg = isDark
-          ? AppColors.primaryTerracotta.withValues(alpha: 0.3)
+          ? AppColors.primaryTerracotta.withValues(alpha: 0.2)
           : AppColors.primaryTerracottaContainer;
       fg = isDark
           ? AppColors.primaryTerracottaLight
@@ -60,7 +60,9 @@ class CountdownChip extends StatelessWidget {
       bg = isDark
           ? AppColors.accentAmber.withValues(alpha: 0.25)
           : AppColors.accentAmberContainer;
-      fg = isDark ? AppColors.accentAmberLight : AppColors.accentAmber;
+      fg = isDark
+          ? AppColors.accentAmberLight
+          : AppColors.accentAmberOnContainer;
     } else {
       bg = isDark
           ? AppColors.darkSurfaceVariant

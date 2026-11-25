@@ -1,4 +1,4 @@
-/// The notification cadence before a birthday (SSOT §17).
+/// The notification cadence before a birthday (legacy SSOT §17 (PRODUCT.md §16.7)).
 ///
 /// [daysBefore] is how many whole days ahead of the birthday the reminder is
 /// delivered (0 = on the birthday itself).

@@ -12,11 +12,12 @@ import '../domain/models/relationship.dart';
 import '../domain/models/tone.dart';
 import '../domain/person.dart';
 import '../domain/person_enums.dart' show AutoSendPolicy;
+import '../domain/repositories/people_repository.dart';
 
 /// Persistence face for recipients.
 ///
 /// Implemented by [DriftPeopleStore] backed by the operational SQLite store
-/// (SSOT §13/§19). A fake implementation exists for tests, so UI and services
+/// (legacy SSOT §13/§19 (PRODUCT.md §16.7)). A fake implementation exists for tests, so UI and services
 /// never depend on an actual database.
 abstract class PeopleStore {
   Future<List<Person>> getAll({bool includeDeleted = false});
@@ -37,7 +38,7 @@ abstract class PeopleStore {
 
 /// Drift-backed [PeopleStore]. Version/timestamp integrity is enforced by the
 /// service layer; save stores the entity as given (idempotent by id).
-class DriftPeopleStore implements PeopleStore {
+class DriftPeopleStore implements PeopleStore, PeopleRepository {
   DriftPeopleStore(this._database, {DateTime Function()? now})
     : _now = now ?? clock.clock.now;
 
@@ -57,6 +58,24 @@ class DriftPeopleStore implements PeopleStore {
     final rows = await query.get();
     return rows.map(_toDomain).toList();
   }
+
+  @override
+  Future<List<Person>> getPeople() => getAll();
+
+  @override
+  Future<Person?> getPerson(String id) async {
+    final person = await getById(id);
+    return person?.deletedAt == null ? person : null;
+  }
+
+  @override
+  Stream<List<Person>> watchPeople() => watchAll();
+
+  @override
+  Future<void> savePerson(Person person) => save(person);
+
+  @override
+  Future<void> deletePerson(String id) => softDeleteAggregate(id);
 
   @override
   Stream<List<Person>> watchAll({bool includeDeleted = false}) {
@@ -83,14 +102,32 @@ class DriftPeopleStore implements PeopleStore {
 
   @override
   Future<void> save(Person person) async {
+    final existing = await (_database.select(
+      _database.persons,
+    )..where((row) => row.id.equals(person.id))).getSingleOrNull();
+    final storedPerson = person.deletedAt == null && existing?.deletedAt != null
+        ? person.copyWith(deletedAt: existing!.deletedAt)
+        : person;
+    // nullToAbsent: false so a cleared optional field overwrites the old
+    // value instead of being skipped by the upsert (audit A1-004).
     await _database
         .into(_database.persons)
-        .insertOnConflictUpdate(_toRow(person));
+        .insertOnConflictUpdate(_toRow(storedPerson).toCompanion(false));
   }
 
   @override
   Future<void> saveAggregate(Person person, {Birthday? birthday}) async {
     await _database.transaction(() async {
+      final existingPerson = await (_database.select(
+        _database.persons,
+      )..where((row) => row.id.equals(person.id))).getSingleOrNull();
+      if (existingPerson?.deletedAt != null && person.deletedAt == null) {
+        throw StateError(
+          'Cannot update a deleted contact without restoring it.',
+        );
+      }
+
+      var birthdayToSave = birthday;
       if (birthday != null) {
         final previous = await (_database.select(
           _database.birthdays,
@@ -98,9 +135,15 @@ class DriftPeopleStore implements PeopleStore {
         final occurrenceChanged =
             previous != null &&
             (previous.cycleYear != birthday.cycleYear ||
-                previous.date.year != birthday.date.year ||
-                previous.date.month != birthday.date.month ||
-                previous.date.day != birthday.date.day);
+                !birthday.isSameCalendarDate(previous.date));
+        if (previous != null && !occurrenceChanged) {
+          // A person edit must not overwrite progress recorded concurrently by
+          // Message Studio for this same birthday cycle.
+          birthdayToSave = birthday.copyWith(
+            status: BirthdayStatus.fromString(previous.status),
+            draftId: previous.draftId,
+          );
+        }
         if (occurrenceChanged) {
           await (_database.delete(_database.messageDrafts)..where(
                 (row) =>
@@ -114,10 +157,10 @@ class DriftPeopleStore implements PeopleStore {
         }
       }
       await save(person);
-      if (birthday != null) {
+      if (birthdayToSave != null) {
         await _database
             .into(_database.birthdays)
-            .insertOnConflictUpdate(_birthdayRow(birthday));
+            .insertOnConflictUpdate(_birthdayRow(birthdayToSave));
       }
     });
   }

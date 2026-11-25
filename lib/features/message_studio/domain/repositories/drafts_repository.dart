@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
+import 'package:ai_birthday/features/jobs/domain/job.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 
 abstract interface class DraftsRepository {
@@ -16,6 +17,7 @@ abstract interface class DraftsRepository {
     BirthdayStatus birthdayStatus, {
     bool requireUnchanged = false,
     MessageDraft? expectedCurrentDraft,
+    JobAttemptFence? jobFence,
   });
 
   Future<int> deleteDraftsForBirthday(String birthdayId);
@@ -67,7 +69,11 @@ class InMemoryDraftsRepository implements DraftsRepository {
     if (_store[draft.id]?.status == DraftStatus.confirmedSent) {
       throw StateError('A confirmed-sent draft is immutable. Save a revision.');
     }
-    _store[draft.id] = draft;
+    // Mirrors the persistent store: revision is repository-owned and monotonic.
+    final existing = _store[draft.id];
+    _store[draft.id] = draft.copyWith(
+      revision: existing == null ? draft.revision + 1 : existing.revision + 1,
+    );
     _controller.add(_sortedDrafts());
   }
 
@@ -77,7 +83,20 @@ class InMemoryDraftsRepository implements DraftsRepository {
     BirthdayStatus birthdayStatus, {
     bool requireUnchanged = false,
     MessageDraft? expectedCurrentDraft,
+    JobAttemptFence? jobFence,
   }) async {
+    // This store has no durable job table with which to validate ownership.
+    // Fail closed rather than allowing a fenced background write.
+    if (jobFence != null) return false;
+    if (requireUnchanged) {
+      final active = await getDraftForBirthday(draft.birthdayId);
+      final unchanged = expectedCurrentDraft == null
+          ? active == null
+          : active != null &&
+                active.id == expectedCurrentDraft.id &&
+                active.revision == expectedCurrentDraft.revision;
+      if (!unchanged) return false;
+    }
     await saveDraft(draft);
     return true;
   }

@@ -1,4 +1,4 @@
-/// Application entitlement model for AI features (SSOT §5, §11).
+/// Application entitlement model for AI features (legacy SSOT §5, §11 (PRODUCT.md §16.7)).
 library;
 
 /// Entitlement state of the application.

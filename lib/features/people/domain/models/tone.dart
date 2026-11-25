@@ -1,4 +1,4 @@
-/// Tone and length constraints for message generation and review (SSOT §6, §16).
+/// Tone and length constraints for message generation and review (legacy SSOT §6, §16 (PRODUCT.md §16.7)).
 library;
 
 /// Desired tone for the generated or drafted birthday message.

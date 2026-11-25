@@ -5,7 +5,7 @@ import 'models/tone.dart';
 import 'person.dart';
 import 'person_enums.dart' show AutoSendPolicy;
 
-/// Editable recipient data captured by the add/edit forms (SSOT §7).
+/// Editable recipient data captured by the add/edit forms (legacy SSOT §7 (PRODUCT.md §16.7)).
 ///
 /// The sync envelope ([Person.id], timestamps, [Person.version]) is produced
 /// on save, never entered by the user.
@@ -57,13 +57,16 @@ class PersonDraft {
     LeapDayResolution? leapDayResolution,
     bool clearLeapDayResolution = false,
     String? phoneNumber,
+    bool clearPhoneNumber = false,
     String? email,
+    bool clearEmail = false,
     RelationshipCategory? relationship,
     RelationshipCloseness? relationshipCloseness,
     String? preferredLanguage,
     MessageTone? preferredTone,
     List<String>? importantFacts,
     String? notes,
+    bool clearNotes = false,
     DeliveryChannel? preferredDeliveryChannel,
     String? timezone,
     bool clearTimezone = false,
@@ -78,15 +81,15 @@ class PersonDraft {
       leapDayResolution: clearLeapDayResolution
           ? null
           : (leapDayResolution ?? this.leapDayResolution),
-      phoneNumber: phoneNumber ?? this.phoneNumber,
-      email: email ?? this.email,
+      phoneNumber: clearPhoneNumber ? null : (phoneNumber ?? this.phoneNumber),
+      email: clearEmail ? null : (email ?? this.email),
       relationship: relationship ?? this.relationship,
       relationshipCloseness:
           relationshipCloseness ?? this.relationshipCloseness,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       preferredTone: preferredTone ?? this.preferredTone,
       importantFacts: importantFacts ?? this.importantFacts,
-      notes: notes ?? this.notes,
+      notes: clearNotes ? null : (notes ?? this.notes),
       preferredDeliveryChannel:
           preferredDeliveryChannel ?? this.preferredDeliveryChannel,
       timezone: clearTimezone ? null : (timezone ?? this.timezone),
@@ -158,13 +161,16 @@ class PersonDraft {
       leapDayResolution: leapDayResolution,
       clearLeapDayResolution: leapDayResolution == null,
       phoneNumber: phoneNumber,
+      clearPhoneNumber: phoneNumber == null,
       email: email,
+      clearEmail: email == null,
       relationship: relationship,
       relationshipCloseness: relationshipCloseness,
       preferredLanguage: preferredLanguage,
       preferredTone: preferredTone,
       importantFacts: importantFacts,
       notes: notes,
+      clearNotes: notes == null,
       preferredDeliveryChannel: preferredDeliveryChannel,
       timezone: timezone,
       clearTimezone: timezone == null,

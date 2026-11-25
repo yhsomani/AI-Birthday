@@ -1,4 +1,4 @@
-/// Declarative routing configuration for AI-Birthday (SSOT §3, §15, §16, §24, §28).
+/// Declarative routing configuration for AI-Birthday (legacy SSOT §3, §15, §16, §24, §28 (PRODUCT.md §16.7)).
 library;
 
 import 'package:flutter/material.dart';
@@ -22,7 +22,34 @@ final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
 );
 
+/// In-memory cache of the onboarding flag so navigation does not hit secure
+/// storage every time.
+///
+/// Only a positive result is cached (completion never reverts), so finishing
+/// onboarding is picked up by the very next redirect. A read *failure* is not
+/// "not onboarded": the user is let through and the read retried later,
+/// instead of being trapped in onboarding by a flaky Keystore.
+class OnboardingGate {
+  OnboardingGate(this._storage);
+
+  final CredentialStorage _storage;
+  bool _completed = false;
+
+  Future<bool> isCompleted() async {
+    if (_completed) return true;
+    try {
+      _completed = await _storage.hasCompletedOnboarding();
+    } catch (_) {
+      return true;
+    }
+    return _completed;
+  }
+}
+
 GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
+  final gate = credentialStorage == null
+      ? null
+      : OnboardingGate(credentialStorage);
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/dashboard',
@@ -30,11 +57,16 @@ GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
     // way back into the shell.
     errorBuilder: (context, state) => _NotFoundScreen(state),
     redirect: (context, state) async {
-      if (credentialStorage == null) return null;
-      final completed = await credentialStorage.hasCompletedOnboarding();
+      if (gate == null) return null;
+      final completed = await gate.isCompleted();
       final isOnboarding = state.matchedLocation == '/onboarding';
       if (!completed && !isOnboarding) {
         return '/onboarding';
+      }
+      if (completed &&
+          isOnboarding &&
+          state.uri.queryParameters['replay'] != 'true') {
+        return '/dashboard';
       }
       return null;
     },

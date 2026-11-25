@@ -62,4 +62,24 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 10));
   });
+
+  testWidgets(
+    'onboarding is replayable only through its explicit Settings route',
+    (tester) async {
+      await pumpApp(tester);
+      final router = routerOf(tester);
+
+      router.go('/onboarding');
+      await tester.pumpAndSettle();
+      expect(find.text('Never miss a birthday that matters.'), findsNothing);
+      expect(find.text('Today'), findsOneWidget);
+
+      router.go('/onboarding?replay=true');
+      await tester.pumpAndSettle();
+      expect(find.text('Never miss a birthday that matters.'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 10));
+    },
+  );
 }

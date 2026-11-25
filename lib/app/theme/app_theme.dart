@@ -19,10 +19,10 @@ class AppTheme {
   static const String bodyFont = 'Outfit';
 
   /// Material 3 Light Theme
-  static ThemeData get light => _buildTheme(Brightness.light);
+  static final ThemeData light = _buildTheme(Brightness.light);
 
   /// Material 3 Dark Theme
-  static ThemeData get dark => _buildTheme(Brightness.dark);
+  static final ThemeData dark = _buildTheme(Brightness.dark);
 
   static ThemeData _buildTheme(Brightness brightness) {
     final isDark = brightness == Brightness.dark;

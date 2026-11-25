@@ -1,4 +1,4 @@
-/// Secure storage for user credentials (SSOT §5, §20).
+/// Secure storage for user credentials (legacy SSOT §5, §20 (PRODUCT.md §16.7)).
 ///
 /// Security rules:
 /// - Secrets are never logged.
@@ -12,6 +12,14 @@ abstract interface class SecureStoreDriver {
   Future<String?> read(String key);
   Future<void> write(String key, String value);
   Future<void> delete(String key);
+}
+
+/// A driver that can tell "key is missing" (null) from "the read failed"
+/// (throws). Plain [SecureStoreDriver.read] collapses both into null, which is
+/// right for optional values but wrong for flags like onboarding completion.
+abstract interface class StrictReadSecureStoreDriver
+    implements SecureStoreDriver {
+  Future<String?> readOrThrow(String key);
 }
 
 /// Contract for credential storage.
@@ -29,6 +37,8 @@ abstract interface class CredentialStorage {
   Future<void> recordGeminiKeyVerifiedAt(DateTime at);
   Future<void> clearGeminiKeyVerifiedAt();
 
+  /// Whether onboarding was completed. May throw if secure storage cannot be
+  /// read; a missing flag returns false.
   Future<bool> hasCompletedOnboarding();
   Future<void> setCompletedOnboarding(bool completed);
 
@@ -102,7 +112,12 @@ class SecureCredentialStorage implements CredentialStorage {
 
   @override
   Future<bool> hasCompletedOnboarding() async {
-    final flag = await _driver.read(_onboardingKey);
+    // A read failure propagates (instead of looking like "not onboarded") so
+    // callers can avoid re-onboarding a returning user.
+    final driver = _driver;
+    final flag = driver is StrictReadSecureStoreDriver
+        ? await driver.readOrThrow(_onboardingKey)
+        : await driver.read(_onboardingKey);
     return flag == 'true';
   }
 

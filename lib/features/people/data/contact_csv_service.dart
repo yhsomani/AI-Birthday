@@ -1,4 +1,4 @@
-/// CSV import, export, normalization, and duplicate detection service (SSOT §18).
+/// CSV import, export, normalization, and duplicate detection service (legacy SSOT §18 (PRODUCT.md §16.7)).
 library;
 
 import 'dart:convert';
@@ -52,7 +52,7 @@ class ParsedContactCandidate {
   final String? timezone;
   final bool autoPrepare;
 
-  /// Human-readable explanation if this candidate looks like a duplicate (SSOT §18).
+  /// Human-readable explanation if this candidate looks like a duplicate (legacy SSOT §18 (PRODUCT.md §16.7)).
   final String? duplicateWarning;
 
   /// Row-specific repair required before this candidate can be imported.
@@ -335,7 +335,9 @@ class ContactCsvService {
         closenessStr,
       );
       final preferredTone = MessageTone.fromString(toneStr);
-      final preferredDeliveryChannel = DeliveryChannel.fromString(channelStr);
+      final preferredDeliveryChannel = DeliveryChannel.fromString(
+        channelStr ?? DeliveryChannel.whatsapp.name,
+      );
       final preferredLanguage = languageStr ?? 'en';
       final autoPrepare =
           ProductCapabilities.autoPrepare &&
@@ -349,7 +351,7 @@ class ContactCsvService {
                 .toList()
           : <String>[];
 
-      // Duplicate candidate check (SSOT §18 & AUD-011)
+      // Duplicate candidate check (legacy SSOT §18 (PRODUCT.md §16.7) & AUD-011)
       String? duplicateWarning;
 
       // ⚡ Bolt: Hoist invariant .toLowerCase() and phone cleaning out of loop

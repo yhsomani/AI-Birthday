@@ -42,6 +42,24 @@ void main() {
       expect(lines.first, isNot(contains('secret fondness detail')));
     });
 
+    test('redacts sensitive values embedded in message strings', () {
+      final lines = <String>[];
+      final logger = ConsoleAppLogger(level: LogLevel.verbose, sink: lines.add);
+      const email = 'person@example.com';
+      const key = 'AIzaSy123456789012345678901234567890';
+      logger.error(
+        'auth',
+        'failed for email=$email with key=$key and phone +1 415 555 1212',
+      );
+      expect(lines.single, isNot(contains(email)));
+      expect(lines.single, isNot(contains(key)));
+      expect(lines.single, isNot(contains('+1 415 555 1212')));
+
+      final recording = RecordingLogger();
+      recording.info('auth', 'failed for $email');
+      expect(recording.records.single.message, isNot(contains(email)));
+    });
+
     test('forOperation binds every record to the operation id', () {
       final lines = <String>[];
       final logger = ConsoleAppLogger(level: LogLevel.verbose, sink: lines.add);

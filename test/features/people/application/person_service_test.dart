@@ -187,6 +187,33 @@ void main() {
   });
 
   test(
+    'person edit preserves birthday progress written after form load',
+    () async {
+      final created = await service.create(validDraft());
+      final birthdayId = 'birthday-${created.id}';
+      await (db.update(
+        db.birthdays,
+      )..where((row) => row.id.equals(birthdayId))).write(
+        const BirthdaysCompanion(
+          status: Value('messageReviewed'),
+          draftId: Value('studio-draft'),
+        ),
+      );
+
+      await service.update(
+        created,
+        validDraft().copyWith(name: 'Grace Updated'),
+      );
+
+      final birthday = await (db.select(
+        db.birthdays,
+      )..where((row) => row.id.equals(birthdayId))).getSingle();
+      expect(birthday.status, 'messageReviewed');
+      expect(birthday.draftId, 'studio-draft');
+    },
+  );
+
+  test(
     'date change atomically removes active draft/job but keeps sent history',
     () async {
       final created = await service.create(validDraft());

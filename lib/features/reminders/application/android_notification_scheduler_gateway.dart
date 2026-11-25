@@ -6,7 +6,7 @@ import '../domain/reminder_kind.dart';
 import '../domain/reminder_schedule.dart';
 import 'notification_scheduler_gateway.dart';
 
-/// Production Android notification scheduler gateway (SSOT §17).
+/// Production Android notification scheduler gateway (legacy SSOT §17 (PRODUCT.md §16.7)).
 ///
 /// Communicates over MethodChannel with native Android AlarmManager and
 /// NotificationManager. Gracefully handles host platforms (tests, desktop)
@@ -14,10 +14,10 @@ import 'notification_scheduler_gateway.dart';
 class AndroidNotificationSchedulerGateway
     implements NotificationSchedulerGateway {
   const AndroidNotificationSchedulerGateway({
-    MethodChannel channel = const MethodChannel(
+    this._channel = const MethodChannel(
       'com.yashsomani.ai_birthday/notifications',
     ),
-  }) : _channel = channel;
+  });
 
   final MethodChannel _channel;
 

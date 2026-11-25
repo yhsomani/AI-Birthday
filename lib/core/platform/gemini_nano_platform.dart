@@ -12,7 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:ai_birthday/core/errors/app_failure.dart';
 
-/// Normalized Gemini Nano states (SSOT §5).
+/// Normalized Gemini Nano states (legacy SSOT §5 (PRODUCT.md §16.7)).
 ///
 /// Mapped from native AICore/ML Kit states into this authoritative set:
 /// AVAILABLE, DOWNLOADABLE, DOWNLOADING, NOT_READY, UNAVAILABLE, BUSY,
@@ -29,12 +29,6 @@ enum NanoState {
 
   bool get isUsable => this == NanoState.available;
   bool get isBusy => this == NanoState.busy || this == NanoState.downloading;
-}
-
-/// A cataly regulatable generation handle so callers can cancel.
-abstract interface class NanoGenerationHandle {
-  /// Requests cancellation of the in-flight generation. Best-effort.
-  Future<void> cancel();
 }
 
 /// Result of a Nano generation.
@@ -69,19 +63,20 @@ abstract interface class GeminiNanoPlatform {
 /// Production MethodChannel platform bridge for Gemini Nano on Android.
 class MethodChannelGeminiNanoPlatform implements GeminiNanoPlatform {
   MethodChannelGeminiNanoPlatform({
-    MethodChannel channel = const MethodChannel(
-      'com.yashsomani.ai_birthday/nano',
-    ),
-  }) : _channel = channel;
+    this._channel = const MethodChannel('com.yashsomani.ai_birthday/nano'),
+    bool Function()? isLiveAndroid,
+  }) : _liveAndroidOverride = isLiveAndroid;
 
   final MethodChannel _channel;
+  final bool Function()? _liveAndroidOverride;
   final StreamController<NanoState> _stateController =
       StreamController<NanoState>.broadcast();
 
   bool get _isLiveAndroid =>
-      !kIsWeb &&
-      defaultTargetPlatform == TargetPlatform.android &&
-      WidgetsBinding.instance is WidgetsFlutterBinding;
+      _liveAndroidOverride?.call() ??
+      (!kIsWeb &&
+          defaultTargetPlatform == TargetPlatform.android &&
+          WidgetsBinding.instance is WidgetsFlutterBinding);
 
   @override
   Future<NanoState> currentState() async {
@@ -142,9 +137,22 @@ class MethodChannelGeminiNanoPlatform implements GeminiNanoPlatform {
         'prompt': prompt,
       });
       return NanoGenerationResult(text: res ?? '');
-    } on PlatformException {
-      // 🛡️ SECURITY: Prevent internal exception strings from leaking into the UI.
-      throw AppFailure.providerError(detail: 'Nano platform error');
+    } on PlatformException catch (error) {
+      switch (error.code) {
+        case 'NANO_NOT_READY':
+          throw const AppFailure.nanoUnavailable(
+            action: 'Wait until Gemini Nano is ready, then try again.',
+          );
+        case 'NANO_EMPTY_RESPONSE':
+          throw const AppFailure.invalidAiResponse();
+        case 'NANO_GENERATION_ERROR':
+          throw const AppFailure.nanoGenerationFailed();
+        default:
+          // Do not expose native exception messages or details to the UI.
+          throw const AppFailure.providerError(
+            detail: 'An on-device AI error occurred.',
+          );
+      }
     }
   }
 

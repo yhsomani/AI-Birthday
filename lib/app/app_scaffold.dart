@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:ai_birthday/features/reminders/application/reminder_providers.dart';
 import 'package:ai_birthday/l10n/app_localizations.dart';
 
-/// Material 3 bottom-navigation scaffold hosting the application shell (SSOT §15, §24).
+/// Material 3 bottom-navigation scaffold hosting the application shell (legacy SSOT §15, §24 (PRODUCT.md §16.7)).
 class AppScaffold extends ConsumerStatefulWidget {
   const AppScaffold({super.key, required this.navigationShell});
 

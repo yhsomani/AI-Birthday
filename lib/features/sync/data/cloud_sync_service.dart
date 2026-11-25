@@ -1,6 +1,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:drift/drift.dart' as drift;
 import 'package:http/http.dart' as http;
@@ -10,6 +11,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/security/credential_storage.dart';
 import '../../auth/domain/auth_state.dart';
 import '../../auth/domain/google_identity.dart';
+import '../../birthdays/domain/models/birthday.dart' as domain;
 import 'package:ai_birthday/core/config/firebase_config.dart';
 
 class CloudSyncResult {
@@ -46,7 +48,7 @@ class CloudSyncResult {
   final DateTime timestamp;
 
   String toResultRef() => jsonEncode({
-    'timestamp': timestamp.toIso8601String(),
+    'timestamp': timestamp.toUtc().toIso8601String(),
     'uploaded': uploadedCount,
     'restored': downloadedCount,
     'skipped': skippedCount,
@@ -58,22 +60,15 @@ class CloudSyncResult {
 
 class CloudSyncService {
   CloudSyncService({
-    required AppDatabase db,
-    required SecureStoreDriver store,
+    required this._db,
+    required this._store,
     http.Client? httpClient,
-    AppLogger? logger,
+    this._logger,
     String? apiKey,
-    Future<String?> Function()? freshIdToken,
-  }) : _db = db,
-       _store = store,
-       _http = httpClient ?? http.Client(),
-       _logger = logger,
-       _freshIdToken = freshIdToken,
-       _apiKey =
-           apiKey ??
-           (const String.fromEnvironment('FIREBASE_WEB_API_KEY').isNotEmpty
-               ? const String.fromEnvironment('FIREBASE_WEB_API_KEY')
-               : _defaultFirebaseApiKey);
+    this._freshIdToken,
+    this._appCheckTokenProvider,
+  }) : _http = httpClient ?? http.Client(),
+       _apiKey = apiKey ?? FirebaseConfig.webApiKey;
 
   final AppDatabase _db;
   final SecureStoreDriver _store;
@@ -81,14 +76,13 @@ class CloudSyncService {
   final AppLogger? _logger;
   final String _apiKey;
   final Future<String?> Function()? _freshIdToken;
+  final Future<String?> Function()? _appCheckTokenProvider;
 
   static const String _projectId = FirebaseConfig.projectId;
 
   /// Firebase web API key of the shipped project. Public identifier (it also
   /// ships in `google-services.json`), so release builds work without a
   /// `--dart-define`; the request still needs a signed-in user's ID token.
-  static const String _defaultFirebaseApiKey = FirebaseConfig.webApiKey;
-
   static const String _lastSyncPrefix = 'cloud_last_sync_timestamp_';
   static const String _localDataOwnerKey = 'cloud_local_data_owner_v1';
 
@@ -124,7 +118,7 @@ class CloudSyncService {
   Future<DateTime?> getLastSyncTime(String accountId) async {
     try {
       final str = await _store.read(_lastSyncPrefix + accountId);
-      if (str != null) return DateTime.tryParse(str);
+      if (str != null) return _parseInstant(str);
     } catch (_) {}
     return null;
   }
@@ -163,10 +157,13 @@ class CloudSyncService {
     return uid.isEmpty ? null : uid;
   }
 
-  Map<String, String> _headers(AuthState authState) {
+  Future<Map<String, String>> _headers(AuthState authState) async {
     final idToken = authState.identity?.idToken;
+    final appCheckToken = await _appCheckTokenProvider?.call();
     return {
       'Content-Type': 'application/json',
+      if (appCheckToken != null && appCheckToken.isNotEmpty)
+        'X-Firebase-AppCheck': appCheckToken,
       if (idToken != null && idToken.isNotEmpty)
         'Authorization': 'Bearer $idToken',
     };
@@ -191,11 +188,12 @@ class CloudSyncService {
     return 'projects/$_projectId/databases/(default)/documents/users/$uid/$collection/$documentId';
   }
 
-  static const int _snapshotSchemaVersion = 1;
+  static const int _snapshotSchemaVersion = 2;
+  static final math.Random _generationRandom = math.Random.secure();
 
   /// Identifier for one immutable backup generation (audit F05).
   String _newGenerationId(DateTime now) =>
-      'g${now.toUtc().microsecondsSinceEpoch}';
+      'g${now.toUtc().microsecondsSinceEpoch}-${_generationRandom.nextInt(1 << 32).toRadixString(16)}';
 
   /// Document URL under the owner's tree, for single-document reads.
   String _documentUrl(String uid, String path) {
@@ -204,7 +202,7 @@ class CloudSyncService {
   }
 
   /// Fields of one document, or null when it does not exist.
-  Future<Map<String, dynamic>?> _getDocumentFields(
+  Future<Map<String, dynamic>?> _getDocument(
     String url,
     Map<String, String> headers,
   ) async {
@@ -220,7 +218,21 @@ class CloudSyncService {
     if (body is! Map<String, dynamic>) {
       throw const FormatException('CLOUD_GET_INVALID_RESPONSE');
     }
-    return (body['fields'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+    return body;
+  }
+
+  Future<Map<String, dynamic>?> _getDocumentFields(
+    String url,
+    Map<String, String> headers,
+  ) async {
+    final document = await _getDocument(url, headers);
+    if (document == null) return null;
+    final fields = document['fields'];
+    if (fields == null) return <String, dynamic>{};
+    if (fields is! Map<String, dynamic>) {
+      throw const FormatException('CLOUD_GET_INVALID_FIELDS');
+    }
+    return fields;
   }
 
   /// Sends up to 500 full-document writes in one Firestore `commit` call and
@@ -242,7 +254,17 @@ class CloudSyncService {
           body: jsonEncode({'writes': writes}),
         )
         .timeout(const Duration(seconds: 30));
-    if (response.statusCode != 200) return 0;
+    if (response.statusCode != 200) {
+      _logger?.warning(
+        'CloudBackup',
+        'Firestore batch write was rejected.',
+        params: {
+          'statusCode': response.statusCode,
+          'writeCount': writes.length,
+        },
+      );
+      return 0;
+    }
     final decoded = jsonDecode(response.body);
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('CLOUD_COMMIT_INVALID_RESPONSE');
@@ -312,7 +334,7 @@ class CloudSyncService {
     'personId': _firestoreString(b.personId),
     'personName': _firestoreString(person?.name ?? 'Unknown'),
     'cycleYear': _firestoreInt(b.cycleYear),
-    'date': _firestoreDate(b.date),
+    'date': _firestoreCalendarDate(b.date),
     'status': _firestoreString(b.status),
     if (b.draftId != null) 'draftId': _firestoreString(b.draftId!),
     'createdAt': _firestoreDate(b.createdAt),
@@ -391,9 +413,22 @@ class CloudSyncService {
 
   Map<String, dynamic> _firestoreBool(bool value) => {'booleanValue': value};
 
+  /// Backup instants are written as UTC so a restore on a device in another
+  /// timezone compares them correctly (A3-014).
   Map<String, dynamic> _firestoreDate(DateTime value) => {
-    'stringValue': value.toIso8601String(),
+    'stringValue': value.toUtc().toIso8601String(),
   };
+
+  /// New snapshots store birthday dates as unambiguous ISO calendar days.
+  Map<String, dynamic> _firestoreCalendarDate(DateTime value) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    final year = value.year.toString().padLeft(4, '0');
+    return {'stringValue': '$year-${two(value.month)}-${two(value.day)}'};
+  }
+
+  /// Parses a stored timestamp as a UTC instant. Strings without a zone
+  /// (written by older builds with the device's local time) are read as local.
+  static DateTime? _parseInstant(String raw) => DateTime.tryParse(raw)?.toUtc();
 
   String? _string(Map<String, dynamic> fields, String key) {
     final raw = fields[key];
@@ -418,8 +453,248 @@ class CloudSyncService {
 
   DateTime? _date(Map<String, dynamic> fields, String key) {
     final raw = _string(fields, key);
-    return raw == null ? null : DateTime.tryParse(raw);
+    return raw == null ? null : _parseInstant(raw);
   }
+
+  /// Calendar day of a birthday as a local midnight, whatever zone the stored
+  /// string carries.
+  DateTime? _calendarDate(Map<String, dynamic> fields, String key) {
+    final raw = _string(fields, key);
+    final parsed = raw == null ? null : DateTime.tryParse(raw);
+    return parsed == null
+        ? null
+        : DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  DateTime? _restoreBirthdayDate(
+    Map<String, dynamic> fields,
+    Map<String, dynamic>? snapshotPerson,
+    int snapshotSchemaVersion,
+  ) {
+    final raw = _string(fields, 'date');
+    if (raw == null) return null;
+    final cycleYear =
+        _integer(fields, 'cycleYear') ?? DateTime.tryParse(raw)?.year;
+    final isLegacyEncoding =
+        snapshotSchemaVersion == 1 || RegExp(r'T').hasMatch(raw);
+    final month = snapshotPerson == null
+        ? null
+        : _integer(snapshotPerson, 'birthdayMonth');
+    final day = snapshotPerson == null
+        ? null
+        : _integer(snapshotPerson, 'birthdayDay');
+    if (isLegacyEncoding && cycleYear != null && month != null && day != null) {
+      return domain.Birthday.calculateOccurrenceDate(
+        year: cycleYear,
+        month: month,
+        day: day,
+        preferMar1:
+            snapshotPerson != null &&
+            _string(snapshotPerson, 'leapDayResolution') == 'mar1',
+      );
+    }
+
+    return _calendarDate(fields, 'date');
+  }
+
+  int? _birthdayCycleYear(Map<String, dynamic> fields) =>
+      _integer(fields, 'cycleYear') ??
+      DateTime.tryParse(_string(fields, 'date') ?? '')?.year;
+
+  String _birthdayCycleKey(String personId, int cycleYear) =>
+      '$personId:$cycleYear';
+
+  bool _isLegacyBirthdayDate(
+    Map<String, dynamic> fields,
+    int snapshotSchemaVersion,
+  ) {
+    final raw = _string(fields, 'date');
+    return snapshotSchemaVersion == 1 ||
+        (raw != null && RegExp(r'T').hasMatch(raw));
+  }
+
+  bool _birthdayRecordIsPreferred(
+    Map<String, dynamic> candidate,
+    Map<String, dynamic> current,
+  ) {
+    final candidateUpdated =
+        _date(candidate, 'updatedAt') ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final currentUpdated =
+        _date(current, 'updatedAt') ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final updatedOrder = candidateUpdated.compareTo(currentUpdated);
+    if (updatedOrder != 0) return updatedOrder > 0;
+
+    final candidateCreated =
+        _date(candidate, 'createdAt') ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final currentCreated =
+        _date(current, 'createdAt') ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final createdOrder = candidateCreated.compareTo(currentCreated);
+    if (createdOrder != 0) return createdOrder > 0;
+
+    final candidateId = _string(candidate, 'id')!;
+    final currentId = _string(current, 'id')!;
+    return candidateId.compareTo(currentId) < 0;
+  }
+
+  bool _localBirthdayIsPreferred(Birthday candidate, Birthday current) {
+    final updatedOrder = candidate.updatedAt.compareTo(current.updatedAt);
+    if (updatedOrder != 0) return updatedOrder > 0;
+    final createdOrder = candidate.createdAt.compareTo(current.createdAt);
+    if (createdOrder != 0) return createdOrder > 0;
+    return candidate.id.compareTo(current.id) < 0;
+  }
+
+  String _nonConflictingRestoreId(
+    String remoteId,
+    String personId,
+    int cycleYear,
+    Map<String, Birthday> existingBirthdays,
+  ) {
+    final existing = existingBirthdays[remoteId];
+    if (existing == null ||
+        (existing.personId == personId && existing.cycleYear == cycleYear)) {
+      return remoteId;
+    }
+
+    final base = '$remoteId-cycle-$cycleYear';
+    var candidate = base;
+    var suffix = 1;
+    while (true) {
+      final collision = existingBirthdays[candidate];
+      if (collision == null ||
+          (collision.personId == personId &&
+              collision.cycleYear == cycleYear)) {
+        return candidate;
+      }
+      candidate = '$base-$suffix';
+      suffix++;
+    }
+  }
+
+  bool _validField(
+    Map<String, dynamic> fields,
+    String key,
+    bool Function(Map<String, dynamic>) read, {
+    bool required = true,
+  }) {
+    if (!fields.containsKey(key)) return !required;
+    final value = fields[key];
+    return value is Map<String, dynamic> && read(fields);
+  }
+
+  bool _validString(
+    Map<String, dynamic> fields,
+    String key, {
+    bool required = true,
+  }) => _validField(
+    fields,
+    key,
+    (fields) => _string(fields, key) != null,
+    required: required,
+  );
+
+  bool _validInteger(
+    Map<String, dynamic> fields,
+    String key, {
+    bool required = true,
+  }) => _validField(
+    fields,
+    key,
+    (fields) => _integer(fields, key) != null,
+    required: required,
+  );
+
+  bool _validBoolean(
+    Map<String, dynamic> fields,
+    String key, {
+    bool required = true,
+  }) => _validField(
+    fields,
+    key,
+    (fields) => _boolean(fields, key) != null,
+    required: required,
+  );
+
+  bool _validInstant(
+    Map<String, dynamic> fields,
+    String key, {
+    bool required = true,
+  }) => _validField(
+    fields,
+    key,
+    (fields) => _date(fields, key) != null,
+    required: required,
+  );
+
+  bool _validCalendarDate(
+    Map<String, dynamic> fields,
+    String key, {
+    bool required = true,
+  }) => _validField(fields, key, (fields) {
+    final raw = _string(fields, key);
+    if (raw == null || _calendarDate(fields, key) == null) return false;
+    final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(raw);
+    if (match == null) return false;
+    final year = int.parse(match.group(1)!);
+    final month = int.parse(match.group(2)!);
+    final day = int.parse(match.group(3)!);
+    final date = DateTime(year, month, day);
+    return date.year == year && date.month == month && date.day == day;
+  }, required: required);
+
+  bool _validPersonRecord(Map<String, dynamic> fields) =>
+      _validString(fields, 'id') &&
+      _validString(fields, 'name') &&
+      _validString(fields, 'relationship', required: false) &&
+      _validString(fields, 'relationshipCloseness', required: false) &&
+      _validString(fields, 'preferredLanguage', required: false) &&
+      _validString(fields, 'preferredTone', required: false) &&
+      _validString(fields, 'importantFacts', required: false) &&
+      _validString(fields, 'preferredDeliveryChannel', required: false) &&
+      _validString(fields, 'autoSendPolicy', required: false) &&
+      _validString(fields, 'leapDayResolution', required: false) &&
+      _validString(fields, 'phoneNumber', required: false) &&
+      _validString(fields, 'email', required: false) &&
+      _validString(fields, 'notes', required: false) &&
+      _validString(fields, 'timezone', required: false) &&
+      _validInteger(fields, 'birthdayMonth', required: false) &&
+      _validInteger(fields, 'birthdayDay', required: false) &&
+      _validInteger(fields, 'birthYear', required: false) &&
+      _validInteger(fields, 'version', required: false) &&
+      _validBoolean(fields, 'autoPrepare', required: false) &&
+      _validInstant(fields, 'createdAt', required: false) &&
+      _validInstant(fields, 'updatedAt', required: false) &&
+      _validInstant(fields, 'deletedAt', required: false);
+
+  bool _validBirthdayRecord(Map<String, dynamic> fields) =>
+      _validString(fields, 'id') &&
+      _validString(fields, 'personId') &&
+      _validString(fields, 'status', required: false) &&
+      _validString(fields, 'draftId', required: false) &&
+      _validInteger(fields, 'cycleYear', required: false) &&
+      _validCalendarDate(fields, 'date') &&
+      _validInstant(fields, 'createdAt', required: false) &&
+      _validInstant(fields, 'updatedAt', required: false);
+
+  bool _validDraftRecord(Map<String, dynamic> fields) =>
+      _validString(fields, 'id') &&
+      _validString(fields, 'birthdayId') &&
+      _validString(fields, 'personId') &&
+      _validString(fields, 'body') &&
+      _validString(fields, 'tone', required: false) &&
+      _validString(fields, 'length', required: false) &&
+      _validString(fields, 'status', required: false) &&
+      _validString(fields, 'providerType', required: false) &&
+      _validInteger(fields, 'variationIndex', required: false) &&
+      _validInstant(fields, 'createdAt', required: false) &&
+      _validInstant(fields, 'updatedAt', required: false);
+
+  bool _validReminderRecord(Map<String, dynamic> fields) =>
+      _validString(fields, 'key') &&
+      _validString(fields, 'kinds', required: false) &&
+      _validBoolean(fields, 'enabled', required: false) &&
+      _validInteger(fields, 'quietHoursStartMinutes', required: false) &&
+      _validInteger(fields, 'quietHoursEndMinutes', required: false);
 
   Future<CloudSyncResult> sync(AuthState authState) async {
     final now = DateTime.now();
@@ -448,6 +723,18 @@ class CloudSyncService {
     }
 
     try {
+      final headers = await _headers(authState);
+      final previousPointer = await _getDocument(
+        _documentUrl(uid, 'backup/current'),
+        headers,
+      );
+      final previousPointerUpdateTime = previousPointer?['updateTime'];
+      if (previousPointer != null &&
+          (previousPointerUpdateTime is! String ||
+              previousPointerUpdateTime.isEmpty)) {
+        throw const FormatException('CLOUD_POINTER_UPDATE_TIME_MISSING');
+      }
+
       // Snapshot backup (audit F05): every row goes into a new immutable
       // generation, including unchanged rows, so each generation is complete.
       // The `backup/current` pointer only moves after the whole generation and
@@ -468,7 +755,6 @@ class CloudSyncService {
       // Resolve person names for birthday docs from the full set (tombstoned
       // people included).
       final peopleMap = {for (final p in allPersonRows) p.id: p};
-      final headers = _headers(authState);
       final generationPath = 'generations/$generationId';
 
       final writes = <Map<String, dynamic>>[
@@ -545,6 +831,7 @@ class CloudSyncService {
             'name': _documentPath(uid, 'generations', generationId),
             'fields': {
               'schemaVersion': _firestoreInt(_snapshotSchemaVersion),
+              'birthdayDateEncoding': _firestoreString('calendar-date-v1'),
               'generationId': _firestoreString(generationId),
               'createdAt': _firestoreDate(now),
               'people': _firestoreInt(allPersonRows.length),
@@ -563,6 +850,9 @@ class CloudSyncService {
               'publishedAt': _firestoreDate(now),
             },
           },
+          'currentDocument': previousPointer == null
+              ? {'exists': false}
+              : {'updateTime': previousPointerUpdateTime},
         },
       ], headers);
       if (published != 2) {
@@ -577,7 +867,16 @@ class CloudSyncService {
         );
       }
 
-      await _store.write(_lastSyncPrefix + uid, now.toIso8601String());
+      await _store.write(_lastSyncPrefix + uid, now.toUtc().toIso8601String());
+      // Generation cleanup is intentionally disabled: client timestamps and
+      // listing order cannot prove that a generation is neither active nor
+      // currently published by another device. Retention needs a server lease
+      // or equivalent coordination before deleting any generation.
+      _logger?.warning(
+        'CloudBackup',
+        'Backup generation cleanup is paused pending server-coordinated leases.',
+        params: {'generationId': generationId},
+      );
       _logger?.info(
         'CloudBackup',
         'Backup finished successfully.',
@@ -637,7 +936,7 @@ class CloudSyncService {
     }
 
     try {
-      final headers = _headers(authState);
+      final headers = await _headers(authState);
       var restored = 0;
 
       // Read the published pointer, its manifest, and the generation's
@@ -659,14 +958,22 @@ class CloudSyncService {
       if (generationId == null || generationId.isEmpty) {
         throw const FormatException('CLOUD_POINTER_INVALID');
       }
+      final pointerSchemaVersion = pointer.containsKey('schemaVersion')
+          ? _integer(pointer, 'schemaVersion')
+          : 1;
+      if (pointerSchemaVersion != 1 &&
+          pointerSchemaVersion != _snapshotSchemaVersion) {
+        throw const FormatException('CLOUD_POINTER_SCHEMA_UNSUPPORTED');
+      }
       final manifest = await _getDocumentFields(
         _documentUrl(uid, 'generations/$generationId'),
         headers,
       );
       if (manifest == null ||
-          _integer(manifest, 'schemaVersion') != _snapshotSchemaVersion) {
+          _integer(manifest, 'schemaVersion') != pointerSchemaVersion) {
         throw const FormatException('CLOUD_MANIFEST_INVALID');
       }
+      final snapshotSchemaVersion = pointerSchemaVersion!;
 
       final peopleDocs = await _listDocuments(
         _collectionUrl(uid, 'generations/$generationId/people'),
@@ -699,15 +1006,13 @@ class CloudSyncService {
       // Pre-validate all downloaded records before mutating local database (AUD-002).
       for (final doc in peopleDocs) {
         final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
-        if (_string(fields, 'id') == null || _string(fields, 'name') == null) {
+        if (!_validPersonRecord(fields)) {
           throw const FormatException('CLOUD_RESTORE_MALFORMED_RECORD:people');
         }
       }
       for (final doc in birthdayDocs) {
         final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
-        if (_string(fields, 'id') == null ||
-            _string(fields, 'personId') == null ||
-            _date(fields, 'date') == null) {
+        if (!_validBirthdayRecord(fields)) {
           throw const FormatException(
             'CLOUD_RESTORE_MALFORMED_RECORD:birthdays',
           );
@@ -715,16 +1020,13 @@ class CloudSyncService {
       }
       for (final doc in draftDocs) {
         final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
-        if (_string(fields, 'id') == null ||
-            _string(fields, 'birthdayId') == null ||
-            _string(fields, 'personId') == null ||
-            _string(fields, 'body') == null) {
+        if (!_validDraftRecord(fields)) {
           throw const FormatException('CLOUD_RESTORE_MALFORMED_RECORD:drafts');
         }
       }
       for (final doc in reminderDocs) {
         final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
-        if (_string(fields, 'key') == null) {
+        if (!_validReminderRecord(fields)) {
           throw const FormatException(
             'CLOUD_RESTORE_MALFORMED_RECORD:reminderSettings',
           );
@@ -834,6 +1136,17 @@ class CloudSyncService {
           restored++;
         }
 
+        final snapshotPeopleById = {
+          for (final doc in peopleDocs)
+            _string((doc['fields'] as Map<String, dynamic>?) ?? {}, 'id')!:
+                (doc['fields'] as Map<String, dynamic>?) ?? {},
+        };
+        final localPeopleById = birthdayDocs.isEmpty
+            ? const <String, Person>{}
+            : {
+                for (final row in await _db.select(_db.persons).get())
+                  row.id: row,
+              };
         var existingBirthdays = const <String, Birthday>{};
         if (birthdayDocs.isNotEmpty || draftDocs.isNotEmpty) {
           existingBirthdays = {
@@ -842,14 +1155,153 @@ class CloudSyncService {
           };
         }
         final validBirthdayIds = {...existingBirthdays.keys};
+        var existingDrafts = const <String, MessageDraft>{};
+        if (draftDocs.isNotEmpty || birthdayDocs.isNotEmpty) {
+          existingDrafts = {
+            for (final row in await _db.select(_db.messageDrafts).get())
+              row.id: row,
+          };
+        }
+        final remoteDraftFieldsById = <String, Map<String, dynamic>>{
+          for (final doc in draftDocs)
+            if (_string((doc['fields'] as Map<String, dynamic>?) ?? {}, 'id')
+                case final String id)
+              id: (doc['fields'] as Map<String, dynamic>?) ?? {},
+        };
+        final birthdayIdByCycle = <String, String>{};
+        final birthdayCycleKeyById = <String, String>{};
+        final birthdayPersonIdById = <String, String>{};
+        for (final birthday in existingBirthdays.values) {
+          final cycleKey = _birthdayCycleKey(
+            birthday.personId,
+            birthday.cycleYear,
+          );
+          final currentId = birthdayIdByCycle[cycleKey];
+          final current = currentId == null
+              ? null
+              : existingBirthdays[currentId];
+          if (current == null || _localBirthdayIsPreferred(birthday, current)) {
+            birthdayIdByCycle[cycleKey] = birthday.id;
+          }
+          birthdayCycleKeyById[birthday.id] = cycleKey;
+          birthdayPersonIdById[birthday.id] = birthday.personId;
+        }
+        final birthdayDocsByCycle = <String, List<Map<String, dynamic>>>{};
+        final remoteBirthdayCycleKeyById = <String, String>{};
+        final ambiguousRemoteBirthdayIds = <String>{};
+        for (final doc in birthdayDocs) {
+          final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
+          final personId = _string(fields, 'personId');
+          final cycleYear = _birthdayCycleYear(fields);
+          if (personId == null ||
+              cycleYear == null ||
+              !activePersonIds.contains(personId)) {
+            continue;
+          }
+          final cycleKey = _birthdayCycleKey(personId, cycleYear);
+          birthdayDocsByCycle.putIfAbsent(cycleKey, () => []).add(doc);
+          final remoteId = _string(fields, 'id');
+          if (remoteId != null) {
+            final priorCycle = remoteBirthdayCycleKeyById[remoteId];
+            if (priorCycle != null && priorCycle != cycleKey) {
+              ambiguousRemoteBirthdayIds.add(remoteId);
+            } else {
+              remoteBirthdayCycleKeyById[remoteId] = cycleKey;
+            }
+          }
+        }
+        final selectedBirthdayIdByCycle = <String, String>{};
+        final selectedRemoteBirthdayIdByCycle = <String, String>{};
+        final birthdayIdRemap = <String, String>{};
+        final sortedCycleKeys = birthdayDocsByCycle.keys.toList()..sort();
+        for (final cycleKey in sortedCycleKeys) {
+          final localBirthdayId = birthdayIdByCycle[cycleKey];
+          final candidateDocs = birthdayDocsByCycle[cycleKey]!;
+          final winner = candidateDocs.reduce((best, candidate) {
+            final bestFields = best['fields'] as Map<String, dynamic>;
+            final candidateFields = candidate['fields'] as Map<String, dynamic>;
+            return _birthdayRecordIsPreferred(candidateFields, bestFields)
+                ? candidate
+                : best;
+          });
+          final winnerFields = winner['fields'] as Map<String, dynamic>;
+          final winnerId = _string(winnerFields, 'id')!;
+          var selectedId =
+              localBirthdayId ??
+              _nonConflictingRestoreId(
+                winnerId,
+                _string(winnerFields, 'personId')!,
+                _birthdayCycleYear(winnerFields)!,
+                existingBirthdays,
+              );
+          if (localBirthdayId == null) {
+            final base = selectedId;
+            var suffix = 1;
+            while (birthdayCycleKeyById.containsKey(selectedId) &&
+                birthdayCycleKeyById[selectedId] != cycleKey) {
+              selectedId = '$base-$suffix';
+              suffix++;
+            }
+          }
+          selectedBirthdayIdByCycle[cycleKey] = selectedId;
+          selectedRemoteBirthdayIdByCycle[cycleKey] = winnerId;
+          birthdayCycleKeyById[selectedId] = cycleKey;
+          birthdayPersonIdById[selectedId] = _string(winnerFields, 'personId')!;
+          for (final doc in candidateDocs) {
+            final fields = doc['fields'] as Map<String, dynamic>;
+            final remoteId = _string(fields, 'id')!;
+            if (!ambiguousRemoteBirthdayIds.contains(remoteId)) {
+              birthdayIdRemap[remoteId] = selectedId;
+            }
+          }
+        }
+
+        bool draftMatchesCycle(
+          String? draftId,
+          String personId,
+          String cycleKey,
+        ) {
+          if (draftId == null) return false;
+          final remoteDraft = remoteDraftFieldsById[draftId];
+          if (remoteDraft != null) {
+            final sourceBirthdayId = _string(remoteDraft, 'birthdayId');
+            final sourceCycleKey = sourceBirthdayId == null
+                ? null
+                : remoteBirthdayCycleKeyById[sourceBirthdayId];
+            return sourceBirthdayId != null &&
+                !ambiguousRemoteBirthdayIds.contains(sourceBirthdayId) &&
+                _string(remoteDraft, 'personId') == personId &&
+                sourceCycleKey == cycleKey;
+          }
+          final localDraft = existingDrafts[draftId];
+          if (localDraft == null || localDraft.personId != personId) {
+            return false;
+          }
+          return birthdayPersonIdById[localDraft.birthdayId] == personId &&
+              birthdayCycleKeyById[localDraft.birthdayId] == cycleKey;
+        }
+
+        String statusForCycle(String? status, bool hasCycleDraft) {
+          final restoredStatus = status ?? 'upcoming';
+          if (!hasCycleDraft &&
+              const {
+                'messageDrafted',
+                'messageReviewed',
+                'readyForDelivery',
+              }.contains(restoredStatus)) {
+            return 'messageNotPrepared';
+          }
+          return restoredStatus;
+        }
+
         for (final doc in birthdayDocs) {
           final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
           final id = _string(fields, 'id');
           final personId = _string(fields, 'personId');
-          final date = _date(fields, 'date');
-          if (id == null || personId == null || date == null) {
+          final cycleYear = _birthdayCycleYear(fields);
+          if (id == null || personId == null) {
             skippedRecords.add(
-              'birthdays/${id ?? "unknown"}: missing id, personId, or date',
+              'birthdays/${id ?? "unknown"}: missing id or personId',
             );
             continue;
           }
@@ -860,43 +1312,129 @@ class CloudSyncService {
             continue;
           }
 
+          if (cycleYear == null) {
+            skippedRecords.add('birthdays/$id: missing cycle year');
+            continue;
+          }
+          final cycleKey = _birthdayCycleKey(personId, cycleYear);
+          final selectedId = selectedBirthdayIdByCycle[cycleKey];
+          if (selectedId == null ||
+              id != selectedRemoteBirthdayIdByCycle[cycleKey]) {
+            conflictRecords.add(
+              'birthdays/$id: duplicate cycle mapped to survivor ${selectedId ?? "unknown"}',
+            );
+            continue;
+          }
+          final snapshotPerson = snapshotPeopleById[personId];
+          final date = _restoreBirthdayDate(
+            fields,
+            snapshotPerson,
+            snapshotSchemaVersion,
+          );
+          if (date == null) {
+            skippedRecords.add('birthdays/$id: invalid calendar date');
+            continue;
+          }
+          if (_isLegacyBirthdayDate(fields, snapshotSchemaVersion)) {
+            final localPerson = localPeopleById[personId];
+            final snapshotMonth = snapshotPerson == null
+                ? null
+                : _integer(snapshotPerson, 'birthdayMonth');
+            final snapshotDay = snapshotPerson == null
+                ? null
+                : _integer(snapshotPerson, 'birthdayDay');
+            if (snapshotMonth == null || snapshotDay == null) {
+              conflictRecords.add(
+                'birthdays/$id: snapshot birthday is unavailable; stored date retained instead of using current profile',
+              );
+            } else if (localPerson != null &&
+                (localPerson.birthdayMonth != snapshotMonth ||
+                    localPerson.birthdayDay != snapshotDay ||
+                    localPerson.leapDayResolution !=
+                        _string(snapshotPerson!, 'leapDayResolution'))) {
+              conflictRecords.add(
+                'birthdays/$id: current profile differs; cycle date reconstructed from snapshot profile',
+              );
+            }
+          }
+
           final remoteUpdatedAt = _date(fields, 'updatedAt') ?? now;
-          final existing = existingBirthdays[id];
+          final existing = existingBirthdays[selectedId];
+          final remoteDraftId = _string(fields, 'draftId');
+          final remoteDraftIsForCycle = draftMatchesCycle(
+            remoteDraftId,
+            personId,
+            cycleKey,
+          );
+          if (remoteDraftId != null && !remoteDraftIsForCycle) {
+            conflictRecords.add(
+              'birthdays/$id: referenced draft belongs to another or unknown cycle; it was not made current',
+            );
+          }
           if (existing != null &&
               !remoteUpdatedAt.isAfter(existing.updatedAt)) {
-            conflictRecords.add('birthdays/$id: local copy is equal or newer');
+            conflictRecords.add(
+              'birthdays/$id: local cycle is newer or equal; local status and date preserved',
+            );
+            final localDraftIsForCycle = draftMatchesCycle(
+              existing.draftId,
+              personId,
+              cycleKey,
+            );
+            final keptDraftId = localDraftIsForCycle
+                ? existing.draftId
+                : (remoteDraftIsForCycle ? remoteDraftId : null);
+            final keptStatus = statusForCycle(
+              existing.status,
+              keptDraftId != null,
+            );
+            if (existing.draftId != keptDraftId ||
+                existing.status != keptStatus) {
+              await (_db.update(
+                _db.birthdays,
+              )..where((row) => row.id.equals(selectedId))).write(
+                BirthdaysCompanion(
+                  draftId: drift.Value(keptDraftId),
+                  status: drift.Value(keptStatus),
+                ),
+              );
+            }
             continue;
           }
 
+          final localDraftIsForCycle = draftMatchesCycle(
+            existing?.draftId,
+            personId,
+            cycleKey,
+          );
+          final restoredDraftId = remoteDraftIsForCycle
+              ? remoteDraftId
+              : (localDraftIsForCycle ? existing?.draftId : null);
+          final restoredStatus = statusForCycle(
+            _string(fields, 'status'),
+            restoredDraftId != null,
+          );
           await _db
               .into(_db.birthdays)
               .insertOnConflictUpdate(
                 BirthdaysCompanion(
-                  id: drift.Value(id),
+                  id: drift.Value(selectedId),
                   personId: drift.Value(personId),
-                  cycleYear: drift.Value(
-                    _integer(fields, 'cycleYear') ?? date.year,
-                  ),
+                  cycleYear: drift.Value(cycleYear),
                   date: drift.Value(date),
-                  status: drift.Value(_string(fields, 'status') ?? 'upcoming'),
-                  draftId: drift.Value(_string(fields, 'draftId')),
+                  status: drift.Value(restoredStatus),
+                  draftId: drift.Value(restoredDraftId),
                   createdAt: drift.Value(
                     _date(fields, 'createdAt') ?? remoteUpdatedAt,
                   ),
                   updatedAt: drift.Value(remoteUpdatedAt),
                 ),
               );
-          validBirthdayIds.add(id);
+          validBirthdayIds.add(selectedId);
+          birthdayIdRemap[id] = selectedId;
           restored++;
         }
 
-        var existingDrafts = const <String, MessageDraft>{};
-        if (draftDocs.isNotEmpty) {
-          existingDrafts = {
-            for (final row in await _db.select(_db.messageDrafts).get())
-              row.id: row,
-          };
-        }
         for (final doc in draftDocs) {
           final fields = (doc['fields'] as Map<String, dynamic>?) ?? {};
           final id = _string(fields, 'id');
@@ -912,14 +1450,23 @@ class CloudSyncService {
             );
             continue;
           }
+          final restoredBirthdayId = birthdayIdRemap[birthdayId] ?? birthdayId;
+          final sourceCycleKey = remoteBirthdayCycleKeyById[birthdayId];
+          final restoredCycleKey = birthdayCycleKeyById[restoredBirthdayId];
 
           // AUD-004: Never restore a draft whose person or birthday is deleted or missing.
           if (!activePersonIds.contains(personId)) {
             skippedRecords.add('drafts/$id: person $personId not active');
             continue;
           }
-          if (!validBirthdayIds.contains(birthdayId)) {
-            skippedRecords.add('drafts/$id: birthday $birthdayId not valid');
+          if (!validBirthdayIds.contains(restoredBirthdayId) ||
+              birthdayPersonIdById[restoredBirthdayId] != personId ||
+              (sourceCycleKey != null &&
+                  (ambiguousRemoteBirthdayIds.contains(birthdayId) ||
+                      restoredCycleKey != sourceCycleKey))) {
+            skippedRecords.add(
+              'drafts/$id: birthday $birthdayId has no matching person/cycle survivor',
+            );
             continue;
           }
 
@@ -954,7 +1501,7 @@ class CloudSyncService {
                 .insert(
                   MessageDraftsCompanion(
                     id: drift.Value(revisionId),
-                    birthdayId: drift.Value(birthdayId),
+                    birthdayId: drift.Value(restoredBirthdayId),
                     personId: drift.Value(personId),
                     body: drift.Value(body),
                     tone: drift.Value(_string(fields, 'tone') ?? 'warm'),
@@ -974,7 +1521,7 @@ class CloudSyncService {
                 );
             await (_db.update(
               _db.birthdays,
-            )..where((row) => row.id.equals(birthdayId))).write(
+            )..where((row) => row.id.equals(restoredBirthdayId))).write(
               BirthdaysCompanion(
                 draftId: drift.Value(revisionId),
                 status: drift.Value(birthdayStatus),
@@ -993,7 +1540,7 @@ class CloudSyncService {
               .insertOnConflictUpdate(
                 MessageDraftsCompanion(
                   id: drift.Value(id),
-                  birthdayId: drift.Value(birthdayId),
+                  birthdayId: drift.Value(restoredBirthdayId),
                   personId: drift.Value(personId),
                   body: drift.Value(body),
                   tone: drift.Value(_string(fields, 'tone') ?? 'warm'),

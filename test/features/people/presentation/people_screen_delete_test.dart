@@ -170,6 +170,44 @@ void main() {
       await tester.pump(Duration.zero);
     },
   );
+
+  testWidgets('undo failure is logged and shown to the user', (tester) async {
+    final db = await seedDb(withBirthday: true);
+    final log = RecordingLogger();
+    tester.view.physicalSize = const Size(600, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          loggerProvider.overrideWithValue(log),
+          personServiceProvider.overrideWith(
+            (ref) => _FailingRestoreService(
+              ref.watch(peopleStoreProvider),
+              ref.watch(loggerProvider),
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: PeopleScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await deleteAna(tester);
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not restore Ana.'), findsOneWidget);
+    expect(
+      log.records.any((record) => record.message.contains('Undo failed')),
+      isTrue,
+    );
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(Duration.zero);
+  });
 }
 
 class _FailingPersonService extends PersonService {
@@ -179,5 +217,15 @@ class _FailingPersonService extends PersonService {
   @override
   Future<void> remove(String id) async {
     throw Exception('Simulated database error');
+  }
+}
+
+class _FailingRestoreService extends PersonService {
+  _FailingRestoreService(PeopleStore store, AppLogger logger)
+    : super(store, const PersonInputValidator(), logger);
+
+  @override
+  Future<void> restore(String id, {b_models.Birthday? birthday}) async {
+    throw Exception('Simulated restore failure');
   }
 }

@@ -1,8 +1,10 @@
-/// Message Studio for AI generation, editing, and delivery handoff (SSOT §16).
+/// Message Studio for AI generation, editing, and delivery handoff (legacy SSOT §16 (PRODUCT.md §16.7)).
 library;
 
 import 'dart:async';
 import 'dart:convert';
+
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,6 +44,13 @@ class MessageStudioScreen extends ConsumerStatefulWidget {
       _MessageStudioScreenState();
 }
 
+/// Thrown by [_MessageStudioScreenState._saveDraft] when the stored draft
+/// changed after this screen loaded it (for example an AI result was applied).
+/// The editor text is kept and the user has already been told.
+class _DraftSaveConflict implements Exception {
+  const _DraftSaveConflict();
+}
+
 class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
@@ -51,11 +60,18 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   Birthday? _birthday;
   Person? _person;
   MessageDraft? _draft;
+  // Last draft row known to be persisted (with its repository revision). The
+  // optimistic-concurrency token for saves; `_draft` may be edited in memory.
+  MessageDraft? _persistedDraft;
   bool _isLoading = true;
   // AI work is a durable background job now: this flag tracks whether the
   // active job (or a synchronous variations run) is in flight. The job row is
   // the source of truth — the widget follows it even across re-entry.
   bool _isGenerating = false;
+  // Variations run outside the durable queue; tracked separately so finishing
+  // them never clears the flag of a concurrently running job.
+  bool _variationsLoading = false;
+  bool get _aiBusy => _isGenerating || _variationsLoading;
   String? _retryingLabel;
   String? _errorMessage;
   AppFailureCode? _lastFailureCode;
@@ -79,6 +95,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   Future<void>? _saveFuture;
   bool _hasUnsavedChanges = false;
   bool _saveFailed = false;
+  bool _discardingUnsavedChanges = false;
   DateTime? _lastSavedTime;
   // Single-flight guard: stops a rapid double-tap from launching the external
   // delivery app twice (two SMS composers, two handoff records).
@@ -101,6 +118,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
+      // Nothing to flush: a no-op write would still bump updatedAt/revision and
+      // make a queued AI result look stale.
+      if (!_hasUnsavedChanges) return;
       _autosaveTimer?.cancel();
       _performAutosave();
     }
@@ -164,11 +184,14 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   }
 
   Future<void> _performAutosaveOnce() async {
-    if (_person == null || !mounted) return;
+    if (_person == null || !mounted || !_hasUnsavedChanges) return;
     final savingRevision = _editRevision;
     setState(() => _isSaving = true);
     try {
-      await _saveDraft(status: _draft?.status ?? DraftStatus.draft);
+      await _saveDraft(
+        status: _draft?.status ?? DraftStatus.draft,
+        skipIfUnchanged: true,
+      );
       if (mounted) {
         setState(() {
           _isSaving = false;
@@ -179,19 +202,25 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
           _lastFailureCode = null;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() {
           _isSaving = false;
           _saveFailed = true;
           _hasUnsavedChanges = true;
           _lastSavedTime = null;
-          _errorMessage =
-              'Your latest message could not be saved. It is still in the editor; use Save now to retry.';
+          _errorMessage = e is _DraftSaveConflict
+              ? _conflictMessage
+              : 'Your latest message could not be saved. It is still in the editor; use Save now to retry.';
         });
       }
     }
   }
+
+  static const String _conflictMessage =
+      'This draft was changed elsewhere (for example an AI result was applied) '
+      'after you started editing. Your text is still in the editor and was not '
+      'saved over it. Use Save now to keep your version.';
 
   Future<bool> _saveBeforeLeaving() async {
     _autosaveTimer?.cancel();
@@ -199,30 +228,73 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     return !_saveFailed && !_hasUnsavedChanges;
   }
 
+  Future<void> _discardAndLeave() async {
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Discard unsaved changes?'),
+        content: const Text(
+          'Your latest edits could not be saved. Leaving now will discard them.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep editing'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Discard edits'),
+          ),
+        ],
+      ),
+    );
+    if (discard != true || !mounted) return;
+    _autosaveTimer?.cancel();
+    setState(() {
+      _discardingUnsavedChanges = true;
+      _hasUnsavedChanges = false;
+      _saveFailed = false;
+    });
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.of(context).pop();
+  }
+
   String get _activeBirthdayId => _birthday?.id ?? widget.birthdayId ?? '';
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
+    try {
+      final bRepo = ref.read(birthdaysRepositoryProvider);
+      final pRepo = ref.read(peopleRepositoryProvider);
+      final dRepo = ref.read(draftsRepositoryProvider);
+      _draftsRepo = dRepo;
 
-    final bRepo = ref.read(birthdaysRepositoryProvider);
-    final pRepo = ref.read(peopleRepositoryProvider);
-    final dRepo = ref.read(draftsRepositoryProvider);
-    _draftsRepo = dRepo;
+      Birthday? birthday;
+      if (widget.birthdayId != null && widget.birthdayId!.isNotEmpty) {
+        birthday = await bRepo.getBirthday(widget.birthdayId!);
+        if (!mounted) return;
+        birthday ??= await bRepo.getBirthdayForPerson(widget.birthdayId!);
+      }
+      if (!mounted) return;
+      if (birthday == null &&
+          widget.personId != null &&
+          widget.personId!.isNotEmpty) {
+        birthday = await bRepo.getBirthdayForPerson(widget.personId!);
+      }
+      if (!mounted) return;
 
-    Birthday? birthday;
-    if (widget.birthdayId != null && widget.birthdayId!.isNotEmpty) {
-      birthday = await bRepo.getBirthday(widget.birthdayId!);
-      birthday ??= await bRepo.getBirthdayForPerson(widget.birthdayId!);
-    }
-    if (birthday == null &&
-        widget.personId != null &&
-        widget.personId!.isNotEmpty) {
-      birthday = await bRepo.getBirthdayForPerson(widget.personId!);
-    }
+      if (birthday == null) {
+        setState(() {
+          _errorMessage = 'Birthday event not found.';
+          _isLoading = false;
+        });
+        return;
+      }
 
-    if (birthday != null) {
       final targetId = birthday.id;
       final person = await pRepo.getPerson(birthday.personId);
+      if (!mounted) return;
       if (person == null || !person.hasResolvableBirthday) {
         setState(() {
           _errorMessage = person == null
@@ -233,11 +305,13 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         return;
       }
       final draft = await dRepo.getDraftForBirthday(birthday.id);
+      if (!mounted) return;
 
       setState(() {
         _birthday = birthday;
         _person = person;
         _draft = draft;
+        _persistedDraft = draft;
         if (draft != null) {
           _messageController.text = draft.body;
           _selectedTone = draft.tone;
@@ -248,27 +322,38 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         _isLoading = false;
       });
 
-      // Follow the birthday's durable generation job: in-flight states
-      // ("Drafting…", "Retrying…"), applied results, and failures all come
-      // from the job row so the studio stays truthful across re-entry. Seat
-      // the state with a one-shot read, then ride the worker's in-process
-      // transition stream (a plain broadcast, so no drift query timers).
       _aiJobSub?.cancel();
-      final latest = await ref
-          .read(jobsRepositoryProvider)
-          .latestJob(JobTypes.aiGenerate, targetId);
-      if (latest != null && mounted) _handleJobEvent(latest);
-      _aiJobSub = ref
-          .read(jobWorkerProvider)
-          .events
+      final jobsRepository = ref.read(jobsRepositoryProvider);
+      final worker = ref.read(jobWorkerProvider);
+      _aiJobSub = worker.events
           .where(
             (job) =>
                 job.type == JobTypes.aiGenerate && job.subjectId == targetId,
           )
           .listen(_handleJobEvent);
-    } else {
+      final latest = await jobsRepository.latestJob(
+        JobTypes.aiGenerate,
+        targetId,
+      );
+      if (!mounted) return;
+      if (latest != null &&
+          (latest.status == JobStatus.queued ||
+              latest.status == JobStatus.running ||
+              latest.status == JobStatus.retrying)) {
+        _handleJobEvent(latest);
+      }
+    } catch (error, stackTrace) {
+      if (!mounted) return;
+      ref
+          .read(loggerProvider)
+          .error(
+            'MessageStudio',
+            'Could not load birthday studio data',
+            error: error,
+            stackTrace: stackTrace,
+          );
       setState(() {
-        _errorMessage = 'Birthday event not found.';
+        _errorMessage = 'Could not load this birthday. Try again.';
         _isLoading = false;
       });
     }
@@ -311,7 +396,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     if (_person == null || _birthday == null) return;
     if (_messageController.text.isNotEmpty || _draft != null) {
       try {
-        await _saveDraft(status: DraftStatus.draft);
+        await _saveDraft(status: DraftStatus.draft, skipIfUnchanged: true);
+      } on _DraftSaveConflict {
+        return;
       } catch (_) {
         if (mounted) {
           setState(() {
@@ -330,27 +417,48 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         .read(draftsRepositoryProvider)
         .getDraftForBirthday(birthdayId);
 
-    final job = await ref
-        .read(jobWorkerProvider)
-        .enqueue(
-          type: JobTypes.aiGenerate,
-          subjectId: birthdayId,
-          payload: jsonEncode(
-            AiJobPayload(
-              birthdayId: birthdayId,
-              personId: _person!.id,
-              tone: tone ?? _selectedTone,
-              length: length ?? _selectedLength,
-              customInstruction: customInstruction,
-              existingMessage: existingMessage,
-              targetLanguage: targetLanguage,
-              targetCycleYear: _birthday!.cycleYear,
-              forceNano: forceNano,
-              draftUpdatedAt: revisedDraft?.updatedAt.toIso8601String(),
-            ).toJson(),
-          ),
-          maxAttempts: 3,
-        );
+    final JobRecord job;
+    try {
+      job = await ref
+          .read(jobWorkerProvider)
+          .enqueue(
+            type: JobTypes.aiGenerate,
+            subjectId: birthdayId,
+            payload: jsonEncode(
+              AiJobPayload(
+                birthdayId: birthdayId,
+                personId: _person!.id,
+                tone: tone ?? _selectedTone,
+                length: length ?? _selectedLength,
+                customInstruction: customInstruction,
+                rewriteExisting:
+                    existingMessage != null &&
+                    existingMessage.trim().isNotEmpty,
+                targetLanguage: targetLanguage,
+                targetCycleYear: _birthday!.cycleYear,
+                forceNano: forceNano,
+                draftUpdatedAt: revisedDraft?.updatedAt.toIso8601String(),
+                draftRevision: revisedDraft?.revision,
+              ).toJson(),
+            ),
+            maxAttempts: 3,
+          );
+    } catch (error, stackTrace) {
+      if (!mounted) return;
+      ref
+          .read(loggerProvider)
+          .error(
+            'MessageStudio',
+            'Could not enqueue AI generation',
+            error: error,
+            stackTrace: stackTrace,
+          );
+      setState(() {
+        _errorMessage =
+            'Another AI request is already in progress for this birthday. Wait for it to finish before changing the request.';
+      });
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _lastEnqueuedJobId = job.id;
@@ -429,6 +537,33 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     if (!mounted) return;
 
     final userEdited = _enqueuedRevision != _editRevision;
+    // The worker deliberately did not apply its result: report neutrally, never
+    // as a success, and never pull stale text over the user's editor.
+    if (job.wasDropped) {
+      if (draft != null) _persistedDraft = draft;
+      if (draft != null && !userEdited && !_hasUnsavedChanges) {
+        setState(() {
+          _messageController.text = draft.body;
+          _draft = draft;
+          _selectedTone = draft.tone;
+          _selectedLength = draft.length;
+        });
+      }
+      if (ours) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              userEdited
+                  ? (_pendingStaleLabel ?? 'Your edits were kept.')
+                  : 'AI result not applied because the draft changed. Generate again if you still want it.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (draft != null) _persistedDraft = draft;
     if (draft != null && !userEdited) {
       setState(() {
         _messageController.text = draft.body;
@@ -459,13 +594,49 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     }
   }
 
-  Future<void> _saveDraft({DraftStatus status = DraftStatus.draft}) async {
+  /// Persists the editor as the birthday's draft.
+  ///
+  /// Writes are optimistic: the stored row must still be the one this screen
+  /// last loaded/saved ([_persistedDraft] revision), otherwise nothing is
+  /// written, the editor text is kept and [_DraftSaveConflict] is thrown.
+  /// [skipIfUnchanged] avoids no-op writes (which would bump `updatedAt` and
+  /// revision and make a queued AI result look stale). A brand-new draft is
+  /// never created from an empty editor.
+  Future<void> _saveDraft({
+    DraftStatus status = DraftStatus.draft,
+    bool skipIfUnchanged = false,
+  }) async {
     if (_person == null) return;
     final repo = _draftsRepo;
     if (repo == null) return;
     final birthday = _birthday;
     if (birthday == null) return;
     final savedRevision = _editRevision;
+    final persisted = _persistedDraft;
+    final body = _messageController.text;
+
+    // Opening Studio and leaving must not create an empty "draft" or flip the
+    // birthday to "Message drafted". Clearing an existing draft is still saved.
+    if (persisted == null && body.trim().isEmpty) {
+      if (_editRevision == savedRevision) _hasUnsavedChanges = false;
+      return;
+    }
+    if (skipIfUnchanged &&
+        persisted != null &&
+        persisted.status != DraftStatus.confirmedSent &&
+        persisted.status == status &&
+        persisted.body == body &&
+        persisted.tone == _selectedTone &&
+        persisted.length == _selectedLength) {
+      if (mounted && _editRevision == savedRevision) {
+        setState(() {
+          _hasUnsavedChanges = false;
+          _saveFailed = false;
+        });
+      }
+      return;
+    }
+
     final now = DateTime.now();
     final canonicalDraft = await repo.getDraft(_activeBirthdayId);
     final startsNewRevision =
@@ -478,7 +649,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       id: draftId,
       birthdayId: _activeBirthdayId,
       personId: _person!.id,
-      body: _messageController.text,
+      body: body,
       tone: _selectedTone,
       length: _selectedLength,
       status: status,
@@ -492,17 +663,70 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         : birthday.status == BirthdayStatus.handedOff && !startsNewRevision
         ? BirthdayStatus.handedOff
         : BirthdayStatus.messageDrafted;
-    await repo.saveDraftAndUpdateBirthday(updatedDraft, nextStatus);
+    final applied = await repo.saveDraftAndUpdateBirthday(
+      updatedDraft,
+      nextStatus,
+      requireUnchanged: true,
+      expectedCurrentDraft: persisted,
+    );
+    if (!applied) {
+      await _adoptStoredDraftAfterConflict(repo);
+      throw const _DraftSaveConflict();
+    }
+    final stored = await repo.getDraft(updatedDraft.id);
+    _persistedDraft = stored ?? updatedDraft;
     _birthday = birthday.copyWith(draftId: updatedDraft.id, status: nextStatus);
     if (mounted) {
       setState(() {
-        _draft = updatedDraft;
+        _draft = stored ?? updatedDraft;
         if (_editRevision == savedRevision) {
           _hasUnsavedChanges = false;
           _saveFailed = false;
           _lastSavedTime = DateTime.now();
         }
       });
+    }
+  }
+
+  /// A save lost the race with another writer. Re-seat the concurrency token on
+  /// the stored row (so an explicit "Save now" can overwrite knowingly), keep
+  /// the editor text untouched, and offer the stored text.
+  Future<void> _adoptStoredDraftAfterConflict(DraftsRepository repo) async {
+    final stored = await repo.getDraftForBirthday(_activeBirthdayId);
+    final refreshedBirthday = await ref
+        .read(birthdaysRepositoryProvider)
+        .getBirthday(_activeBirthdayId);
+    _persistedDraft = stored;
+    if (refreshedBirthday != null) _birthday = refreshedBirthday;
+    if (!mounted) return;
+    setState(() {
+      _draft = stored;
+      _hasUnsavedChanges = true;
+    });
+    if (stored != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Another change was saved to this draft. Your text was kept and not overwritten.',
+          ),
+          action: SnackBarAction(
+            label: 'Use saved text',
+            onPressed: () {
+              if (!mounted) return;
+              _editRevision++;
+              setState(() {
+                _messageController.text = stored.body;
+                _selectedTone = stored.tone;
+                _selectedLength = stored.length;
+                _draft = stored;
+                _hasUnsavedChanges = false;
+                _saveFailed = false;
+                _errorMessage = null;
+              });
+            },
+          ),
+        ),
+      );
     }
   }
 
@@ -528,92 +752,42 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       return;
     }
 
-    setState(() => _isSending = true);
+    final WhatsAppHandoffResult handoff;
     try {
-      final builder = ref.read(whatsappHandoffBuilderProvider);
-      final handoff = builder.buildHandoff(
-        rawPhoneNumber: phone,
-        message: message,
-      );
-
-      // Save draft as ready for delivery
-      await _saveDraft(status: DraftStatus.ready);
-
-      // Attempt to launch WhatsApp with official Click-to-Chat URL
-      bool launched = false;
-      try {
-        launched = await launchUrl(
-          handoff.uri,
-          mode: LaunchMode.externalApplication,
-        );
-      } catch (e) {
-        ref
-            .read(loggerProvider)
-            .warning(
-              'MessageStudio',
-              'Could not launch WhatsApp directly',
-              error: e,
-            );
-      }
-
-      // Track handoff status only when launch succeeds; otherwise action required (SSOT §9)
-      if (launched) {
-        // Evidence and the handed-off status move in one transaction (audit F20).
-        await ref
-            .read(deliveryEventsRepositoryProvider)
-            .recordHandoffAndMarkHandedOff(
-              birthdayId: _activeBirthdayId,
-              draftId: _draft?.id,
-              channel: DeliveryChannel.whatsapp,
-              at: DateTime.now(),
-            );
-      } else {
-        await ref
-            .read(deliveryEventsRepositoryProvider)
-            .recordOutcome(
-              birthdayId: _activeBirthdayId,
-              draftId: _draft?.id,
-              channel: DeliveryChannel.whatsapp,
-              outcome: DeliveryOutcome.launchFailed,
-              at: DateTime.now(),
-            );
-        await ref
-            .read(birthdaysRepositoryProvider)
-            .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
-      }
-
-      if (mounted) {
-        _showHandoffConfirmationDialog(
-          handoff.uri.toString(),
-          wasLaunched: launched,
-          channelName: 'WhatsApp',
-        );
-      }
+      handoff = ref
+          .read(whatsappHandoffBuilderProvider)
+          .buildHandoff(rawPhoneNumber: phone, message: message);
     } on AppFailure catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.detail ?? e.message ?? 'Handoff failed')),
-        );
-      }
-    } catch (e, st) {
-      ref
-          .read(loggerProvider)
-          .error(
-            'MessageStudio',
-            'Unexpected error launching WhatsApp handoff',
-            error: e,
-            stackTrace: st,
-          );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open the delivery app.')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSending = false);
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.detail ?? e.message ?? 'Handoff failed')),
+      );
+      return;
     }
+
+    await _performHandoff(
+      channel: DeliveryChannel.whatsapp,
+      channelName: 'WhatsApp',
+      expectedMessage: message,
+      confirmationDetail: handoff.uri.toString(),
+      launch: () async {
+        // Official Click-to-Chat URL; a launcher exception is a failed launch.
+        try {
+          return await launchUrl(
+            handoff.uri,
+            mode: LaunchMode.externalApplication,
+          );
+        } catch (e) {
+          ref
+              .read(loggerProvider)
+              .warning(
+                'MessageStudio',
+                'Could not launch WhatsApp directly',
+                error: e,
+              );
+          return false;
+        }
+      },
+    );
   }
 
   Future<void> _handleSmsSend() async {
@@ -638,52 +812,15 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       return;
     }
 
-    setState(() => _isSending = true);
-    try {
-      await _saveDraft(status: DraftStatus.ready);
-      final smsService = ref.read(smsDeliveryServiceProvider);
-      final launched = await smsService.sendSms(
-        phoneNumber: phone,
-        message: message,
-      );
-
-      if (launched) {
-        // Evidence and the handed-off status move in one transaction (audit F20).
-        await ref
-            .read(deliveryEventsRepositoryProvider)
-            .recordHandoffAndMarkHandedOff(
-              birthdayId: _activeBirthdayId,
-              draftId: _draft?.id,
-              channel: DeliveryChannel.sms,
-              at: DateTime.now(),
-            );
-      } else {
-        await ref
-            .read(deliveryEventsRepositoryProvider)
-            .recordOutcome(
-              birthdayId: _activeBirthdayId,
-              draftId: _draft?.id,
-              channel: DeliveryChannel.sms,
-              outcome: DeliveryOutcome.launchFailed,
-              at: DateTime.now(),
-            );
-        await ref
-            .read(birthdaysRepositoryProvider)
-            .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
-      }
-
-      if (mounted) {
-        _showHandoffConfirmationDialog(
-          'Recipient: $phone',
-          wasLaunched: launched,
-          channelName: 'SMS',
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSending = false);
-      }
-    }
+    await _performHandoff(
+      channel: DeliveryChannel.sms,
+      channelName: 'SMS',
+      expectedMessage: message,
+      confirmationDetail: 'Recipient: $phone',
+      launch: () => ref
+          .read(smsDeliveryServiceProvider)
+          .sendSms(phoneNumber: phone, message: message),
+    );
   }
 
   Future<void> _handleShareSend() async {
@@ -698,51 +835,208 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
       return;
     }
 
+    await _performHandoff(
+      channel: DeliveryChannel.share,
+      channelName: 'Share Sheet',
+      expectedMessage: message,
+      confirmationDetail: 'Shared via Android chooser',
+      launch: () => ref
+          .read(nativeShareServiceProvider)
+          .shareText(
+            text: message,
+            title: 'Birthday greeting for ${_person?.name}',
+          ),
+    );
+  }
+
+  /// Shared single-flight handoff: save the draft as ready, launch the external
+  /// app, then record evidence. Each phase reports its own failure so a launch
+  /// failure, a save failure and an evidence-write failure are never conflated.
+  Future<void> _performHandoff({
+    required DeliveryChannel channel,
+    required String channelName,
+    required String expectedMessage,
+    required String confirmationDetail,
+    required Future<bool> Function() launch,
+  }) async {
     setState(() => _isSending = true);
     try {
-      await _saveDraft(status: DraftStatus.ready);
-      final shareService = ref.read(nativeShareServiceProvider);
-      final launched = await shareService.shareText(
-        text: message,
-        title: 'Birthday greeting for ${_person?.name}',
+      try {
+        await _saveDraft(status: DraftStatus.ready);
+      } on _DraftSaveConflict {
+        // Already explained to the user; nothing was opened.
+        if (mounted) setState(() => _errorMessage = _conflictMessage);
+        return;
+      } catch (e, st) {
+        ref
+            .read(loggerProvider)
+            .error(
+              'MessageStudio',
+              'Could not save draft before $channelName handoff',
+              error: e,
+              stackTrace: st,
+            );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Your message could not be saved, so $channelName was not opened. Please try again.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (_draft?.body.trim() != expectedMessage) {
+        if (mounted) {
+          setState(() {
+            _errorMessage =
+                'The message changed while it was being prepared. Review it and try again.';
+          });
+        }
+        return;
+      }
+      final bodyHash = crypto.sha256
+          .convert(utf8.encode(expectedMessage))
+          .toString();
+      final birthdayId = _activeBirthdayId;
+      final draftId = _draft?.id;
+      final draftRevision = _draft?.revision;
+      if (draftId == null || draftRevision == null) {
+        if (mounted) {
+          setState(() {
+            _errorMessage =
+                'The saved draft could not be verified. Please save it and try again.';
+          });
+        }
+        return;
+      }
+
+      var launched = false;
+      try {
+        launched = await launch();
+      } catch (e, st) {
+        ref
+            .read(loggerProvider)
+            .error(
+              'MessageStudio',
+              'Unexpected error launching $channelName handoff',
+              error: e,
+              stackTrace: st,
+            );
+      }
+
+      await _recordHandoffEvidence(
+        birthdayId: birthdayId,
+        draftId: draftId,
+        channel: channel,
+        channelName: channelName,
+        confirmationDetail: confirmationDetail,
+        launched: launched,
+        bodyHash: bodyHash,
+        draftRevision: draftRevision,
       );
-
-      if (launched) {
-        // Evidence and the handed-off status move in one transaction (audit F20).
-        await ref
-            .read(deliveryEventsRepositoryProvider)
-            .recordHandoffAndMarkHandedOff(
-              birthdayId: _activeBirthdayId,
-              draftId: _draft?.id,
-              channel: DeliveryChannel.share,
-              at: DateTime.now(),
-            );
-      } else {
-        await ref
-            .read(deliveryEventsRepositoryProvider)
-            .recordOutcome(
-              birthdayId: _activeBirthdayId,
-              draftId: _draft?.id,
-              channel: DeliveryChannel.share,
-              outcome: DeliveryOutcome.launchFailed,
-              at: DateTime.now(),
-            );
-        await ref
-            .read(birthdaysRepositoryProvider)
-            .updateBirthdayStatus(_activeBirthdayId, BirthdayStatus.failed);
-      }
-
-      if (mounted) {
-        _showHandoffConfirmationDialog(
-          'Shared via Android chooser',
-          wasLaunched: launched,
-          channelName: 'Share Sheet',
-        );
-      }
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
       }
+    }
+  }
+
+  /// Records the launch outcome (evidence + birthday status) and then shows the
+  /// confirmation dialog. If only this write fails the external app may already
+  /// be open, so the message says so and offers a retry of just the record.
+  Future<void> _recordHandoffEvidence({
+    required String birthdayId,
+    required String draftId,
+    required DeliveryChannel channel,
+    required String channelName,
+    required String confirmationDetail,
+    required bool launched,
+    required String bodyHash,
+    required int? draftRevision,
+  }) async {
+    final at = DateTime.now();
+    try {
+      final events = ref.read(deliveryEventsRepositoryProvider);
+      if (launched) {
+        // Evidence and the handed-off status move in one transaction (audit F20).
+        await events.recordHandoffAndMarkHandedOff(
+          birthdayId: birthdayId,
+          draftId: draftId,
+          draftRevision: draftRevision,
+          bodyHash: bodyHash,
+          channel: channel,
+          at: at,
+        );
+      } else {
+        await events.recordOutcome(
+          birthdayId: birthdayId,
+          draftId: draftId,
+          draftRevision: draftRevision,
+          bodyHash: bodyHash,
+          channel: channel,
+          outcome: DeliveryOutcome.launchFailed,
+          at: at,
+        );
+        await ref
+            .read(birthdaysRepositoryProvider)
+            .updateBirthdayStatus(birthdayId, BirthdayStatus.failed);
+      }
+    } catch (e, st) {
+      ref
+          .read(loggerProvider)
+          .error(
+            'MessageStudio',
+            'Could not record $channelName handoff evidence',
+            error: e,
+            stackTrace: st,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 10),
+          content: Text(
+            launched
+                ? '$channelName was opened, but the handoff could not be recorded. Retry so History stays accurate.'
+                : 'Could not open $channelName, and that failure could not be recorded. Retry to record it.',
+          ),
+          action: SnackBarAction(
+            label: 'Retry record',
+            onPressed: () => _recordHandoffEvidence(
+              channel: channel,
+              channelName: channelName,
+              confirmationDetail: confirmationDetail,
+              launched: launched,
+              birthdayId: birthdayId,
+              draftId: draftId,
+              bodyHash: bodyHash,
+              draftRevision: draftRevision,
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (mounted) {
+      _showHandoffConfirmationDialog(
+        confirmationDetail,
+        wasLaunched: launched,
+        channelName: channelName,
+        handoff: DeliveryHandoff(
+          birthdayId: birthdayId,
+          draftId: draftId,
+          draftRevision: draftRevision,
+          bodyHash: bodyHash,
+          channel: channel,
+          at: at.toUtc(),
+          outcome: launched
+              ? DeliveryOutcome.launched
+              : DeliveryOutcome.launchFailed,
+        ),
+      );
     }
   }
 
@@ -778,9 +1072,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
   }
 
   Future<void> _generateVariations() async {
-    if (_person == null) return;
+    if (_person == null || _aiBusy) return;
     setState(() {
-      _isGenerating = true;
+      _variationsLoading = true;
       _errorMessage = null;
     });
 
@@ -794,24 +1088,32 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         MessageTone.funny,
         MessageTone.emotional,
       ];
-      final variations = await Future.wait(
-        tones.map((t) async {
-          final req = AiGenerationRequest(
-            person: _person!,
-            tone: t,
-            length: _selectedLength,
-            targetCycleYear: _birthday?.cycleYear,
-          );
+      // Sequential and per-variant tolerant: one failed tone must not discard
+      // the others, and a non-retryable failure (locked, no key) stops early.
+      final variations = <MapEntry<MessageTone, String>>[];
+      Object? firstError;
+      for (final t in tones) {
+        try {
           final res = await aiRouter.generate(
-            request: req,
+            request: AiGenerationRequest(
+              person: _person!,
+              tone: t,
+              length: _selectedLength,
+              targetCycleYear: _birthday?.cycleYear,
+            ),
             entitlement: entitlement,
           );
-          return MapEntry(t, res.message);
-        }),
-      );
+          variations.add(MapEntry(t, res.message));
+        } catch (e) {
+          firstError ??= e;
+          if (e is AppFailure && !e.isRetryable) break;
+        }
+        if (!mounted) return;
+      }
+      if (variations.isEmpty) throw firstError ?? StateError('no variations');
 
       if (!mounted) return;
-      setState(() => _isGenerating = false);
+      setState(() => _variationsLoading = false);
 
       final selected = await showModalBottomSheet<String>(
         context: context,
@@ -877,10 +1179,29 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
         // variations were generating or the sheet was open.
         if (revision == _editRevision) {
           _messageController.text = selected;
-          await _saveDraft();
-          if (mounted) {
+          _editRevision++;
+          _hasUnsavedChanges = true;
+          var saved = true;
+          var conflict = false;
+          try {
+            await _saveDraft();
+          } on _DraftSaveConflict {
+            saved = false;
+            conflict = true;
+          } catch (_) {
+            saved = false;
+            if (mounted) _scheduleAutosave();
+          }
+          // A conflict has already been explained (and never auto-overwrites).
+          if (mounted && !conflict) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Variation applied! ✨')),
+              SnackBar(
+                content: Text(
+                  saved
+                      ? 'Variation applied! ✨'
+                      : 'Variation applied, but it could not be saved yet. It stays in the editor and will be retried.',
+                ),
+              ),
             );
           }
         } else {
@@ -900,7 +1221,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               ? '${e.message}: ${e.detail ?? ''} ${e.action ?? ''}'.trim()
               : 'Could not generate variations. You can compose your message manually or retry.';
           _lastFailureCode = e is AppFailure ? e.code : null;
-          _isGenerating = false;
+          _variationsLoading = false;
         });
       }
     }
@@ -956,10 +1277,30 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     _ => DeliveryChannel.whatsapp,
   };
 
+  bool _isCurrentHandoff(DeliveryHandoff handoff) {
+    final draftId = handoff.draftId;
+    final revision = handoff.draftRevision;
+    final bodyHash = handoff.bodyHash;
+    if (handoff.birthdayId != _activeBirthdayId ||
+        draftId == null ||
+        revision == null ||
+        bodyHash == null ||
+        _draft?.id != draftId ||
+        _draft?.revision != revision ||
+        _draft?.birthdayId != handoff.birthdayId) {
+      return false;
+    }
+    return crypto.sha256
+            .convert(utf8.encode(_messageController.text.trim()))
+            .toString() ==
+        bodyHash;
+  }
+
   void _showHandoffConfirmationDialog(
     String detailInfo, {
     required bool wasLaunched,
     String channelName = 'WhatsApp',
+    DeliveryHandoff? handoff,
   }) {
     showDialog(
       context: context,
@@ -1019,8 +1360,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                   await ref
                       .read(deliveryEventsRepositoryProvider)
                       .recordOutcome(
-                        birthdayId: _activeBirthdayId,
-                        draftId: _draft?.id,
+                        birthdayId: handoff?.birthdayId ?? _activeBirthdayId,
+                        draftId: handoff?.draftId,
+                        draftRevision: handoff?.draftRevision,
+                        bodyHash: handoff?.bodyHash,
                         channel: _handoffChannelForName(channelName),
                         outcome: DeliveryOutcome.notSent,
                         at: DateTime.now(),
@@ -1039,15 +1382,32 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               child: const Text('Not Sent Yet'),
             ),
             FilledButton(
-              onPressed: wasLaunched
+              onPressed: wasLaunched &&
+                      handoff?.draftRevision != null &&
+                      handoff?.bodyHash != null
                   ? () async {
                       HapticFeedback.lightImpact();
                       try {
+                        if (!_isCurrentHandoff(handoff!)) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'This draft changed after the handoff. It was not marked sent; review and hand off the current text.',
+                                ),
+                              ),
+                            );
+                          }
+                          return;
+                        }
                         await ref
                             .read(deliveryEventsRepositoryProvider)
                             .confirmHandoff(
-                              birthdayId: _activeBirthdayId,
-                              draftId: _draft?.id ?? _activeBirthdayId,
+                              birthdayId: handoff.birthdayId,
+                              draftId: handoff.draftId!,
+                              expectedDraftRevision:
+                                  handoff.draftRevision!,
+                              expectedBodyHash: handoff.bodyHash!,
                               at: DateTime.now(),
                             );
                         await _loadData();
@@ -1067,7 +1427,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                'No successful handoff was recorded, so this message was not marked sent.',
+                                'This handoff no longer matches the saved draft, so it was not marked sent.',
                               ),
                             ),
                           );
@@ -1089,12 +1449,24 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     HapticFeedback.lightImpact();
     final repo = ref.read(deliveryEventsRepositoryProvider);
     final handoff = await repo.latestHandoffForBirthday(_activeBirthdayId);
-    final channel = handoff?.channel.displayName ?? 'delivery app';
     if (!mounted) return;
+    if (handoff == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No handoff evidence is available to confirm.'),
+        ),
+      );
+      return;
+    }
+    final channel = handoff.channel.displayName;
+    final isCurrent = _isCurrentHandoff(handoff);
     _showHandoffConfirmationDialog(
-      'Opened via $channel — ${_messageController.text.trim()}',
+      isCurrent
+          ? 'Opened via $channel — ${_messageController.text.trim()}'
+          : 'This handoff is tied to an earlier saved message. The current draft must be handed off again before it can be marked sent.',
       wasLaunched: true,
       channelName: channel,
+      handoff: handoff,
     );
   }
 
@@ -1183,13 +1555,15 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
 
     HapticFeedback.lightImpact();
     await _saveDraft(status: DraftStatus.approvedForAutoSms);
-    await _reconcileAutoSms();
+    final scheduled = await _reconcileAutoSms();
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Message approved! Automatic SMS scheduled for midnight 00:00.',
+            scheduled
+                ? 'Message approved! Automatic SMS scheduled for midnight 00:00.'
+                : 'Message approved, but Automatic SMS could not be scheduled. Check eligibility and permissions.',
           ),
         ),
       );
@@ -1207,18 +1581,28 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     }
   }
 
-  Future<void> _reconcileAutoSms() async {
-    if (_person == null) return;
+  Future<bool> _reconcileAutoSms() async {
+    if (_person == null) return false;
     try {
       final smsService = ref.read(birthdaySmsServiceProvider);
       final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
       final birthday = await birthdaysRepo.getBirthday(_activeBirthdayId);
-      await smsService.reconcileRecipientSms(
+      return await smsService.reconcileRecipientSms(
         person: _person!,
         birthday: birthday,
         draft: _draft,
       );
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      ref
+          .read(loggerProvider)
+          .error(
+            'MessageStudio',
+            'Automatic SMS reconciliation failed',
+            error: error,
+            stackTrace: stackTrace,
+          );
+      return false;
+    }
   }
 
   /// Replaces the AI controls when the account is not entitled (audit H).
@@ -1264,9 +1648,13 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                child: Text(
-                  _errorMessage ?? 'Birthday not found',
-                  textAlign: TextAlign.center,
+                child: Semantics(
+                  container: true,
+                  liveRegion: true,
+                  child: Text(
+                    _errorMessage ?? 'Birthday not found',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -1277,6 +1665,11 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                 icon: const Icon(Icons.people_outline),
                 label: const Text('Go to People'),
               ),
+              if (_errorMessage?.startsWith('Could not load') ?? false)
+                TextButton(
+                  onPressed: _loadData,
+                  child: const Text('Try Again'),
+                ),
             ],
           ),
         ),
@@ -1297,7 +1690,9 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     final phoneInvalid = !phoneMissing && !hasUsablePhone;
 
     return PopScope<void>(
-      canPop: !_hasUnsavedChanges && !_isSaving && !_saveFailed,
+      canPop:
+          _discardingUnsavedChanges ||
+          (!_hasUnsavedChanges && !_isSaving && !_saveFailed),
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         final saved = await _saveBeforeLeaving();
@@ -1367,11 +1762,15 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                         ),
                         const SizedBox(width: AppSpacing.xs),
                         Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontSize: 13,
+                          child: Semantics(
+                            container: true,
+                            liveRegion: true,
+                            child: Text(
+                              _errorMessage!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                         ),
@@ -1396,6 +1795,12 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                             style: TextButton.styleFrom(
                               visualDensity: VisualDensity.compact,
                             ),
+                          ),
+                        if (_saveFailed)
+                          TextButton.icon(
+                            icon: const Icon(Icons.delete_outline, size: 16),
+                            label: const Text('Discard edits'),
+                            onPressed: _isSaving ? null : _discardAndLeave,
                           ),
                         // On a credential failure, offer the on-device fallback
                         // (audit 02 AC P1-1): retry with Gemini Nano forced.
@@ -1508,7 +1913,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                       label: const Text('Unlock with Pro'),
                     )
                   : FilledButton.tonalIcon(
-                      onPressed: _isGenerating ? null : _generateWithAi,
+                      onPressed: _aiBusy ? null : _generateWithAi,
                       icon: _isGenerating
                           ? const SizedBox(
                               width: 18,
@@ -1524,28 +1929,32 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
                     ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            // Alternate delivery channels (SSOT §10)
+            // Alternate delivery channels (legacy SSOT §10 (PRODUCT.md §16.7))
             Wrap(
               spacing: 8,
               runSpacing: 8,
               alignment: WrapAlignment.center,
               children: [
-                if (hasUsablePhone)
+                if (hasUsablePhone &&
+                    person.preferredDeliveryChannel != DeliveryChannel.sms)
                   OutlinedButton.icon(
                     onPressed: _isSending ? null : _handleSmsSend,
                     icon: const Icon(Icons.sms_outlined, size: 18),
                     label: const Text('Send via SMS'),
                   ),
-                OutlinedButton.icon(
-                  onPressed: _isSending ? null : _handleShareSend,
-                  icon: const Icon(Icons.share_outlined, size: 18),
-                  label: const Text('Share Sheet'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _copyToClipboard,
-                  icon: const Icon(Icons.copy_outlined, size: 18),
-                  label: const Text('Copy Text'),
-                ),
+                if (person.preferredDeliveryChannel != DeliveryChannel.share)
+                  OutlinedButton.icon(
+                    onPressed: _isSending ? null : _handleShareSend,
+                    icon: const Icon(Icons.share_outlined, size: 18),
+                    label: const Text('Share Sheet'),
+                  ),
+                if (person.preferredDeliveryChannel !=
+                    DeliveryChannel.clipboard)
+                  OutlinedButton.icon(
+                    onPressed: _copyToClipboard,
+                    icon: const Icon(Icons.copy_outlined, size: 18),
+                    label: const Text('Copy Text'),
+                  ),
               ],
             ),
             if (ProductCapabilities.automaticSms &&
@@ -1827,7 +2236,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               ActionChip(
                 avatar: const Icon(Icons.compress, size: 16),
                 label: const Text('Shorten'),
-                onPressed: _isGenerating
+                onPressed: _aiBusy
                     ? null
                     : () {
                         HapticFeedback.lightImpact();
@@ -1837,7 +2246,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               ActionChip(
                 avatar: const Icon(Icons.expand, size: 16),
                 label: const Text('Expand'),
-                onPressed: _isGenerating
+                onPressed: _aiBusy
                     ? null
                     : () {
                         HapticFeedback.lightImpact();
@@ -1847,7 +2256,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               ActionChip(
                 avatar: const Icon(Icons.translate, size: 16),
                 label: const Text('Translate'),
-                onPressed: _isGenerating
+                onPressed: _aiBusy
                     ? null
                     : () {
                         HapticFeedback.lightImpact();
@@ -1857,7 +2266,7 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
               ActionChip(
                 avatar: const Icon(Icons.casino_outlined, size: 16),
                 label: const Text('Variations'),
-                onPressed: _isGenerating
+                onPressed: _aiBusy
                     ? null
                     : () {
                         HapticFeedback.lightImpact();

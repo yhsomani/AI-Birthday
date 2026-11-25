@@ -20,8 +20,9 @@ abstract interface class JobsRepository {
   /// The most recent job of [type] for [subjectId] in any state.
   Future<JobRecord?> latestJob(String type, String subjectId);
 
-  /// Creates a job, or returns the existing active one (dedupe). `maxAttempts`
-  /// is the bounded retry ceiling. Returns the active job in both cases.
+  /// Creates a job, or returns an active job with identical inputs (dedupe).
+  /// An active job with different inputs is rejected rather than silently
+  /// dropping the newer request.
   Future<JobRecord> enqueue({
     required String type,
     required String subjectId,
@@ -39,21 +40,40 @@ abstract interface class JobsRepository {
   /// worker can discard the side effect).
   Future<bool> isCanceled(String id);
 
-  Future<void> markRetrying(
+  Future<bool> markRetrying(
     String id, {
+    required int expectedAttempt,
     required DateTime nextRetryAt,
     required String? errorCode,
     required String? errorMessage,
   });
 
-  Future<void> markSucceeded(String id, {String? resultRef});
+  Future<bool> markSucceeded(
+    String id, {
+    required int expectedAttempt,
+    String? resultRef,
+  });
 
-  Future<void> markFailed(String id, {String? errorCode, String? errorMessage});
+  Future<bool> markFailed(
+    String id, {
+    required int expectedAttempt,
+    String? errorCode,
+    String? errorMessage,
+  });
 
-  Future<void> cancel(String id);
+  Future<bool> cancel(String id);
+
+  /// Earliest moment the worker must wake without any external notification:
+  /// the soonest deferred `nextRetryAt` of a queued/retrying job, or the point
+  /// a `running` row becomes stale. Null when nothing is scheduled.
+  Future<DateTime?> nextWakeAt({
+    Duration staleGrace = const Duration(minutes: 2),
+  });
 
   /// Crash recovery: rolls jobs left `running` longer than [grace] back to
-  /// `queued` (they never completed). Returns the number reset.
+  /// `queued` (they never completed). Rows that already used their whole
+  /// attempt budget are marked `failed` (`interrupted`) instead, so a job that
+  /// kills the process cannot crash-loop. Returns the number re-queued.
   Future<int> resetStale(
     DateTime now, {
     Duration grace = const Duration(minutes: 2),
@@ -61,6 +81,7 @@ abstract interface class JobsRepository {
 
   /// At process start, no local handler from the previous isolate can still
   /// be running. Recover all `running` rows without making fresh work race.
+  /// Exhausted rows are failed instead of re-queued (see [resetStale]).
   Future<int> resetRunningAtStartup(DateTime now);
 }
 
@@ -110,31 +131,62 @@ class DriftJobsRepository implements JobsRepository {
     String? payload,
     int maxAttempts = 1,
   }) async {
-    final existing = await activeJob(type, subjectId);
-    if (existing != null) return existing;
+    return _database.transaction(() async {
+      final existing = await activeJob(type, subjectId);
+      if (existing != null) {
+        if (existing.payload != payload) {
+          throw StateError(
+            'An active $type job for $subjectId already has different inputs.',
+          );
+        }
+        return existing;
+      }
 
-    final now = DateTime.now();
-    final id = '${type}_${subjectId}_${now.microsecondsSinceEpoch}';
-    await _database
-        .into(_database.jobs)
-        .insert(
-          db.JobsCompanion.insert(
-            id: id,
-            type: type,
-            status: JobStatus.queued.name,
-            subjectId: subjectId,
-            payload: drift.Value(payload),
-            attempts: const drift.Value(0),
-            maxAttempts: drift.Value(maxAttempts),
-            createdAt: now,
-          ),
-        );
-    return (await getById(id))!;
+      final now = DateTime.now();
+      final id = '${type}_${subjectId}_${now.microsecondsSinceEpoch}';
+      await _database
+          .into(_database.jobs)
+          .insert(
+            db.JobsCompanion.insert(
+              id: id,
+              type: type,
+              status: JobStatus.queued.name,
+              subjectId: subjectId,
+              payload: drift.Value(payload),
+              attempts: const drift.Value(0),
+              maxAttempts: drift.Value(maxAttempts),
+              createdAt: now,
+            ),
+          );
+      return (await getById(id))!;
+    });
   }
 
   @override
   Future<JobRecord?> claimNext(DateTime now) {
     return _database.transaction(() async {
+      // Never run a job past its attempt budget (recovered/restored rows).
+      final exhausted =
+          await (_database.select(_database.jobs)..where(
+                (j) =>
+                    j.status.isIn([
+                      JobStatus.queued.name,
+                      JobStatus.retrying.name,
+                    ]) &
+                    j.attempts.isBiggerOrEqual(j.maxAttempts),
+              ))
+              .get();
+      for (final row in exhausted) {
+        await (_database.update(
+          _database.jobs,
+        )..where((j) => j.id.equals(row.id))).write(
+          _interruptedCompanion(
+            now,
+            clearPayload: row.type == JobTypes.aiGenerate,
+          ),
+        );
+      }
+
       final query = _database.select(_database.jobs)
         ..where(
           (j) =>
@@ -186,45 +238,69 @@ class DriftJobsRepository implements JobsRepository {
   }
 
   @override
-  Future<void> markRetrying(
+  Future<bool> markRetrying(
     String id, {
+    required int expectedAttempt,
     required DateTime nextRetryAt,
     required String? errorCode,
     required String? errorMessage,
   }) async {
-    await (_database.update(
-      _database.jobs,
-    )..where((j) => j.id.equals(id))).write(
-      db.JobsCompanion(
-        status: drift.Value(JobStatus.retrying.name),
-        startedAt: const drift.Value(null),
-        nextRetryAt: drift.Value(nextRetryAt),
-        errorCode: drift.Value(errorCode),
-        errorMessage: drift.Value(errorMessage),
-      ),
-    );
+    final changed =
+        await (_database.update(_database.jobs)..where(
+              (j) =>
+                  j.id.equals(id) &
+                  j.status.equals(JobStatus.running.name) &
+                  j.attempts.equals(expectedAttempt),
+            ))
+            .write(
+              db.JobsCompanion(
+                status: drift.Value(JobStatus.retrying.name),
+                startedAt: const drift.Value(null),
+                nextRetryAt: drift.Value(nextRetryAt),
+                errorCode: drift.Value(errorCode),
+                errorMessage: drift.Value(errorMessage),
+              ),
+            );
+    return changed == 1;
   }
 
   @override
-  Future<void> markSucceeded(String id, {String? resultRef}) async {
-    await _database.transaction(() async {
+  Future<bool> markSucceeded(
+    String id, {
+    required int expectedAttempt,
+    String? resultRef,
+  }) {
+    return _database.transaction(() async {
       final row = await (_database.select(
         _database.jobs,
       )..where((j) => j.id.equals(id))).getSingleOrNull();
-      if (row == null) return;
+      if (row == null ||
+          row.status != JobStatus.running.name ||
+          row.attempts != expectedAttempt) {
+        return false;
+      }
 
-      await (_database.update(
-        _database.jobs,
-      )..where((j) => j.id.equals(id))).write(
-        db.JobsCompanion(
-          status: drift.Value(JobStatus.succeeded.name),
-          finishedAt: drift.Value(DateTime.now()),
-          resultRef: drift.Value(resultRef),
-          errorCode: const drift.Value(null),
-          errorMessage: const drift.Value(null),
-          nextRetryAt: const drift.Value(null),
-        ),
-      );
+      final changed =
+          await (_database.update(_database.jobs)..where(
+                (j) =>
+                   j.id.equals(id) &
+                   j.status.equals(JobStatus.running.name) &
+                   j.attempts.equals(expectedAttempt),
+              ))
+              .write(
+                db.JobsCompanion(
+                  status: drift.Value(JobStatus.succeeded.name),
+                  finishedAt: drift.Value(DateTime.now()),
+                  resultRef: drift.Value(resultRef),
+                  payload: drift.Value(
+                    row.type == JobTypes.aiGenerate ? null : row.payload,
+                  ),
+                  errorCode: const drift.Value(null),
+                  errorMessage: const drift.Value(null),
+                  nextRetryAt: const drift.Value(null),
+                ),
+              );
+      if (changed != 1) return false;
 
       // Retention: keep only the active job + latest terminal row per
       // (type, subject) so the queue stays bounded on long-lived birthdays.
@@ -240,92 +316,188 @@ class DriftJobsRepository implements JobsRepository {
                 ]),
           ))
           .go();
+      return true;
     });
   }
 
   @override
-  Future<void> markFailed(
+  Future<bool> markFailed(
     String id, {
+    required int expectedAttempt,
     String? errorCode,
     String? errorMessage,
   }) async {
-    await (_database.update(
-      _database.jobs,
-    )..where((j) => j.id.equals(id))).write(
-      db.JobsCompanion(
-        status: drift.Value(JobStatus.failed.name),
-        finishedAt: drift.Value(DateTime.now()),
-        errorCode: drift.Value(errorCode),
-        errorMessage: drift.Value(errorMessage),
-        nextRetryAt: const drift.Value(null),
-      ),
-    );
+    final row = await getById(id);
+    if (row == null ||
+        row.status != JobStatus.running ||
+        row.attempts != expectedAttempt) {
+      return false;
+    }
+    final changed =
+        await (_database.update(_database.jobs)..where(
+              (j) =>
+                  j.id.equals(id) &
+                  j.status.equals(JobStatus.running.name) &
+                  j.attempts.equals(expectedAttempt),
+            ))
+            .write(
+              db.JobsCompanion(
+                status: drift.Value(JobStatus.failed.name),
+                finishedAt: drift.Value(DateTime.now()),
+                payload: drift.Value(
+                  row.type == JobTypes.aiGenerate ? null : row.payload,
+                ),
+                errorCode: drift.Value(errorCode),
+                errorMessage: drift.Value(errorMessage),
+                nextRetryAt: const drift.Value(null),
+              ),
+            );
+    return changed == 1;
   }
 
   @override
-  Future<void> cancel(String id) async {
-    await (_database.update(_database.jobs)..where(
-          (j) =>
-              j.id.equals(id) &
-              j.status.isIn([
+  Future<bool> cancel(String id) {
+    return _database.transaction(() async {
+      final row = await getById(id);
+      if (row == null ||
+          ![
+            JobStatus.queued,
+            JobStatus.running,
+            JobStatus.retrying,
+          ].contains(row.status)) {
+        return false;
+      }
+      final changed =
+          await (_database.update(_database.jobs)..where(
+                (j) =>
+                    j.id.equals(id) &
+                    j.status.isIn([
+                      JobStatus.queued.name,
+                      JobStatus.running.name,
+                      JobStatus.retrying.name,
+                    ]),
+              ))
+              .write(
+                db.JobsCompanion(
+                  status: drift.Value(JobStatus.canceled.name),
+                  finishedAt: drift.Value(DateTime.now()),
+                  payload: drift.Value(
+                    row.type == JobTypes.aiGenerate ? null : row.payload,
+                  ),
+                ),
+              );
+      return changed == 1;
+    });
+  }
+
+  @override
+  Future<DateTime?> nextWakeAt({
+    Duration staleGrace = const Duration(minutes: 2),
+  }) async {
+    final rows =
+        await (_database.select(_database.jobs)..where(
+              (j) => j.status.isIn([
                 JobStatus.queued.name,
-                JobStatus.running.name,
                 JobStatus.retrying.name,
+                JobStatus.running.name,
               ]),
-        ))
-        .write(
-          db.JobsCompanion(
-            status: drift.Value(JobStatus.canceled.name),
-            finishedAt: drift.Value(DateTime.now()),
-          ),
-        );
+            ))
+            .get();
+    DateTime? earliest;
+    void consider(DateTime? candidate) {
+      if (candidate == null) return;
+      if (earliest == null || candidate.isBefore(earliest!)) {
+        earliest = candidate;
+      }
+    }
+
+    for (final row in rows) {
+      if (row.status == JobStatus.running.name) {
+        final startedAt = row.startedAt;
+        if (startedAt != null) consider(startedAt.add(staleGrace));
+      } else {
+        consider(row.nextRetryAt);
+      }
+    }
+    return earliest;
   }
 
   @override
   Future<int> resetStale(
     DateTime now, {
     Duration grace = const Duration(minutes: 2),
-  }) async {
+  }) {
     final cutoff = now.subtract(grace);
-    final staleJobIds =
-        await (_database.select(_database.jobs)..where(
-              (j) =>
-                  j.status.equals(JobStatus.running.name) &
-                  j.startedAt.isSmallerThanValue(cutoff),
-            ))
-            .get();
-    if (staleJobIds.isEmpty) return 0;
-
-    await (_database.update(_database.jobs)..where(
-          (j) =>
-              j.status.equals(JobStatus.running.name) &
-              j.startedAt.isSmallerThanValue(cutoff),
-        ))
-        .write(
-          db.JobsCompanion(
-            status: drift.Value(JobStatus.queued.name),
-            startedAt: const drift.Value(null),
-          ),
-        );
-    return staleJobIds.length;
+    return _recoverRunning(
+      now,
+      where: (j) =>
+          j.status.equals(JobStatus.running.name) &
+          j.startedAt.isSmallerThanValue(cutoff),
+      deferTo: null,
+    );
   }
 
   @override
-  Future<int> resetRunningAtStartup(DateTime now) async {
-    final rows = await (_database.select(
-      _database.jobs,
-    )..where((job) => job.status.equals(JobStatus.running.name))).get();
-    if (rows.isEmpty) return 0;
-    await (_database.update(
-      _database.jobs,
-    )..where((job) => job.status.equals(JobStatus.running.name))).write(
-      db.JobsCompanion(
-        status: drift.Value(JobStatus.queued.name),
-        startedAt: const drift.Value(null),
-        nextRetryAt: drift.Value(now),
+  Future<int> resetRunningAtStartup(DateTime now) {
+    return _recoverRunning(
+      now,
+      where: (j) => j.status.equals(JobStatus.running.name),
+      deferTo: now,
+    );
+  }
+
+  Future<int> _recoverRunning(
+    DateTime now, {
+    required drift.Expression<bool> Function(db.$JobsTable) where,
+    required DateTime? deferTo,
+  }) {
+    return _database.transaction(() async {
+      final rows = await (_database.select(_database.jobs)..where(where)).get();
+      var requeued = 0;
+      for (final row in rows) {
+        final target = _database.update(_database.jobs)
+          ..where((j) => j.id.equals(row.id));
+        if (row.attempts >= row.maxAttempts) {
+          await target.write(
+            _interruptedCompanion(
+              now,
+              clearPayload: row.type == JobTypes.aiGenerate,
+            ),
+          );
+        } else {
+          await target.write(
+            db.JobsCompanion(
+              status: drift.Value(JobStatus.queued.name),
+              startedAt: const drift.Value(null),
+              nextRetryAt: deferTo == null
+                  ? const drift.Value.absent()
+                  : drift.Value(deferTo),
+            ),
+          );
+          requeued++;
+        }
+      }
+      return requeued;
+    });
+  }
+
+  static db.JobsCompanion _interruptedCompanion(
+    DateTime now, {
+    bool clearPayload = false,
+  }) {
+    return db.JobsCompanion(
+      status: drift.Value(JobStatus.failed.name),
+      startedAt: const drift.Value(null),
+      finishedAt: drift.Value(now),
+      payload: clearPayload
+          ? const drift.Value(null)
+          : const drift.Value.absent(),
+      nextRetryAt: const drift.Value(null),
+      errorCode: const drift.Value('interrupted'),
+      errorMessage: const drift.Value(
+        'This task was interrupted and used all of its attempts. Please try again.',
       ),
     );
-    return rows.length;
   }
 
   static JobRecord _fromRow(db.Job row) {

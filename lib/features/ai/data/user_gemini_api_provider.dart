@@ -1,4 +1,4 @@
-/// User-provided Gemini API provider implementation (SSOT §5, §6).
+/// User-provided Gemini API provider implementation (legacy SSOT §5, §6 (PRODUCT.md §16.7)).
 ///
 /// Features:
 /// - Connects directly to Google Gemini API using the user's stored key.
@@ -7,6 +7,7 @@
 /// - Maps network and HTTP errors to strongly-typed [AppFailure] instances.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -69,13 +70,12 @@ class GeminiConnectionResult {
 
 class UserGeminiApiProvider implements AiMessageProvider {
   UserGeminiApiProvider({
-    required CredentialStorage credentialStorage,
+    required this._credentialStorage,
     AppLogger? logger,
     AiPromptBuilder? promptBuilder,
     HttpPostSender? httpSender,
     this.model = 'gemini-3.5-flash-lite',
-  }) : _credentialStorage = credentialStorage,
-       _logger = logger ?? ConsoleAppLogger(),
+  }) : _logger = logger ?? ConsoleAppLogger(),
        _promptBuilder = promptBuilder ?? const AiPromptBuilder(),
        _httpSender = httpSender ?? _defaultHttpSender;
 
@@ -135,6 +135,8 @@ class UserGeminiApiProvider implements AiMessageProvider {
       }, requestBody);
     } on SocketException {
       throw const AppFailure.networkUnavailable();
+    } on TimeoutException {
+      throw const AppFailure.timeout();
     } on HttpException catch (e, st) {
       _logger.error(
         'UserGeminiApiProvider',
@@ -338,14 +340,24 @@ class UserGeminiApiProvider implements AiMessageProvider {
     final client = HttpClient();
     client.connectionTimeout = const Duration(seconds: 15);
     try {
-      final request = await client.postUrl(uri);
-      headers.forEach((k, v) => request.headers.set(k, v));
-      request.add(utf8.encode(body));
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
-      return HttpResponsePayload(
-        statusCode: response.statusCode,
-        body: responseBody,
+      return await (() async {
+        final request = await client.postUrl(uri);
+        headers.forEach((k, v) => request.headers.set(k, v));
+        request.add(utf8.encode(body));
+        final response = await request.close();
+        final responseBody = await response.transform(utf8.decoder).join();
+        return HttpResponsePayload(
+          statusCode: response.statusCode,
+          body: responseBody,
+        );
+      })().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          // Future.timeout alone only stops awaiting the socket operation.
+          // Force-closing the client tears down the in-flight request too.
+          client.close(force: true);
+          throw TimeoutException('Gemini request timed out.');
+        },
       );
     } finally {
       client.close();

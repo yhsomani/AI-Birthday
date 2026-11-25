@@ -1,7 +1,13 @@
 import type { Firestore } from 'firebase-admin/firestore';
+import { logger } from 'firebase-functions/logger';
 
 import { safeAddMs } from '../domain/policies.js';
+import { safeErrorCategory } from './safeErrorCategory.js';
 import { ControlPlaneService } from './controlPlane.js';
+import { runBounded } from './runBounded.js';
+
+const SWEEP_CONCURRENCY = 4;
+const MAX_SWEEP_ITEMS = 20;
 
 export interface CoordinationOperationSweepResult {
   readonly completed: number;
@@ -26,16 +32,19 @@ export class CoordinationOperationOrchestrator {
 
   public async sweep(limit = 20): Promise<CoordinationOperationSweepResult> {
     const nowMs = this.clock();
+    const boundedLimit = Number.isFinite(limit)
+      ? Math.min(Math.max(Math.floor(limit), 1), MAX_SWEEP_ITEMS)
+      : MAX_SWEEP_ITEMS;
     const operations = await this.db
       .collection('coordinationOperationFences')
       .where('nextSweepAtMs', '<=', nowMs)
       .orderBy('nextSweepAtMs', 'asc')
-      .limit(limit)
+      .limit(boundedLimit)
       .get();
     let completed = 0;
     let pending = 0;
     let failed = 0;
-    for (const operation of operations.docs) {
+    await runBounded(operations.docs, SWEEP_CONCURRENCY, async operation => {
       const requestKeyValue = operation.get('requestKey') as unknown;
       const expectedRequestKey =
         typeof requestKeyValue === 'string' &&
@@ -59,15 +68,18 @@ export class CoordinationOperationOrchestrator {
               : nowMs,
           );
         }
-      } catch {
+      } catch (error) {
         failed += 1;
+        logger.error('coordination_operation_sweep_item_failed', {
+          errorType: safeErrorCategory(error),
+        });
         await this.controlPlane.deferCoordinationOperation(
           operation.id,
           expectedRequestKey,
           nowMs,
         );
       }
-    }
+    });
     return { completed, pending, failed };
   }
 }

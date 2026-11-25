@@ -50,10 +50,10 @@ Future<void> main() async {
 
   var passedCount = 0;
 
-  // 1. Birthday Calculations & SSOT §14 Leap Day Rules
+  // 1. Birthday Calculations & legacy SSOT §14 (PRODUCT.md §16.7) Leap Day Rules
   {
     print(
-      '\n[1/6] Testing Birthday Date & Leap Day Calculations (SSOT §14)...',
+      '\n[1/6] Testing Birthday Date & Leap Day Calculations (legacy SSOT §14 (PRODUCT.md §16.7))...',
     );
 
     final standard = Birthday.calculateOccurrenceDate(
@@ -145,10 +145,10 @@ Future<void> main() async {
     passedCount++;
   }
 
-  // 2. Strict Prompt Builder Policy (SSOT §21)
+  // 2. Strict Prompt Builder Policy (legacy SSOT §21 (PRODUCT.md §16.7))
   {
     print(
-      '\n[2/6] Testing AI Prompt Builder Policy & Guardrails (SSOT §21)...',
+      '\n[2/6] Testing AI Prompt Builder Policy & Guardrails (legacy SSOT §21 (PRODUCT.md §16.7))...',
     );
     const builder = AiPromptBuilder();
 
@@ -226,10 +226,10 @@ Future<void> main() async {
     passedCount++;
   }
 
-  // 3. AI Router Rules (SSOT §5)
+  // 3. AI Router Rules (legacy SSOT §5 (PRODUCT.md §16.7))
   {
     print(
-      '\n[3/6] Testing AI Router Entitlement & Provider Routing Rules (SSOT §5)...',
+      '\n[3/6] Testing AI Router Entitlement & Provider Routing Rules (legacy SSOT §5 (PRODUCT.md §16.7))...',
     );
     final storage = InMemoryCredentialStorage();
     final mockGemini = MockAiProvider(
@@ -327,9 +327,11 @@ Future<void> main() async {
     passedCount++;
   }
 
-  // 4. WhatsApp Handoff Builder (SSOT §9)
+  // 4. WhatsApp Handoff Builder (legacy SSOT §9 (PRODUCT.md §16.7))
   {
-    print('\n[4/6] Testing WhatsApp Click-to-Chat Handoff (SSOT §9)...');
+    print(
+      '\n[4/6] Testing WhatsApp Click-to-Chat Handoff (legacy SSOT §9 (PRODUCT.md §16.7))...',
+    );
     const builder = WhatsAppHandoffBuilder();
 
     // International phone number cleaning
@@ -381,9 +383,11 @@ Future<void> main() async {
     passedCount++;
   }
 
-  // 5. Credential Storage & Security (SSOT §20)
+  // 5. Credential Storage & Security (legacy SSOT §20 (PRODUCT.md §16.7))
   {
-    print('\n[5/6] Testing Credential Storage (SSOT §20)...');
+    print(
+      '\n[5/6] Testing Credential Storage (legacy SSOT §20 (PRODUCT.md §16.7))...',
+    );
     final storage = InMemoryCredentialStorage();
 
     assertTrue(!(await storage.hasGeminiApiKey()), 'Initially has no key');
@@ -410,10 +414,10 @@ Future<void> main() async {
     passedCount++;
   }
 
-  // 6. Logging Sanitization & PII Protection (SSOT §23)
+  // 6. Logging Sanitization & PII Protection (legacy SSOT §23 (PRODUCT.md §16.7))
   {
     print(
-      '\n[6/6] Testing Logging Sanitization & PII Protection (SSOT §23)...',
+      '\n[6/6] Testing Logging Sanitization & PII Protection (legacy SSOT §23 (PRODUCT.md §16.7))...',
     );
     final recordingLogger = RecordingLogger();
 

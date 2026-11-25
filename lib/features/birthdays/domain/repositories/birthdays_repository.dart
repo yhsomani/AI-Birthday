@@ -9,6 +9,10 @@ abstract interface class BirthdaysRepository {
   Future<Birthday?> getBirthdayForPerson(String personId);
   Future<void> saveBirthday(Birthday birthday);
   Future<void> rolloverBirthday(Birthday birthday);
+  Future<void> mergeDuplicateBirthdays(
+    Birthday birthday, {
+    required List<String> duplicateIds,
+  });
   Future<void> updateBirthdayStatus(
     String id,
     BirthdayStatus status, {
@@ -62,6 +66,17 @@ class InMemoryBirthdaysRepository implements BirthdaysRepository {
   Future<void> rolloverBirthday(Birthday birthday) => saveBirthday(birthday);
 
   @override
+  Future<void> mergeDuplicateBirthdays(
+    Birthday birthday, {
+    required List<String> duplicateIds,
+  }) async {
+    for (final id in duplicateIds) {
+      _store.remove(id);
+    }
+    await saveBirthday(birthday);
+  }
+
+  @override
   Future<void> updateBirthdayStatus(
     String id,
     BirthdayStatus status, {
@@ -92,7 +107,7 @@ class InMemoryBirthdaysRepository implements BirthdaysRepository {
 
   List<Birthday> _sortedBirthdays() {
     final list = _store.values.toList();
-    list.sort((a, b) => a.date.compareTo(b.date));
+    list.sort(Birthday.compareByDate);
     return list;
   }
 }

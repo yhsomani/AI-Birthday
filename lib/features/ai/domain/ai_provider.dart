@@ -1,4 +1,4 @@
-/// Abstract AI Provider interface for message generation (SSOT §4, §5).
+/// Abstract AI Provider interface for message generation (legacy SSOT §4, §5 (PRODUCT.md §16.7)).
 library;
 
 import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';

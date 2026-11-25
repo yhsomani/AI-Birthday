@@ -1,4 +1,4 @@
-/// Relationship metadata for recipients in AI-Birthday (SSOT §7).
+/// Relationship metadata for recipients in AI-Birthday (legacy SSOT §7 (PRODUCT.md §16.7)).
 library;
 
 /// High-level category of relationship to the user.

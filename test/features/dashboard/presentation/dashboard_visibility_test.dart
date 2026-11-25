@@ -155,5 +155,42 @@ void main() {
 
       expect(find.text('No phone number'), findsOneWidget);
     });
+
+    testWidgets(
+      'shows a see-all route when more than five birthdays are upcoming',
+      (tester) async {
+        final now = DateTime.now();
+        final people = [
+          for (var index = 0; index < 6; index++)
+            Person(
+              id: 'person-$index',
+              name: 'Person $index',
+              birthdayMonth: now.add(Duration(days: index + 8)).month,
+              birthdayDay: now.add(Duration(days: index + 8)).day,
+              createdAt: now,
+              updatedAt: now,
+            ),
+        ];
+        final birthdays = [
+          for (var index = 0; index < 6; index++)
+            Birthday(
+              id: 'birthday-$index',
+              personId: people[index].id,
+              cycleYear: now.add(Duration(days: index + 8)).year,
+              date: DateTime(
+                now.add(Duration(days: index + 8)).year,
+                now.add(Duration(days: index + 8)).month,
+                now.add(Duration(days: index + 8)).day,
+              ),
+              createdAt: now,
+              updatedAt: now,
+            ),
+        ];
+
+        await pumpDashboard(tester, people: people, birthdays: birthdays);
+
+        expect(find.text('See all birthdays'), findsOneWidget);
+      },
+    );
   });
 }

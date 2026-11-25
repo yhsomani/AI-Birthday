@@ -1,4 +1,4 @@
-/// Native Android Share Chooser service (SSOT §10).
+/// Native Android Share Chooser service (legacy SSOT §10 (PRODUCT.md §16.7)).
 library;
 
 import 'package:flutter/services.dart';

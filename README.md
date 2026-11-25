@@ -1,261 +1,73 @@
-# AI-Birthday 🎂
+# AI-Birthday
 
-> **A local-first personal birthday assistant with AI-assisted, user-controlled messaging.**
+AI-Birthday is a **local-first Android app that helps you remember people's birthdays and send personal wishes**. It keeps your birthday records on the device, reminds you in time, helps you draft a message (manually or with AI you control), and hands the message to WhatsApp, SMS or the share sheet **for you to review and send**. It never claims a message was delivered unless you confirm it.
 
-AI-Birthday is a Flutter & Android application engineered to help you remember important birthdays and compose personalized wishes tailored to each relationship. Birthday and contact data is stored locally by default. Cloud backup is optional and, when enabled, stores the app's saved people, birthday cycles, message drafts, and reminder settings in the app's Firestore project under the signed-in user's account.
+> **Status (snapshot `c4aace16` plus uncommitted fixes, 2026-11-25).** The Flutter app builds and its automated tests pass (`flutter analyze` clean; 653 Flutter tests; 91 backend unit tests; 12 hosting tests). The Firebase backend and the public Hosting site are source-complete but **their deployment is not evidenced** in this repository. No device or emulator end-to-end run, release build or production verification was performed. See [IMPLEMENTATION.md](IMPLEMENTATION.md) for exactly what is verified and what is not.
 
----
+## Main capabilities
 
-## 🌟 Key Highlights & Architecture Principles
-
-- **Local-First SQLite Persistence**: Powered by [Drift](https://drift.simonbinder.eu/) SQLite on-device storage. Fast queries, offline-first reliability, and reactive UI streams.
-- **Privacy & Transparent Data Architecture**: Contact names, phone numbers, birthdates, notes, drafts, and reminder settings remain local by default. Cloud Backup is opt-in and account-scoped to the authenticated Firebase UID.
-- **Credential Security**: User Gemini API keys are stored through `flutter_secure_storage` and are not written to the SQLite database or cloud backup.
-- **Bring-Your-Own-Key (BYOK) & On-Device AI Routing**:
-  - Direct client-to-API inference via a current stable Google Gemini Flash-Lite model.
-  - Native Android platform channel bridge for Gemini Nano (Google AICore / ML Kit GenAI), truthfully reported as unavailable until on-device model weights are loaded and verified.
-  - Strict Prompt Boundary: recipient facts, drafts, and custom rewrite requests are passed as user data, not executable instructions; the prompt explicitly forbids invented personal details.
-- **Native Android Notification Delivery**: Real exact alarms scheduled via `AlarmManager` with high-priority notification channels and customizable Quiet Hours (e.g., 22:00–08:00) that respect sleep schedules. Clean cancellation of scheduled `PendingIntent`s upon disabling.
-- **Human-in-the-Loop WhatsApp Handoff**: The application never sends messages autonomously. It constructs pre-filled WhatsApp deep links, opens native WhatsApp for user inspection, and transitions to completed only after explicit user confirmation.
-
----
-
-## 🏗️ System Architecture
-
-```mermaid
-flowchart TD
-    subgraph UI ["Flutter Presentation Layer"]
-        Dashboard["Dashboard & Home Feed"]
-        People["People & Birthday Directory"]
-        Calendar["Interactive Calendar"]
-        Studio["Message Studio"]
-        History["Celebration History"]
-        Settings["Settings & Preferences"]
-    end
-
-    subgraph State ["Riverpod State & Domain Services"]
-        RP["StreamProviders & StateNotifiers"]
-        AI_Router["AI Router (BYOK & Nano)"]
-        Reminder_Svc["Reminder Scheduler & Service"]
-        WA_Builder["WhatsApp Handoff Builder"]
-    end
-
-    subgraph Persistence ["Local Storage & Hardware Security"]
-        Drift["SQLite Database (Drift Engine)"]
-        Keystore["Android KeyStore (EncryptedPrefs)"]
-    end
-
-    subgraph Native ["Android Native Layer (Kotlin)"]
-        MethodChannel["MethodChannel Bridge"]
-        AlarmMgr["Android AlarmManager"]
-        NotifReceiver["BirthdayNotificationReceiver"]
-        AICore["Google AICore / ML Kit Nano Bridge"]
-    end
-
-    UI --> RP
-    RP --> Drift
-    RP --> AI_Router
-    RP --> Reminder_Svc
-    RP --> WA_Builder
-    AI_Router --> Keystore
-    AI_Router --> MethodChannel
-    Reminder_Svc --> MethodChannel
-    MethodChannel --> AlarmMgr
-    AlarmMgr --> NotifReceiver
-    MethodChannel --> AICore
-```
-
----
-
-## 📱 Feature Overview
-
-### 1. Unified Dashboard
-- **Today's Celebrations**: Instant hero banners for birthdays happening today with quick action to open Message Studio.
-- **Upcoming Feed**: Chronologically sorted birthdays within a 30-day window with real-time countdown chips (`in X days`).
-- **Action Needed**: Visual indicators for upcoming birthdays requiring attention.
-- **Quick Actions**: One-tap shortcuts to Add Person or Browse Calendar.
-
-### 2. Recipient Management
-- Full CRUD operations with soft-delete and instant **Undo** snackbar.
-- Supports comprehensive metadata: Full Name, Month/Day, optional Birth Year (calculates milestone ages), Phone Number (E.164 normalized), Relationship Category (Family, Friend, Colleague, Partner, Other), Relationship Closeness, Preferred Tone, Preferred Language, and Important Facts.
-- Full Gregorian leap-year handling (Feb 29 birthdays correctly resolve in leap and non-leap years).
-
-### 3. Interactive Birthday Calendar
-- Visual month grid view with responsive day cells.
-- Colored event dot indicators for birthdays.
-- Multi-month navigation with automatic today highlight.
-- Bottom sheet breakdown of all celebrations occurring in the selected month.
-
-### 4. Message Studio
-- **Personalized AI Generation**: Uses the configured AI route, subject to the app's subscription entitlement. When a user Gemini API key is configured, requests go directly to Google's Gemini API; Gemini Nano is used when the supported on-device route is available.
-- **Tone Selector**: Warm, Playful, Formal, Short, or Heartfelt.
-- **Relationship Context**: Incorporates relationship closeness and verified user facts.
-- **Editing & Polishing**: Full draft editing, copy-to-clipboard, and regenerate controls.
-
-### 5. Native WhatsApp Delivery Flow
-- Formats E.164 phone numbers and encodes custom greeting messages into official WhatsApp URL schemes.
-- Launches native WhatsApp app or WhatsApp Business (`com.whatsapp`, `com.whatsapp.w4b`).
-- Post-send confirmation dialog updates database draft status to `confirmedSent` and birthday status to `completed`.
-
-### 6. Local Notifications & Exact Alarms
-- Configurable reminder milestones: 7 days before, 2 days before, 1 day before, and Birthday Day.
-- Night Quiet Hours window (defaults to 22:00 – 08:00) prevents notifications from disturbing sleep.
-- Android 13+ runtime notification permissions (`POST_NOTIFICATIONS`) and Android 12+ exact alarm scheduling (`SCHEDULE_EXACT_ALARM`).
-
-### 7. Automatic Birthday SMS (Gated; Not Currently Available)
-- The automatic-SMS capability is disabled by default in Dart and hard-disabled in the Android sender. Scheduling or delivery is not currently available in either flavor.
-- The `play` flavor excludes `android.permission.SEND_SMS`; the `personal` flavor declares it but remains disabled. Manual SMS composer handoff is a separate user-initiated flow.
-- The planned Android capability requires explicit opt-in for each recipient and approval of the exact message before any occurrence can be scheduled. Edits, destination changes, or revocation must cancel and invalidate pending work.
-- Google Play eligibility is not established by this repository. If policy/review does not allow automatic SMS in Play, that flavor must retain manual handoff; automatic sending may only be enabled in explicitly eligible variants after policy, safety, and physical-device validation.
-
----
-
-## 🛠️ Development Setup
-
-### Prerequisites
-- [Flutter SDK](https://flutter.dev/docs/get-started/install) compatible with the repository SDK constraint (`Dart >=3.11.0`); CI currently verifies with Flutter 3.47.6
-- [Android SDK](https://developer.android.com/studio) with API 35 (Android 15) and build-tools
-- Java 17 (Zulu or OpenJDK)
-- Physical Android device or Emulator
-
-### Installation & Run
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/yhsomani/AI-Birthday.git
-   cd AI-Birthday
-   ```
-
-2. **Install Flutter dependencies:**
-   ```bash
-   flutter pub get
-   ```
-
-3. **Generate Drift SQLite code (if modifying schema):**
-   ```bash
-   dart run build_runner build --delete-conflicting-outputs
-   ```
-
-4. **Run static analysis and tests:**
-   ```bash
-   dart analyze
-   flutter test
-   ```
-
-5. **Build and install flavors:**
-   - **Personal flavor (automatic SMS remains disabled):**
-     ```bash
-     flutter build apk --flavor personal --debug
-     # Or using the root installation script:
-     build-and-install-android.bat personal
-     ```
-   - **Google Play Store flavor (strictly zero SEND_SMS):**
-     ```bash
-     flutter build apk --flavor play --release
-     build-and-install-android.bat play
-     ```
-
-### Google Sign-In setup (SHA-1 fingerprints)
-
-Google Sign-In fails on a device if the signing certificate (SHA-1) of the
-build you run is not registered for the Firebase/Google Cloud project. The
-typical symptom is `GoogleSignInException ... [16] Account reauth failed.`
-right after picking an account.
-
-1. Read the SHA-1 of every keystore you sign with:
-
-   ```bash
-   # Debug keystore (~/.android/debug.keystore), password "android"
-   keytool -list -v -keystore "%USERPROFILE%\.android\debug.keystore" -alias androiddebugkey -storepass android
-
-   # Release keystore
-   keytool -list -v -keystore /path/to/release.keystore -alias <alias>
-   ```
-
-2. In [Firebase Console](https://console.firebase.google.com/) → Project
-   settings → Your apps → Android app (`com.yashsomani.ai_birthday`), add each
-   SHA-1. Register the debug SHA-1 too — without it, `flutter run` builds can
-   never sign in, only release builds can.
-3. Download the updated `google-services.json` into `android/app/` if the
-   console offers it, then rebuild.
-
-The Firebase web API key ships in `google-services.json` and is a public
-project identifier, not a secret. Release/CI builds may override it with
-`--dart-define=FIREBASE_WEB_API_KEY=...`.
-
----
-
-## 🧪 Quality Assurance & Test Suite
-
-The repository contains unit, domain, repository, widget, integration, E2E, and backend tests covering:
-  - Guided 3-step onboarding flow and state persistence
-  - Calendar math and leap year resolution (`BirthdayEngine`)
-  - Drift SQLite persistence & sync envelope with version increments and field preservation
-  - Redaction of sensitive credentials (`AppLogger`, `SecureCredentialStorage`)
-  - Subscription verification truthfulness (no local Pro fallback grants)
-  - Cloud Backup verified write success checks and auth headers
-  - Delivery status truthfulness (`handedOff` vs `confirmedSent`)
-  - AI prompt construction and model fallback routing
-  - WhatsApp deep-link generation and validation
-  - Reminder scheduler, exact alarm pending intent cancellation, and quiet-hours windowing
-  - Full UI flows and widget navigation
-- **Backend Verification**: Vitest coverage includes Firestore authorization rules, deletion workflows, privacy policies, transport validation, and subscription verification. CI must be used as the execution evidence for current pass/fail status.
-
----
-
-## 🔒 Security & Privacy Practices
-
-1. **Default Local Storage**: Contact names, relationships, phone numbers, and birth dates remain local unless the user explicitly uses cloud backup or an external delivery/AI feature that requires the data.
-2. **Secure API Key Storage**: Gemini API keys are stored through `flutter_secure_storage`; the key is not included in normal database or cloud-backup records.
-3. **Structured Log Redaction**: Internal logger (`ConsoleAppLogger`) automatically redacts API keys, phone numbers, and authentication tokens before printing.
-4. **Release Signing**: Release builds do not fall back to the debug signing key. A Play-ready signed artifact requires release keystore configuration in the build environment.
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-## 🧭 Source-linked feature knowledge base
-
-> **[Explore the complete project knowledge portal](docs/knowledge/README.md)** — verified-source feature taxonomy, recursive micro/nano decomposition, user journeys, navigation, data flows, evidence references and improvement findings.
-
-| Explore | Documentation |
+| Area | What the current source provides |
 |---|---|
-| Feature hierarchy, atomic responsibilities and code locations | [Functional tree](docs/knowledge/features/README.md) |
-| All major routes and step-by-step user journeys | [Navigation & journeys](docs/knowledge/journeys/README.md) |
-| Frontend-to-service execution, backend boundaries and data lineage | [Architecture & technical flows](docs/knowledge/architecture/README.md) |
-| Known gaps, contradictions, risk priorities and TO-BE improvements | [Gap register](docs/knowledge/gaps/README.md) |
-| Searchable machine-readable features and statuses | [Feature registry](docs/knowledge/feature-registry.json) |
-| How to maintain and validate the knowledge system | [Documentation maintenance](docs/knowledge/maintenance/README.md) |
+| People | Create, edit, search, filter, soft-delete with undo; CSV and Android-contacts import with per-row review; CSV export |
+| Birthdays | Calendar-date occurrences with per-person timezone and a per-person Feb 29 choice (Feb 28 or Mar 1) |
+| Reminders | Local notifications with exact alarms, quiet hours, re-planned at app start and on resume |
+| Message Studio | Autosaved drafts, durable AI jobs, tone and length controls, manual writing always available |
+| AI (entitlement-first) | Bring-your-own Gemini key or on-device Gemini Nano, both only with an active app entitlement; bounded timeouts and typed failures |
+| Delivery | WhatsApp, SMS composer and share/copy hand-offs; an explicit, separate "I sent it" confirmation; Activity history |
+| Account (optional) | Google sign-in, Play Billing with server-side verification, opt-in cloud backup and restore (owner-scoped Firestore, **not** end-to-end encrypted) |
+| Backend and site (separate) | Firebase Functions (purchase verification, account deletion, a sender-coordination control plane with no mobile caller) and a static Hosting site (privacy, terms, support, account deletion) |
 
-### Current structure (conceptual)
+Automatic SMS and automatic message preparation are **disabled by default and not available as end-to-end features**. Supported platform: **Android** (Flutter; flavors `play` and `personal`). There is no iOS target in this repository.
+
+## Technology stack
+
+Flutter and Dart (`>=3.12.0 <4.0.0`), Riverpod, go_router, Drift/SQLite (schema v7), flutter_secure_storage, Firebase (Auth, App Check, Firestore, Functions), Google Play Billing (`in_app_purchase`), Kotlin native layer (notifications, alarms, Gemini Nano bridge, gated SMS adapter), TypeScript backend (Functions, Vitest) and a Vite/TypeScript Hosting site. Exact versions: [pubspec.yaml](pubspec.yaml), [backend/functions/package.json](backend/functions/package.json), [backend/hosting/package.json](backend/hosting/package.json).
+
+## Repository structure
 
 ```text
-AI-Birthday
-├── First-use & experience
-│   ├── Onboarding, dashboard, navigation, settings
-│   └── Calendar & history
-├── Remember
-│   ├── People (create/edit/delete/import/export)
-│   └── Birthday (recurrence/timezone/leap day/lifecycle)
-├── Prepare
-│   ├── Reminders (rules/quiet hours/native alarms)
-│   └── Durable background jobs
-├── Personalize
-│   ├── Message Studio (manual editing/autosave/rewrite)
-│   └── AI providers (user Gemini key / entitled Nano)
-├── Deliver (user-controlled)
-│   ├── WhatsApp / SMS / Share handoff
-│   └── Explicit sent confirmation
-├── Optional account services
-│   ├── Google/Firebase identity, Play billing
-│   └── Cloud backup/restore
-└── Separate backend and hosting services
-    ├── Firebase coordination control plane
-    └── Public support/legal/account-deletion site
+lib/                  Flutter app: app/ (shell, router, providers), core/ (database, config, security, logging),
+                      features/<module>/ (people, birthdays, reminders, calendar, dashboard, message_studio, ai,
+                      delivery, jobs, history, settings, auth, subscription, sync, onboarding), shared/ (design system)
+android/              Gradle build, flavors, Kotlin native code
+test/, integration_test/   Dart unit, widget, end-to-end and golden tests
+backend/functions/    Firebase Functions (TypeScript) and Vitest suites
+backend/hosting/      Public Hosting site (Vite/TypeScript) and Node tests
+backend/              firebase.json, Firestore rules and indexes
+docs/graph/           Machine-readable feature registry, project graph, traceability, migration record, validators
+.github/workflows/    CI
 ```
 
-**Evidence and limitations:** this map was created from the repository at [`75b9d91`](https://github.com/yhsomani/AI-Birthday/commit/75b9d91aadcc1c4136fdcb2c06340d3744bc50a4). “Implemented” means source code is present, not that real-device behavior or deployment is verified. The Firebase coordination backend is documented separately and must **not** be conflated with autonomous personal WhatsApp messaging. See the [knowledge portal](docs/knowledge/README.md) for distinctions between source, requirements, CI and runtime evidence.
+## Quick start
+
+Prerequisites, toolchain versions and every command with its caveats are in [OPERATIONS.md](OPERATIONS.md). In short:
+
+```bash
+flutter pub get
+flutter run --flavor personal            # or --flavor play
+flutter analyze && flutter test --exclude-tags golden
+(cd backend/functions && npm ci && npm run check)
+(cd backend/hosting && npm ci && npm run check)
+python3 docs/graph/tools/validate_docs.py   # documentation, registry and graph validation
+```
+
+Google sign-in, Firebase and Play Billing require project-specific configuration (SHA-1 fingerprints, `google-services.json`, `FIREBASE_WEB_API_KEY`); see [OPERATIONS.md §2](OPERATIONS.md#2-local-development) and [§13](OPERATIONS.md#13-play-billing-and-purchases-setup). No secrets belong in the repository.
+
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| [PRODUCT.md](PRODUCT.md) | Single source of truth for intended behaviour: vision, users, journeys, features, requirements, UX, business rules, decisions and open decisions |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System, data and API architecture, data flows, integrations, ADRs |
+| [SECURITY.md](SECURITY.md) | Trust boundaries, privacy, access control, threat model, security gaps |
+| [IMPLEMENTATION.md](IMPLEMENTATION.md) | Verified implementation status, issue register, tests, technical debt, release readiness |
+| [OPERATIONS.md](OPERATIONS.md) | Setup, build, test, database migrations, CI/CD, deployment, runbooks, documentation maintenance |
+| [PROJECT_MINDMAP.md](PROJECT_MINDMAP.md) | Generated master graph: hierarchy, journeys, navigation, API and module dependencies |
+| [backend/README.md](backend/README.md), [backend/hosting/README.md](backend/hosting/README.md) | Package-level guides for the Functions and Hosting packages |
+| [docs/graph/](docs/graph/) | Supporting feature registry, project graph data, traceability matrix, documentation migration record |
+
+Source code and execution evidence decide what is implemented; PRODUCT.md decides what is intended; discrepancies are reported in IMPLEMENTATION.md. Older documentation (blueprints, audits, archives, design notes) was consolidated into these documents; the removed files remain in Git history at commit `c4aace16`, and [docs/graph/migration-matrix.csv](docs/graph/migration-matrix.csv) records where each preserved item went.
+
+## License
+
+No `LICENSE` file is present in this repository. Licensing is an open decision (see [PRODUCT.md §14](PRODUCT.md#14-open-decisions-and-unresolved-questions)). Bundled fonts (Outfit, Bricolage Grotesque) are under the SIL Open Font License; their texts are in [assets/fonts/](assets/fonts/).

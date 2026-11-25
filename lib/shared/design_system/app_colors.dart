@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Centralized semantic color tokens for AI-Birthday (SSOT §3, §22).
+/// Centralized semantic color tokens for AI-Birthday (legacy SSOT §3, §22 (PRODUCT.md §16.7)).
 ///
 /// Clean, warm, and editorial. Strictly avoids generic neon gradients or arbitrary hues.
 class AppColors {
@@ -16,6 +16,9 @@ class AppColors {
   static const Color accentAmberLight = Color(0xFFF0A65B);
   static const Color accentAmberContainer = Color(0xFFFEF3E7);
 
+  /// Amber for text on [accentAmberContainer] (4.9:1; [accentAmber] is 2.7:1).
+  static const Color accentAmberOnContainer = Color(0xFFA35700);
+
   static const Color accentForest = Color(0xFF2D5A46);
   static const Color accentForestLight = Color(0xFF4E8B6D);
   static const Color accentForestContainer = Color(0xFFE8F2EC);
@@ -26,7 +29,8 @@ class AppColors {
   static const Color lightSurfaceVariant = Color(0xFFF2ECE4);
   static const Color lightBorder = Color(0xFFE5DDD3);
   static const Color lightTextPrimary = Color(0xFF1C1917);
-  static const Color lightTextSecondary = Color(0xFF78716C);
+  // 5.0:1 on lightSurfaceVariant, 5.5:1 on lightBackground (was 4.1:1).
+  static const Color lightTextSecondary = Color(0xFF6A635E);
 
   // Dark surfaces (Warm Charcoal / Espresso)
   static const Color darkBackground = Color(0xFF161413);

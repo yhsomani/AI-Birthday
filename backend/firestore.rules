@@ -2,57 +2,251 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // True while the server has fenced this account for deletion. The presence
-    // document is server-only; get() reads it without client read access.
     function deletionInProgress(userId) {
-      return exists(/databases/$(database)/documents/coordinationPresence/$(userId)) &&
-        get(/databases/$(database)/documents/coordinationPresence/$(userId)).data.state == 'DELETING';
+      return exists(/databases/$(database)/documents/deletionTombstones/$(userId)) ||
+        (exists(/databases/$(database)/documents/coordinationPresence/$(userId)) &&
+          get(/databases/$(database)/documents/coordinationPresence/$(userId)).data.state == 'DELETING');
     }
 
-    // Entitlement status is readable only by the authenticated owner, writable only by server.
-    match /users/{userId}/entitlement/{document=**} {
+    function ownerAccess(userId) {
+      return request.auth != null && request.auth.uid == userId &&
+        !deletionInProgress(userId);
+    }
+
+    function hasOnlyKeys(data, allowed) {
+      return data.keys().hasOnly(allowed);
+    }
+
+    function hasRequiredKeys(data, required) {
+      return data.keys().hasAll(required);
+    }
+
+    function stringAtMost(data, field, maximum) {
+      return data.get(field, '') is string && data.get(field, '').size() <= maximum;
+    }
+
+    function optionalStringAtMost(data, field, maximum) {
+      return !(field in data) || stringAtMost(data, field, maximum);
+    }
+
+    function optionalIntegerInRange(data, field, minimum, maximum) {
+      return !(field in data) ||
+        (data.get(field, 0) is int &&
+          data.get(field, 0) >= minimum &&
+          data.get(field, 0) <= maximum);
+    }
+
+    function validPerson(data, documentId) {
+      return hasRequiredKeys(data, [
+          'id', 'name', 'relationship', 'relationshipCloseness',
+          'preferredLanguage', 'preferredTone', 'importantFacts',
+          'preferredDeliveryChannel', 'autoPrepare', 'autoSendPolicy',
+          'createdAt', 'updatedAt', 'version'
+        ]) &&
+        hasOnlyKeys(data, [
+          'id', 'name', 'birthdayMonth', 'birthdayDay', 'birthYear',
+          'leapDayResolution', 'phoneNumber', 'email', 'relationship',
+          'relationshipCloseness', 'preferredLanguage', 'preferredTone',
+          'importantFacts', 'notes', 'preferredDeliveryChannel', 'timezone',
+          'autoPrepare', 'autoSendPolicy', 'createdAt', 'updatedAt',
+          'version', 'deletedAt'
+        ]) &&
+        data.id is string && data.id == documentId &&
+        stringAtMost(data, 'name', 200) &&
+        stringAtMost(data, 'relationship', 100) &&
+        stringAtMost(data, 'relationshipCloseness', 100) &&
+        stringAtMost(data, 'preferredLanguage', 32) &&
+        stringAtMost(data, 'preferredTone', 64) &&
+        stringAtMost(data, 'importantFacts', 4096) &&
+        stringAtMost(data, 'preferredDeliveryChannel', 64) &&
+        stringAtMost(data, 'autoSendPolicy', 64) &&
+        stringAtMost(data, 'createdAt', 40) &&
+        stringAtMost(data, 'updatedAt', 40) &&
+        optionalStringAtMost(data, 'leapDayResolution', 64) &&
+        optionalStringAtMost(data, 'phoneNumber', 40) &&
+        optionalStringAtMost(data, 'email', 320) &&
+        optionalStringAtMost(data, 'notes', 4096) &&
+        optionalStringAtMost(data, 'timezone', 100) &&
+        optionalStringAtMost(data, 'deletedAt', 40) &&
+        data.autoPrepare is bool &&
+        data.version is int && data.version >= 0 &&
+        optionalIntegerInRange(data, 'birthdayMonth', 1, 12) &&
+        optionalIntegerInRange(data, 'birthdayDay', 1, 31) &&
+        optionalIntegerInRange(data, 'birthYear', 0, 9999);
+    }
+
+    function validBirthday(data, documentId) {
+      return hasRequiredKeys(data, [
+          'id', 'personId', 'personName', 'cycleYear', 'date', 'status',
+          'createdAt', 'updatedAt'
+        ]) &&
+        hasOnlyKeys(data, [
+          'id', 'personId', 'personName', 'cycleYear', 'date', 'status',
+          'draftId', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id == documentId &&
+        stringAtMost(data, 'personId', 128) &&
+        stringAtMost(data, 'personName', 200) &&
+        data.cycleYear is int && data.cycleYear >= 0 && data.cycleYear <= 9999 &&
+        stringAtMost(data, 'date', 32) &&
+        stringAtMost(data, 'status', 64) &&
+        optionalStringAtMost(data, 'draftId', 128) &&
+        stringAtMost(data, 'createdAt', 40) &&
+        stringAtMost(data, 'updatedAt', 40);
+    }
+
+    function validDraft(data, documentId) {
+      return hasRequiredKeys(data, [
+          'id', 'birthdayId', 'personId', 'body', 'tone', 'length', 'status',
+          'providerType', 'variationIndex', 'createdAt', 'updatedAt'
+        ]) &&
+        hasOnlyKeys(data, [
+          'id', 'birthdayId', 'personId', 'body', 'tone', 'length', 'status',
+          'providerType', 'variationIndex', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id == documentId &&
+        stringAtMost(data, 'birthdayId', 128) &&
+        stringAtMost(data, 'personId', 128) &&
+        data.body is string &&
+        stringAtMost(data, 'tone', 64) &&
+        stringAtMost(data, 'length', 64) &&
+        stringAtMost(data, 'status', 64) &&
+        stringAtMost(data, 'providerType', 64) &&
+        data.variationIndex is int && data.variationIndex >= 0 &&
+        stringAtMost(data, 'createdAt', 40) &&
+        stringAtMost(data, 'updatedAt', 40);
+    }
+
+    function validReminderSettings(data, documentId) {
+      return hasRequiredKeys(data, [
+          'key', 'enabled', 'kinds', 'quietHoursStartMinutes',
+          'quietHoursEndMinutes'
+        ]) &&
+        hasOnlyKeys(data, [
+          'key', 'enabled', 'kinds', 'quietHoursStartMinutes',
+          'quietHoursEndMinutes'
+        ]) &&
+        data.key is string && data.key == documentId &&
+        data.enabled is bool &&
+        stringAtMost(data, 'kinds', 256) &&
+        data.quietHoursStartMinutes is int &&
+        data.quietHoursStartMinutes >= 0 &&
+        data.quietHoursStartMinutes < 1440 &&
+        data.quietHoursEndMinutes is int &&
+        data.quietHoursEndMinutes >= 0 &&
+        data.quietHoursEndMinutes < 1440;
+    }
+
+    function validLegacyGenerationId(generationId) {
+      return generationId.matches('^g[0-9]{1,16}$');
+    }
+
+    function validRandomizedGenerationId(generationId) {
+      return generationId.matches('^g[0-9]{1,16}-[0-9a-f]{1,8}$');
+    }
+
+    function validGenerationId(generationId) {
+      return validLegacyGenerationId(generationId) ||
+        validRandomizedGenerationId(generationId);
+    }
+
+    function validGenerationCounts(data) {
+      return data.people is int && data.people >= 0 && data.people <= 1000000 &&
+        data.birthdays is int && data.birthdays >= 0 && data.birthdays <= 1000000 &&
+        data.drafts is int && data.drafts >= 0 && data.drafts <= 1000000 &&
+        data.reminderSettings is int &&
+        data.reminderSettings >= 0 && data.reminderSettings <= 1000000;
+    }
+
+    function validGenerationManifest(data, generationId) {
+      return data.schemaVersion is int &&
+        data.generationId is string && data.generationId == generationId &&
+        ((data.schemaVersion == 1 &&
+            validLegacyGenerationId(generationId) &&
+            hasRequiredKeys(data, [
+              'schemaVersion', 'generationId', 'createdAt', 'people',
+              'birthdays', 'drafts', 'reminderSettings'
+            ]) &&
+            hasOnlyKeys(data, [
+              'schemaVersion', 'generationId', 'createdAt', 'people',
+              'birthdays', 'drafts', 'reminderSettings'
+            ])) ||
+          (data.schemaVersion == 2 &&
+            validRandomizedGenerationId(generationId) &&
+            hasRequiredKeys(data, [
+              'schemaVersion', 'birthdayDateEncoding', 'generationId',
+              'createdAt', 'people', 'birthdays', 'drafts', 'reminderSettings'
+            ]) &&
+            hasOnlyKeys(data, [
+              'schemaVersion', 'birthdayDateEncoding', 'generationId',
+              'createdAt', 'people', 'birthdays', 'drafts', 'reminderSettings'
+            ]) &&
+            data.birthdayDateEncoding is string &&
+            data.birthdayDateEncoding == 'calendar-date-v1')) &&
+        stringAtMost(data, 'createdAt', 40) &&
+        validGenerationCounts(data);
+    }
+
+    function validBackupPointer(data) {
+      return hasRequiredKeys(data, ['schemaVersion', 'generationId', 'publishedAt']) &&
+        hasOnlyKeys(data, ['schemaVersion', 'generationId', 'publishedAt']) &&
+        data.schemaVersion is int &&
+        data.generationId is string &&
+        ((data.schemaVersion == 1 &&
+            validLegacyGenerationId(data.generationId)) ||
+          (data.schemaVersion == 2 &&
+            validRandomizedGenerationId(data.generationId))) &&
+        stringAtMost(data, 'publishedAt', 40);
+    }
+
+    match /users/{userId}/entitlement/status {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow write: if false;
     }
 
-    // Opt-in cloud backup data is readable & writable only by the authenticated owner.
-    // Writes are fenced while the account is being deleted, so a backup in
-    // flight cannot recreate data after the purge (audit F03).
-    match /users/{userId}/backup/{document=**} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.uid == userId &&
-        !deletionInProgress(userId);
-    }
-
-    // Immutable backup generations (audit F05): the manifest and each generation's
-    // collections, owner-only and fenced during deletion like the other backup data.
     match /users/{userId}/generations/{generationId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow create, delete: if request.auth != null && request.auth.uid == userId &&
-        !deletionInProgress(userId);
+      allow read: if request.auth != null && request.auth.uid == userId &&
+        validGenerationId(generationId);
+      allow create: if ownerAccess(userId) &&
+        validGenerationManifest(request.resource.data, generationId);
+      allow delete: if ownerAccess(userId) && validGenerationId(generationId);
       allow update: if false;
     }
 
-    match /users/{userId}/generations/{generationId}/{collection}/{document=**} {
+    match /users/{userId}/generations/{generationId}/{collection}/{documentId} {
       allow read: if request.auth != null && request.auth.uid == userId &&
+        validGenerationId(generationId) &&
         collection in ['people', 'birthdays', 'drafts', 'reminderSettings'];
-      allow create, delete: if request.auth != null && request.auth.uid == userId &&
-        collection in ['people', 'birthdays', 'drafts', 'reminderSettings'] &&
-        !deletionInProgress(userId);
+      allow create: if ownerAccess(userId) &&
+        validGenerationId(generationId) &&
+        (collection == 'people' && validPerson(request.resource.data, documentId) ||
+          collection == 'birthdays' && validBirthday(request.resource.data, documentId) ||
+          collection == 'drafts' && validDraft(request.resource.data, documentId) ||
+          collection == 'reminderSettings' &&
+            validReminderSettings(request.resource.data, documentId));
+      allow delete: if ownerAccess(userId) &&
+        validGenerationId(generationId) &&
+        collection in ['people', 'birthdays', 'drafts', 'reminderSettings'];
       allow update: if false;
     }
 
-    // The mobile app's opt-in cloud backup data is scoped to the signed-in owner.
-    // This data is intentionally stored in separate collections from server-only coordination state.
-    match /users/{userId}/{collection}/{document=**} {
+    match /users/{userId}/{collection}/{documentId} {
       allow read: if request.auth != null && request.auth.uid == userId &&
-        collection in ['people', 'birthdays', 'drafts', 'reminderSettings'];
-      allow write: if request.auth != null && request.auth.uid == userId &&
-        collection in ['people', 'birthdays', 'drafts', 'reminderSettings'] &&
-        !deletionInProgress(userId);
+        (collection == 'backup' && documentId == 'current' ||
+          collection in ['people', 'birthdays', 'drafts', 'reminderSettings']);
+      allow create, update: if ownerAccess(userId) &&
+        (collection == 'backup' && documentId == 'current' &&
+            validBackupPointer(request.resource.data) ||
+          collection == 'people' && validPerson(request.resource.data, documentId) ||
+          collection == 'birthdays' && validBirthday(request.resource.data, documentId) ||
+          collection == 'drafts' && validDraft(request.resource.data, documentId) ||
+          collection == 'reminderSettings' &&
+            validReminderSettings(request.resource.data, documentId));
+      allow delete: if ownerAccess(userId) &&
+        (collection == 'backup' && documentId == 'current' ||
+          collection in ['people', 'birthdays', 'drafts', 'reminderSettings']);
     }
 
-    // The coordination ledger, entitlement writes, and unknown collections are server-only.
     match /{document=**} {
       allow read, write: if false;
     }

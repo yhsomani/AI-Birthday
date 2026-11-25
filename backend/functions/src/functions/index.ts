@@ -17,6 +17,7 @@ import { CoordinationOperationOrchestrator } from '../services/coordinationOpera
 import { ControlPlaneService } from '../services/controlPlane.js';
 import { DeletionOrchestrator } from '../services/deletionOrchestrator.js';
 import { SubscriptionVerificationService } from '../services/subscriptionVerification.js';
+import { safeErrorCategory } from '../services/safeErrorCategory.js';
 import {
   armSchema,
   accountModeSchema,
@@ -160,6 +161,9 @@ async function safeCall<T>(operation: () => Promise<T>): Promise<T> {
     if (error instanceof HttpsError) {
       throw error;
     }
+    logger.error('callable_internal_failure', {
+      errorType: safeErrorCategory(error),
+    });
     // Transport/internal failure is deliberately ambiguous. It must never be
     // converted into armWritten=false or any other no-write proof.
     throw new HttpsError('unavailable', 'COORDINATION_UNAVAILABLE');

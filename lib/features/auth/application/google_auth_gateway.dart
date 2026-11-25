@@ -1,6 +1,6 @@
 import '../domain/google_identity.dart';
 
-/// Platform boundary for Google sign-in / Firebase Auth (SSOT §12, FR-001).
+/// Platform boundary for Google sign-in / Firebase Auth (legacy SSOT §12 (PRODUCT.md §16.7), FR-001).
 ///
 /// The device implementation follows the restored reference clients in
 /// `firebase/reference/FirebaseIdentityRuntime.kt`: Google OAuth id token →

@@ -1312,15 +1312,15 @@ class $BirthdaysTable extends Birthdays
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _dateMeta = const VerificationMeta('date');
   @override
-  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
-    'date',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
+  late final GeneratedColumnWithTypeConverter<DateTime, String> date =
+      GeneratedColumn<String>(
+        'date',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($BirthdaysTable.$converterdate);
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -1407,14 +1407,6 @@ class $BirthdaysTable extends Birthdays
     } else if (isInserting) {
       context.missing(_cycleYearMeta);
     }
-    if (data.containsKey('date')) {
-      context.handle(
-        _dateMeta,
-        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_dateMeta);
-    }
     if (data.containsKey('status')) {
       context.handle(
         _statusMeta,
@@ -1466,10 +1458,12 @@ class $BirthdaysTable extends Birthdays
         DriftSqlType.int,
         data['${effectivePrefix}cycle_year'],
       )!,
-      date: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}date'],
-      )!,
+      date: $BirthdaysTable.$converterdate.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}date'],
+        )!,
+      ),
       status: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}status'],
@@ -1493,12 +1487,18 @@ class $BirthdaysTable extends Birthdays
   $BirthdaysTable createAlias(String alias) {
     return $BirthdaysTable(attachedDatabase, alias);
   }
+
+  static TypeConverter<DateTime, String> $converterdate =
+      const CalendarDateConverter();
 }
 
 class Birthday extends DataClass implements Insertable<Birthday> {
   final String id;
   final String personId;
   final int cycleYear;
+
+  /// Calendar date of the occurrence (`yyyy-MM-dd`), independent of any time
+  /// zone. See [CalendarDateConverter].
   final DateTime date;
   final String status;
   final String? draftId;
@@ -1520,7 +1520,11 @@ class Birthday extends DataClass implements Insertable<Birthday> {
     map['id'] = Variable<String>(id);
     map['person_id'] = Variable<String>(personId);
     map['cycle_year'] = Variable<int>(cycleYear);
-    map['date'] = Variable<DateTime>(date);
+    {
+      map['date'] = Variable<String>(
+        $BirthdaysTable.$converterdate.toSql(date),
+      );
+    }
     map['status'] = Variable<String>(status);
     if (!nullToAbsent || draftId != null) {
       map['draft_id'] = Variable<String>(draftId);
@@ -1690,7 +1694,7 @@ class BirthdaysCompanion extends UpdateCompanion<Birthday> {
     Expression<String>? id,
     Expression<String>? personId,
     Expression<int>? cycleYear,
-    Expression<DateTime>? date,
+    Expression<String>? date,
     Expression<String>? status,
     Expression<String>? draftId,
     Expression<DateTime>? createdAt,
@@ -1747,7 +1751,9 @@ class BirthdaysCompanion extends UpdateCompanion<Birthday> {
       map['cycle_year'] = Variable<int>(cycleYear.value);
     }
     if (date.present) {
-      map['date'] = Variable<DateTime>(date.value);
+      map['date'] = Variable<String>(
+        $BirthdaysTable.$converterdate.toSql(date.value),
+      );
     }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
@@ -1880,6 +1886,18 @@ class $MessageDraftsTable extends MessageDrafts
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1913,6 +1931,7 @@ class $MessageDraftsTable extends MessageDrafts
     status,
     providerType,
     variationIndex,
+    revision,
     createdAt,
     updatedAt,
   ];
@@ -2001,6 +2020,12 @@ class $MessageDraftsTable extends MessageDrafts
         ),
       );
     }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -2062,6 +2087,10 @@ class $MessageDraftsTable extends MessageDrafts
         DriftSqlType.int,
         data['${effectivePrefix}variation_index'],
       )!,
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -2089,6 +2118,10 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
   final String status;
   final String providerType;
   final int variationIndex;
+
+  /// Monotonic write counter used for stale-write detection; unlike
+  /// `updatedAt` (unix seconds) it distinguishes saves within the same second.
+  final int revision;
   final DateTime createdAt;
   final DateTime updatedAt;
   const MessageDraft({
@@ -2101,6 +2134,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
     required this.status,
     required this.providerType,
     required this.variationIndex,
+    required this.revision,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -2116,6 +2150,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
     map['status'] = Variable<String>(status);
     map['provider_type'] = Variable<String>(providerType);
     map['variation_index'] = Variable<int>(variationIndex);
+    map['revision'] = Variable<int>(revision);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -2132,6 +2167,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
       status: Value(status),
       providerType: Value(providerType),
       variationIndex: Value(variationIndex),
+      revision: Value(revision),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -2152,6 +2188,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
       status: serializer.fromJson<String>(json['status']),
       providerType: serializer.fromJson<String>(json['providerType']),
       variationIndex: serializer.fromJson<int>(json['variationIndex']),
+      revision: serializer.fromJson<int>(json['revision']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -2169,6 +2206,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
       'status': serializer.toJson<String>(status),
       'providerType': serializer.toJson<String>(providerType),
       'variationIndex': serializer.toJson<int>(variationIndex),
+      'revision': serializer.toJson<int>(revision),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -2184,6 +2222,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
     String? status,
     String? providerType,
     int? variationIndex,
+    int? revision,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => MessageDraft(
@@ -2196,6 +2235,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
     status: status ?? this.status,
     providerType: providerType ?? this.providerType,
     variationIndex: variationIndex ?? this.variationIndex,
+    revision: revision ?? this.revision,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -2216,6 +2256,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
       variationIndex: data.variationIndex.present
           ? data.variationIndex.value
           : this.variationIndex,
+      revision: data.revision.present ? data.revision.value : this.revision,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -2233,6 +2274,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
           ..write('status: $status, ')
           ..write('providerType: $providerType, ')
           ..write('variationIndex: $variationIndex, ')
+          ..write('revision: $revision, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -2250,6 +2292,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
     status,
     providerType,
     variationIndex,
+    revision,
     createdAt,
     updatedAt,
   );
@@ -2266,6 +2309,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
           other.status == this.status &&
           other.providerType == this.providerType &&
           other.variationIndex == this.variationIndex &&
+          other.revision == this.revision &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -2280,6 +2324,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
   final Value<String> status;
   final Value<String> providerType;
   final Value<int> variationIndex;
+  final Value<int> revision;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -2293,6 +2338,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
     this.status = const Value.absent(),
     this.providerType = const Value.absent(),
     this.variationIndex = const Value.absent(),
+    this.revision = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2307,6 +2353,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
     required String status,
     required String providerType,
     this.variationIndex = const Value.absent(),
+    this.revision = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
@@ -2330,6 +2377,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
     Expression<String>? status,
     Expression<String>? providerType,
     Expression<int>? variationIndex,
+    Expression<int>? revision,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -2344,6 +2392,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
       if (status != null) 'status': status,
       if (providerType != null) 'provider_type': providerType,
       if (variationIndex != null) 'variation_index': variationIndex,
+      if (revision != null) 'revision': revision,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -2360,6 +2409,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
     Value<String>? status,
     Value<String>? providerType,
     Value<int>? variationIndex,
+    Value<int>? revision,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -2374,6 +2424,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
       status: status ?? this.status,
       providerType: providerType ?? this.providerType,
       variationIndex: variationIndex ?? this.variationIndex,
+      revision: revision ?? this.revision,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -2410,6 +2461,9 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
     if (variationIndex.present) {
       map['variation_index'] = Variable<int>(variationIndex.value);
     }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -2434,6 +2488,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
           ..write('status: $status, ')
           ..write('providerType: $providerType, ')
           ..write('variationIndex: $variationIndex, ')
+          ..write('revision: $revision, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -2873,6 +2928,28 @@ class $DeliveryEventsTable extends DeliveryEvents
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _draftRevisionMeta = const VerificationMeta(
+    'draftRevision',
+  );
+  @override
+  late final GeneratedColumn<int> draftRevision = GeneratedColumn<int>(
+    'draft_revision',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _bodyHashMeta = const VerificationMeta(
+    'bodyHash',
+  );
+  @override
+  late final GeneratedColumn<String> bodyHash = GeneratedColumn<String>(
+    'body_hash',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _channelMeta = const VerificationMeta(
     'channel',
   );
@@ -2912,6 +2989,8 @@ class $DeliveryEventsTable extends DeliveryEvents
     id,
     birthdayId,
     draftId,
+    draftRevision,
+    bodyHash,
     channel,
     outcome,
     handedOffAt,
@@ -2945,6 +3024,21 @@ class $DeliveryEventsTable extends DeliveryEvents
       context.handle(
         _draftIdMeta,
         draftId.isAcceptableOrUnknown(data['draft_id']!, _draftIdMeta),
+      );
+    }
+    if (data.containsKey('draft_revision')) {
+      context.handle(
+        _draftRevisionMeta,
+        draftRevision.isAcceptableOrUnknown(
+          data['draft_revision']!,
+          _draftRevisionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('body_hash')) {
+      context.handle(
+        _bodyHashMeta,
+        bodyHash.isAcceptableOrUnknown(data['body_hash']!, _bodyHashMeta),
       );
     }
     if (data.containsKey('channel')) {
@@ -2993,6 +3087,14 @@ class $DeliveryEventsTable extends DeliveryEvents
         DriftSqlType.string,
         data['${effectivePrefix}draft_id'],
       ),
+      draftRevision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}draft_revision'],
+      ),
+      bodyHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}body_hash'],
+      ),
       channel: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}channel'],
@@ -3018,6 +3120,8 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
   final String id;
   final String birthdayId;
   final String? draftId;
+  final int? draftRevision;
+  final String? bodyHash;
   final String channel;
   final String outcome;
   final DateTime handedOffAt;
@@ -3025,6 +3129,8 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
     required this.id,
     required this.birthdayId,
     this.draftId,
+    this.draftRevision,
+    this.bodyHash,
     required this.channel,
     required this.outcome,
     required this.handedOffAt,
@@ -3036,6 +3142,12 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
     map['birthday_id'] = Variable<String>(birthdayId);
     if (!nullToAbsent || draftId != null) {
       map['draft_id'] = Variable<String>(draftId);
+    }
+    if (!nullToAbsent || draftRevision != null) {
+      map['draft_revision'] = Variable<int>(draftRevision);
+    }
+    if (!nullToAbsent || bodyHash != null) {
+      map['body_hash'] = Variable<String>(bodyHash);
     }
     map['channel'] = Variable<String>(channel);
     map['outcome'] = Variable<String>(outcome);
@@ -3050,6 +3162,12 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
       draftId: draftId == null && nullToAbsent
           ? const Value.absent()
           : Value(draftId),
+      draftRevision: draftRevision == null && nullToAbsent
+          ? const Value.absent()
+          : Value(draftRevision),
+      bodyHash: bodyHash == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bodyHash),
       channel: Value(channel),
       outcome: Value(outcome),
       handedOffAt: Value(handedOffAt),
@@ -3065,6 +3183,8 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
       id: serializer.fromJson<String>(json['id']),
       birthdayId: serializer.fromJson<String>(json['birthdayId']),
       draftId: serializer.fromJson<String?>(json['draftId']),
+      draftRevision: serializer.fromJson<int?>(json['draftRevision']),
+      bodyHash: serializer.fromJson<String?>(json['bodyHash']),
       channel: serializer.fromJson<String>(json['channel']),
       outcome: serializer.fromJson<String>(json['outcome']),
       handedOffAt: serializer.fromJson<DateTime>(json['handedOffAt']),
@@ -3077,6 +3197,8 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
       'id': serializer.toJson<String>(id),
       'birthdayId': serializer.toJson<String>(birthdayId),
       'draftId': serializer.toJson<String?>(draftId),
+      'draftRevision': serializer.toJson<int?>(draftRevision),
+      'bodyHash': serializer.toJson<String?>(bodyHash),
       'channel': serializer.toJson<String>(channel),
       'outcome': serializer.toJson<String>(outcome),
       'handedOffAt': serializer.toJson<DateTime>(handedOffAt),
@@ -3087,6 +3209,8 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
     String? id,
     String? birthdayId,
     Value<String?> draftId = const Value.absent(),
+    Value<int?> draftRevision = const Value.absent(),
+    Value<String?> bodyHash = const Value.absent(),
     String? channel,
     String? outcome,
     DateTime? handedOffAt,
@@ -3094,6 +3218,10 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
     id: id ?? this.id,
     birthdayId: birthdayId ?? this.birthdayId,
     draftId: draftId.present ? draftId.value : this.draftId,
+    draftRevision: draftRevision.present
+        ? draftRevision.value
+        : this.draftRevision,
+    bodyHash: bodyHash.present ? bodyHash.value : this.bodyHash,
     channel: channel ?? this.channel,
     outcome: outcome ?? this.outcome,
     handedOffAt: handedOffAt ?? this.handedOffAt,
@@ -3105,6 +3233,10 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
           ? data.birthdayId.value
           : this.birthdayId,
       draftId: data.draftId.present ? data.draftId.value : this.draftId,
+      draftRevision: data.draftRevision.present
+          ? data.draftRevision.value
+          : this.draftRevision,
+      bodyHash: data.bodyHash.present ? data.bodyHash.value : this.bodyHash,
       channel: data.channel.present ? data.channel.value : this.channel,
       outcome: data.outcome.present ? data.outcome.value : this.outcome,
       handedOffAt: data.handedOffAt.present
@@ -3119,6 +3251,8 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
           ..write('id: $id, ')
           ..write('birthdayId: $birthdayId, ')
           ..write('draftId: $draftId, ')
+          ..write('draftRevision: $draftRevision, ')
+          ..write('bodyHash: $bodyHash, ')
           ..write('channel: $channel, ')
           ..write('outcome: $outcome, ')
           ..write('handedOffAt: $handedOffAt')
@@ -3127,8 +3261,16 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, birthdayId, draftId, channel, outcome, handedOffAt);
+  int get hashCode => Object.hash(
+    id,
+    birthdayId,
+    draftId,
+    draftRevision,
+    bodyHash,
+    channel,
+    outcome,
+    handedOffAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3136,6 +3278,8 @@ class DeliveryEvent extends DataClass implements Insertable<DeliveryEvent> {
           other.id == this.id &&
           other.birthdayId == this.birthdayId &&
           other.draftId == this.draftId &&
+          other.draftRevision == this.draftRevision &&
+          other.bodyHash == this.bodyHash &&
           other.channel == this.channel &&
           other.outcome == this.outcome &&
           other.handedOffAt == this.handedOffAt);
@@ -3145,6 +3289,8 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
   final Value<String> id;
   final Value<String> birthdayId;
   final Value<String?> draftId;
+  final Value<int?> draftRevision;
+  final Value<String?> bodyHash;
   final Value<String> channel;
   final Value<String> outcome;
   final Value<DateTime> handedOffAt;
@@ -3153,6 +3299,8 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
     this.id = const Value.absent(),
     this.birthdayId = const Value.absent(),
     this.draftId = const Value.absent(),
+    this.draftRevision = const Value.absent(),
+    this.bodyHash = const Value.absent(),
     this.channel = const Value.absent(),
     this.outcome = const Value.absent(),
     this.handedOffAt = const Value.absent(),
@@ -3162,6 +3310,8 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
     required String id,
     required String birthdayId,
     this.draftId = const Value.absent(),
+    this.draftRevision = const Value.absent(),
+    this.bodyHash = const Value.absent(),
     required String channel,
     this.outcome = const Value.absent(),
     required DateTime handedOffAt,
@@ -3174,6 +3324,8 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
     Expression<String>? id,
     Expression<String>? birthdayId,
     Expression<String>? draftId,
+    Expression<int>? draftRevision,
+    Expression<String>? bodyHash,
     Expression<String>? channel,
     Expression<String>? outcome,
     Expression<DateTime>? handedOffAt,
@@ -3183,6 +3335,8 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
       if (id != null) 'id': id,
       if (birthdayId != null) 'birthday_id': birthdayId,
       if (draftId != null) 'draft_id': draftId,
+      if (draftRevision != null) 'draft_revision': draftRevision,
+      if (bodyHash != null) 'body_hash': bodyHash,
       if (channel != null) 'channel': channel,
       if (outcome != null) 'outcome': outcome,
       if (handedOffAt != null) 'handed_off_at': handedOffAt,
@@ -3194,6 +3348,8 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
     Value<String>? id,
     Value<String>? birthdayId,
     Value<String?>? draftId,
+    Value<int?>? draftRevision,
+    Value<String?>? bodyHash,
     Value<String>? channel,
     Value<String>? outcome,
     Value<DateTime>? handedOffAt,
@@ -3203,6 +3359,8 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
       id: id ?? this.id,
       birthdayId: birthdayId ?? this.birthdayId,
       draftId: draftId ?? this.draftId,
+      draftRevision: draftRevision ?? this.draftRevision,
+      bodyHash: bodyHash ?? this.bodyHash,
       channel: channel ?? this.channel,
       outcome: outcome ?? this.outcome,
       handedOffAt: handedOffAt ?? this.handedOffAt,
@@ -3221,6 +3379,12 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
     }
     if (draftId.present) {
       map['draft_id'] = Variable<String>(draftId.value);
+    }
+    if (draftRevision.present) {
+      map['draft_revision'] = Variable<int>(draftRevision.value);
+    }
+    if (bodyHash.present) {
+      map['body_hash'] = Variable<String>(bodyHash.value);
     }
     if (channel.present) {
       map['channel'] = Variable<String>(channel.value);
@@ -3243,6 +3407,8 @@ class DeliveryEventsCompanion extends UpdateCompanion<DeliveryEvent> {
           ..write('id: $id, ')
           ..write('birthdayId: $birthdayId, ')
           ..write('draftId: $draftId, ')
+          ..write('draftRevision: $draftRevision, ')
+          ..write('bodyHash: $bodyHash, ')
           ..write('channel: $channel, ')
           ..write('outcome: $outcome, ')
           ..write('handedOffAt: $handedOffAt, ')
@@ -4684,10 +4850,11 @@ class $$BirthdaysTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<DateTime> get date => $composableBuilder(
-    column: $table.date,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnWithTypeConverterFilters<DateTime, DateTime, String> get date =>
+      $composableBuilder(
+        column: $table.date,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 
   ColumnFilters<String> get status => $composableBuilder(
     column: $table.status,
@@ -4734,7 +4901,7 @@ class $$BirthdaysTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<DateTime> get date => $composableBuilder(
+  ColumnOrderings<String> get date => $composableBuilder(
     column: $table.date,
     builder: (column) => ColumnOrderings(column),
   );
@@ -4778,7 +4945,7 @@ class $$BirthdaysTableAnnotationComposer
   GeneratedColumn<int> get cycleYear =>
       $composableBuilder(column: $table.cycleYear, builder: (column) => column);
 
-  GeneratedColumn<DateTime> get date =>
+  GeneratedColumnWithTypeConverter<DateTime, String> get date =>
       $composableBuilder(column: $table.date, builder: (column) => column);
 
   GeneratedColumn<String> get status =>
@@ -4897,6 +5064,7 @@ typedef $$MessageDraftsTableCreateCompanionBuilder =
       required String status,
       required String providerType,
       Value<int> variationIndex,
+      Value<int> revision,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<int> rowid,
@@ -4912,6 +5080,7 @@ typedef $$MessageDraftsTableUpdateCompanionBuilder =
       Value<String> status,
       Value<String> providerType,
       Value<int> variationIndex,
+      Value<int> revision,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -4968,6 +5137,11 @@ class $$MessageDraftsTableFilterComposer
 
   ColumnFilters<int> get variationIndex => $composableBuilder(
     column: $table.variationIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5036,6 +5210,11 @@ class $$MessageDraftsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -5089,6 +5268,9 @@ class $$MessageDraftsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -5136,6 +5318,7 @@ class $$MessageDraftsTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<String> providerType = const Value.absent(),
                 Value<int> variationIndex = const Value.absent(),
+                Value<int> revision = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -5149,6 +5332,7 @@ class $$MessageDraftsTableTableManager
                 status: status,
                 providerType: providerType,
                 variationIndex: variationIndex,
+                revision: revision,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -5164,6 +5348,7 @@ class $$MessageDraftsTableTableManager
                 required String status,
                 required String providerType,
                 Value<int> variationIndex = const Value.absent(),
+                Value<int> revision = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -5177,6 +5362,7 @@ class $$MessageDraftsTableTableManager
                 status: status,
                 providerType: providerType,
                 variationIndex: variationIndex,
+                revision: revision,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -5434,6 +5620,8 @@ typedef $$DeliveryEventsTableCreateCompanionBuilder =
       required String id,
       required String birthdayId,
       Value<String?> draftId,
+      Value<int?> draftRevision,
+      Value<String?> bodyHash,
       required String channel,
       Value<String> outcome,
       required DateTime handedOffAt,
@@ -5444,6 +5632,8 @@ typedef $$DeliveryEventsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> birthdayId,
       Value<String?> draftId,
+      Value<int?> draftRevision,
+      Value<String?> bodyHash,
       Value<String> channel,
       Value<String> outcome,
       Value<DateTime> handedOffAt,
@@ -5471,6 +5661,16 @@ class $$DeliveryEventsTableFilterComposer
 
   ColumnFilters<String> get draftId => $composableBuilder(
     column: $table.draftId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get draftRevision => $composableBuilder(
+    column: $table.draftRevision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bodyHash => $composableBuilder(
+    column: $table.bodyHash,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5514,6 +5714,16 @@ class $$DeliveryEventsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get draftRevision => $composableBuilder(
+    column: $table.draftRevision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bodyHash => $composableBuilder(
+    column: $table.bodyHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get channel => $composableBuilder(
     column: $table.channel,
     builder: (column) => ColumnOrderings(column),
@@ -5549,6 +5759,14 @@ class $$DeliveryEventsTableAnnotationComposer
 
   GeneratedColumn<String> get draftId =>
       $composableBuilder(column: $table.draftId, builder: (column) => column);
+
+  GeneratedColumn<int> get draftRevision => $composableBuilder(
+    column: $table.draftRevision,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get bodyHash =>
+      $composableBuilder(column: $table.bodyHash, builder: (column) => column);
 
   GeneratedColumn<String> get channel =>
       $composableBuilder(column: $table.channel, builder: (column) => column);
@@ -5598,6 +5816,8 @@ class $$DeliveryEventsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> birthdayId = const Value.absent(),
                 Value<String?> draftId = const Value.absent(),
+                Value<int?> draftRevision = const Value.absent(),
+                Value<String?> bodyHash = const Value.absent(),
                 Value<String> channel = const Value.absent(),
                 Value<String> outcome = const Value.absent(),
                 Value<DateTime> handedOffAt = const Value.absent(),
@@ -5606,6 +5826,8 @@ class $$DeliveryEventsTableTableManager
                 id: id,
                 birthdayId: birthdayId,
                 draftId: draftId,
+                draftRevision: draftRevision,
+                bodyHash: bodyHash,
                 channel: channel,
                 outcome: outcome,
                 handedOffAt: handedOffAt,
@@ -5616,6 +5838,8 @@ class $$DeliveryEventsTableTableManager
                 required String id,
                 required String birthdayId,
                 Value<String?> draftId = const Value.absent(),
+                Value<int?> draftRevision = const Value.absent(),
+                Value<String?> bodyHash = const Value.absent(),
                 required String channel,
                 Value<String> outcome = const Value.absent(),
                 required DateTime handedOffAt,
@@ -5624,6 +5848,8 @@ class $$DeliveryEventsTableTableManager
                 id: id,
                 birthdayId: birthdayId,
                 draftId: draftId,
+                draftRevision: draftRevision,
+                bodyHash: bodyHash,
                 channel: channel,
                 outcome: outcome,
                 handedOffAt: handedOffAt,

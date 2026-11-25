@@ -95,7 +95,7 @@ void main() {
     expect(good.isValid, isTrue);
   });
 
-  test('constrains facts, notes and relationship lengths', () {
+  test('constrains facts and notes', () {
     expect(
       validator
           .validate(base().copyWith(importantFacts: ['f' * 201]))
@@ -113,6 +113,25 @@ void main() {
           .validate(base().copyWith(notes: 'n' * 2001))
           .errorFor(PersonField.notes),
       InputError.notesTooLong,
+    );
+  });
+
+  test('accepts language tags beyond the form built-in examples', () {
+    expect(
+      validator.validate(base().copyWith(preferredLanguage: 'pt-BR')).isValid,
+      isTrue,
+    );
+    expect(
+      validator
+          .validate(base().copyWith(preferredLanguage: ''))
+          .errorFor(PersonField.language),
+      InputError.languageRequired,
+    );
+    expect(
+      validator
+          .validate(base().copyWith(preferredLanguage: 'abcdefghijk'))
+          .errorFor(PersonField.language),
+      InputError.languageTooLong,
     );
   });
 

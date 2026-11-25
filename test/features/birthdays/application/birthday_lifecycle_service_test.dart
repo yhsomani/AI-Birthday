@@ -215,36 +215,45 @@ void main() {
       },
     );
 
-    test('throws when a person has more than one stored birthday', () async {
-      final repo = InMemoryBirthdaysRepository(
-        initialBirthdays: [
-          Birthday(
-            id: 'birthday-person-1-a',
-            personId: 'person-1',
-            cycleYear: 2026,
-            date: DateTime(2026, 10, 25),
-            status: BirthdayStatus.upcoming,
-            createdAt: DateTime(2026, 1, 1),
-            updatedAt: DateTime(2026, 1, 1),
-          ),
-          Birthday(
-            id: 'birthday-person-1-b',
-            personId: 'person-1',
-            cycleYear: 2025,
-            date: DateTime(2025, 10, 25),
-            status: BirthdayStatus.completed,
-            createdAt: DateTime(2025, 1, 1),
-            updatedAt: DateTime(2025, 10, 25),
-          ),
-        ],
-      );
+    test(
+      'keeps separate cycle rows without promoting an older occurrence',
+      () async {
+        final repo = InMemoryBirthdaysRepository(
+          initialBirthdays: [
+            Birthday(
+              id: 'birthday-person-1-a',
+              personId: 'person-1',
+              cycleYear: 2026,
+              date: DateTime(2026, 10, 25),
+              status: BirthdayStatus.upcoming,
+              createdAt: DateTime(2026, 1, 1),
+              updatedAt: DateTime(2026, 1, 1),
+            ),
+            Birthday(
+              id: 'birthday-person-1-b',
+              personId: 'person-1',
+              cycleYear: 2025,
+              date: DateTime(2025, 10, 25),
+              status: BirthdayStatus.completed,
+              createdAt: DateTime(2025, 1, 1),
+              updatedAt: DateTime(2025, 10, 25),
+            ),
+          ],
+        );
 
-      // Matches drift's `getSingleOrNull` contract, which also throws on >1 row.
-      await expectLater(
-        service.refresh(people: [person()], birthdaysRepository: repo),
-        throwsStateError,
-      );
-    });
+        await service.refresh(people: [person()], birthdaysRepository: repo);
+
+        final remaining = await repo.getBirthdays();
+        expect(remaining, hasLength(2));
+        expect(
+          remaining.map((birthday) => (birthday.id, birthday.cycleYear)),
+          containsAll([
+            ('birthday-person-1-a', 2026),
+            ('birthday-person-1-b', 2025),
+          ]),
+        );
+      },
+    );
   });
 }
 
@@ -281,6 +290,12 @@ class _RecordingBirthdaysRepository implements BirthdaysRepository {
   @override
   Future<void> rolloverBirthday(Birthday birthday) =>
       _inner.rolloverBirthday(birthday);
+
+  @override
+  Future<void> mergeDuplicateBirthdays(
+    Birthday birthday, {
+    required List<String> duplicateIds,
+  }) => _inner.mergeDuplicateBirthdays(birthday, duplicateIds: duplicateIds);
 
   @override
   Future<void> updateBirthdayStatus(

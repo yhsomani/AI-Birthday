@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:ai_birthday/core/database/app_database.dart';
+import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/core/security/credential_storage.dart';
 import 'package:ai_birthday/features/auth/domain/auth_state.dart';
 import 'package:ai_birthday/features/auth/domain/google_identity.dart';
@@ -25,6 +26,33 @@ class InMemoryStoreDriver implements SecureStoreDriver {
   @override
   Future<void> write(String key, String value) async => data[key] = value;
 }
+
+MockClient _backupAwareClient(
+  Future<http.Response> Function(http.Request) handler,
+) => MockClient((request) async {
+  final isCurrentPointer =
+      request.method == 'GET' && request.url.path.endsWith('/backup/current');
+  try {
+    final response = await handler(request);
+    if (isCurrentPointer && response.statusCode != 200) {
+      return http.Response('not found', 404);
+    }
+    if (isCurrentPointer && response.statusCode == 200) {
+      try {
+        final body = jsonDecode(response.body);
+        if (body is! Map || body['fields'] is! Map) {
+          return http.Response('not found', 404);
+        }
+      } catch (_) {
+        return http.Response('not found', 404);
+      }
+    }
+    return response;
+  } catch (_) {
+    if (isCurrentPointer) return http.Response('not found', 404);
+    rethrow;
+  }
+});
 
 void main() {
   allowMultipleInMemoryDatabases();
@@ -58,7 +86,7 @@ void main() {
         final service = CloudSyncService(
           db: db,
           store: store,
-          httpClient: MockClient((_) async {
+          httpClient: _backupAwareClient((_) async {
             requests++;
             return http.Response('{}', 200);
           }),
@@ -127,8 +155,9 @@ void main() {
           );
 
       var commitCount = 0;
-      final mockClient = MockClient((request) async {
+      final mockClient = _backupAwareClient((request) async {
         expect(request.method, 'POST');
+        expect(request.headers['X-Firebase-AppCheck'], 'test-app-check');
         expect(
           request.url.path,
           endsWith('documents:commit'),
@@ -205,6 +234,7 @@ void main() {
         db: db,
         store: store,
         httpClient: mockClient,
+        appCheckTokenProvider: () async => 'test-app-check',
       );
 
       final auth = const AuthState(
@@ -227,6 +257,50 @@ void main() {
       final lastSync = await service.getLastSyncTime('uid-test');
       expect(lastSync, isNotNull);
     });
+
+    test(
+      'a changed current pointer rejects stale generation publication (A3-016)',
+      () async {
+        var sawConditionalPointerWrite = false;
+        final service = CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: _backupAwareClient((request) async {
+            if (request.method == 'GET') {
+              return http.Response(
+                jsonEncode({
+                  'updateTime': '2026-01-01T00:00:00Z',
+                  'fields': {
+                    'generationId': {
+                      'stringValue': 'another-device-generation',
+                    },
+                  },
+                }),
+                200,
+              );
+            }
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
+            final writes = body['writes'] as List;
+            final pointerWrite = writes.cast<Map<String, dynamic>>().firstWhere(
+              (write) => ((write['update'] as Map)['name'] as String).endsWith(
+                '/backup/current',
+              ),
+            );
+            expect(pointerWrite['currentDocument'], {
+              'updateTime': '2026-01-01T00:00:00Z',
+            });
+            sawConditionalPointerWrite = true;
+            return http.Response('precondition failed', 409);
+          }),
+        );
+
+        final result = await service.sync(_signedInAuth);
+
+        expect(sawConditionalPointerWrite, isTrue);
+        expect(result.success, isFalse);
+        expect(result.error, contains('previous backup is unchanged'));
+      },
+    );
 
     test('chunks more than 500 writes across multiple commits', () async {
       final now = DateTime.now();
@@ -252,7 +326,7 @@ void main() {
       }
 
       final batchSizes = <int>[];
-      final mockClient = MockClient((request) async {
+      final mockClient = _backupAwareClient((request) async {
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         final writes = body['writes'] as List;
         batchSizes.add(writes.length);
@@ -330,7 +404,7 @@ void main() {
             ),
           );
 
-      final mockClient = MockClient((request) async {
+      final mockClient = _backupAwareClient((request) async {
         return http.Response(
           jsonEncode({
             'writeResults': [
@@ -393,7 +467,7 @@ void main() {
             );
 
         final rowNames = <String>[];
-        final client = MockClient((request) async {
+        final client = _backupAwareClient((request) async {
           final body = jsonDecode(request.body) as Map<String, dynamic>;
           final writes = body['writes'] as List;
           for (final w in writes) {
@@ -454,7 +528,7 @@ void main() {
             );
 
         var publishRequested = false;
-        final client = MockClient((request) async {
+        final client = _backupAwareClient((request) async {
           final body = jsonDecode(request.body) as Map<String, dynamic>;
           final writes = body['writes'] as List;
           publishRequested = writes.any(
@@ -476,6 +550,34 @@ void main() {
         expect(result.error, contains('invalid response'));
         expect(publishRequested, isFalse);
         expect(await service.getLastSyncTime('uid-test'), isNull);
+      },
+    );
+
+    test(
+      'logs the status code when Firestore rejects a batch (A3-019)',
+      () async {
+        final logger = RecordingLogger();
+        final service = CloudSyncService(
+          db: db,
+          store: store,
+          logger: logger,
+          httpClient: _backupAwareClient((request) async {
+            if (request.method == 'GET') return http.Response('missing', 404);
+            return http.Response('denied', 503);
+          }),
+        );
+
+        final result = await service.sync(_signedInAuth);
+
+        expect(result.success, isFalse);
+        expect(
+          logger.records.any(
+            (record) =>
+                record.message == 'Firestore batch write was rejected.' &&
+                record.params['statusCode'] == 503,
+          ),
+          isTrue,
+        );
       },
     );
 
@@ -501,7 +603,7 @@ void main() {
           );
 
       final requestedPaths = <String>[];
-      final client = MockClient((request) async {
+      final client = _backupAwareClient((request) async {
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         final writes = body['writes'] as List;
         requestedPaths.addAll(
@@ -549,7 +651,7 @@ void main() {
               ),
             );
 
-        final failingClient = MockClient((request) async {
+        final failingClient = _backupAwareClient((request) async {
           return http.Response('Forbidden', 403);
         });
 
@@ -593,7 +695,7 @@ void main() {
             ),
           );
 
-      final mockClient = MockClient(
+      final mockClient = _backupAwareClient(
         (outer) => servePublished(outer, (request) async {
           expect(request.method, 'GET');
           if (request.url.path.endsWith('/people') ||
@@ -684,7 +786,7 @@ void main() {
             ),
           );
 
-      final mockClient = MockClient(
+      final mockClient = _backupAwareClient(
         (outer) => servePublished(outer, (request) async {
           expect(request.method, 'GET');
           if (request.url.path.endsWith('/people')) {
@@ -778,7 +880,7 @@ void main() {
               ),
             );
 
-        final mockClient = MockClient(
+        final mockClient = _backupAwareClient(
           (outer) => servePublished(outer, (request) async {
             if (request.url.path.endsWith('/birthdays')) {
               return http.Response(
@@ -885,7 +987,7 @@ void main() {
 
       final peopleDocs = List.generate(150, (i) => personDoc('restored-$i'));
 
-      final mockClient = MockClient(
+      final mockClient = _backupAwareClient(
         (outer) => servePublished(outer, (request) async {
           expect(request.method, 'GET');
           if (request.url.path.endsWith('/people')) {
@@ -939,7 +1041,7 @@ void main() {
           },
         };
 
-        final mockClient = MockClient(
+        final mockClient = _backupAwareClient(
           (outer) => servePublished(outer, (request) async {
             if (request.url.path.endsWith('/people')) {
               return http.Response(
@@ -1008,7 +1110,7 @@ void main() {
             );
 
         final authorizations = <String?>[];
-        final client = MockClient((request) async {
+        final client = _backupAwareClient((request) async {
           authorizations.add(request.headers['Authorization']);
           return http.Response('{}', 500);
         });
@@ -1063,7 +1165,7 @@ void main() {
             );
 
         final newer = DateTime.utc(2026, 2, 1);
-        final client = MockClient(
+        final client = _backupAwareClient(
           (request) => servePublished(request, (subReq) async {
             if (!subReq.url.path.endsWith('/people')) {
               return http.Response(jsonEncode({'documents': []}), 200);
@@ -1124,6 +1226,150 @@ void main() {
       },
     );
 
+    test('legacy timestamp birthday dates restore as cycle days and drafts remap '
+        'from duplicate IDs', () async {
+      final baseTime = DateTime.utc(2025, 1, 1);
+      final older = DateTime.utc(2026, 1, 1);
+      final newer = DateTime.utc(2026, 2, 1);
+      final localProfileUpdate = DateTime.utc(2027, 1, 1);
+      await db
+          .into(db.persons)
+          .insert(
+            PersonsCompanion.insert(
+              id: 'p-legacy',
+              name: 'Locally Changed Birthday',
+              birthdayMonth: const Value(4),
+              birthdayDay: const Value(2),
+              relationship: 'friend',
+              relationshipCloseness: 'close',
+              preferredLanguage: 'en',
+              preferredTone: 'warm',
+              importantFacts: '',
+              preferredDeliveryChannel: 'whatsapp',
+              autoSendPolicy: 'manualOnly',
+              createdAt: baseTime,
+              updatedAt: localProfileUpdate,
+              version: 2,
+            ),
+          );
+      await db
+          .into(db.birthdays)
+          .insert(
+            BirthdaysCompanion.insert(
+              id: 'b-local',
+              personId: 'p-legacy',
+              cycleYear: 2026,
+              date: DateTime(2026, 4, 2),
+              status: 'pending',
+              createdAt: baseTime,
+              updatedAt: older,
+            ),
+          );
+      Map<String, dynamic> date(String value) => {'stringValue': value};
+      Map<String, dynamic> integer(int value) => {'integerValue': '$value'};
+      Map<String, dynamic> person = {
+        'id': date('p-legacy'),
+        'name': date('Legacy Birthday'),
+        'birthdayMonth': integer(3),
+        'birthdayDay': integer(1),
+        'relationship': date('friend'),
+        'relationshipCloseness': date('close'),
+        'preferredLanguage': date('en'),
+        'preferredTone': date('warm'),
+        'importantFacts': date(''),
+        'preferredDeliveryChannel': date('whatsapp'),
+        'autoSendPolicy': date('manualOnly'),
+        'createdAt': date(baseTime.toIso8601String()),
+        'updatedAt': date(newer.toIso8601String()),
+        'version': integer(1),
+      };
+      Map<String, dynamic> birthday(
+        String id,
+        String timestamp,
+        DateTime updatedAt,
+      ) => {
+        'id': date(id),
+        'personId': date('p-legacy'),
+        'cycleYear': integer(2026),
+        'date': date(timestamp),
+        'status': date('pending'),
+        'createdAt': date(baseTime.toIso8601String()),
+        'updatedAt': date(updatedAt.toIso8601String()),
+      };
+      final docs = {
+        'people': [
+          {'name': 'users/uid-test/people/p-legacy', 'fields': person},
+        ],
+        'birthdays': [
+          {
+            'name': 'users/uid-test/birthdays/b-old',
+            'fields': birthday('b-old', '2026-03-01T23:30:00-08:00', older),
+          },
+          {
+            'name': 'users/uid-test/birthdays/b-survivor',
+            'fields': birthday('b-survivor', '2026-03-02T03:30:00+00:00', newer)
+              ..['status'] = date('messageDrafted')
+              ..['draftId'] = date('d-legacy'),
+          },
+        ],
+        'drafts': [
+          {
+            'name': 'users/uid-test/drafts/d-legacy',
+            'fields': {
+              'id': date('d-legacy'),
+              'birthdayId': date('b-old'),
+              'personId': date('p-legacy'),
+              'body': date('Happy birthday!'),
+              'tone': date('warm'),
+              'length': date('short'),
+              'status': date('draft'),
+              'providerType': date('manual'),
+              'variationIndex': integer(0),
+              'createdAt': date(baseTime.toIso8601String()),
+              'updatedAt': date(newer.toIso8601String()),
+            },
+          },
+        ],
+        'reminderSettings': <Map<String, dynamic>>[],
+      };
+
+      final result = await CloudSyncService(
+        db: db,
+        store: store,
+        httpClient: _backupAwareClient(
+          (request) => servePublished(request, (subRequest) async {
+            for (final collection in docs.keys) {
+              if (subRequest.url.path.endsWith('/$collection')) {
+                return http.Response(
+                  jsonEncode({'documents': docs[collection]}),
+                  200,
+                );
+              }
+            }
+            return http.Response(jsonEncode({'documents': []}), 200);
+          }),
+        ),
+      ).restore(_signedInAuth);
+
+      expect(result.success, isTrue, reason: result.error);
+      final birthdays = await db.select(db.birthdays).get();
+      expect(birthdays, hasLength(1));
+      expect(birthdays.single.id, 'b-local');
+      expect(birthdays.single.date, DateTime(2026, 3, 1));
+      expect(birthdays.single.status, 'messageDrafted');
+      expect(birthdays.single.draftId, 'd-legacy');
+      final draft = await db.select(db.messageDrafts).getSingle();
+      expect(draft.birthdayId, 'b-local');
+      expect(
+        result.conflictRecords.any(
+          (conflict) => conflict.contains(
+            'current profile differs; cycle date reconstructed from snapshot profile',
+          ),
+        ),
+        isTrue,
+      );
+    });
+
     test(
       'newer cloud draft cannot overwrite confirmed-sent local draft',
       () async {
@@ -1178,7 +1424,7 @@ void main() {
               ),
             );
 
-        final client = MockClient(
+        final client = _backupAwareClient(
           (request) => servePublished(request, (subReq) async {
             if (subReq.url.path.endsWith('/drafts')) {
               return http.Response(
@@ -1243,12 +1489,143 @@ void main() {
     );
 
     test(
+      'restore keeps a prior-cycle draft attached to its own cycle',
+      () async {
+        final createdAt = DateTime.utc(2024, 1, 1);
+        final firstUpdate = DateTime.utc(2025, 1, 1);
+        final secondUpdate = DateTime.utc(2026, 1, 1);
+        Map<String, dynamic> stringValue(String value) => {
+          'stringValue': value,
+        };
+        Map<String, dynamic> integerValue(int value) => {
+          'integerValue': '$value',
+        };
+        final person = {
+          'id': stringValue('p-cycle'),
+          'name': stringValue('Cycle Person'),
+          'birthdayMonth': integerValue(3),
+          'birthdayDay': integerValue(1),
+          'relationship': stringValue('friend'),
+          'relationshipCloseness': stringValue('close'),
+          'preferredLanguage': stringValue('en'),
+          'preferredTone': stringValue('warm'),
+          'importantFacts': stringValue(''),
+          'preferredDeliveryChannel': stringValue('whatsapp'),
+          'autoSendPolicy': stringValue('manualOnly'),
+          'createdAt': stringValue(createdAt.toIso8601String()),
+          'updatedAt': stringValue(secondUpdate.toIso8601String()),
+        };
+        Map<String, dynamic> birthday(
+          String id,
+          int cycleYear,
+          String status,
+          DateTime updatedAt, {
+          String? draftId,
+        }) => {
+          'id': stringValue(id),
+          'personId': stringValue('p-cycle'),
+          'cycleYear': integerValue(cycleYear),
+          'date': stringValue('$cycleYear-03-01T00:00:00Z'),
+          'status': stringValue(status),
+          if (draftId != null) 'draftId': stringValue(draftId),
+          'createdAt': stringValue(createdAt.toIso8601String()),
+          'updatedAt': stringValue(updatedAt.toIso8601String()),
+        };
+        final docs = {
+          'people': [
+            {'name': 'users/uid-test/people/p-cycle', 'fields': person},
+          ],
+          'birthdays': [
+            {
+              'name': 'users/uid-test/birthdays/b-cycle-2025',
+              'fields': birthday(
+                'b-cycle-2025',
+                2025,
+                'messageDrafted',
+                firstUpdate,
+                draftId: 'd-prior-cycle',
+              ),
+            },
+            {
+              'name': 'users/uid-test/birthdays/b-cycle-2026',
+              'fields': birthday(
+                'b-cycle-2026',
+                2026,
+                'messageDrafted',
+                secondUpdate,
+                draftId: 'd-prior-cycle',
+              ),
+            },
+          ],
+          'drafts': [
+            {
+              'name': 'users/uid-test/drafts/d-prior-cycle',
+              'fields': {
+                'id': stringValue('d-prior-cycle'),
+                'birthdayId': stringValue('b-cycle-2025'),
+                'personId': stringValue('p-cycle'),
+                'body': stringValue('Earlier birthday draft'),
+                'tone': stringValue('warm'),
+                'length': stringValue('short'),
+                'status': stringValue('draft'),
+                'providerType': stringValue('manual'),
+                'variationIndex': integerValue(0),
+                'createdAt': stringValue(createdAt.toIso8601String()),
+                'updatedAt': stringValue(firstUpdate.toIso8601String()),
+              },
+            },
+          ],
+          'reminderSettings': <Map<String, dynamic>>[],
+        };
+
+        final result = await CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: _backupAwareClient(
+            (request) => servePublished(request, (subRequest) async {
+              for (final collection in docs.keys) {
+                if (subRequest.url.path.endsWith('/$collection')) {
+                  return http.Response(
+                    jsonEncode({'documents': docs[collection]}),
+                    200,
+                  );
+                }
+              }
+              return http.Response(jsonEncode({'documents': []}), 200);
+            }),
+          ),
+        ).restore(_signedInAuth);
+
+        expect(result.success, isTrue, reason: result.error);
+        final birthdays = await db.select(db.birthdays).get();
+        final earlier = birthdays.singleWhere((row) => row.cycleYear == 2025);
+        final current = birthdays.singleWhere((row) => row.cycleYear == 2026);
+        expect(earlier.draftId, 'd-prior-cycle');
+        expect(earlier.status, 'messageDrafted');
+        expect(current.draftId, isNull);
+        expect(current.status, 'messageNotPrepared');
+        expect(
+          (await db.select(db.messageDrafts).getSingle()).birthdayId,
+          'b-cycle-2025',
+        );
+        expect(
+          result.conflictRecords.any(
+            (conflict) => conflict.contains(
+              'referenced draft belongs to another or unknown cycle',
+            ),
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test(
       'restore fails and aborts before write when a document is malformed (AUD-002)',
       () async {
-        final client = MockClient((request) async {
+        final client = _backupAwareClient((request) async {
           return servePublished(request, (subReq) async {
             if (subReq.url.path.endsWith('/people')) {
-              // Document missing required 'name' field
+              // A required field with the wrong Firestore type is invalid.
               return http.Response(
                 jsonEncode({
                   'documents': [
@@ -1257,7 +1634,7 @@ void main() {
                           'users/uid-test/generations/g-test/people/p-malformed',
                       'fields': {
                         'id': {'stringValue': 'p-malformed'},
-                        // Missing name
+                        'name': {'integerValue': '42'},
                       },
                     },
                   ],

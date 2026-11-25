@@ -1,3 +1,0 @@
-# Domain Maps
-
-Detailed maintainable maps already exist in `definitive/diagrams`: [people/birthday](../../definitive/diagrams/people-birthday-map.md), [studio/AI/delivery](../../definitive/diagrams/studio-ai-delivery-map.md), [account/continuity](../../definitive/diagrams/account-continuity-map.md), [domain ecosystem](../../definitive/diagrams/domain-ecosystem-map.md). They describe target structure. 2.0 current-state deltas: schema v6/leap preference exists; auto-SMS is disabled in both compile/native gates; Autopilot is server-only/undeployed; aggregate identity/write authority/backup lifecycle remain conflicts.

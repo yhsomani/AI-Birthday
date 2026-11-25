@@ -1,6 +1,6 @@
 /// Stable, user-facing failure model for the application.
 ///
-/// Every failure should answer three questions (SSOT layer guidance):
+/// Every failure should answer three questions (layering guidance, ARCHITECTURE.md §3.3):
 /// - What failed? (`code` / `message`)
 /// - Why did it fail? (`detail`)
 /// - What can the user do next? (`action`)
@@ -21,6 +21,8 @@ enum AppFailureCode {
   aiCredentialMissing,
   aiCredentialInvalid,
   aiNanoUnavailable,
+  aiNanoGenerationFailed,
+  aiInvalidResponse,
   aiBusy,
   aiQuotaExceeded,
   aiTimeout,
@@ -70,6 +72,7 @@ class AppFailure implements Exception {
     AppFailureCode.aiTimeout ||
     AppFailureCode.aiBusy ||
     AppFailureCode.aiProviderError ||
+    AppFailureCode.aiNanoGenerationFailed ||
     AppFailureCode.syncConflict ||
     AppFailureCode.deliveryFailed => true,
     _ => false,
@@ -78,7 +81,17 @@ class AppFailure implements Exception {
   /// User-safe one-line description (message + detail + action). This is the
   /// exact composition the studio used to render failures, shared so the job
   /// worker persists the same copy the UI would have shown.
-  String get userMessage => '$message: ${detail ?? ''} ${action ?? ''}';
+  String get userMessage {
+    final description = message?.trim() ?? '';
+    final guidance = [detail, action]
+        .whereType<String>()
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .join(' ');
+    if (description.isEmpty) return guidance;
+    if (guidance.isEmpty) return description;
+    return '$description: $guidance';
+  }
 
   /// Whether a configured credential exists but is invalid (never "missing").
   bool get isCredentialError => switch (code) {
@@ -127,6 +140,22 @@ class AppFailure implements Exception {
         message: 'On-device AI is unavailable',
         detail: 'Gemini Nano is not available on this device.',
         action: action ?? 'Add a Gemini API key in Settings.',
+      );
+
+  /// The provider completed but returned no usable generated content.
+  const AppFailure.invalidAiResponse()
+    : this(
+        AppFailureCode.aiInvalidResponse,
+        message: 'AI returned an empty response',
+        action: 'Try again or choose another provider.',
+      );
+
+  /// A transient on-device generation failure that can be retried.
+  const AppFailure.nanoGenerationFailed()
+    : this(
+        AppFailureCode.aiNanoGenerationFailed,
+        message: 'On-device AI could not complete the request',
+        action: 'Try again.',
       );
 
   /// The AI provider is busy processing another request.

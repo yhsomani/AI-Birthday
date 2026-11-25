@@ -25,12 +25,12 @@ enum InputError {
   leapDayPolicyRequired,
   invalidPhone,
   invalidEmail,
-  relationshipTooLong,
   languageTooLong,
   factTooLong,
   tooManyFacts,
   notesTooLong,
   invalidTimezone,
+  languageRequired,
 }
 
 extension InputErrorLabel on InputError {
@@ -44,14 +44,13 @@ extension InputErrorLabel on InputError {
       'Choose February 28 or March 1 for non-leap years',
     InputError.invalidPhone => 'Phone number looks incorrect',
     InputError.invalidEmail => 'Email address looks incorrect',
-    InputError.relationshipTooLong =>
-      'Relationship must be 60 characters or fewer',
     InputError.languageTooLong => 'Language tag is too long',
     InputError.factTooLong => 'Each fact must be 200 characters or fewer',
     InputError.tooManyFacts => 'A maximum of 20 facts is supported',
     InputError.notesTooLong => 'Notes must be 2000 characters or fewer',
     InputError.invalidTimezone =>
       'Unknown timezone; use an IANA name like "Asia/Kolkata"',
+    InputError.languageRequired => 'Language code is required',
   };
 }
 
@@ -121,14 +120,9 @@ class PersonInputValidator {
       }
     }
 
-    final relationship = d.relationship.name;
-    if (relationship.length > 60) {
-      errors[PersonField.relationship] = InputError.relationshipTooLong;
-    }
-
     final language = d.preferredLanguage.trim();
     if (language.isEmpty) {
-      errors[PersonField.language] = InputError.languageTooLong;
+      errors[PersonField.language] = InputError.languageRequired;
     } else if (language.length > 10) {
       errors[PersonField.language] = InputError.languageTooLong;
     }

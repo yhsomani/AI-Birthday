@@ -1,10 +1,11 @@
 /// Authoritative Settings screen for Account, Reminders, AI Credentials,
-/// Subscription Entitlement, and Help & Guide (SSOT §5, §11, §17, §20).
+/// Subscription Entitlement, and Help & Guide (legacy SSOT §5, §11, §17, §20 (PRODUCT.md §16.7)).
 library;
 
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -47,7 +48,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isTestingKey = false;
   GeminiConnectionResult? _connectionResult;
   DateTime? _lastVerifiedAt;
-  bool _isPurchasing = false;
+  ValueListenable<PurchaseUiState>? _purchaseUi;
+  PurchaseStatus _lastPurchaseStatus = PurchaseStatus.idle;
   // Cloud backup/restore now run as durable background jobs: `_isSyncing`
   // follows the account's active cloud job (truthful even after re-entry),
   // and failures stay visible inline with a retry affordance.
@@ -61,6 +63,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   // Durable job bookkeeping for the signed-in account's cloud_sync job.
   StreamSubscription<JobRecord?>? _cloudJobSub;
+  int _cloudJobWatchGeneration = 0;
+  bool _isRestoringCloudData = false;
   String? _lastHandledCloudJobId;
   JobStatus? _lastHandledCloudJobStatus;
   // Set when THIS screen visit enqueues a job: gates the success/failure
@@ -77,12 +81,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _checkStoredKey();
     _checkNanoState();
     _loadLastSyncTime();
-    _initCloudJobWatch();
+    unawaited(_initCloudJobWatch());
+    _purchaseUi =
+        ref.read(subscriptionNotifierProvider.notifier).purchaseUiState
+          ..addListener(_onPurchaseUiChanged);
   }
 
   @override
   void dispose() {
+    _purchaseUi?.removeListener(_onPurchaseUiChanged);
     _cloudJobSub?.cancel();
+    _cloudJobWatchGeneration++;
     _apiKeyController.dispose();
     super.dispose();
   }
@@ -92,14 +101,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// the state with a one-shot read, then ride the worker's in-process
   /// transition stream (a plain broadcast, so no drift query timers).
   Future<void> _initCloudJobWatch() async {
+    final generation = ++_cloudJobWatchGeneration;
+    await _cloudJobSub?.cancel();
+    _cloudJobSub = null;
+    if (!mounted || generation != _cloudJobWatchGeneration) return;
     final auth = ref.read(authControllerProvider).valueOrNull;
     final identity = auth?.identity;
     final accountId = identity?.firebaseUid ?? identity?.googleSubject;
-    if (accountId == null || accountId.isEmpty) return;
-    _cloudJobSub?.cancel();
+    if (accountId == null || accountId.isEmpty || !mounted) {
+      return;
+    }
     final latest = await ref
         .read(jobsRepositoryProvider)
         .latestJob(JobTypes.cloudSync, accountId);
+    if (!mounted || generation != _cloudJobWatchGeneration) return;
     if (latest != null && mounted) _onCloudJobEvent(latest);
     _cloudJobSub = ref
         .read(jobWorkerProvider)
@@ -126,6 +141,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       case JobStatus.queued || JobStatus.running || JobStatus.retrying:
         setState(() {
           _isSyncing = true;
+          _isRestoringCloudData = operation == CloudJobPayload.restore;
           _cloudError = null;
         });
       case JobStatus.succeeded:
@@ -153,6 +169,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         }
         setState(() {
           _isSyncing = false;
+          _isRestoringCloudData = false;
           _cloudError = null;
           if (report != null) _restoreReport = report;
           if (report != null) _restoreDetails = details;
@@ -173,6 +190,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         final message = job.errorMessage ?? 'Cloud operation failed.';
         setState(() {
           _isSyncing = false;
+          _isRestoringCloudData = false;
           _cloudError = message;
         });
         if (ours) {
@@ -189,6 +207,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       case JobStatus.canceled:
         setState(() {
           _isSyncing = false;
+          _isRestoringCloudData = false;
           _cloudError = null;
         });
     }
@@ -318,7 +337,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           maxAttempts: 2,
         );
-    _initCloudJobWatch();
+    unawaited(_initCloudJobWatch());
     if (!mounted) return;
     setState(() {
       _isSyncing = true;
@@ -380,7 +399,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           maxAttempts: 1,
         );
-    _initCloudJobWatch();
+    unawaited(_initCloudJobWatch());
     if (!mounted) return;
     setState(() {
       _isSyncing = true;
@@ -657,25 +676,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _handlePurchasePro() async {
     HapticFeedback.lightImpact();
-    setState(() => _isPurchasing = true);
-    final success = await ref
-        .read(subscriptionNotifierProvider.notifier)
-        .purchaseProMonthly();
-    if (!mounted) return;
-    setState(() => _isPurchasing = false);
+    // Progress and the outcome (snackbar) come from the purchase UI state.
+    await ref.read(subscriptionNotifierProvider.notifier).purchaseProMonthly();
+  }
 
-    final reason = ref
-        .read(subscriptionNotifierProvider.notifier)
-        .lastPurchaseFailure;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'Purchase flow opened. Google Play will verify the subscription before AI is unlocked.'
-              : _purchaseFailureMessage(reason),
-        ),
-      ),
-    );
+  /// Reports each terminal purchase result once, then acknowledges it.
+  void _onPurchaseUiChanged() {
+    final ui = _purchaseUi?.value;
+    if (ui == null || !mounted) return;
+    final previous = _lastPurchaseStatus;
+    _lastPurchaseStatus = ui.status;
+    if (ui.status == previous) return;
+
+    final message = switch (ui.status) {
+      PurchaseStatus.success => 'Pro verified. AI features are unlocked.',
+      PurchaseStatus.error => _purchaseFailureMessage(ui.failure),
+      PurchaseStatus.cancelled =>
+        'Purchase cancelled. You have not been charged.',
+      _ => null,
+    };
+    if (message == null) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+    ref.read(subscriptionNotifierProvider.notifier).clearPurchaseResult();
   }
 
   Future<void> _handleManageSubscription() async {
@@ -694,26 +718,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       'Pro is not available on this install. Install the Google Play version.',
     PurchaseFailure.verificationUnavailable =>
       'Pro purchases are temporarily unavailable. You have not been charged. Try again later.',
+    PurchaseFailure.verificationFailed =>
+      'We could not verify your purchase yet. Tap "Restore Purchases" to retry; do not buy again.',
+    PurchaseFailure.purchaseError =>
+      'Google Play could not complete the purchase. Try again.',
     _ => 'Purchase could not be started. Try again.',
   };
 
   Future<void> _handleRestorePurchases() async {
     HapticFeedback.lightImpact();
-    final restored = await ref
+    final outcome = await ref
         .read(subscriptionNotifierProvider.notifier)
-        .restorePurchases();
+        .restorePurchasesDetailed();
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          restored
-              ? 'Verified Pro subscription restored.'
-              : 'No verified active subscription was found.',
-        ),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(_restoreMessage(outcome))));
   }
+
+  String _restoreMessage(RestoreOutcome outcome) => switch (outcome) {
+    RestoreOutcome.restored => 'Verified Pro subscription restored.',
+    RestoreOutcome.notFound =>
+      'No active Pro subscription was found for this Google Play account.',
+    RestoreOutcome.verificationFailed =>
+      'A purchase was found but could not be verified. Check your connection and try again.',
+    RestoreOutcome.signInRequired =>
+      'Sign in with Google to restore your purchases.',
+    RestoreOutcome.storeUnavailable =>
+      'Google Play Billing is not available on this device.',
+    RestoreOutcome.error => 'Restore failed. Try again.',
+  };
 
   /// On-device section is only shown when Gemini Nano can run or be set up here.
   bool get _nanoSupported =>
@@ -753,7 +788,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Card(child: const _AuthTile()),
           const SizedBox(height: 20),
 
-          // Section 5: Reminders & Quiet Hours (SSOT §17)
+          // Section 5: Reminders & Quiet Hours (legacy SSOT §17 (PRODUCT.md §16.7))
           AppSectionHeader(title: 'Reminders', isAccent: true),
           Card(
             clipBehavior: Clip.antiAlias,
@@ -996,7 +1031,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 20),
           ],
 
-          // Section 1.5: Cloud Backup (SSOT §13)
+          // Section 1.5: Cloud Backup (legacy SSOT §13 (PRODUCT.md §16.7))
           AppSectionHeader(title: 'Cloud Backup', isAccent: true),
           CloudBackupCard(
             lastSyncTime: _lastSyncTime,
@@ -1004,12 +1039,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             restoreReport: _restoreReport,
             restoreDetails: _restoreDetails,
             isSyncing: _isSyncing,
+            isRestoring: _isRestoringCloudData,
             onBackup: _handleCloudSync,
             onRestore: _handleCloudRestore,
           ),
           const SizedBox(height: 20),
 
-          // Section 2: Subscription & Entitlement (SSOT §11)
+          // Section 2: Subscription & Entitlement (legacy SSOT §11 (PRODUCT.md §16.7))
           AppSectionHeader(title: 'Subscription & Entitlement', isAccent: true),
           Card(
             child: Padding(
@@ -1060,25 +1096,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
                   if (!entitlement.canUseAi) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _isPurchasing ? null : _handlePurchasePro,
-                        icon: _isPurchasing
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.star_outline),
-                        label: Text(
-                          _isPurchasing
-                              ? 'Verifying Purchase...'
-                              : 'Upgrade via Google Play (\$2.99/mo)',
-                        ),
-                      ),
+                    ValueListenableBuilder<PurchaseUiState>(
+                      valueListenable: entitlementNotifier.purchaseUiState,
+                      builder: (context, ui, _) {
+                        final busy = ui.isBusy;
+                        final price = ui.productPrice;
+                        return SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: busy ? null : _handlePurchasePro,
+                            icon: busy
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.star_outline),
+                            label: Text(switch (ui.status) {
+                              PurchaseStatus.purchasing =>
+                                'Opening Google Play...',
+                              PurchaseStatus.verifying =>
+                                'Verifying purchase...',
+                              _ =>
+                                price == null
+                                    ? 'Upgrade via Google Play'
+                                    : 'Upgrade via Google Play ($price/mo)',
+                            }),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -1124,10 +1172,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton.icon(
-                        onPressed: _handleRestorePurchases,
-                        icon: const Icon(Icons.refresh, size: 16),
-                        label: const Text('Restore Purchases'),
+                      ValueListenableBuilder<PurchaseUiState>(
+                        valueListenable: entitlementNotifier.purchaseUiState,
+                        builder: (context, ui, _) => TextButton.icon(
+                          onPressed: ui.isRestoring
+                              ? null
+                              : _handleRestorePurchases,
+                          icon: ui.isRestoring
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.refresh, size: 16),
+                          label: Text(
+                            ui.isRestoring
+                                ? 'Restoring...'
+                                : 'Restore Purchases',
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1137,7 +1202,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Section 3: AI Provider & Personal Gemini API Key (SSOT §5, §20)
+          // Section 3: AI Provider & Personal Gemini API Key (legacy SSOT §5, §20 (PRODUCT.md §16.7))
           AppSectionHeader(title: 'AI provider', isAccent: true),
           Card(
             clipBehavior: Clip.antiAlias,
@@ -1203,6 +1268,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 TextField(
                   controller: _apiKeyController,
                   obscureText: _obscureKey,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  enableIMEPersonalizedLearning: false,
                   onChanged: (_) {
                     if (_connectionResult != null) {
                       setState(() => _connectionResult = null);
@@ -1281,7 +1349,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         'Stored securely on this device in hardware-backed encrypted storage. Sent directly to Google Gemini API only when generating messages, and never to AI-Birthday servers. Never included in sync or application logs.',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: context.colors.textSecondary,
                           height: 1.3,
                         ),
                       ),
@@ -1327,7 +1395,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Section 4: On-Device AI / Gemini Nano (SSOT §5, §25)
+          // Section 4: On-Device AI / Gemini Nano (legacy SSOT §5, §25 (PRODUCT.md §16.7))
           if (_nanoSupported) ...[
             AppSectionHeader(title: 'On-Device Intelligence', isAccent: true),
             Card(
@@ -1438,7 +1506,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    context.push('/onboarding');
+                    context.push('/onboarding?replay=true');
                   },
                 ),
                 const Divider(height: 1),
@@ -1464,7 +1532,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           Center(
             child: Text(
-              'AI-Birthday • v1.0.0',
+              'AI-Birthday',
               style: theme.textTheme.labelMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -1843,7 +1911,7 @@ class _GeminiSetupGuideSheet extends StatelessWidget {
                         Text(
                           'Step-by-step setup in Google AI Studio',
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
+                            color: context.colors.textSecondary,
                           ),
                         ),
                       ],

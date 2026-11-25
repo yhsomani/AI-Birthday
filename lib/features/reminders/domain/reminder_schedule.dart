@@ -45,7 +45,7 @@ class ReminderPlan {
   int get count => active.length + suppressed.length;
 }
 
-/// Pure reminder planning (SSOT §17, FR-005).
+/// Pure reminder planning (legacy SSOT §17 (PRODUCT.md §16.7), FR-005).
 ///
 /// Uses [BirthdayEngine] for the next occurrence (timezone-aware, leap-day
 /// resolved), then places each enabled lead at [reminderHour] local time on

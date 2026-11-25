@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/product_capabilities.dart';
 import '../../../core/core_providers.dart';
-import '../../reminders/application/reminder_providers.dart';
 import '../../reminders/application/reminder_settings_controller.dart';
 import '../application/person_service.dart';
 import '../domain/person.dart';
@@ -31,14 +30,17 @@ final personServiceProvider = Provider<PersonService>(
 
 /// Refreshes the reminder plan after contact changes that bypass
 /// [PersonService]'s onChanged hook (CSV / device-contacts imports, which
-/// batch-write through the repositories). Failures are logged, never thrown —
-/// an import must not be blocked by schedule refresh.
+/// batch-write through the repositories). Failures are logged and exposed as
+/// a retry-pending reminder state, never thrown — a person write must not be
+/// blocked by schedule refresh (audit A1-003/A1-010).
 Future<void> resyncReminderSchedule(ProviderContainer container) async {
   try {
-    final reminderService = container.read(reminderServiceProvider);
-    final settings = container.read(reminderSettingsProvider);
+    // Waits for the saved settings; failures are surfaced on the settings
+    // state and retried at the next start / resume, never thrown here.
+    await container
+        .read(reminderSettingsProvider.notifier)
+        .replan(reason: 'people_changed');
     final people = await container.read(peopleStoreProvider).getAll();
-    await reminderService.sync(people: people, settings: settings);
 
     // Reconcile automated SMS jobs only for a separately approved build.
     if (ProductCapabilities.automaticSms) {

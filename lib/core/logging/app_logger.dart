@@ -1,6 +1,6 @@
 /// Sanitized, structured logging for AI-Birthday.
 ///
-/// Observability contract (SSOT / SECURITY / CODE_STYLE):
+/// Observability contract (PRODUCT.md §11, SECURITY.md):
 /// - allowed: operation id, duration, provider type, error category,
 ///   success/failure, non-sensitive entity ids, sanitized error codes.
 /// - never logged: API credentials, access tokens, message bodies, phone
@@ -44,6 +44,24 @@ final RegExp _sensitiveKeyRegExp = RegExp(
   r'(^sub$|subject|uid|user[-_]?id|credential|secret|token|api[-_]?key|password|key|phone([-._]?number)?|address|email|note|message|content|body|text|fact|quote)',
   caseSensitive: false,
 );
+final RegExp _emailRegExp = RegExp(
+  r'\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',
+  caseSensitive: false,
+);
+final RegExp _credentialRegExp = RegExp(
+  r'\b(?:Bearer\s+)?(?:AIza[0-9A-Za-z_-]{20,}|ya29\.[0-9A-Za-z._-]{20,}|eyJ[0-9A-Za-z_-]{20,}\.[0-9A-Za-z_-]{10,}\.[0-9A-Za-z_-]{10,})\b',
+);
+final RegExp _phoneRegExp = RegExp(r'(?<!\w)\+?\d[\d ()-]{7,}\d(?!\w)');
+final RegExp _sensitiveAssignmentRegExp = RegExp(
+  r'''\b(?:email|phone(?:Number)?|address|token|apiKey|credential|secret|password|note|message|content|body)\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)''',
+  caseSensitive: false,
+);
+
+String _redactMessage(String message) => message
+    .replaceAll(_emailRegExp, '[REDACTED]')
+    .replaceAll(_credentialRegExp, '[REDACTED]')
+    .replaceAll(_phoneRegExp, '[REDACTED]')
+    .replaceAll(_sensitiveAssignmentRegExp, '[REDACTED]');
 
 /// Redacts values whose key suggests sensitive content.
 Object? _redactValue(String key, Object? value) {
@@ -142,7 +160,7 @@ class ConsoleAppLogger implements AppLogger {
         ? ''
         : ' trace=${record.stackTrace.toString().split('\n').firstWhere((line) => line.trim().isNotEmpty, orElse: () => '')}';
     sink(
-      '[${record.level.name}] ${record.category}$opacity$categoryInfo: ${record.message}$durationInfo$extra$errorInfo$traceInfo',
+      '[${record.level.name}] ${record.category}$opacity$categoryInfo: ${_redactMessage(record.message)}$durationInfo$extra$errorInfo$traceInfo',
     );
   }
 
@@ -158,7 +176,7 @@ class ConsoleAppLogger implements AppLogger {
     LogRecord(
       level: LogLevel.verbose,
       category: category,
-      message: message,
+      message: _redactMessage(message),
       operationId: operationId,
       params: params,
     ),
@@ -425,7 +443,7 @@ class RecordingLogger implements AppLogger {
     final record = LogRecord(
       level: level,
       category: category,
-      message: message,
+      message: _redactMessage(message),
       operationId: operationId,
       params: params.map(
         (key, value) => MapEntry(key, _redactValue(key, value)),

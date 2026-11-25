@@ -7,7 +7,7 @@ import {
   deriveDeletionReceiptKey,
   isDeletionReceiptId,
   receiptProjection,
-} from '../src/deletion-contract.js';
+} from '../src/deletion-contract.ts';
 
 const receiptId = 'abcdef01-abcd-4def-8abc-abcdef001201';
 const now = 1_800_000_000_000;

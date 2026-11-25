@@ -9,6 +9,9 @@
 /// 4. Otherwise apply via an idempotent upsert (stable draft id = birthday
 ///    id, like every other save path in the studio), then mark the birthday.
 ///
+/// Cases 2-3 (and a lost compare-and-set on apply) return [JobSkipped] so the
+/// caller can say "result not applied" instead of claiming success.
+///
 /// Duplicate delivery after a crash is safe by construction: the apply is an
 /// upsert of the same row with the same body, and the guards make a stale
 /// re-apply impossible.
@@ -38,10 +41,11 @@ class AiJobPayload {
     required this.tone,
     required this.length,
     this.customInstruction,
-    this.existingMessage,
+    this.rewriteExisting = false,
     this.targetLanguage,
     this.forceNano = false,
     this.draftUpdatedAt,
+    this.draftRevision,
     this.targetCycleYear,
   });
 
@@ -50,7 +54,7 @@ class AiJobPayload {
   final MessageTone tone;
   final MessageLength length;
   final String? customInstruction;
-  final String? existingMessage;
+  final bool rewriteExisting;
   final String? targetLanguage;
   final bool forceNano;
 
@@ -58,6 +62,10 @@ class AiJobPayload {
   /// draft row existed — a fresh generation). The stale guard applies the
   /// result only if the draft is still unchanged.
   final String? draftUpdatedAt;
+
+  /// Monotonic `revision` of that draft at enqueue time. Unlike [draftUpdatedAt]
+  /// (1 s precision) it distinguishes two writes inside the same second.
+  final int? draftRevision;
 
   /// Calendar year this message targets (the birthday row's `cycleYear`),
   /// persisted so "Turning age" in the prompt is stable across restarts and
@@ -70,10 +78,11 @@ class AiJobPayload {
     'tone': tone.name,
     'length': length.name,
     'customInstruction': customInstruction,
-    'existingMessage': existingMessage,
+    'rewriteExisting': rewriteExisting,
     'targetLanguage': targetLanguage,
     'forceNano': forceNano,
     'draftUpdatedAt': draftUpdatedAt,
+    'draftRevision': draftRevision,
     'targetCycleYear': targetCycleYear,
   };
 
@@ -85,10 +94,13 @@ class AiJobPayload {
       tone: MessageTone.fromString(json['tone'] as String?),
       length: MessageLength.fromString(json['length'] as String?),
       customInstruction: json['customInstruction'] as String?,
-      existingMessage: json['existingMessage'] as String?,
+      rewriteExisting:
+          json['rewriteExisting'] as bool? ??
+          ((json['existingMessage'] as String?)?.trim().isNotEmpty ?? false),
       targetLanguage: json['targetLanguage'] as String?,
       forceNano: json['forceNano'] as bool? ?? false,
       draftUpdatedAt: json['draftUpdatedAt'] as String?,
+      draftRevision: json['draftRevision'] as int?,
       targetCycleYear: json['targetCycleYear'] as int?,
     );
   }
@@ -96,20 +108,12 @@ class AiJobPayload {
 
 class AiGenerationJobHandler implements JobHandler {
   AiGenerationJobHandler({
-    required PeopleRepository peopleRepository,
-    required DraftsRepository draftsRepository,
-    required BirthdaysRepository birthdaysRepository,
-    required JobsRepository jobsRepository,
-    required Future<AiGenerationResult> Function(
-      AiGenerationRequest request, {
-      required bool forceNano,
-    })
-    generate,
-  }) : _peopleRepository = peopleRepository,
-       _draftsRepository = draftsRepository,
-       _birthdaysRepository = birthdaysRepository,
-       _jobsRepository = jobsRepository,
-       _generate = generate;
+    required this._peopleRepository,
+    required this._draftsRepository,
+    required this._birthdaysRepository,
+    required this._jobsRepository,
+    required this._generate,
+  });
 
   final PeopleRepository _peopleRepository;
   final DraftsRepository _draftsRepository;
@@ -150,13 +154,24 @@ class AiGenerationJobHandler implements JobHandler {
       );
     }
 
+    final rewriteDraft = payload.rewriteExisting
+        ? await _draftsRepository.getDraftForBirthday(payload.birthdayId)
+        : null;
+    if (payload.rewriteExisting && rewriteDraft == null) {
+      return JobFailed(
+        retryable: false,
+        code: 'notFound',
+        message: 'The draft to rewrite no longer exists.',
+      );
+    }
+
     final result = await _generate(
       AiGenerationRequest(
         person: person,
         tone: payload.tone,
         length: payload.length,
         customInstruction: payload.customInstruction,
-        existingMessage: payload.existingMessage,
+        existingMessage: rewriteDraft?.body,
         targetLanguage: payload.targetLanguage,
         targetCycleYear: payload.targetCycleYear ?? birthday.cycleYear,
       ),
@@ -166,7 +181,7 @@ class AiGenerationJobHandler implements JobHandler {
     // Cancel-while-running: a cancel that landed during generation discards
     // the result; the worker leaves the row canceled.
     if (await _jobsRepository.isCanceled(job.id)) {
-      return const JobSucceeded();
+      return const JobSkipped('canceled');
     }
 
     // Cycle rollover guard: re-verify the birthday still exists and targets the
@@ -176,7 +191,7 @@ class AiGenerationJobHandler implements JobHandler {
     );
     final targetCycleYear = payload.targetCycleYear ?? birthday.cycleYear;
     if (latestBirthday == null || latestBirthday.cycleYear != targetCycleYear) {
-      return const JobSucceeded();
+      return const JobSkipped('cycleChanged');
     }
 
     // Stale guard: if the draft changed after this job was enqueued, the
@@ -189,8 +204,11 @@ class AiGenerationJobHandler implements JobHandler {
         : DateTime.tryParse(payload.draftUpdatedAt!);
     final stale =
         current != null &&
-        (enqueuedAt == null || current.updatedAt.isAfter(enqueuedAt));
-    if (stale) return const JobSucceeded();
+        (enqueuedAt == null ||
+            current.updatedAt.isAfter(enqueuedAt) ||
+            (payload.draftRevision != null &&
+                current.revision != payload.draftRevision));
+    if (stale) return const JobSkipped('stale');
 
     // Apply: normal retries converge on the active row, while an immutable
     // confirmed-sent row is preserved by creating a new revision.
@@ -218,9 +236,10 @@ class AiGenerationJobHandler implements JobHandler {
       BirthdayStatus.messageDrafted,
       requireUnchanged: true,
       expectedCurrentDraft: current,
+      jobFence: JobAttemptFence(jobId: job.id, attempt: job.attempts),
     );
     if (!applied) {
-      return const JobSucceeded();
+      return const JobSkipped('conflict');
     }
 
     return JobSucceeded(revisionId);

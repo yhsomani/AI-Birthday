@@ -1,4 +1,4 @@
-/// A signed-in Google identity (SSOT §12 single login).
+/// A signed-in Google identity (legacy SSOT §12 (PRODUCT.md §16.7) single login).
 ///
 /// Contains no credentials: the ID token is exchanged with Firebase Auth in
 /// the device gateway and never retained, logged or synced here.

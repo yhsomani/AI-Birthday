@@ -1,0 +1,556 @@
+{
+ "schema_version": 1,
+ "note": "Nano-level functional units (PRODUCT.md section 5.5). Handles are proposed IDs (<registry-ID>/n<k>).",
+ "units": [
+  {
+   "id": "PEOPLE-VALIDATE/n1",
+   "parent": "PEOPLE-VALIDATE",
+   "label": "Name required, trimmed, ≤120 (BR-001)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/domain/person_input_validator.dart"
+   ],
+   "note": "person_input_validator.dart"
+  },
+  {
+   "id": "PEOPLE-VALIDATE/n2",
+   "parent": "PEOPLE-VALIDATE",
+   "label": "Birthday month/day must form a real calendar date; required by default (BR-002, DEC-016)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/domain/person_input_validator.dart"
+   ],
+   "note": "same"
+  },
+  {
+   "id": "PEOPLE-VALIDATE/n3",
+   "parent": "PEOPLE-VALIDATE",
+   "label": "Birth year 1900–2199 when supplied (BR-003)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/domain/person_input_validator.dart"
+   ],
+   "note": "same"
+  },
+  {
+   "id": "PEOPLE-VALIDATE/n4",
+   "parent": "PEOPLE-VALIDATE",
+   "label": "Phone 6–20 chars of digits and + - ( ) . space (BR-004)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/domain/person_input_validator.dart"
+   ],
+   "note": "same; stricter WhatsApp rule is separate (SEND-WA/n1)"
+  },
+  {
+   "id": "PEOPLE-VALIDATE/n5",
+   "parent": "PEOPLE-VALIDATE",
+   "label": "Email address-shaped, ≤254 (BR-005)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/domain/person_input_validator.dart"
+   ],
+   "note": "same"
+  },
+  {
+   "id": "PEOPLE-VALIDATE/n6",
+   "parent": "PEOPLE-VALIDATE",
+   "label": "Relationship ≤60; language non-empty ≤10; ≤20 facts of ≤200; notes ≤2000 (BR-006)",
+   "status": "PARTIALLY_IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/domain/person_input_validator.dart"
+   ],
+   "note": "the relationship check compares the enum name length and is dead (A1-030); the form maxLength: 60 is the only guard"
+  },
+  {
+   "id": "PEOPLE-VALIDATE/n7",
+   "parent": "PEOPLE-VALIDATE",
+   "label": "Supplied timezone must be a known IANA zone, ≤64 (BR-007)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/domain/person_input_validator.dart"
+   ],
+   "note": "BirthdayEngine.isKnownTimezone"
+  },
+  {
+   "id": "PEOPLE-CRUD/n1",
+   "parent": "PEOPLE-CRUD",
+   "label": "PersonService.create validates then writes Person and Birthday",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/application/person_service.dart"
+   ],
+   "note": "person_service.dart"
+  },
+  {
+   "id": "PEOPLE-CRUD/n2",
+   "parent": "PEOPLE-CRUD",
+   "label": "update validates with requireBirthday: existing.hasBirthday (legacy persons without a birthday can still be edited)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/application/person_service.dart"
+   ],
+   "note": "same"
+  },
+  {
+   "id": "PEOPLE-CRUD/n3",
+   "parent": "PEOPLE-CRUD",
+   "label": "Clamp autoPrepare and autoSendPolicy by ProductCapabilities (both flags default off)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/application/person_service.dart"
+   ],
+   "note": "no consumer reads person.autoPrepare (see AUTO-PREP)"
+  },
+  {
+   "id": "PEOPLE-CRUD/n4",
+   "parent": "PEOPLE-CRUD",
+   "label": "remove → softDeleteAggregate: hard-deletes the person's Birthday rows and jobs; drafts untouched",
+   "status": "PARTIALLY_IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/application/person_service.dart"
+   ],
+   "note": "person row soft-deleted; PII not purged (A1-011)"
+  },
+  {
+   "id": "PEOPLE-CRUD/n5",
+   "parent": "PEOPLE-CRUD",
+   "label": "restoreAggregate restores the birthday from a UI-held snapshot; jobs are not restored",
+   "status": "PARTIALLY_IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/application/person_service.dart"
+   ],
+   "note": "undo exists only on the snackbar; DEC-027 OPEN]"
+  },
+  {
+   "id": "PEOPLE-IMPORT/n1",
+   "parent": "PEOPLE-IMPORT",
+   "label": "importBatch strict all-or-nothing; importValidRows per-row failures",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/presentation/people_screen.dart"
+   ],
+   "note": "A1-006 fixed"
+  },
+  {
+   "id": "PEOPLE-CSV/n1",
+   "parent": "PEOPLE-CSV",
+   "label": "_parseCsvLine quote-aware tokenization (registry micro PEOPLE-CSV-QUOTE-PARSER)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/data/contact_csv_service.dart"
+   ],
+   "note": "contact_csv_service.dart"
+  },
+  {
+   "id": "PEOPLE-CSV/n2",
+   "parent": "PEOPLE-CSV",
+   "label": "parseCsvWithResult date normalization and CsvParseResult.invalidRows",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/data/contact_csv_service.dart"
+   ],
+   "note": "same; limits 1000 rows, 1 MiB"
+  },
+  {
+   "id": "PEOPLE-CSV/n3",
+   "parent": "PEOPLE-CSV",
+   "label": "Duplicate hinting; duplicates unselected in review (_reviewAndImportCandidates)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/data/contact_csv_service.dart"
+   ],
+   "note": "lib/features/people/presentation/"
+  },
+  {
+   "id": "PEOPLE-EXPORT/n1",
+   "parent": "PEOPLE-EXPORT",
+   "label": "Export 16 columns incl. Leap Day Policy; unversioned; omits id/version/tombstone",
+   "status": "PARTIALLY_IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/data/contact_csv_service.dart"
+   ],
+   "note": "no format version (legacy documents disagreed on the export header)"
+  },
+  {
+   "id": "PEOPLE-SEARCH/n1",
+   "parent": "PEOPLE-SEARCH",
+   "label": "Literal case-insensitive substring over name and relationship label (RegExp.escape)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/people/presentation/people_screen.dart"
+   ],
+   "note": "accent/script-insensitive matching not verified (F-012)"
+  },
+  {
+   "id": "BIRTH-CALC/n1",
+   "parent": "BIRTH-CALC",
+   "label": "computeNext returns null for Feb 29 with no leap-day choice",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/birthdays/domain/birthday_engine.dart"
+   ],
+   "note": "legacy Feb-29 persons are skipped (A1-013)"
+  },
+  {
+   "id": "BIRTH-CALC/n2",
+   "parent": "BIRTH-CALC",
+   "label": "_computeInTimezone resolves the IANA zone with an unguarded tz.getLocation",
+   "status": "PARTIALLY_IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/birthdays/domain/birthday_engine.dart"
+   ],
+   "note": "invalid stored zone throws (DEC-029 OPEN])"
+  },
+  {
+   "id": "BIRTH-CYCLE/n1",
+   "parent": "BIRTH-CYCLE",
+   "label": "One Birthday row per person, id birthday-{personId}, unique index on person_id; date stored as yyyy-MM-dd",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/birthdays/application/birthday_lifecycle_service.dart"
+   ],
+   "note": "A1-001, A1-009 fixed; schema v7"
+  },
+  {
+   "id": "BIRTH-CYCLE/n2",
+   "parent": "BIRTH-CYCLE",
+   "label": "Rollover deletes non-confirmedSent drafts and jobs of the old cycle and clears draftId",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/birthdays/application/birthday_lifecycle_service.dart"
+   ],
+   "note": "conflicts with BDY-AC-017; DEC-022 OPEN]"
+  },
+  {
+   "id": "BIRTH-CYCLE/n3",
+   "parent": "BIRTH-CYCLE",
+   "label": "BirthdayStatus enum (created … failed) with no transition-legality guard",
+   "status": "NOT_IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/birthdays/application/birthday_lifecycle_service.dart"
+   ],
+   "note": "FR-008; job transitions are guarded (BR-018)"
+  },
+  {
+   "id": "BIRTH-MIDNIGHT-REFRESH/n1",
+   "parent": "BIRTH-MIDNIGHT-REFRESH",
+   "label": "Local-midnight timer in birthdaysStreamProvider",
+   "status": "PARTIALLY_IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/app/providers.dart"
+   ],
+   "note": "no recipient-midnight or resume refresh (DEC-033 OPEN])"
+  },
+  {
+   "id": "REM-RULES/n1",
+   "parent": "REM-RULES",
+   "label": "Plan emits at most one reminder per enabled kind per person (BR-010)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/reminders/domain/reminder_schedule.dart"
+   ],
+   "note": "reminder_schedule.dart"
+  },
+  {
+   "id": "REM-RULES/n2",
+   "parent": "REM-RULES",
+   "label": "Reject a reminder whose time is not after the reference instant (BR-011)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/reminders/domain/reminder_schedule.dart"
+   ],
+   "note": "same"
+  },
+  {
+   "id": "REM-QUIET-HOURS/n1",
+   "parent": "REM-QUIET-HOURS",
+   "label": "Suppress inside quiet hours (default 22:00–08:00) or defer to before the end of the birthday day (BR-012)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/reminders/domain/quiet_hours.dart"
+   ],
+   "note": "quiet hours evaluated in the recipient frame (A1-015)"
+  },
+  {
+   "id": "REM-PLAN-STAMP/n1",
+   "parent": "REM-PLAN-STAMP",
+   "label": "Plan stamp makes start/resume re-plan idempotent; replan is serialised",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/reminders/application/reminder_plan_stamp.dart"
+   ],
+   "note": "A1-002/003/010 fixed"
+  },
+  {
+   "id": "REM-RULES/n3",
+   "parent": "REM-RULES",
+   "label": "Reminder hour hardcoded to 09:00",
+   "status": "PARTIALLY_IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/reminders/domain/reminder_schedule.dart"
+   ],
+   "note": "A1-015 open"
+  },
+  {
+   "id": "STUDIO-AI-QUEUE/n1",
+   "parent": "STUDIO-AI-QUEUE",
+   "label": "_enqueueGenerate enqueues an ai_generate job",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart"
+   ],
+   "note": "message_studio_screen.dart"
+  },
+  {
+   "id": "STUDIO-AI-QUEUE/n2",
+   "parent": "STUDIO-AI-QUEUE",
+   "label": "AiRouter gates on entitlement (BR-013) then selects BYOK or Nano (BR-014)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/ai/domain/ai_router.dart"
+   ],
+   "note": "ai_router.dart"
+  },
+  {
+   "id": "STUDIO-AI-QUEUE/n3",
+   "parent": "STUDIO-AI-QUEUE",
+   "label": "_withTimeout bounds a provider call at 30 s (BR-015) → retryable typed failure",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart"
+   ],
+   "note": "same"
+  },
+  {
+   "id": "STUDIO-AI-RECOVERY/n1",
+   "parent": "STUDIO-AI-RECOVERY",
+   "label": "ai_job_handler recovery of interrupted jobs at startup; retry with backoff and jitter (BR-018/019)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart"
+   ],
+   "note": "JOBS-CANCEL has no production caller (UNREACHABLE])"
+  },
+  {
+   "id": "STUDIO-AUTOSAVE/n1",
+   "parent": "STUDIO-AUTOSAVE",
+   "label": "Debounced autosave; lifecycle flush on pause/inactive when dirty",
+   "status": "PARTIALLY_IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart"
+   ],
+   "note": "dispose() does not flush (A2-024)"
+  },
+  {
+   "id": "STUDIO-STALE-RESULT-GUARD/n1",
+   "parent": "STUDIO-STALE-RESULT-GUARD",
+   "label": "Draft revision column stops an older write overwriting a newer revision",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart"
+   ],
+   "note": "A2-004 fixed; cloud restore does not carry revision"
+  },
+  {
+   "id": "SEND-WA/n1",
+   "parent": "SEND-WA",
+   "label": "Sanitize to digits, strip 00, require 7–15 digits, no leading 0, reject empty text, URL-encode (BR-016)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/delivery/data/whatsapp_handoff_builder.dart"
+   ],
+   "note": "whatsapp_handoff_builder.dart"
+  },
+  {
+   "id": "SEND-TRUTH/n1",
+   "parent": "SEND-TRUTH",
+   "label": "DeliveryEvents insert-only; outcomes launched, copied, launchFailed, notSent, confirmed",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart"
+   ],
+   "note": "BR-017"
+  },
+  {
+   "id": "SEND-EXPLICIT-CONFIRMATION/n1",
+   "parent": "SEND-EXPLICIT-CONFIRMATION",
+   "label": "Dialog \"Did you send the message?\" → \"Not Sent Yet\" / \"Yes, I Sent It\" → confirmedSent",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart"
+   ],
+   "note": "handoff-evidence failure offers \"Retry record\""
+  },
+  {
+   "id": "STUDIO-EDIT/n1",
+   "parent": "STUDIO-EDIT",
+   "label": "CTA ladder: Unlock with Pro → Add Phone Number → Fix Phone Number → Send via SMS → View in History",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart"
+   ],
+   "note": "§7.6"
+  },
+  {
+   "id": "BILL/n1",
+   "parent": "BILL",
+   "label": "UserEntitlement.canUseAi: only active, trial or grace with no passed expiry (BR-020)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/subscription/application/subscription_service.dart"
+   ],
+   "note": "lib/features/subscription/"
+  },
+  {
+   "id": "CTRL-PURCHASE/n1",
+   "parent": "CTRL-PURCHASE",
+   "label": "verifyPurchase: authenticated + App Check → Play verification → uid binding (SHA-256 of ai-birthday-purchase-binding:v1: + uid) → fenced transaction (ownership ledger + entitlement)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "backend/functions/src/services/subscriptionVerification.ts"
+   ],
+   "note": "A3-001, A4-004; not deployed"
+  },
+  {
+   "id": "CLOUD-UP/n1",
+   "parent": "CLOUD-UP",
+   "label": "Write immutable generation → validate/publish manifest → advance current only after all writes (BR-022)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/sync/data/cloud_sync_service.dart"
+   ],
+   "note": "retention keeps current + previous"
+  },
+  {
+   "id": "CLOUD-DOWN/n1",
+   "parent": "CLOUD-DOWN",
+   "label": "Restore preflight: validate complete manifest and every record, then one local transaction, then reminder re-plan",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/sync/data/cloud_sync_service.dart"
+   ],
+   "note": "draft revision not carried"
+  },
+  {
+   "id": "CTRL-CLAIM/n1",
+   "parent": "CTRL-CLAIM",
+   "label": "Coordination operations API-001..API-017 (installation registration, sender lease, claim, arm, outcome, retry, transfer, release, status)",
+   "status": "UNREACHABLE",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "backend/functions/src/services/controlPlane.ts"
+   ],
+   "note": "backend-only, no client caller, dormant (ISSUE-002)"
+  },
+  {
+   "id": "CTRL-DELETE/n1",
+   "parent": "CTRL-DELETE",
+   "label": "requestAccountDeletion / accountDeletionReceipt / sweepDeletionDrains saga (API-012, 013, 019)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "backend/functions/src/services/deletionOrchestrator.ts"
+   ],
+   "note": "not deployed"
+  },
+  {
+   "id": "DASH/n1",
+   "parent": "DASH",
+   "label": "Section assignment: Action Needed; Today's Birthdays (completed only); Upcoming ≤30 days; 1–7 days actionable → Action Needed",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/dashboard/presentation/dashboard_screen.dart"
+   ],
+   "note": "dashboard_screen.dart"
+  },
+  {
+   "id": "HISTORY/n1",
+   "parent": "HISTORY",
+   "label": "Status labels from DraftStatus and DeliveryOutcome; deleted persons render \"Removed contact\"",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/history/presentation/history_screen.dart"
+   ],
+   "note": "history_screen.dart"
+  },
+  {
+   "id": "ONB-GATE/n1",
+   "parent": "ONB-GATE",
+   "label": "Router redirect to /onboarding; positive result cached; read error lets the user through (BR-025)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/app/router.dart"
+   ],
+   "note": "A3-010 residual"
+  },
+  {
+   "id": "DB-STARTUP-RECOVERY/n1",
+   "parent": "DB-STARTUP-RECOVERY",
+   "label": "10 s DB preflight timeout → recovery screen → retry (ACT-029)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/core/core_providers.dart"
+   ],
+   "note": "core_providers.dart"
+  },
+  {
+   "id": "SEND-SMS/n1",
+   "parent": "SEND-SMS",
+   "label": "SMS composer URI: 3–15 digits, leading + or 00 preserved as +, national-format numbers and short codes accepted, body percent-encoded (%20); deliberately less strict than WhatsApp (A2-018)",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/delivery/data/sms_delivery_service.dart"
+   ],
+   "note": ""
+  }
+ ]
+}

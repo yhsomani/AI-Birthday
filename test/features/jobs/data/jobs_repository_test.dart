@@ -27,38 +27,77 @@ void main() {
 
   tearDown(() => database.close());
 
-  test('enqueue dedupes an active job and returns the original row', () async {
-    final first = await repo.enqueue(
-      type: JobTypes.aiGenerate,
-      subjectId: 'b1',
-      maxAttempts: 3,
-    );
-    final again = await repo.enqueue(
-      type: JobTypes.aiGenerate,
-      subjectId: 'b1',
-      maxAttempts: 5,
-    );
+  test(
+    'enqueue dedupes identical inputs and rejects different active inputs',
+    () async {
+      final first = await repo.enqueue(
+        type: JobTypes.aiGenerate,
+        subjectId: 'b1',
+        payload: '{"message":"one"}',
+        maxAttempts: 3,
+      );
+      final again = await repo.enqueue(
+        type: JobTypes.aiGenerate,
+        subjectId: 'b1',
+        payload: '{"message":"one"}',
+        maxAttempts: 5,
+      );
 
-    expect(again.id, first.id);
-    expect(again.maxAttempts, 3); // the original job wins, not the new request
+      expect(again.id, first.id);
+      expect(
+        again.maxAttempts,
+        3,
+      ); // the original job wins, not the new request
+      await expectLater(
+        repo.enqueue(
+          type: JobTypes.aiGenerate,
+          subjectId: 'b1',
+          payload: '{"message":"two"}',
+        ),
+        throwsStateError,
+      );
 
-    // A different subject is a different job.
-    final other = await repo.enqueue(
-      type: JobTypes.aiGenerate,
-      subjectId: 'b2',
-    );
-    expect(other.id, isNot(first.id));
+      // A different subject is a different job.
+      final other = await repo.enqueue(
+        type: JobTypes.aiGenerate,
+        subjectId: 'b2',
+      );
+      expect(other.id, isNot(first.id));
 
-    // A terminal job frees the slot: a new generation can be queued.
-    await repo.markSucceeded(first.id, resultRef: 'b1');
-    final fresh = await repo.enqueue(
-      type: JobTypes.aiGenerate,
-      subjectId: 'b1',
-      maxAttempts: 2,
-    );
-    expect(fresh.id, isNot(first.id));
-    expect(fresh.id, startsWith('${JobTypes.aiGenerate}_b1_'));
-  });
+      // A terminal job frees the slot: a new generation can be queued.
+      await repo.claimNext(DateTime.now());
+      await repo.markSucceeded(first.id, expectedAttempt: 1, resultRef: 'b1');
+      final fresh = await repo.enqueue(
+        type: JobTypes.aiGenerate,
+        subjectId: 'b1',
+        maxAttempts: 2,
+      );
+      expect(fresh.id, isNot(first.id));
+      expect(fresh.id, startsWith('${JobTypes.aiGenerate}_b1_'));
+    },
+  );
+
+  test(
+    'concurrent identical enqueue calls create only one active job',
+    () async {
+      final jobs = await Future.wait(
+        List.generate(
+          4,
+          (_) => repo.enqueue(
+            type: JobTypes.aiGenerate,
+            subjectId: 'concurrent',
+            payload: '{}',
+          ),
+        ),
+      );
+
+      expect(jobs.map((job) => job.id).toSet(), hasLength(1));
+      expect(
+        await repo.activeJob(JobTypes.aiGenerate, 'concurrent'),
+        isNotNull,
+      );
+    },
+  );
 
   test(
     'claimNext claims the oldest due job first and returns running state',
@@ -106,10 +145,12 @@ void main() {
 
   test('markRetrying defers the retry and records the failure', () async {
     final job = await repo.enqueue(type: 't', subjectId: 's', maxAttempts: 3);
+    await repo.claimNext(DateTime.now());
     final nextRetryAt = DateTime.now().add(const Duration(seconds: 4));
 
     await repo.markRetrying(
       job.id,
+      expectedAttempt: 1,
       nextRetryAt: nextRetryAt,
       errorCode: 'network',
       errorMessage: 'Could not reach the service.',
@@ -138,6 +179,7 @@ void main() {
     await repo.claimNext(now);
     await repo.markRetrying(
       job.id,
+      expectedAttempt: 1,
       nextRetryAt: now.add(const Duration(seconds: 30)),
       errorCode: 'network',
       errorMessage: 'backoff',
@@ -154,10 +196,12 @@ void main() {
     'markSucceeded prunes older terminal rows (bounded retention)',
     () async {
       final j1 = await repo.enqueue(type: JobTypes.aiGenerate, subjectId: 'b1');
-      await repo.markSucceeded(j1.id, resultRef: 'r1');
+      await repo.claimNext(DateTime.now());
+      await repo.markSucceeded(j1.id, expectedAttempt: 1, resultRef: 'r1');
 
       final j2 = await repo.enqueue(type: JobTypes.aiGenerate, subjectId: 'b1');
-      await repo.markSucceeded(j2.id, resultRef: 'r2');
+      await repo.claimNext(DateTime.now());
+      await repo.markSucceeded(j2.id, expectedAttempt: 1, resultRef: 'r2');
 
       expect(await repo.getById(j1.id), isNull); // pruned
       expect((await repo.getById(j2.id))!.status, JobStatus.succeeded);
@@ -177,12 +221,105 @@ void main() {
       expect(await repo.isCanceled(job.id), isTrue);
 
       final done = await repo.enqueue(type: 't', subjectId: 's2');
-      await repo.markSucceeded(done.id);
+      await repo.claimNext(DateTime.now());
+      await repo.markSucceeded(done.id, expectedAttempt: 1);
       await repo.cancel(done.id); // no-op
 
       expect((await repo.getById(done.id))!.status, JobStatus.succeeded);
     },
   );
+
+  test('terminal AI transitions scrub persisted prompt text', () async {
+    final success = await repo.enqueue(
+      type: JobTypes.aiGenerate,
+      subjectId: 'success',
+      payload: '{"existingMessage":"private draft"}',
+    );
+    await repo.claimNext(DateTime.now());
+    expect(await repo.markSucceeded(success.id, expectedAttempt: 1), isTrue);
+    expect((await repo.getById(success.id))!.payload, isNull);
+
+    final failed = await repo.enqueue(
+      type: JobTypes.aiGenerate,
+      subjectId: 'failed',
+      payload: '{"customInstruction":"private instruction"}',
+    );
+    await repo.claimNext(DateTime.now());
+    expect(await repo.markFailed(failed.id, expectedAttempt: 1), isTrue);
+    expect((await repo.getById(failed.id))!.payload, isNull);
+  });
+
+  test(
+    'terminal transition cannot overwrite a concurrent cancellation',
+    () async {
+      final job = await repo.enqueue(
+        type: JobTypes.aiGenerate,
+        subjectId: 'cancel-race',
+        payload: '{}',
+      );
+      await repo.claimNext(DateTime.now());
+      expect(await repo.cancel(job.id), isTrue);
+
+      expect(await repo.markSucceeded(job.id, expectedAttempt: 1), isFalse);
+      expect(
+        await repo.markRetrying(
+          job.id,
+          expectedAttempt: 1,
+          nextRetryAt: DateTime.now(),
+          errorCode: null,
+          errorMessage: null,
+        ),
+        isFalse,
+      );
+      expect(await repo.markFailed(job.id, expectedAttempt: 1), isFalse);
+      expect((await repo.getById(job.id))!.status, JobStatus.canceled);
+    },
+  );
+
+  test('stale attempt transitions cannot overwrite a retry claim', () async {
+    final job = await repo.enqueue(
+      type: JobTypes.aiGenerate,
+      subjectId: 'stale-attempt',
+      maxAttempts: 2,
+    );
+    final firstAttempt = (await repo.claimNext(DateTime.now()))!;
+    expect(firstAttempt.attempts, 1);
+    expect(
+      await repo.markRetrying(
+        job.id,
+        expectedAttempt: firstAttempt.attempts,
+        nextRetryAt: DateTime.now(),
+        errorCode: 'timeout',
+        errorMessage: 'Timed out.',
+      ),
+      isTrue,
+    );
+
+    final secondAttempt = (await repo.claimNext(DateTime.now()))!;
+    expect(secondAttempt.attempts, 2);
+    expect(
+      await repo.markSucceeded(job.id, expectedAttempt: firstAttempt.attempts),
+      isFalse,
+    );
+    expect(
+      await repo.markFailed(job.id, expectedAttempt: firstAttempt.attempts),
+      isFalse,
+    );
+    expect(
+      await repo.markRetrying(
+        job.id,
+        expectedAttempt: firstAttempt.attempts,
+        nextRetryAt: DateTime.now(),
+        errorCode: 'late',
+        errorMessage: 'Stale attempt.',
+      ),
+      isFalse,
+    );
+    expect(
+      await repo.markSucceeded(job.id, expectedAttempt: secondAttempt.attempts),
+      isTrue,
+    );
+  });
 
   test(
     'resetStale rolls orphaned running rows back to queued after grace',
@@ -198,7 +335,8 @@ void main() {
               subjectId: 's',
               startedAt: Value(now.subtract(const Duration(minutes: 5))),
               attempts: const Value(1),
-              maxAttempts: const Value(1),
+              // Budget remains, so recovery re-queues (exhausted rows fail).
+              maxAttempts: const Value(3),
               createdAt: now.subtract(const Duration(minutes: 6)),
             ),
           );
@@ -225,11 +363,91 @@ void main() {
   );
 
   test('resetRunningAtStartup recovers fresh previous-process jobs', () async {
-    final job = await repo.enqueue(type: 't', subjectId: 'startup');
+    final job = await repo.enqueue(
+      type: 't',
+      subjectId: 'startup',
+      maxAttempts: 3,
+    );
     await repo.claimNext(DateTime.now());
 
     final reset = await repo.resetRunningAtStartup(DateTime.now());
     expect(reset, 1);
     expect((await repo.getById(job.id))!.status, JobStatus.queued);
   });
+
+  test(
+    'A2-006: recovery fails exhausted running rows instead of re-queuing',
+    () async {
+      final job = await repo.enqueue(type: 't', subjectId: 'poison');
+      await repo.claimNext(DateTime.now()); // attempts 1 of max 1
+
+      final reset = await repo.resetRunningAtStartup(DateTime.now());
+      expect(reset, 0);
+      final row = (await repo.getById(job.id))!;
+      expect(row.status, JobStatus.failed);
+      expect(row.errorCode, 'interrupted');
+      expect(await repo.claimNext(DateTime.now()), isNull);
+    },
+  );
+
+  test(
+    'A2-006: resetStale fails exhausted rows; claimNext skips exhausted',
+    () async {
+      final now = DateTime.now();
+      await database
+          .into(database.jobs)
+          .insert(
+            appdb.JobsCompanion.insert(
+              id: 'old',
+              type: 't',
+              status: JobStatus.running.name,
+              subjectId: 's',
+              startedAt: Value(now.subtract(const Duration(minutes: 5))),
+              attempts: const Value(2),
+              maxAttempts: const Value(2),
+              createdAt: now.subtract(const Duration(minutes: 6)),
+            ),
+          );
+      await database
+          .into(database.jobs)
+          .insert(
+            appdb.JobsCompanion.insert(
+              id: 'queued-exhausted',
+              type: 't',
+              status: JobStatus.queued.name,
+              subjectId: 's2',
+              attempts: const Value(3),
+              maxAttempts: const Value(3),
+              createdAt: now,
+            ),
+          );
+
+      expect(await repo.resetStale(now), 0);
+      expect((await repo.getById('old'))!.status, JobStatus.failed);
+      expect(await repo.claimNext(now), isNull);
+      expect(
+        (await repo.getById('queued-exhausted'))!.status,
+        JobStatus.failed,
+      );
+    },
+  );
+
+  test(
+    'A2-005: nextWakeAt reports the earliest retry or stale deadline',
+    () async {
+      expect(await repo.nextWakeAt(), isNull);
+      final job = await repo.enqueue(type: 't', subjectId: 'r', maxAttempts: 3);
+      await repo.claimNext(DateTime.now());
+      final due = DateTime.now().add(const Duration(seconds: 30));
+      await repo.markRetrying(
+        job.id,
+        expectedAttempt: 1,
+        nextRetryAt: due,
+        errorCode: 'network',
+        errorMessage: 'x',
+      );
+      final wake = (await repo.nextWakeAt())!;
+      expect(wake.difference(due).inSeconds.abs(), lessThanOrEqualTo(1));
+    },
+  );
 }

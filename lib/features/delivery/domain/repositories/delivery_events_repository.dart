@@ -11,6 +11,8 @@ abstract interface class DeliveryEventsRepository {
     required DeliveryChannel channel,
     required DateTime at,
     String? draftId,
+    int? draftRevision,
+    String? bodyHash,
   });
 
   /// Appends one truthful delivery action, including copy, failure and the
@@ -21,6 +23,8 @@ abstract interface class DeliveryEventsRepository {
     required DeliveryOutcome outcome,
     required DateTime at,
     String? draftId,
+    int? draftRevision,
+    String? bodyHash,
   });
 
   /// Records the handoff and moves the birthday to handed off in one
@@ -30,12 +34,16 @@ abstract interface class DeliveryEventsRepository {
     required DeliveryChannel channel,
     required DateTime at,
     String? draftId,
+    int? draftRevision,
+    String? bodyHash,
   });
 
   /// Atomically marks the birthday completed and the exact draft confirmed.
   Future<void> confirmHandoff({
     required String birthdayId,
     required String draftId,
+    required int expectedDraftRevision,
+    required String expectedBodyHash,
     required DateTime at,
   });
 

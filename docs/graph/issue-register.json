@@ -1,0 +1,1571 @@
+{
+ "schema_version": 1,
+ "note": "Machine copy of the issue register documented in IMPLEMENTATION.md section 4; resolution FIXED means changed in the working tree and verified by the listed tests, not deployed.",
+ "issues": [
+  {
+   "id": "A1-001",
+   "severity": "P1",
+   "feature": "Birthdays / lifecycle / dashboard",
+   "title": "Birthday.date is persisted via Drift dateTime() (unix seconds).",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/birthdays/application/birthday_lifecycle_service.dart",
+    "lib/features/people/application/person_service.dart",
+    "lib/features/people/data/person_repository.dart",
+    "lib/features/birthdays/domain/models/birthday.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-002",
+   "severity": "P1",
+   "feature": "Reminders",
+   "title": "Reminders are one-shot AlarmManager alarms for the next occurrence only.",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/people/data/person_providers.dart",
+    "lib/app/providers.dart",
+    "lib/features/reminders/domain/reminder_schedule.dart",
+    "lib/app/app.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-003",
+   "severity": "P1",
+   "feature": "Reminders / sync",
+   "title": "Race: resyncReminderSchedule does container.read(reminderSettingsProvider) (person_providers.dart:39).",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/reminders/application/reminder_settings_controller.dart",
+    "lib/features/reminders/application/reminder_service.dart",
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt",
+    "lib/app/providers.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-004",
+   "severity": "P2",
+   "feature": "People edit",
+   "title": "PersonDraft.applyTo uses copyWith, where null means \"keep\".",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/people/domain/person_input.dart",
+    "lib/features/people/presentation/person_form_screen.dart",
+    "lib/features/people/domain/models/person.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-005",
+   "severity": "P2",
+   "feature": "People form",
+   "title": "The \"Relationship (optional)\" free text (hint \"e.g.",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/people/presentation/person_form_screen.dart",
+    "lib/features/people/domain/models/relationship.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-006",
+   "severity": "P2",
+   "feature": "People import (CSV / device)",
+   "title": "importBatch calls _ensureValid for each draft, but the candidate check (isImportable) only covers birthday/leap.",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/people/application/person_service.dart",
+    "lib/features/people/domain/person_input_validator.dart",
+    "lib/features/people/data/device_contacts_service.dart",
+    "lib/features/people/presentation/people_screen.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-007",
+   "severity": "P2",
+   "feature": "Reminders / Android",
+   "title": "No receiver or Dart hook for TIMEZONE_CHANGED / TIME_SET / DATE_CHANGED / SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED.",
+   "resolution": "PARTIAL",
+   "evidence": [
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/BirthdayNotificationReceiver.kt",
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-008",
+   "severity": "P2",
+   "feature": "People data layer",
+   "title": "Two Drift persistence stacks on persons: DriftPeopleStore (written by PersonService, read by personListProvider → Calendar) and DriftPeopleRepository ",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/people/data/person_repository.dart",
+    "lib/core/database/drift_repositories.dart",
+    "lib/app/providers.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-009",
+   "severity": "P2",
+   "feature": "DB / dashboard",
+   "title": "No UNIQUE on birthdays.person_id, no foreign keys, no PRAGMA foreign_keys.",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/core/database/app_database.dart",
+    "lib/features/birthdays/application/birthday_lifecycle_service.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-010",
+   "severity": "P2",
+   "feature": "Reminders / people",
+   "title": "Reminder planning runs after the DB commit via the onChanged hook;",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/people/application/person_service.dart",
+    "lib/features/people/data/person_providers.dart",
+    "lib/features/people/presentation/person_form_screen.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-011",
+   "severity": "P2",
+   "feature": "People delete / privacy",
+   "title": "Soft delete keeps the Person row (name, phone, email, notes, facts) forever.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/people/data/person_repository.dart",
+    "lib/features/people/presentation/people_screen.dart",
+    "lib/core/database/drift_repositories.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-012",
+   "severity": "P3",
+   "feature": "autoPrepare",
+   "title": "Behind compile-time ProductCapabilities.autoPrepare (default false), the toggle is hidden (person_form_screen.dart:629-641) and PersonService clamps t",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-013",
+   "severity": "P3",
+   "feature": "Leap day",
+   "title": "The v6 migration adds a nullable leap_day_resolution without a backfill.",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-014",
+   "severity": "P3",
+   "feature": "Birthday domain",
+   "title": "Duplicate and dead logic.",
+   "resolution": "OPEN",
+   "evidence": [
+    "test/run_all_domain_tests.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-015",
+   "severity": "P3",
+   "feature": "Reminders (UNCONFIRMED vs spec)",
+   "title": "ReminderService.sync never passes fallbackTimezone/deviceTimezone (params in reminder_schedule.dart:75-76), so quiet hours use the recipient's wall cl",
+   "resolution": "UNCONFIRMED",
+   "evidence": [
+    "lib/features/reminders/application/reminder_service.dart",
+    "lib/features/reminders/domain/reminder_schedule.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-016",
+   "severity": "P3",
+   "feature": "DB schema",
+   "title": "Indexes (delivery_events.birthday_id, birthdays.person_id, message_drafts.birthday_id, jobs.status) are raw SQL in beforeOpen, invisible to Drift tool",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/core/database/app_database.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-017",
+   "severity": "P3",
+   "feature": "Android SMS gate",
+   "title": "AUTOMATIC_SMS_ENABLED = false is hardcoded in two Kotlin files (MainActivity.kt:37, BirthdaySmsReceiver.kt:53), separate from Dart --dart-define ENABL",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-018",
+   "severity": "P3",
+   "feature": "Copy",
+   "title": "Onboarding says \"AI-Birthday schedules gentle leads\" but reminders are off by default and no permission is requested.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/onboarding/presentation/onboarding_screen.dart",
+    "lib/features/dashboard/presentation/dashboard_screen.dart",
+    "lib/features/people/presentation/people_screen.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-019",
+   "severity": "P3",
+   "feature": "Error handling",
+   "title": "Silent catches: undo failure (people_screen.dart undo catch (_) {}), SMS reconcile (person_form_screen.dart:274-288).",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-020",
+   "severity": "P3",
+   "feature": "People form",
+   "title": "DropdownButtonFormField for language has 5 fixed items, but import accepts any code ≤ 10 chars.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/people/presentation/person_form_screen.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-021",
+   "severity": "P3",
+   "feature": "Reminders / privacy",
+   "title": "Reminder JSON persisted in SharedPreferences contains the person name in the title unless hideNames is on.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/reminders/application/android_notification_scheduler_gateway.dart",
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/BirthdayNotificationReceiver.kt"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-022",
+   "severity": "P3",
+   "feature": "People update",
+   "title": "update reads the prior birthday outside the transaction and then saveAggregate does insertOnConflictUpdate of all columns, so a concurrent Studio stat",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/people/application/person_service.dart",
+    "lib/features/people/data/person_repository.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-023",
+   "severity": "P3",
+   "feature": "Router / deep link",
+   "title": "Redirect reads secure storage on every navigation (router.dart:32-40).",
+   "resolution": "PARTIAL",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-024",
+   "severity": "P3",
+   "feature": "CSV",
+   "title": "\"Lossless\" export joins facts with ;",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/people/data/contact_csv_service.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-025",
+   "severity": "P3",
+   "feature": "Accessibility / l10n",
+   "title": "Only 1 Semantics in these features (calendar).",
+   "resolution": "PARTIAL",
+   "evidence": [
+    "lib/features/onboarding/presentation/onboarding_screen.dart",
+    "lib/features/people/presentation/people_screen.dart",
+    "lib/features/history/presentation/history_screen.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-026",
+   "severity": "P3",
+   "feature": "Repo hygiene",
+   "title": "Unused dev dependency fake_async.",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-027",
+   "severity": "P3",
+   "feature": "Birthdays / lifecycle",
+   "title": "The midnight timer is set once at provider build.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/app/providers.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-028",
+   "severity": "P3",
+   "feature": "Lifecycle",
+   "title": "Rollover deletes non-confirmed drafts.",
+   "resolution": "UNCONFIRMED",
+   "evidence": [
+    "lib/features/birthdays/application/birthday_lifecycle_service.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-029",
+   "severity": "P3",
+   "feature": "DB migration",
+   "title": "from<3 uses alterTable(TableMigration(persons)) (experimental) without newColumns/transformers;",
+   "resolution": "UNCONFIRMED",
+   "evidence": [
+    "lib/core/database/app_database.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-030",
+   "severity": "P4",
+   "feature": "Validator",
+   "title": "d.relationship.name.length is compared against an enum, so relationshipTooLong is dead.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/people/domain/person_input_validator.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-031",
+   "severity": "P4",
+   "feature": "Calendar",
+   "title": "Shows \"turns N\" with ≤ 0 ages when browsing years before birth.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/calendar/presentation/calendar_screen.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-032",
+   "severity": "P4",
+   "feature": "Dashboard / People",
+   "title": "Dead branches: \"Unknown\" person fallbacks (null persons are skipped, :91), the unreachable completed label in the action card.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/dashboard/presentation/dashboard_screen.dart",
+    "lib/features/people/presentation/people_screen.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A1-033",
+   "severity": "P4",
+   "feature": "Dashboard",
+   "title": "Only 5 upcoming shown, no \"see all\".",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/dashboard/presentation/dashboard_screen.dart"
+   ],
+   "source_report": "A1"
+  },
+  {
+   "id": "A2-001",
+   "severity": "P1",
+   "feature": "STUDIO-AUTOSAVE × STUDIO-AI-QUEUE",
+   "title": "didChangeAppLifecycleState autosaves on inactive/paused without checking _hasUnsavedChanges;",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart",
+    "lib/features/jobs/application/ai_job_handler.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-002",
+   "severity": "P2",
+   "feature": "STUDIO-AI-RECOVERY",
+   "title": "Handler returns plain JobSucceeded() for four different outcomes (applied, canceled, cycle-mismatch, stale-dropped, CAS-lost) and the screen assumes s",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/jobs/application/ai_job_handler.dart",
+    "lib/features/message_studio/presentation/message_studio_screen.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-003",
+   "severity": "P2",
+   "feature": "STUDIO-AUTOSAVE",
+   "title": "Same lifecycle path persists a draft row even when editor empty and _draft==null;",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart",
+    "lib/core/database/drift_repositories.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-004",
+   "severity": "P2",
+   "feature": "STUDIO-STALE-RESULT-GUARD",
+   "title": "Optimistic revision token is updatedAt at 1 s resolution;",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/core/database/drift_repositories.dart",
+    "lib/features/message_studio/presentation/message_studio_screen.dart",
+    "lib/features/jobs/application/ai_job_handler.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-005",
+   "severity": "P2",
+   "feature": "JOBS-RETRY-RECOVERY",
+   "title": "A due-time timer is only armed inside _process after markRetrying.",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/jobs/application/job_worker.dart",
+    "lib/features/jobs/data/jobs_repository.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-006",
+   "severity": "P2",
+   "feature": "JOBS-RETRY-RECOVERY / BR-019",
+   "title": "resetRunningAtStartup/resetStale revert running→queued, and claimNext re-claims without checking attempts < maxAttempts;",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/jobs/data/jobs_repository.dart",
+    "lib/features/jobs/application/job_worker.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-007",
+   "severity": "P2",
+   "feature": "JOBS / AI router",
+   "title": "No job-level timeout: await handler.run(job) (job_worker.dart:208) blocks the single serial drain.",
+   "resolution": "FIXED",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-008",
+   "severity": "P2",
+   "feature": "JOBS",
+   "title": "Repository transitions after the handler are not guarded and _drain is unawaited: an exception from markSucceeded/markRetrying/markFailed/claimNext es",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/jobs/application/job_worker.dart",
+    "lib/features/jobs/data/jobs_repository.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-009",
+   "severity": "P3",
+   "feature": "JOBS-CANCEL",
+   "title": "(1) isCanceled() check and markSucceeded/markRetrying/markFailed are separate statements;",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/jobs/application/job_worker.dart",
+    "lib/features/jobs/data/jobs_repository.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-010",
+   "severity": "P3",
+   "feature": "JOBS-DEDUPE",
+   "title": "enqueue is check-then-insert (not transactional/unique-indexed) and returns the existing active job ignoring the new payload (different tone/instructi",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/jobs/data/jobs_repository.dart",
+    "lib/features/jobs/application/job_worker.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-011",
+   "severity": "P2",
+   "feature": "SEND-SMS / SEND-SHARE (Studio)",
+   "title": "_handleSmsSend / _handleShareSend have try/finally with no catch;",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-012",
+   "severity": "P2",
+   "feature": "STUDIO-VARIATIONS",
+   "title": "_generateVariations bypasses the durable queue and fires 3 parallel aiRouter.generate calls via Future.wait (eager failure: one error discards 2 succe",
+   "resolution": "PARTIAL",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-013",
+   "severity": "P2",
+   "feature": "SEND-SMS-AUTOMATION",
+   "title": "reconcileRecipientSms({globalSmsEnabled = true}) is fail-open by default;",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/delivery/application/birthday_sms_service.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-014",
+   "severity": "P2",
+   "feature": "SMS-NATIVE-IDEMPOTENCY",
+   "title": "Kotlin persists the job as scheduled before the alarm is armed and does not call canScheduleExactAlarms() (the notification path does, MainActivity.kt",
+   "resolution": "OPEN",
+   "evidence": [
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/BirthdaySmsReceiver.kt",
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-015",
+   "severity": "P3",
+   "feature": "STUDIO-AUTO-SMS-APPROVAL",
+   "title": "_reconcileAutoSms swallows every error (catch (_) {}) and ignores the bool result, yet _approveForAutoSms always shows \"Automatic SMS scheduled for mi",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart",
+    "lib/features/delivery/application/birthday_sms_service.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-016",
+   "severity": "P3",
+   "feature": "SMS-NATIVE-IDEMPOTENCY",
+   "title": "Terminal jobs (delivered/failed/cancelled/expired/skipped) are never pruned from scheduled_sms_prefs, retaining phone number + message body forever;",
+   "resolution": "OPEN",
+   "evidence": [
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/BirthdaySmsReceiver.kt"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-017",
+   "severity": "P3",
+   "feature": "CAPS-PRODUCT / manifests",
+   "title": "Gating is split across three constants that must change together and are not driven by ENABLE_AUTOMATIC_SMS: Dart product_capabilities.dart:22-25, Kot",
+   "resolution": "OPEN",
+   "evidence": [
+    "android/app/src/main/AndroidManifest.xml"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-018",
+   "severity": "P2",
+   "feature": "SEND-SMS-COMPOSER",
+   "title": "Uri(scheme:'sms', path: phone.replaceAll(RegExp(r'\\D'),''), queryParameters:{'body':msg}) strips the leading + (country code semantics lost) and encod",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/delivery/data/sms_delivery_service.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-019",
+   "severity": "P3",
+   "feature": "AI-NANO-AVAILABILITY",
+   "title": "(1) Kotlin NANO_NOT_READY/EMPTY_RESPONSE/GENERATION_ERROR all become AppFailure.providerError (retryable ⇒ 3 pointless retries);",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/core/platform/gemini_nano_platform.dart",
+    "lib/features/ai/domain/ai_router.dart",
+    "lib/features/ai/data/gemini_nano_provider.dart",
+    "lib/app/providers.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-020",
+   "severity": "P3",
+   "feature": "AI-BYOK",
+   "title": "Future.timeout does not cancel the socket;",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/ai/data/user_gemini_api_provider.dart",
+    "lib/features/ai/domain/ai_router.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-021",
+   "severity": "P3",
+   "feature": "Error messaging",
+   "title": "AppFailure.userMessage = '$message: ${detail ?? ''} ${action ?? ''}' ⇒ \"AI request timed out:  \", \"AI is busy:  \", \"null: …\" when message==null;",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/core/errors/app_failure.dart",
+    "lib/features/message_studio/presentation/message_studio_screen.dart",
+    "lib/features/jobs/application/job_worker.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-022",
+   "severity": "P3",
+   "feature": "JOBS (privacy)",
+   "title": "AiJobPayload persists existingMessage (full draft text) and customInstruction;",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/jobs/application/ai_job_handler.dart",
+    "lib/features/jobs/data/jobs_repository.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-023",
+   "severity": "P3",
+   "feature": "STUDIO states",
+   "title": "_loadData has no try/catch and no mounted checks before setState (:204-275): a repository exception leaves the full-screen spinner forever (:1254-1256",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-024",
+   "severity": "P3",
+   "feature": "STUDIO-AUTOSAVE",
+   "title": "After a failed save PopScope.canPop=false and the only exits are \"Save now\"/retry — no Discard;",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-025",
+   "severity": "P3",
+   "feature": "STUDIO-AI-RECOVERY",
+   "title": "On load the latest job of any age is replayed into _handleJobEvent (:257-260): an old failed job re-shows its error banner every visit;",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-026",
+   "severity": "P3",
+   "feature": "SEND-TRUTH (GAP-11)",
+   "title": "Handoff event stores draftId only (no body hash/revision).",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/message_studio/presentation/message_studio_screen.dart",
+    "lib/core/database/drift_repositories.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-027",
+   "severity": "P3",
+   "feature": "Delivery/Jobs enums",
+   "title": "Fail-open parsing: unknown DeliveryOutcome ⇒ launched, DeliveryChannel ⇒ whatsapp, JobStatus ⇒ queued, DraftStatus ⇒ draft.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/delivery/domain/models/delivery_handoff.dart",
+    "lib/features/delivery/domain/models/delivery_channel.dart",
+    "lib/features/jobs/domain/job.dart",
+    "lib/features/message_studio/domain/models/message_draft.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-028",
+   "severity": "P3",
+   "feature": "STUDIO (maintainability)",
+   "title": "1,873-line State class mixing autosave, job follower, 3 delivery flows, variations/translate sheets, auto-SMS and all UI.",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-029",
+   "severity": "P3",
+   "feature": "STUDIO a11y",
+   "title": "Only one Semantics node in the feature (:1810).",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-030",
+   "severity": "P4",
+   "feature": "STUDIO UI",
+   "title": "Duplicate actions: preferred-channel primary button (:1478-1503) is repeated in the alternate row (:1533-1548) (\"Send via SMS\"/\"Open Share Sheet\" vs \"",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-031",
+   "severity": "P4",
+   "feature": "Dead / mocked code",
+   "title": "DefaultGeminiNanoPlatform (no references), NanoGenerationHandle (typo'd doc \"cataly regulatable\", unused), JobStatus.isActive (unused and inconsistent",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/ai/data/gemini_nano_provider.dart",
+    "lib/core/platform/gemini_nano_platform.dart",
+    "lib/features/jobs/domain/job.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-032",
+   "severity": "P4",
+   "feature": "Comments/docs",
+   "title": "ai_router.dart:63,81,87 numbering stale vs header;",
+   "resolution": "PARTIAL",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-033",
+   "severity": "P4",
+   "feature": "AI-PROMPT",
+   "title": "Untrusted-data delimiters are not escaped: a fact/instruction/draft containing </UNTRUSTED_USER_FACTS>, </USER_STYLE_REQUEST>, </UNTRUSTED_CURRENT_DRA",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/ai/domain/ai_prompt_builder.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-034",
+   "severity": "P4",
+   "feature": "STUDIO i18n",
+   "title": "All Studio copy and the 6-language list are hard-coded English (no AppLocalizations, though l10n.yaml exists and is used in app.dart);",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-035",
+   "severity": "P3",
+   "feature": "AI-BYOK-KEYTEST vs BR-013",
+   "title": "BR-013 says entitlement is required \"before either BYOK or Nano is selected or invoked\".",
+   "resolution": "UNCONFIRMED",
+   "evidence": [
+    "lib/features/settings/presentation/settings_screen.dart",
+    "lib/features/ai/data/user_gemini_api_provider.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-036",
+   "severity": "P4",
+   "feature": "Delivery",
+   "title": "No length limit/handling for very long messages in wa.me/sms: URIs or editor (maxLines:5 only);",
+   "resolution": "UNCONFIRMED",
+   "evidence": [
+    "lib/features/delivery/data/whatsapp_handoff_builder.dart",
+    "lib/features/delivery/data/sms_delivery_service.dart"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A2-037",
+   "severity": "P4",
+   "feature": "SMS timing",
+   "title": "computeSendTime builds a device-local midnight (DateTime(y,m,d)) while date is computed in person.timezone;",
+   "resolution": "UNCONFIRMED",
+   "evidence": [
+    "lib/features/delivery/application/birthday_sms_service.dart",
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/BirthdaySmsReceiver.kt"
+   ],
+   "source_report": "A2"
+  },
+  {
+   "id": "A3-001",
+   "severity": "P1",
+   "feature": "BILL-ACCOUNT-BINDING / restore purchases",
+   "title": "The Play applicationUserName/accountBinding is a random UUID kept only in device secure storage (purchase_binding_<googleSubject>).",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/subscription/application/subscription_service.dart",
+    "backend/functions/src/services/subscriptionVerification.ts",
+    "lib/features/auth/presentation/auth_bottom_sheet.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-002",
+   "severity": "P2",
+   "feature": "CLOUD-UP / retention",
+   "title": "Every backup writes a full new generation.",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/sync/data/cloud_sync_service.dart",
+    "backend/ttl-policies.json",
+    "backend/firestore.rules"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-003",
+   "severity": "P2",
+   "feature": "SETTINGS-HELP-PRIVACY / data deletion",
+   "title": "There is no in-app action to delete the cloud backup or the account.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/settings/presentation/settings_screen.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-004",
+   "severity": "P2",
+   "feature": "APP-FIREBASE-BOOTSTRAP / App Check",
+   "title": "App Check tokens are attached only to verifyPurchase (X-Firebase-AppCheck).",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/subscription/application/subscription_service.dart",
+    "lib/features/sync/data/cloud_sync_service.dart",
+    "lib/features/auth/data/live_google_auth_gateway.dart",
+    "backend/firestore.rules"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-005",
+   "severity": "P2",
+   "feature": "BILL / purchase flow",
+   "title": "_verificationEndpointReachable probe tolerates a missing App Check token (works only if the server doesn't enforce), but _verifyPurchase hard-fails wi",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/subscription/application/subscription_service.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-006",
+   "severity": "P2",
+   "feature": "SETTINGS / purchase UI",
+   "title": "The price is hardcoded $2.99/mo;",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/settings/presentation/settings_screen.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-007",
+   "severity": "P2",
+   "feature": "SETTINGS / purchase UI",
+   "title": "_isPurchasing is reset when purchaseProMonthly returns, but verification happens later via the purchase stream.",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/settings/presentation/settings_screen.dart",
+    "lib/features/subscription/application/subscription_service.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-008",
+   "severity": "P2",
+   "feature": "AUTH gateway",
+   "title": "signInWithIdp and securetoken refresh http.post calls have no .timeout (cloud sync uses 30 s).",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/auth/data/live_google_auth_gateway.dart",
+    "lib/features/sync/data/cloud_sync_service.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-009",
+   "severity": "P2",
+   "feature": "SEC / error handling",
+   "title": "There is no global error handling in main.dart (FlutterError.onError, PlatformDispatcher.onError, runZonedGuarded).",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/main.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-010",
+   "severity": "P2",
+   "feature": "SEC-CREDENTIAL-STORAGE / router",
+   "title": "FlutterSecureStorageDriver.read swallows exceptions and returns null.",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/core/security/flutter_secure_storage_driver.dart",
+    "lib/app/router.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-011",
+   "severity": "P2",
+   "feature": "Design system / a11y",
+   "title": "Contrast failures confirmed by computation.",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/shared/design_system/countdown_chip.dart",
+    "lib/shared/design_system/celebration_card.dart",
+    "lib/shared/design_system/app_section_header.dart",
+    "test/ui/contrast_test.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-012",
+   "severity": "P2",
+   "feature": "THEME-TOKENS / GAP-14",
+   "title": "GAP-14 is not resolved.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/shared/design_system/app_colors.dart",
+    "lib/shared/design_system/app_spacing.dart",
+    "lib/app/theme/app_theme.dart",
+    "lib/shared/design_system/design_system.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-013",
+   "severity": "P2",
+   "feature": "SETTINGS / dark-mode a11y",
+   "title": "Colors.grey[600] text on the dark surface 1D1A17 = 3.76:1 (12sp privacy note, guide subtitle).",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/settings/presentation/settings_screen.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-014",
+   "severity": "P2",
+   "feature": "SYNC restore",
+   "title": "Timestamps are serialised from local drift DateTimes with toIso8601String(), with no offset or Z.",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/sync/data/cloud_sync_service.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-015",
+   "severity": "P3",
+   "feature": "CLOUD-DOWN / tombstones",
+   "title": "Drafts and birthdays have no tombstones.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/sync/data/cloud_sync_service.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-016",
+   "severity": "P3",
+   "feature": "CLOUD-UP",
+   "title": "The backup/current pointer is last-writer-wins.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/sync/data/cloud_sync_service.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-017",
+   "severity": "P3",
+   "feature": "CLOUD-DOWN validation",
+   "title": "Restore validation checks only required-string presence.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/sync/data/cloud_sync_service.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-018",
+   "severity": "P3",
+   "feature": "CLOUD privacy",
+   "title": "The backup is plaintext PII.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/settings/presentation/widgets/cloud_backup_card.dart",
+    "lib/features/auth/presentation/auth_bottom_sheet.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-019",
+   "severity": "P3",
+   "feature": "SYNC error handling",
+   "title": "_commitBatch returns 0 on any non-200 without logging the status.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/sync/data/cloud_sync_service.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-020",
+   "severity": "P3",
+   "feature": "OBS-LOGGER / secure storage",
+   "title": "The logger redacts params only, not message strings.",
+   "resolution": "PARTIAL",
+   "evidence": [
+    "lib/core/security/flutter_secure_storage_driver.dart",
+    "lib/core/logging/app_logger.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-021",
+   "severity": "P3",
+   "feature": "SETTINGS-GEMINI-KEY",
+   "title": "The key TextField lacks enableSuggestions:false, autocorrect:false and enableIMEPersonalizedLearning:false.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/settings/presentation/settings_screen.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-022",
+   "severity": "P3",
+   "feature": "SETTINGS cloud card",
+   "title": "The label shows \"Backing up...\" even during a restore.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/settings/presentation/widgets/cloud_backup_card.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-023",
+   "severity": "P3",
+   "feature": "SETTINGS cloud-job watch",
+   "title": "_initCloudJobWatch() is called unawaited after every enqueue, so concurrent calls can leak a subscription.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/settings/presentation/settings_screen.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-024",
+   "severity": "P3",
+   "feature": "BILL / account switching",
+   "title": "An account switch without sign-out calls reloadAccountEntitlement only (cache load, no restore).",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/subscription/application/subscription_service.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-025",
+   "severity": "P3",
+   "feature": "BILL pending flag",
+   "title": "_hasPendingVerification = true is set after state = UserEntitlement.free, and it is not part of the state, so no notification fires if the state was a",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/subscription/application/subscription_service.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-026",
+   "severity": "P3",
+   "feature": "ROUTER / shell",
+   "title": "The async redirect guards only onboarding, is not refreshable, and completed users can still open /onboarding.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/app/router.dart",
+    "lib/app/app_scaffold.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-027",
+   "severity": "P3",
+   "feature": "L10N",
+   "title": "Localisation is almost absent: 4 keys in app_en.arb, used only in app.dart/app_scaffold.dart.",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-028",
+   "severity": "P3",
+   "feature": "Tooling",
+   "title": "analysis_options.yaml is stock flutter_lints: no strict-casts/strict-inference, no unawaited_futures, no always_use_package_imports (imports are mixed",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-029",
+   "severity": "P3",
+   "feature": "Dead code / deps",
+   "title": "Dead or unused: lib/core/security/secret_store.dart (SecretStore, SecureStorageSecretStore;",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/settings/presentation/settings_screen.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-030",
+   "severity": "P3",
+   "feature": "Docs/comments",
+   "title": "resetToFreeTier is documented as \"test-only, unavailable outside debug\", but it is used in production by the auth listener.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/subscription/application/subscription_service.dart",
+    "lib/app/providers.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-031",
+   "severity": "P3",
+   "feature": "SETTINGS maintainability",
+   "title": "settings_screen.dart is 2,032 lines in one State class (purchase, key, nano, cloud, reminders, SMS, help).",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/settings/presentation/settings_screen.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-032",
+   "severity": "P4",
+   "feature": "SETTINGS",
+   "title": "Hardcoded 'AI-Birthday • v1.0.0' duplicates the pubspec version.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/settings/presentation/settings_screen.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-033",
+   "severity": "P4",
+   "feature": "Shell a11y",
+   "title": "The nav bar height is 80  textScale unclamped.",
+   "resolution": "UNCONFIRMED",
+   "evidence": [
+    "lib/app/app_scaffold.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-034",
+   "severity": "P4",
+   "feature": "App",
+   "title": "AppTheme.light/dark getters rebuild the themes each time AiBirthdayApp rebuilds (it watches entitlement/auth/jobWorker providers).",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/app/app.dart",
+    "lib/app/theme/app_theme.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-035",
+   "severity": "P4",
+   "feature": "CLOUD config",
+   "title": "CloudSyncService reads FIREBASE_WEB_API_KEY via String.fromEnvironment directly, duplicating FirebaseConfig.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/sync/data/cloud_sync_service.dart",
+    "lib/core/config/firebase_config.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-036",
+   "severity": "P4",
+   "feature": "Repo hygiene",
+   "title": "Stray tracked files: dummy.png, get_issue.sh (a one-off grep for haptic feedback), and a root google-services.json (public client config;",
+   "resolution": "OPEN",
+   "evidence": [
+    "google-services.json"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A3-037",
+   "severity": "P4",
+   "feature": "CORE-DB",
+   "title": "AppDatabase is unencrypted plain SQLite with no foreign keys or unique constraints.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/core/database/app_database.dart"
+   ],
+   "source_report": "A3"
+  },
+  {
+   "id": "A4-001",
+   "severity": "P1",
+   "feature": "Hosting /delete/ sign-in",
+   "title": "CSP script-src allows only 'self' + recaptcha hosts.",
+   "resolution": "FIXED",
+   "evidence": [
+    "backend/firebase.json",
+    "backend/hosting/src/app.ts",
+    "backend/hosting/test/static-contract.test.mjs"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-002",
+   "severity": "P2",
+   "feature": "Account deletion / purchase ownership",
+   "title": "purgeAccountTrees deletes accounts/{uid} and users/{uid} only.",
+   "resolution": "FIXED",
+   "evidence": [
+    "backend/functions/src/services/controlPlane.ts",
+    "backend/functions/src/services/subscriptionVerification.ts",
+    "backend/ttl-policies.json"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-003",
+   "severity": "P2",
+   "feature": "releaseAndroidSender / requestSenderRelease",
+   "title": "Release saga reuses purgeAccountTrees, which also recursiveDeletes users/{uid} (opt-in cloud backup and entitlement/status) although the contract/rece",
+   "resolution": "OPEN",
+   "evidence": [
+    "backend/functions/src/services/controlPlane.ts",
+    "backend/functions/test/controlPlane.emulator.test.ts"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-004",
+   "severity": "P2",
+   "feature": "verifyPurchase vs deletion fence",
+   "title": "verifyPurchase never checks tombstone/presence/DELETING;",
+   "resolution": "FIXED",
+   "evidence": [
+    "backend/functions/src/services/subscriptionVerification.ts",
+    "backend/functions/src/services/controlPlane.ts"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-005",
+   "severity": "P2",
+   "feature": "Firestore rules deletion fence",
+   "title": "deletionInProgress() depends on coordinationPresence/{uid}.state=='DELETING';",
+   "resolution": "FIXED",
+   "evidence": [
+    "backend/firestore.rules",
+    "backend/functions/src/services/controlPlane.ts"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-006",
+   "severity": "P2",
+   "feature": "Cloud backup retention (rules + client)",
+   "title": "Each backup writes a full new immutable generation;",
+   "resolution": "FIXED",
+   "evidence": [
+    "lib/features/sync/data/cloud_sync_service.dart",
+    "backend/firestore.rules"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-007",
+   "severity": "P2",
+   "feature": "Public hosting copy vs app capability (conflicts only)",
+   "title": "Public pages describe a product that does not match the shipped Flutter app (see list below).",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-008",
+   "severity": "P2",
+   "feature": "CI Play-manifest guard",
+   "title": "Check greps two hard-coded intermediates with 2>/dev/null;",
+   "resolution": "FIXED",
+   "evidence": [
+    ".github/workflows/ci.yml"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-009",
+   "severity": "P3",
+   "feature": "Hosting deletion contract",
+   "title": "Two copies: src/deletion-contract.ts (type-checked, tsc include) and src/deletion-contract.js (committed JS twin with top-level await import('node:cry",
+   "resolution": "OPEN",
+   "evidence": [
+    "backend/hosting/src/app.ts",
+    "backend/functions/tsconfig.json",
+    "backend/hosting/test/deletion-contract.test.mjs"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-010",
+   "severity": "P3",
+   "feature": "backend/README.md accuracy",
+   "title": "Claims not matching code (list below).",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-011",
+   "severity": "P3",
+   "feature": "Hosting runtime config",
+   "title": "README says generated public/runtime-config.json is \"ignored by Git\";",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-012",
+   "severity": "P3",
+   "feature": "Cloud backup & App Check",
+   "title": "Backup REST calls omit App Check;",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/features/sync/data/cloud_sync_service.dart",
+    "lib/main.dart"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-013",
+   "severity": "P3",
+   "feature": "Purchase verification edges",
+   "title": "(i) Entitlement requires expiry>now even for IN_GRACE_PERIOD;",
+   "resolution": "OPEN",
+   "evidence": [
+    "backend/functions/src/services/subscriptionVerification.ts",
+    "backend/functions/test/subscriptionVerification.test.ts"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-014",
+   "severity": "P3",
+   "feature": "Observability",
+   "title": "safeCall converts every non-HttpsError (incl.",
+   "resolution": "OPEN",
+   "evidence": [
+    "backend/functions/src/functions/index.ts",
+    "backend/functions/src/services/deletionOrchestrator.ts",
+    "backend/functions/src/services/coordinationOperationOrchestrator.ts"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-015",
+   "severity": "P3",
+   "feature": "TTL",
+   "title": "TTL not declared in firebase.json/firestore.indexes.json (no \"ttl\": true field override;",
+   "resolution": "OPEN",
+   "evidence": [
+    "backend/firestore.indexes.json",
+    "backend/ttl-policies.json"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-016",
+   "severity": "P3",
+   "feature": "CI hygiene",
+   "title": "No permissions: block (default token), actions pinned by tag not SHA, no concurrency, push+PR double runs, no Dependabot/CODEOWNERS, hosting prod deps",
+   "resolution": "OPEN",
+   "evidence": [
+    ".github/workflows/ci.yml",
+    "backend/functions/package.json",
+    "backend/functions/tsconfig.build.json"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-017",
+   "severity": "P3",
+   "feature": "Firebase config sprawl",
+   "title": "Four google-services.json for two different projects, none consumed by Gradle (no google-services plugin in android/app/build.gradle.kts/settings.grad",
+   "resolution": "OPEN",
+   "evidence": [
+    "google-services.json"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-018",
+   "severity": "P3",
+   "feature": "Android release config",
+   "title": "No minifyEnabled/shrinkResources/ProGuard rules;",
+   "resolution": "OPEN",
+   "evidence": [
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-019",
+   "severity": "P3",
+   "feature": "Firestore rules validation",
+   "title": "Owner writes have no schema/size/field validation, nested paths unrestricted below {document=};",
+   "resolution": "OPEN",
+   "evidence": [
+    "backend/firestore.rules"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-020",
+   "severity": "P3",
+   "feature": "Schedulers (UNCONFIRMED)",
+   "title": "Sweeps process ≤20 items serially in one 300 s run;",
+   "resolution": "UNCONFIRMED",
+   "evidence": [
+    "backend/functions/src/services/deletionOrchestrator.ts",
+    "backend/functions/src/services/controlPlane.ts",
+    "backend/functions/src/functions/index.ts"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-021",
+   "severity": "P3",
+   "feature": "Dependency state docs",
+   "title": "README \"Dependency audit status\" (2026-07-12) cites Firebase Admin 13.x;",
+   "resolution": "OPEN",
+   "evidence": [
+    "backend/functions/package-lock.json"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-022",
+   "severity": "P4",
+   "feature": "firebase.json caching",
+   "title": "/.html no-store header matches request paths;",
+   "resolution": "OPEN",
+   "evidence": [
+    "backend/firebase.json"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-023",
+   "severity": "P4",
+   "feature": "Receipt in sessionStorage",
+   "title": "Deletion receipt UUID (bearer for status lookup) kept in sessionStorage before/after acceptance;",
+   "resolution": "OPEN",
+   "evidence": [
+    "backend/hosting/src/app.ts",
+    "backend/hosting/test/static-contract.test.mjs"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-024",
+   "severity": "P4",
+   "feature": "z.uuid() case",
+   "title": "Claim/test request ids use z.uuid() (accepts uppercase, versions 1–8) and are used raw as doc ids;",
+   "resolution": "OPEN",
+   "evidence": [
+    "backend/functions/src/transport/schemas.ts",
+    "backend/functions/src/services/controlPlane.ts"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-025",
+   "severity": "P4",
+   "feature": "Repo hygiene",
+   "title": "Root .gitignore ignores all .png (hides legitimate assets;",
+   "resolution": "OPEN",
+   "evidence": [
+    "IMPLEMENTATION.md"
+   ],
+   "source_report": "A4"
+  },
+  {
+   "id": "A4-026",
+   "severity": "P4",
+   "feature": "App Check provider",
+   "title": "Only AndroidPlayIntegrityProvider for all builds incl.",
+   "resolution": "OPEN",
+   "evidence": [
+    "lib/main.dart"
+   ],
+   "source_report": "A4"
+  }
+ ]
+}

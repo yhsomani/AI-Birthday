@@ -3,6 +3,25 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('AppFailure', () {
+    test(
+      'userMessage omits absent parts without nulls or trailing separators',
+      () {
+        expect(const AppFailure.timeout().userMessage, 'AI request timed out');
+        expect(const AppFailure.busy().userMessage, 'AI is busy');
+        expect(
+          const AppFailure.providerError(detail: 'Try again.').userMessage,
+          'AI could not complete the request: Try again.',
+        );
+        expect(
+          const AppFailure(
+            AppFailureCode.unknown,
+            detail: 'Details',
+          ).userMessage,
+          'Details',
+        );
+      },
+    );
+
     test('credentialInvalid is a credential error, not missing', () {
       const failure = AppFailure.credentialInvalid(action: 'Replace the key');
       expect(failure.code, AppFailureCode.aiCredentialInvalid);

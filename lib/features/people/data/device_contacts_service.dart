@@ -1,4 +1,4 @@
-/// Service querying Android device contacts via native ContactsContract (SSOT §18, §25).
+/// Service querying Android device contacts via native ContactsContract (legacy SSOT §18, §25 (PRODUCT.md §16.7)).
 library;
 
 import 'package:flutter/services.dart';
@@ -85,7 +85,7 @@ class DeviceContact {
     final day = parsed?['day'];
     final year = parsed?['year'];
 
-    // Duplicate detection (SSOT §18)
+    // Duplicate detection (legacy SSOT §18 (PRODUCT.md §16.7))
     String? duplicateWarning;
 
     // ⚡ Bolt: Hoist invariant .toLowerCase() and phone cleaning out of loop

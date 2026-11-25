@@ -10,7 +10,7 @@ import '../../delivery/domain/models/delivery_channel.dart';
 import '../../delivery/domain/models/delivery_handoff.dart';
 import '../../message_studio/domain/models/message_draft.dart';
 
-/// History — message and delivery activity timeline (SSOT §3, §16, §28).
+/// History — message and delivery activity timeline (legacy SSOT §3, §16, §28 (PRODUCT.md §16.7)).
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
 

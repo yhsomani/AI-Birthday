@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 
 import 'package:ai_birthday/shared/design_system/app_colors.dart';
+import 'package:ai_birthday/shared/design_system/app_spacing.dart';
 
 /// Semantic color roles, light + dark.
 class AppPalette extends ThemeExtension<AppPalette> {
@@ -193,21 +194,21 @@ extension AppPaletteAccess on BuildContext {
   }
 }
 
-/// Spacing scale, 4dp base. Use instead of raw SizedBox/EdgeInsets values.
+/// Compatibility names for the canonical [AppSpacing] scale.
 abstract final class AppSpace {
-  static const double xs = 4;
-  static const double sm = 8;
-  static const double md = 12;
-  static const double lg = 16;
-  static const double xl = 24;
-  static const double xxl = 32;
+  static const double xs = AppSpacing.xxs;
+  static const double sm = AppSpacing.xs;
+  static const double md = AppSpacing.sm;
+  static const double lg = AppSpacing.md;
+  static const double xl = AppSpacing.xl;
+  static const double xxl = AppSpacing.xxl;
 }
 
 /// Corner radii. Pill = full round (chips, FABs).
 abstract final class AppRadius {
-  static const double sm = 8;
-  static const double md = 12;
-  static const double lg = 16;
+  static const double sm = AppSpacing.radiusSm;
+  static const double md = AppSpacing.radiusMd;
+  static const double lg = AppSpacing.radiusLg;
   static const double pill = 999;
 }
 

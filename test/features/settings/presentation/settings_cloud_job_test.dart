@@ -41,6 +41,7 @@ class GatedCloudSyncService extends CloudSyncService {
   /// When set, `sync` waits on this before returning, so the test can observe
   /// the durable "running" state.
   Completer<void>? gate;
+  Completer<void>? restoreGate;
 
   CloudSyncResult result = CloudSyncResult(
     success: true,
@@ -55,7 +56,11 @@ class GatedCloudSyncService extends CloudSyncService {
   }
 
   @override
-  Future<CloudSyncResult> restore(AuthState authState) => Future.value(result);
+  Future<CloudSyncResult> restore(AuthState authState) async {
+    final g = restoreGate;
+    if (g != null) await g.future;
+    return result;
+  }
 }
 
 void main() {
@@ -159,6 +164,29 @@ void main() {
         expect(latest.status, 'succeeded');
       },
     );
+
+    testWidgets('restore action is labelled as restoring while it runs', (
+      tester,
+    ) async {
+      final service = GatedCloudSyncService(db: harness.db)
+        ..restoreGate = Completer();
+      await pumpSettings(tester, service: service);
+      await signIn(tester);
+
+      await tester.ensureVisible(find.text('Restore from Cloud'));
+      await tester.tap(find.text('Restore from Cloud'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Restore'));
+      await tester.pump();
+
+      expect(find.text('Restoring...'), findsOneWidget);
+      expect(find.text('Backing up...'), findsNothing);
+
+      service.restoreGate!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Restoring...'), findsNothing);
+      expect(find.text('Back Up Now'), findsOneWidget);
+    });
 
     testWidgets(
       'permanent backup failure stays visible inline with a retry affordance',

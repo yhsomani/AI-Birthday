@@ -21,9 +21,9 @@ class AppSpacing {
   static const double bottomClearance = 88.0;
 
   // Radii
-  static const double radiusSm = 6.0;
-  static const double radiusMd = 10.0;
-  static const double radiusLg = 14.0;
+  static const double radiusSm = 8.0;
+  static const double radiusMd = 12.0;
+  static const double radiusLg = 16.0;
   static const double radiusXl = 20.0;
 
   static const BorderRadius roundedSm = BorderRadius.all(

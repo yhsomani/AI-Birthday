@@ -1,4 +1,4 @@
-/// Global Riverpod dependency injection and service providers (SSOT §3, §24, §28).
+/// Global Riverpod dependency injection and service providers (legacy SSOT §3, §24, §28 (PRODUCT.md §16.7)).
 library;
 
 import 'dart:async';
@@ -62,7 +62,7 @@ final hasOwnGeminiKeyProvider = FutureProvider.autoDispose<bool>(
   (ref) => ref.watch(credentialStorageProvider).hasGeminiApiKey(),
 );
 
-/// Subscription Notifier managing entitlement through purchase & verification lifecycle (SSOT §11).
+/// Subscription Notifier managing entitlement through purchase & verification lifecycle (legacy SSOT §11 (PRODUCT.md §16.7)).
 final subscriptionNotifierProvider =
     StateNotifierProvider<SubscriptionNotifier, UserEntitlement>((ref) {
       final logger = ref.watch(loggerProvider);
@@ -89,6 +89,7 @@ final subscriptionNotifierProvider =
           return SubscriptionNotifier.readBindingFromStore(
             secureStore,
             subject,
+            firebaseUid: auth.identity?.firebaseUid,
           );
         },
         accountIdProvider: () async {
@@ -130,7 +131,7 @@ final subscriptionNotifierProvider =
       return notifier;
     });
 
-/// Application Entitlement state provider (Free vs Pro). Defaults safely to Free (SSOT §11).
+/// Application Entitlement state provider (Free vs Pro). Defaults safely to Free (legacy SSOT §11 (PRODUCT.md §16.7)).
 final entitlementProvider = Provider<UserEntitlement>((ref) {
   return ref.watch(subscriptionNotifierProvider);
 });
@@ -140,27 +141,27 @@ final whatsappHandoffBuilderProvider = Provider<WhatsAppHandoffBuilder>((ref) {
   return const WhatsAppHandoffBuilder();
 });
 
-/// SMS Delivery Service provider (SSOT §10).
+/// SMS Delivery Service provider (legacy SSOT §10 (PRODUCT.md §16.7)).
 final smsDeliveryServiceProvider = Provider<SmsDeliveryService>((ref) {
   return const SmsDeliveryService();
 });
 
-/// Native Share Service provider (SSOT §10).
+/// Native Share Service provider (legacy SSOT §10 (PRODUCT.md §16.7)).
 final nativeShareServiceProvider = Provider<NativeShareService>((ref) {
   return const NativeShareService();
 });
 
-/// Contact CSV Service provider (SSOT §18).
+/// Contact CSV Service provider (legacy SSOT §18 (PRODUCT.md §16.7)).
 final contactCsvServiceProvider = Provider<ContactCsvService>((ref) {
   return const ContactCsvService();
 });
 
-/// Device Contacts Service provider (SSOT §18, §25).
+/// Device Contacts Service provider (legacy SSOT §18, §25 (PRODUCT.md §16.7)).
 final deviceContactsServiceProvider = Provider<DeviceContactsService>((ref) {
   return const DeviceContactsService();
 });
 
-/// Cloud Sync Service provider (SSOT §13).
+/// Cloud Sync Service provider (legacy SSOT §13 (PRODUCT.md §16.7)).
 final cloudSyncServiceProvider = Provider<CloudSyncService>((ref) {
   final db = ref.watch(core.databaseProvider);
   final logger = ref.watch(loggerProvider);
@@ -175,6 +176,13 @@ final cloudSyncServiceProvider = Provider<CloudSyncService>((ref) {
     // Refresh the Firebase ID token before each backup or restore (F14).
     freshIdToken: () =>
         ref.read(authControllerProvider.notifier).getValidIdToken(),
+    appCheckTokenProvider: () async {
+      try {
+        return await FirebaseAppCheck.instance.getToken();
+      } catch (_) {
+        return null;
+      }
+    },
   );
 });
 
@@ -197,7 +205,7 @@ final userGeminiApiProvider = Provider<UserGeminiApiProvider>((ref) {
   return UserGeminiApiProvider(credentialStorage: storage, logger: logger);
 });
 
-/// AI Router provider wiring entitlement, user Gemini key, and Gemini Nano (SSOT §5).
+/// AI Router provider wiring entitlement, user Gemini key, and Gemini Nano (legacy SSOT §5 (PRODUCT.md §16.7)).
 final aiRouterProvider = Provider<AiRouter>((ref) {
   final storage = ref.watch(credentialStorageProvider);
   final geminiProvider = ref.watch(userGeminiApiProvider);
@@ -224,19 +232,18 @@ final aiRouterProvider = Provider<AiRouter>((ref) {
   );
 });
 
-/// People Repository provider backed by operational Drift/SQLite (SSOT §13).
+/// People Repository provider backed by operational Drift/SQLite (legacy SSOT §13 (PRODUCT.md §16.7)).
 final peopleRepositoryProvider = Provider<PeopleRepository>((ref) {
-  final db = ref.watch(core.databaseProvider);
-  return DriftPeopleRepository(db);
+  return ref.watch(peopleStoreProvider) as PeopleRepository;
 });
 
-/// Birthdays Repository provider backed by operational Drift/SQLite (SSOT §13).
+/// Birthdays Repository provider backed by operational Drift/SQLite (legacy SSOT §13 (PRODUCT.md §16.7)).
 final birthdaysRepositoryProvider = Provider<BirthdaysRepository>((ref) {
   final db = ref.watch(core.databaseProvider);
   return DriftBirthdaysRepository(db);
 });
 
-/// Drafts Repository provider backed by operational Drift/SQLite (SSOT §13).
+/// Drafts Repository provider backed by operational Drift/SQLite (legacy SSOT §13 (PRODUCT.md §16.7)).
 final draftsRepositoryProvider = Provider<DraftsRepository>((ref) {
   final db = ref.watch(core.databaseProvider);
   return DriftDraftsRepository(db);

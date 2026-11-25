@@ -40,11 +40,10 @@ class CloudJobPayload {
 
 class CloudSyncJobHandler implements JobHandler {
   CloudSyncJobHandler({
-    required CloudSyncService service,
-    required Future<AuthState> Function() authState,
+    required this._service,
+    required this._authState,
     this.onRestored,
-  }) : _service = service,
-       _authState = authState;
+  });
 
   final CloudSyncService _service;
   final Future<AuthState> Function() _authState;

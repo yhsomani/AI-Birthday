@@ -1,8 +1,14 @@
 import type { Auth } from 'firebase-admin/auth';
 import type { Firestore } from 'firebase-admin/firestore';
+import { logger } from 'firebase-functions/logger';
 
 import { safeAddMs } from '../domain/policies.js';
+import { safeErrorCategory } from './safeErrorCategory.js';
 import { ControlPlaneService } from './controlPlane.js';
+import { runBounded } from './runBounded.js';
+
+const SWEEP_CONCURRENCY = 4;
+const MAX_SWEEP_ITEMS = 20;
 
 function errorCode(error: unknown): string | null {
   if (typeof error !== 'object' || error === null || !('code' in error)) {
@@ -53,11 +59,14 @@ export class DeletionOrchestrator {
 
   public async sweep(limit = 20): Promise<DeletionSweepResult> {
     const nowMs = this.clock();
+    const boundedLimit = Number.isFinite(limit)
+      ? Math.min(Math.max(Math.floor(limit), 1), MAX_SWEEP_ITEMS)
+      : MAX_SWEEP_ITEMS;
     const tombstones = this.db.collection('deletionTombstones');
     const due = await tombstones
       .where('nextSweepAtMs', '<=', nowMs)
       .orderBy('nextSweepAtMs', 'asc')
-      .limit(limit)
+      .limit(boundedLimit)
       .get();
 
     let drainsAdvanced = 0;
@@ -65,7 +74,7 @@ export class DeletionOrchestrator {
     let tombstonesFinalized = 0;
     let deferred = 0;
     let failed = 0;
-    for (const document of due.docs) {
+    await runBounded(due.docs, SWEEP_CONCURRENCY, async document => {
       const requestKeyValue = document.get('requestKey') as unknown;
       const expectedRequestKey =
         typeof requestKeyValue === 'string' ? requestKeyValue : null;
@@ -84,7 +93,7 @@ export class DeletionOrchestrator {
               safeAddMs(drainUntilValue, 1),
             );
             deferred += 1;
-            continue;
+            return;
           }
           if (
             (await this.controlPlane.advanceDeletion(document.id)) ===
@@ -99,7 +108,7 @@ export class DeletionOrchestrator {
             );
             deferred += 1;
           }
-          continue;
+          return;
         }
         if (stageValue === 'AUTH_DELETION_PENDING') {
           if (await this.ensureAuthDeleted(document.id)) {
@@ -113,7 +122,7 @@ export class DeletionOrchestrator {
             );
             deferred += 1;
           }
-          continue;
+          return;
         }
         if (stageValue === 'VERIFYING') {
           const cleanupAtValue = document.get('cleanupAtMs') as unknown;
@@ -124,7 +133,7 @@ export class DeletionOrchestrator {
               cleanupAtValue,
             );
             deferred += 1;
-            continue;
+            return;
           }
           if (
             (await this.ensureAuthDeleted(document.id)) &&
@@ -139,7 +148,7 @@ export class DeletionOrchestrator {
             );
             deferred += 1;
           }
-          continue;
+          return;
         }
         await this.controlPlane.deferDeletionSweep(
           document.id,
@@ -147,8 +156,11 @@ export class DeletionOrchestrator {
           nowMs,
         );
         deferred += 1;
-      } catch {
+      } catch (error) {
         failed += 1;
+        logger.error('deletion_sweep_item_failed', {
+          errorType: safeErrorCategory(error),
+        });
         try {
           await this.controlPlane.deferDeletionSweep(
             document.id,
@@ -156,11 +168,12 @@ export class DeletionOrchestrator {
             nowMs,
           );
         } catch {
+          logger.error('deletion_sweep_defer_failed');
           // The next scheduled run retries the still-fenced record. No account
           // identifier or request content is logged.
         }
       }
-    }
+    });
 
     return {
       drainsAdvanced,

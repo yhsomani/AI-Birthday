@@ -1,4 +1,4 @@
-/// Centralized design system exports for AI-Birthday (SSOT §3, §22).
+/// Centralized design system exports for AI-Birthday (legacy SSOT §3, §22 (PRODUCT.md §16.7)).
 library;
 
 export 'app_bottom_sheet.dart';

@@ -2,9 +2,16 @@ name: CI / Release Pipeline
 
 on:
   push:
-    branches: [ main, "feat/**" ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   flutter-quality-and-test:
@@ -12,16 +19,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Java
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: 'zulu'
           java-version: '17'
 
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: 'stable'
           flutter-version: '3.47.6'
@@ -60,13 +67,35 @@ jobs:
           fi
           echo "Client capability boundary verified."
 
-      - name: Verify Play Store Manifest Excludes SEND_SMS
+      - name: Verify Play Store APK Manifest Permissions (fail closed)
         run: |
-          if grep -q "android.permission.SEND_SMS" build/app/intermediates/merged_manifests/playRelease/processPlayReleaseManifest/AndroidManifest.xml 2>/dev/null || grep -q "android.permission.SEND_SMS" build/app/intermediates/merged_manifests/playRelease/AndroidManifest.xml 2>/dev/null; then
-            echo "ERROR: SEND_SMS permission was found in the Play Store release manifest!"
-            exit 1
-          fi
-          echo "Play Store manifest verified: no SEND_SMS permission."
+          set -euo pipefail
+          fail() { echo "ERROR: $1"; exit 1; }
+          APK=build/app/outputs/flutter-apk/app-play-release.apk
+          [ -s "$APK" ] || fail "built Play release APK not found at $APK."
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          [ -n "$SDK_ROOT" ] || fail "ANDROID_HOME/ANDROID_SDK_ROOT is not set; cannot inspect the APK."
+          AAPT2="$(ls -d "$SDK_ROOT"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -n 1 || true)"
+          [ -n "$AAPT2" ] && [ -x "$AAPT2" ] || fail "aapt2 not found under $SDK_ROOT/build-tools."
+          DUMP="$("$AAPT2" dump permissions "$APK")" || fail "aapt2 could not read permissions from $APK."
+          PERMISSIONS="$(printf '%s\n' "$DUMP" | sed -n "s/^uses-permission[a-z0-9-]*: name='\([^']*\)'.*/\1/p" | sort -u)"
+          [ -n "$PERMISSIONS" ] || fail "no permissions could be read from the built APK manifest."
+          echo "Permissions declared by the Play release APK:"
+          printf '%s\n' "$PERMISSIONS"
+          # Sanity check that parsing works: the app always declares INTERNET.
+          printf '%s\n' "$PERMISSIONS" | grep -qx 'android.permission.INTERNET' \
+            || fail "expected android.permission.INTERNET missing; manifest data looks incomplete."
+          # Google Play SMS and Call Log policy: the Play flavor must never declare these.
+          FORBIDDEN="android.permission.SEND_SMS android.permission.READ_SMS android.permission.RECEIVE_SMS android.permission.RECEIVE_MMS android.permission.RECEIVE_WAP_PUSH android.permission.READ_CALL_LOG android.permission.WRITE_CALL_LOG android.permission.PROCESS_OUTGOING_CALLS"
+          FOUND=0
+          for permission in $FORBIDDEN; do
+            if printf '%s\n' "$PERMISSIONS" | grep -qx "$permission"; then
+              echo "ERROR: forbidden permission $permission found in the Play release APK manifest!"
+              FOUND=1
+            fi
+          done
+          [ "$FOUND" -eq 0 ] || exit 1
+          echo "Play Store APK manifest verified: no forbidden SMS/Call Log permissions."
 
       - name: Build Personal Sideload Android Release APK
         env:
@@ -74,14 +103,14 @@ jobs:
         run: flutter build apk --flavor personal --release --dart-define=FIREBASE_WEB_API_KEY="$FIREBASE_WEB_API_KEY"
 
       - name: Upload Play Release APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: app-play-release-apk
           path: build/app/outputs/flutter-apk/app-play-release.apk
           if-no-files-found: error
 
       - name: Upload Personal Sideload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: app-personal-release-apk
           path: build/app/outputs/flutter-apk/app-personal-release.apk
@@ -96,10 +125,10 @@ jobs:
         working-directory: backend/functions
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -117,7 +146,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Install Java for Firebase Emulator
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: 'zulu'
           java-version: '21'
@@ -145,10 +174,10 @@ jobs:
         working-directory: backend/hosting
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '24'
           cache: 'npm'
@@ -159,4 +188,3 @@ jobs:
 
       - name: Typecheck, Test & Production Build
         run: npm run check
-

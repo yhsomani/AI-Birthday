@@ -9,6 +9,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ai_birthday/app/theme/app_theme.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 double _luminance(Color c) {
@@ -127,4 +128,21 @@ void main() {
       });
     });
   }
+
+  test('legacy spacing and radius names resolve to canonical tokens', () {
+    expect(AppSpace.xs, AppSpacing.xxs);
+    expect(AppSpace.sm, AppSpacing.xs);
+    expect(AppSpace.md, AppSpacing.sm);
+    expect(AppSpace.lg, AppSpacing.md);
+    expect(AppSpace.xl, AppSpacing.xl);
+    expect(AppSpace.xxl, AppSpacing.xxl);
+    expect(AppRadius.sm, AppSpacing.radiusSm);
+    expect(AppRadius.md, AppSpacing.radiusMd);
+    expect(AppRadius.lg, AppSpacing.radiusLg);
+  });
+
+  test('theme data is cached across app rebuilds (A3-034)', () {
+    expect(identical(AppTheme.light, AppTheme.light), isTrue);
+    expect(identical(AppTheme.dark, AppTheme.dark), isTrue);
+  });
 }

@@ -1,12 +1,17 @@
+import 'package:ai_birthday/app/providers.dart' show peopleRepositoryProvider;
+import 'package:ai_birthday/core/core_providers.dart' show databaseProvider;
 import 'package:ai_birthday/core/database/app_database.dart' as db;
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/people/data/person_repository.dart';
+import 'package:ai_birthday/features/people/data/person_providers.dart'
+    show peopleStoreProvider;
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/features/people/domain/person.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
   late db.AppDatabase database;
@@ -57,6 +62,20 @@ void main() {
     expect(loaded.preferredDeliveryChannel, DeliveryChannel.whatsapp);
     expect(loaded.version, 1);
     expect(loaded.createdAt, DateTime.utc(2025, 1, 1, 8));
+  });
+
+  test('application and repository providers share one people store', () async {
+    final container = ProviderContainer(
+      overrides: [databaseProvider.overrideWithValue(database)],
+    );
+    addTearDown(container.dispose);
+
+    final store = container.read(peopleStoreProvider);
+    final repository = container.read(peopleRepositoryProvider);
+
+    expect(identical(repository, store), isTrue);
+    await repository.savePerson(person(id: 'shared', name: 'Shared'));
+    expect((await store.getAll()).single.name, 'Shared');
   });
 
   test('watchAll and getAll omit soft-deleted rows and sort by name', () async {
@@ -134,6 +153,20 @@ void main() {
     expect(loaded!.name, 'Samantha');
     expect(loaded.version, updated.version);
   });
+
+  test(
+    'saving through repository cannot resurrect a tombstoned person',
+    () async {
+      final original = person(id: 'deleted', name: 'Deleted');
+      await store.save(original);
+      await store.deletePerson(original.id);
+
+      await store.savePerson(original.copyWith(name: 'Stale update'));
+
+      expect(await store.getPeople(), isEmpty);
+      expect((await store.getById(original.id))!.deletedAt, isNotNull);
+    },
+  );
 
   test('softDelete stamps a timestamp via the injected clock', () async {
     final clocked = DriftPeopleStore(

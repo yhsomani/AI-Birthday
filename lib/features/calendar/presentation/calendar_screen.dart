@@ -9,7 +9,7 @@ import '../../people/data/person_providers.dart';
 import '../../people/domain/person.dart';
 import '../../../shared/design_system/design_system.dart';
 
-/// Calendar view of annual birthdays (SSOT §15 navigation, §14).
+/// Calendar view of annual birthdays (legacy SSOT §15 (PRODUCT.md §16.7) navigation, §14).
 ///
 /// Renders a month grid; every birthday that falls in the visible month is
 /// marked on its (leap-resolved) day. Days are Monday-start, consistent with
@@ -108,7 +108,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               person.name,
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
-            subtitle: person.birthYear != null
+            subtitle: person.birthYear != null && date.year >= person.birthYear!
                 ? Text(
                     '${person.birthYear!}'
                     ' · turns ${date.year - person.birthYear!}',

@@ -89,6 +89,12 @@ void main() {
       expect(find.text('7 Days'), findsOneWidget);
       expect(find.text('2 Days'), findsOneWidget);
       expect(find.text('Today'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'Reminders are optional and start only after you enable them',
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Get Started'), findsOneWidget);
 
       // Tap Get Started -> Saves onboarding completion and goes to dashboard
@@ -110,6 +116,30 @@ void main() {
 
       expect(await fakeStorage.hasCompletedOnboarding(), isTrue);
       expect(find.text('Dashboard Screen'), findsOneWidget);
+    });
+
+    testWidgets('reports onboarding storage failure without navigating', (
+      tester,
+    ) async {
+      final failingStorage = _FailingCompletionStorage();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            credentialStorageProvider.overrideWithValue(failingStorage),
+          ],
+          child: MaterialApp.router(routerConfig: testRouter),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Could not save your progress. Please try again.'),
+        findsOneWidget,
+      );
+      expect(find.text('Dashboard Screen'), findsNothing);
     });
 
     testWidgets(
@@ -151,4 +181,11 @@ void main() {
       },
     );
   });
+}
+
+class _FailingCompletionStorage extends InMemoryCredentialStorage {
+  @override
+  Future<void> setCompletedOnboarding(bool completed) async {
+    throw StateError('Storage unavailable');
+  }
 }

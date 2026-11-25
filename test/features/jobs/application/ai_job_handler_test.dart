@@ -2,6 +2,7 @@
 /// discard, and producer-failure mapping (background-jobs audit).
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/native.dart';
@@ -32,6 +33,7 @@ void main() {
   late DriftDraftsRepository draftsRepo;
   late DriftJobsRepository jobsRepo;
   late int generateCalls;
+  late String? generatedExistingMessage;
 
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
@@ -40,6 +42,7 @@ void main() {
     draftsRepo = DriftDraftsRepository(db);
     jobsRepo = DriftJobsRepository(db);
     generateCalls = 0;
+    generatedExistingMessage = null;
   });
 
   tearDown(() => db.close());
@@ -87,6 +90,7 @@ void main() {
       jobsRepository: jobsRepo,
       generate: (request, {required bool forceNano}) async {
         generateCalls++;
+        generatedExistingMessage = request.existingMessage;
         expect(forceNano, isFalse);
         expect(request.person.id, 'p1');
         return const AiGenerationResult(
@@ -109,6 +113,42 @@ void main() {
     );
     return (await jobsRepo.claimNext(DateTime.now()))!;
   }
+
+  test(
+    'A2-022: rewrite job stores a flag and reloads the draft text',
+    () async {
+      await seedPerson();
+      await seedBirthday();
+      final initial = MessageDraft(
+        id: 'b1',
+        birthdayId: 'b1',
+        personId: 'p1',
+        body: 'Private draft text',
+        createdAt: now,
+        updatedAt: now,
+      );
+      await draftsRepo.saveDraftAndUpdateBirthday(
+        initial,
+        BirthdayStatus.messageDrafted,
+      );
+      final persisted = (await draftsRepo.getDraftForBirthday('b1'))!;
+      final payload = AiJobPayload(
+        birthdayId: 'b1',
+        personId: 'p1',
+        tone: MessageTone.warm,
+        length: MessageLength.standard,
+        rewriteExisting: true,
+        draftUpdatedAt: persisted.updatedAt.toIso8601String(),
+        draftRevision: persisted.revision,
+      );
+
+      expect(payload.toJson(), isNot(contains('existingMessage')));
+      final outcome = await handler().run(await claimedJob(payload: payload));
+
+      expect(outcome, isA<JobSucceeded>());
+      expect(generatedExistingMessage, 'Private draft text');
+    },
+  );
 
   test(
     'unresolved leap policy blocks generation without deleting the job',
@@ -296,7 +336,8 @@ void main() {
         ),
       );
 
-      expect(outcome, isA<JobSucceeded>());
+      expect(outcome, isA<JobSkipped>());
+      expect((outcome as JobSkipped).reason, 'stale');
       final draft = (await draftsRepo.getDraftForBirthday('b1'))!;
       expect(draft.body, 'user edits made while drafting'); // never clobbered
       final birthday = (await birthdaysRepo.getBirthday('b1'))!;
@@ -338,7 +379,9 @@ void main() {
         ),
       );
 
-      expect(outcome, isA<JobSucceeded>());
+      // Dropped results are reported neutrally, not as success.
+      expect(outcome, isA<JobSkipped>());
+      expect((outcome as JobSkipped).reason, 'cycleChanged');
       final draft = await draftsRepo.getDraftForBirthday('b1');
       expect(draft, isNull);
     },
@@ -395,7 +438,8 @@ void main() {
 
       final outcome = await handler().run(job);
 
-      expect(outcome, isA<JobSucceeded>()); // discarded, not an error
+      expect(outcome, isA<JobSkipped>()); // discarded, not an error
+      expect((outcome as JobSkipped).reason, 'canceled');
       expect(generateCalls, 1); // the call itself happened
       expect(await draftsRepo.getDraftForBirthday('b1'), isNull); // no apply
       expect(
@@ -404,6 +448,72 @@ void main() {
       );
     },
   );
+
+  test('timed-out attempt cannot apply its late result after retry succeeds', () async {
+    await seedPerson();
+    await seedBirthday();
+    final lateResult = Completer<AiGenerationResult>();
+    var calls = 0;
+    final fencedHandler = AiGenerationJobHandler(
+      peopleRepository: peopleRepo,
+      draftsRepository: draftsRepo,
+      birthdaysRepository: birthdaysRepo,
+      jobsRepository: jobsRepo,
+      generate: (request, {required bool forceNano}) async {
+        calls++;
+        if (calls == 1) return lateResult.future;
+        return const AiGenerationResult(
+          message: 'retry result',
+          providerType: 'user_gemini',
+        );
+      },
+    );
+    final worker = JobWorker(
+      repository: jobsRepo,
+      handlers: {JobTypes.aiGenerate: fencedHandler},
+      handlerTimeout: const Duration(milliseconds: 20),
+      backoffStep: Duration.zero,
+    );
+    final completed = Completer<JobRecord>();
+    final subscription = worker.events.listen((job) {
+      if (job.status == JobStatus.succeeded && !completed.isCompleted) {
+        completed.complete(job);
+      }
+    });
+    worker.start();
+    final job = await worker.enqueue(
+      type: JobTypes.aiGenerate,
+      subjectId: 'b1',
+      payload: jsonEncode(
+        AiJobPayload(
+          birthdayId: 'b1',
+          personId: 'p1',
+          tone: MessageTone.warm,
+          length: MessageLength.standard,
+        ).toJson(),
+      ),
+      maxAttempts: 2,
+    );
+
+    final succeeded = await completed.future.timeout(
+      const Duration(seconds: 2),
+    );
+    expect(succeeded.attempts, 2);
+    expect(calls, 2);
+
+    lateResult.complete(
+      const AiGenerationResult(
+        message: 'stale first attempt',
+        providerType: 'user_gemini',
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    expect((await jobsRepo.getById(job.id))!.status, JobStatus.succeeded);
+    expect((await draftsRepo.getDraftForBirthday('b1'))!.body, 'retry result');
+    await subscription.cancel();
+    await worker.stop();
+  });
 
   test('producer failures propagate for the worker to classify', () async {
     await seedPerson();
@@ -451,7 +561,8 @@ void main() {
       await birthdaysRepo.saveBirthday(
         Birthday(
           id: 'b-fallback',
-          personId: 'p1',
+          // birthdays.person_id is UNIQUE since schema v7.
+          personId: 'p-fallback',
           cycleYear: fallbackYear,
           date: now,
           status: BirthdayStatus.messageNotPrepared,

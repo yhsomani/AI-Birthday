@@ -1,6 +1,6 @@
 import 'package:timezone/timezone.dart' as tz;
 
-/// Quiet hours: reminders inside this daily window are not delivered (SSOT §17).
+/// Quiet hours: reminders inside this daily window are not delivered (legacy SSOT §17 (PRODUCT.md §16.7)).
 ///
 /// The window is expressed as minutes from local midnight and may wrap midnight
 /// (e.g. 22:00 → 08:00). An empty window ([QuietHours.none]) disables the rule.

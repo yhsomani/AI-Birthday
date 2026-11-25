@@ -1,4 +1,4 @@
-/// Gemini Nano on-device AI provider (SSOT §4, §5, §25).
+/// Gemini Nano on-device AI provider (legacy SSOT §4, §5, §25 (PRODUCT.md §16.7)).
 library;
 
 import 'package:ai_birthday/core/errors/app_failure.dart';
@@ -56,9 +56,7 @@ class GeminiNanoProvider implements AiMessageProvider {
       final trimmed = result.text.trim();
 
       if (trimmed.isEmpty) {
-        throw const AppFailure.providerError(
-          detail: 'Gemini Nano returned an empty response.',
-        );
+        throw const AppFailure.invalidAiResponse();
       }
 
       return AiGenerationResult(
@@ -81,35 +79,4 @@ class GeminiNanoProvider implements AiMessageProvider {
       );
     }
   }
-}
-
-/// Fallback / Default platform implementation for Gemini Nano when running on
-/// non-Android platforms or before native AICore connection is bound.
-class DefaultGeminiNanoPlatform implements GeminiNanoPlatform {
-  const DefaultGeminiNanoPlatform({
-    NanoState initialState = NanoState.unavailable,
-  }) : _initialState = initialState;
-
-  final NanoState _initialState;
-
-  @override
-  Future<NanoState> currentState() async => _initialState;
-
-  @override
-  Stream<NanoState> get stateChanges => Stream.value(_initialState);
-
-  @override
-  Future<NanoState> startDownload() async => _initialState;
-
-  @override
-  Future<NanoGenerationResult> generate(String prompt) async {
-    // The default Dart adapter must never impersonate Gemini Nano. A real
-    // Android AICore implementation is required before this state can be usable.
-    throw const AppFailure.nanoUnavailable(
-      action: 'Gemini Nano is not available in this build.',
-    );
-  }
-
-  @override
-  Future<void> dispose() async {}
 }

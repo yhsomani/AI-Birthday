@@ -102,105 +102,114 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     List<Person> currentPeople,
   ) async {
     final textController = TextEditingController();
-    final parsedCandidates = await showModalBottomSheet<CsvParseResult>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => AppBottomSheet(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Expanded(
-                child: Text(
-                  'Import Contacts (CSV)',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+    final CsvParseResult? parsedCandidates;
+    try {
+      parsedCandidates = await showModalBottomSheet<CsvParseResult>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheetContext) => AppBottomSheet(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Import Contacts (CSV)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                tooltip: 'Close',
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(sheetContext).pop();
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Paste CSV with columns: Name, Month, Day, Year, Phone, Relationship.',
-            style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () async {
-              final picked = await FilePicker.platform.pickFiles(
-                type: FileType.custom,
-                allowedExtensions: const ['csv'],
-                withData: true,
-              );
-              if (picked == null) return;
-              final file = picked.files.single;
-              if (file.size > ContactCsvService.maxInputBytes ||
-                  file.bytes == null) {
-                if (sheetContext.mounted) {
-                  ScaffoldMessenger.of(sheetContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('Choose a CSV file no larger than 1 MB.'),
-                    ),
-                  );
-                }
-                return;
-              }
-              try {
-                textController.text = utf8.decode(
-                  file.bytes!,
-                  allowMalformed: false,
-                );
-              } on FormatException {
-                if (sheetContext.mounted) {
-                  ScaffoldMessenger.of(sheetContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('The CSV must be UTF-8 encoded.'),
-                    ),
-                  );
-                }
-              }
-            },
-            icon: const Icon(Icons.attach_file),
-            label: const Text('Choose CSV File'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: textController,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: 'Sarah,10,7,1992,+14155552671,Friend\n...',
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Close',
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(sheetContext).pop();
+                  },
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () {
-                final csvService = ref.read(contactCsvServiceProvider);
-                final parseResult = csvService.parseCsvWithResult(
-                  textController.text,
-                  existingPeople: currentPeople,
+            const SizedBox(height: 8),
+            Text(
+              'Paste CSV with columns: Name, Month, Day, Year, Phone, Relationship.',
+              style: TextStyle(
+                fontSize: 12,
+                color: context.colors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final picked = await FilePicker.platform.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: const ['csv'],
+                  withData: true,
                 );
-                Navigator.of(sheetContext).pop(parseResult);
+                if (picked == null) return;
+                final file = picked.files.single;
+                if (file.size > ContactCsvService.maxInputBytes ||
+                    file.bytes == null) {
+                  if (sheetContext.mounted) {
+                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                      const SnackBar(
+                        content: Text('Choose a CSV file no larger than 1 MB.'),
+                      ),
+                    );
+                  }
+                  return;
+                }
+                try {
+                  textController.text = utf8.decode(
+                    file.bytes!,
+                    allowMalformed: false,
+                  );
+                } on FormatException {
+                  if (sheetContext.mounted) {
+                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                      const SnackBar(
+                        content: Text('The CSV must be UTF-8 encoded.'),
+                      ),
+                    );
+                  }
+                }
               },
-              child: const Text('Parse & Review Candidates'),
+              icon: const Icon(Icons.attach_file),
+              label: const Text('Choose CSV File'),
             ),
-          ),
-        ],
-      ),
-    );
+            const SizedBox(height: 12),
+            TextField(
+              controller: textController,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Sarah,10,7,1992,+14155552671,Friend\n...',
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  final csvService = ref.read(contactCsvServiceProvider);
+                  final parseResult = csvService.parseCsvWithResult(
+                    textController.text,
+                    existingPeople: currentPeople,
+                  );
+                  Navigator.of(sheetContext).pop(parseResult);
+                },
+                child: const Text('Parse & Review Candidates'),
+              ),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      textController.dispose();
+    }
 
     if (parsedCandidates == null || !context.mounted) return;
+    final result = parsedCandidates;
 
-    if (parsedCandidates.candidates.isEmpty) {
+    if (result.candidates.isEmpty) {
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -213,13 +222,11 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '0 of ${parsedCandidates.totalRows} rows are ready. No records were saved.',
+                    '0 of ${result.totalRows} rows are ready. No records were saved.',
                   ),
-                  if (parsedCandidates.mappedColumns.isNotEmpty)
-                    Text(
-                      'Mapped: ${parsedCandidates.mappedColumns.join(', ')}',
-                    ),
-                  for (final issue in parsedCandidates.invalidRows) ...[
+                  if (result.mappedColumns.isNotEmpty)
+                    Text('Mapped: ${result.mappedColumns.join(', ')}'),
+                  for (final issue in result.invalidRows) ...[
                     const SizedBox(height: 8),
                     Text(issue),
                   ],
@@ -241,10 +248,10 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     await _reviewAndImportCandidates(
       context,
       ref,
-      parsedCandidates.candidates,
+      result.candidates,
       title: 'Review CSV Contacts',
-      repairIssues: parsedCandidates.invalidRows,
-      mappedColumns: parsedCandidates.mappedColumns,
+      repairIssues: result.invalidRows,
+      mappedColumns: result.mappedColumns,
     );
   }
 
@@ -503,15 +510,27 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     ];
 
     try {
-      final imported = await ref
+      final result = await ref
           .read(personServiceProvider)
-          .importBatch(importDrafts);
+          .importValidRows(importDrafts);
       if (!context.mounted) return;
       final messenger = ScaffoldMessenger.of(context);
+      final remaining =
+          repairIssues.length +
+          parsedCandidates.where((c) => !c.isImportable).length;
+      final skipped = result.failures.length;
+      final examples = [
+        for (final f in result.failures.take(3))
+          '${f.name.isEmpty ? 'Row ${f.index + 1}' : f.name} (${f.reasons.join(' ')})',
+      ];
+      final skippedDetail = skipped == 0
+          ? ''
+          : ' $skipped skipped: ${examples.join('; ')}'
+                '${skipped > 3 ? '; and ${skipped - 3} more' : ''}.';
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            'Imported ${imported.length} of ${importDrafts.length}; ${repairIssues.length + parsedCandidates.where((c) => !c.isImportable).length} rows remain for repair.',
+            'Imported ${result.imported.length} of ${importDrafts.length}; $remaining rows remain for repair.$skippedDetail',
           ),
         ),
       );
@@ -632,7 +651,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
       builder: (dialogContext) => AlertDialog(
         title: Text('Remove ${person.name}?'),
         content: const Text(
-          'Their birthday will be hidden. You can undo this at any time.',
+          'Their birthday will be hidden. You can restore this contact from the Undo prompt immediately after removal.',
         ),
         actions: [
           TextButton(
@@ -684,7 +703,20 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
               await ref
                   .read(personServiceProvider)
                   .restore(person.id, birthday: associatedBirthday);
-            } catch (_) {}
+            } catch (error, stackTrace) {
+              ref
+                  .read(loggerProvider)
+                  .warning(
+                    'people',
+                    'Undo failed while restoring a deleted contact.',
+                    params: {'personId': person.id},
+                    error: error,
+                    stackTrace: stackTrace,
+                  );
+              messenger.showSnackBar(
+                SnackBar(content: Text('Could not restore ${person.name}.')),
+              );
+            }
           },
         ),
       ),

@@ -274,4 +274,27 @@ void main() {
       ]);
     },
   );
+
+  testWidgets('does not show a negative age before the birth year', (
+    tester,
+  ) async {
+    final store = FakePeopleStore();
+    addTearDown(store.close);
+    await store.save(
+      person(
+        id: 'future-birth-year',
+        name: 'Future Birthday',
+        month: 2,
+        day: 11,
+        birthYear: 2027,
+      ),
+    );
+    await pumpHarness(tester, store);
+
+    await openDay(tester, '11');
+
+    expect(find.textContaining('turns -'), findsNothing);
+    expect(find.text('2027 · turns -1'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

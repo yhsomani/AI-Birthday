@@ -95,6 +95,14 @@ void main() {
       await pumpSettings(tester);
 
       expect(find.text('Personal Gemini API Key'), findsOneWidget);
+      expect(find.text('AI-Birthday'), findsOneWidget);
+      expect(find.text('AI-Birthday • v1.0.0'), findsNothing);
+      final keyField = tester.widget<TextField>(
+        find.widgetWithText(TextField, 'Paste your Gemini API key'),
+      );
+      expect(keyField.enableSuggestions, isFalse);
+      expect(keyField.autocorrect, isFalse);
+      expect(keyField.enableIMEPersonalizedLearning, isFalse);
       expect(find.text('Not Configured'), findsOneWidget);
       expect(find.text('Get Gemini API key ↗'), findsOneWidget);
       expect(find.text('How to connect'), findsOneWidget);

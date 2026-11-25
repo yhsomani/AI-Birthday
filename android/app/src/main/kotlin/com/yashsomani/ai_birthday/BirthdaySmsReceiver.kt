@@ -58,7 +58,8 @@ class BirthdaySmsReceiver : BroadcastReceiver() {
             jobs: JSONArray,
             description: String
         ): Boolean {
-            if (prefs.edit().putString(KEY_SCHEDULED_SMS_JOBS_JSON, jobs.toString()).commit()) {
+            val retained = pruneTerminalJobs(jobs)
+            if (prefs.edit().putString(KEY_SCHEDULED_SMS_JOBS_JSON, retained.toString()).commit()) {
                 return true
             }
             Log.e(TAG, "Failed to persist $description; attempting to clear the SMS queue.")
@@ -67,6 +68,18 @@ class BirthdaySmsReceiver : BroadcastReceiver() {
                 Log.e(TAG, "Failed to persist clearing the SMS queue after $description failure.")
             }
             return cleared
+        }
+
+        private fun isTerminalStatus(status: String): Boolean =
+            status in setOf("delivered", "failed", "cancelled", "canceled", "expired", "skipped")
+
+        private fun pruneTerminalJobs(jobs: JSONArray): JSONArray {
+            val retained = JSONArray()
+            for (index in 0 until jobs.length()) {
+                val item = jobs.optJSONObject(index) ?: continue
+                if (!isTerminalStatus(item.optString("status"))) retained.put(item)
+            }
+            return retained
         }
 
         /**
@@ -108,8 +121,9 @@ class BirthdaySmsReceiver : BroadcastReceiver() {
                     val scheduleToken = item.optString(KEY_SCHEDULE_TOKEN)
 
                     if (status != "scheduled") {
-                        if (status == "cancelled" && scheduleToken.isBlank()) {
-                            cancelAlarm(context, jobId)
+                        if (isTerminalStatus(status)) {
+                            cancelAlarm(context, jobId, scheduleToken.takeIf { it.isNotBlank() })
+                            continue
                         }
                         remainingArray.put(item)
                         continue
@@ -130,6 +144,8 @@ class BirthdaySmsReceiver : BroadcastReceiver() {
                             item.put("status", "expired")
                             item.put("failureReason", "Missed schedule window (>12h)")
                             recordAttempt(context, jobId, "expired", "Missed schedule window (>12h)")
+                            cancelAlarm(context, jobId, scheduleToken)
+                            continue
                         } else {
                             // Persist recovery decisions before execution; the sender must claim afresh.
                             dueJobs.add(item)
@@ -137,7 +153,7 @@ class BirthdaySmsReceiver : BroadcastReceiver() {
                     } else {
                         scheduleAlarm(context, alarmManager, jobId, scheduleToken, timestampMs)
                     }
-                    remainingArray.put(item)
+                    if (!isTerminalStatus(item.optString("status"))) remainingArray.put(item)
                 }
                 prefs.edit().putString(KEY_SCHEDULED_SMS_JOBS_JSON, remainingArray.toString()).commit()
             }
@@ -172,6 +188,32 @@ class BirthdaySmsReceiver : BroadcastReceiver() {
                 Log.e(TAG, "Refusing to persist invalid SMS job identity, token, timestamp, or status.")
                 return@synchronized false
             }
+            val alarmManager = if (timestampMs > System.currentTimeMillis()) {
+                context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            } else {
+                null
+            }
+            if (timestampMs > System.currentTimeMillis() && alarmManager == null) {
+                Log.e(TAG, "Cannot arm SMS job $jobId: AlarmManager is unavailable.")
+                return@synchronized false
+            }
+            if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                alarmManager != null &&
+                !alarmManager.canScheduleExactAlarms()
+            ) {
+                Log.w(TAG, "Cannot arm SMS job $jobId without exact-alarm permission.")
+                return@synchronized false
+            }
+            if (alarmManager != null) {
+                try {
+                    scheduleAlarm(context, alarmManager, jobId, scheduleToken, timestampMs)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Could not arm SMS alarm for job $jobId.", e)
+                    cancelAlarm(context, jobId, scheduleToken)
+                    return@synchronized false
+                }
+            }
             var replaced = false
             var oldScheduleToken: String? = null
             for (i in 0 until array.length()) {
@@ -190,6 +232,7 @@ class BirthdaySmsReceiver : BroadcastReceiver() {
             if (!replaced) array.put(job)
             if (!prefs.edit().putString(KEY_SCHEDULED_SMS_JOBS_JSON, array.toString()).commit()) {
                 Log.e(TAG, "Failed to persist replacement for SMS job $jobId.")
+                cancelAlarm(context, jobId, scheduleToken)
                 if (replaced) {
                     for (i in 0 until previousJobs.length()) {
                         val previousJob = previousJobs.optJSONObject(i) ?: continue
@@ -211,12 +254,6 @@ class BirthdaySmsReceiver : BroadcastReceiver() {
                 cancelAlarm(context, jobId, oldScheduleToken)
             } else if (replaced) {
                 cancelAlarm(context, jobId)
-            }
-            if (timestampMs > System.currentTimeMillis()) {
-                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-                if (alarmManager != null) {
-                    scheduleAlarm(context, alarmManager, jobId, scheduleToken, timestampMs)
-                }
             }
             true
         }
@@ -642,7 +679,10 @@ class BirthdaySmsReceiver : BroadcastReceiver() {
                 item.put("status", status)
                 item.put("updatedAt", System.currentTimeMillis())
                 item.put("statusDetail", detail)
-                val persisted = prefs.edit().putString(KEY_SCHEDULED_SMS_JOBS_JSON, array.toString()).commit()
+                val persisted = prefs.edit().putString(
+                    KEY_SCHEDULED_SMS_JOBS_JSON,
+                    pruneTerminalJobs(array).toString()
+                ).commit()
                 if (!persisted) {
                     Log.e(TAG, "Failed to persist callback status $status for SMS job $jobId.")
                 }
@@ -672,7 +712,10 @@ class BirthdaySmsReceiver : BroadcastReceiver() {
                         break
                     }
                 }
-                prefs.edit().putString(KEY_SCHEDULED_SMS_JOBS_JSON, array.toString()).commit()
+                prefs.edit().putString(
+                    KEY_SCHEDULED_SMS_JOBS_JSON,
+                    pruneTerminalJobs(array).toString()
+                ).commit()
             }
         }
 

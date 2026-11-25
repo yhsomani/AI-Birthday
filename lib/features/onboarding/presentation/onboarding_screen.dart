@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 
-/// Guided First-Run Onboarding Flow (SSOT §3, §14, §15).
+/// Guided First-Run Onboarding Flow (legacy SSOT §3, §14, §15 (PRODUCT.md §16.7)).
 ///
 /// Introduces the 5-step loop (Remember → Prepare → Personalize → Review → Send),
 /// establishes the local-first privacy promise, and gives clear on-ramps to
@@ -32,7 +32,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Future<void> _finishOnboarding() async {
     HapticFeedback.lightImpact();
-    await ref.read(credentialStorageProvider).setCompletedOnboarding(true);
+    if (!await _saveCompletion()) return;
     if (!mounted) return;
     if (context.canPop()) {
       context.pop();
@@ -48,11 +48,35 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   /// it so back always returns to a real home.
   Future<void> _finishTo(String destination) async {
     HapticFeedback.lightImpact();
-    await ref.read(credentialStorageProvider).setCompletedOnboarding(true);
+    if (!await _saveCompletion()) return;
     if (!mounted) return;
     context.go('/people');
     if (destination != '/people') {
       context.push(destination);
+    }
+  }
+
+  Future<bool> _saveCompletion() async {
+    try {
+      await ref.read(credentialStorageProvider).setCompletedOnboarding(true);
+      return true;
+    } catch (error, stackTrace) {
+      ref
+          .read(loggerProvider)
+          .warning(
+            'onboarding',
+            'Could not save onboarding completion.',
+            error: error,
+            stackTrace: stackTrace,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save your progress. Please try again.'),
+          ),
+        );
+      }
+      return false;
     }
   }
 
@@ -280,7 +304,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'AI-Birthday schedules gentle leads so greetings can be reviewed without stress.',
+              'Reminders are optional and start only after you enable them in Settings. Greetings are always yours to review.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,

@@ -45,8 +45,9 @@ class CelebrationCard extends StatelessWidget {
         : (isDark
               ? AppColors.darkSurfaceVariant
               : AppColors.lightSurfaceVariant);
+    // White on the light-terracotta dark-mode fill is only 2.7:1.
     final avatarFg = isToday
-        ? Colors.white
+        ? (isDark ? AppColors.darkBackground : AppColors.lightSurface)
         : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary);
 
     return Card(

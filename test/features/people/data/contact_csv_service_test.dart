@@ -6,7 +6,7 @@ import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
 
 void main() {
-  group('ContactCsvService (SSOT §18)', () {
+  group('ContactCsvService (legacy SSOT §18 (PRODUCT.md §16.7))', () {
     const service = ContactCsvService();
     final now = DateTime.now();
 
@@ -76,7 +76,7 @@ Bob Jones,12,25,,+1987654321,Friend,Casual,,
     });
 
     test(
-      'detects duplicate candidates by phone number and name (SSOT §18)',
+      'detects duplicate candidates by phone number and name (legacy SSOT §18 (PRODUCT.md §16.7))',
       () {
         const csv = '''Name,Birthday Month,Birthday Day,Birth Year,Phone Number
 Sarah Connor,10,7,1992,+14155552671

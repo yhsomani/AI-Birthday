@@ -40,6 +40,12 @@ class HangingAiProvider implements AiMessageProvider {
   }
 }
 
+/// Credential store whose key probe never answers (a stuck platform channel).
+class HangingCredentialStorage extends InMemoryCredentialStorage {
+  @override
+  Future<bool> hasGeminiApiKey() => Completer<bool>().future;
+}
+
 /// Tracks credential reads so entitlement ordering is part of the contract.
 class CountingCredentialStorage extends InMemoryCredentialStorage {
   int hasGeminiApiKeyCalls = 0;
@@ -52,7 +58,7 @@ class CountingCredentialStorage extends InMemoryCredentialStorage {
 }
 
 void main() {
-  group('AiRouter Routing Rules (SSOT §5)', () {
+  group('AiRouter Routing Rules (legacy SSOT §5 (PRODUCT.md §16.7))', () {
     late InMemoryCredentialStorage credentialStorage;
     late MockAiProvider mockGeminiProvider;
     late MockAiProvider mockNanoProvider;
@@ -255,5 +261,56 @@ void main() {
         );
       },
     );
+
+    test(
+      'A2-007: a stalled credential probe maps to a retryable aiTimeout',
+      () {
+        final router = AiRouter(
+          credentialStorage: HangingCredentialStorage(),
+          userGeminiProvider: mockGeminiProvider,
+          generationTimeout: const Duration(milliseconds: 50),
+        );
+
+        expect(
+          () => router.generate(
+            request: AiGenerationRequest(person: testPerson),
+            entitlement: UserEntitlement.proActive,
+          ),
+          throwsA(
+            isA<AppFailure>().having(
+              (e) => e.code,
+              'code',
+              AppFailureCode.aiTimeout,
+            ),
+          ),
+        );
+      },
+    );
+
+    test('A2-007: a stalled Nano status probe maps to aiTimeout', () {
+      final router = AiRouter(
+        credentialStorage: credentialStorage,
+        userGeminiProvider: mockGeminiProvider,
+        nanoProvider: mockNanoProvider,
+        nanoStatusChecker: () => Completer<GeminiNanoStatus>().future,
+        generationTimeout: const Duration(milliseconds: 50),
+      );
+
+      expect(
+        () => router.generate(
+          request: AiGenerationRequest(person: testPerson),
+          entitlement: UserEntitlement.proActive,
+          forceNano: true,
+        ),
+        throwsA(
+          isA<AppFailure>().having(
+            (e) => e.code,
+            'code',
+            AppFailureCode.aiTimeout,
+          ),
+        ),
+      );
+      expect(mockNanoProvider.generateCalls, 0);
+    });
   });
 }

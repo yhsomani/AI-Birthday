@@ -1,4 +1,4 @@
-/// Command Center Dashboard for AI-Birthday (SSOT §15).
+/// Command Center Dashboard for AI-Birthday (legacy SSOT §15 (PRODUCT.md §16.7)).
 ///
 /// Designed to eliminate generic AI/SaaS templates: no gradients, no arbitrary
 /// pill-shaped badges, no repetitive card soup. Above the fold clearly establishes
@@ -147,7 +147,7 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           ...actionNeededBirthdays.map((b) {
-                            final person = peopleMap[b.personId];
+                            final person = peopleMap[b.personId]!;
                             return _buildActionCard(context, ref, b, person);
                           }),
                           const SizedBox(height: AppSpacing.lg),
@@ -162,7 +162,7 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           ...celebrateToday.map((b) {
-                            final person = peopleMap[b.personId];
+                            final person = peopleMap[b.personId]!;
                             return _buildCelebrationCard(
                               context,
                               ref,
@@ -223,7 +223,7 @@ class DashboardScreen extends ConsumerWidget {
                           )
                         else
                           ...upcomingBirthdays.take(5).map((b) {
-                            final person = peopleMap[b.personId];
+                            final person = peopleMap[b.personId]!;
                             return _buildCelebrationCard(
                               context,
                               ref,
@@ -232,6 +232,15 @@ class DashboardScreen extends ConsumerWidget {
                               isToday: false,
                             );
                           }),
+                        if (upcomingBirthdays.length > 5)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: () => context.go('/calendar'),
+                              icon: const Icon(Icons.calendar_month_outlined),
+                              label: const Text('See all birthdays'),
+                            ),
+                          ),
                         const SizedBox(height: AppSpacing.lg),
 
                         // 5. Quick Actions Bar
@@ -376,7 +385,7 @@ class DashboardScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Birthday birthday,
-    Person? person,
+    Person person,
   ) {
     final now = DateTime.now();
     final days = birthday.daysUntil(now);
@@ -395,9 +404,7 @@ class DashboardScreen extends ConsumerWidget {
                   backgroundColor: AppColors.primaryTerracottaContainer,
                   foregroundColor: AppColors.primaryTerracotta,
                   child: Text(
-                    person != null && person.name.isNotEmpty
-                        ? person.name[0].toUpperCase()
-                        : '?',
+                    person.name.isNotEmpty ? person.name[0].toUpperCase() : '?',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -407,7 +414,7 @@ class DashboardScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        person?.name ?? 'Unknown',
+                        person.name,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -446,16 +453,15 @@ class DashboardScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Channel: ${person?.preferredDeliveryChannel.displayName ?? 'WhatsApp'}',
+                      'Channel: ${person.preferredDeliveryChannel.displayName}',
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (person != null &&
-                        (person.phoneNumber == null ||
-                            person.phoneNumber!.trim().isEmpty)) ...[
+                    if (person.phoneNumber == null ||
+                        person.phoneNumber!.trim().isEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
                         'No phone number',
@@ -507,19 +513,17 @@ class DashboardScreen extends ConsumerWidget {
       BirthdayStatus.messageDrafted => Icons.rate_review_outlined,
       BirthdayStatus.messageReviewed ||
       BirthdayStatus.readyForDelivery => Icons.send_rounded,
-      BirthdayStatus.completed => Icons.verified_outlined,
       BirthdayStatus.handedOff => Icons.check_circle_outline,
       _ => Icons.arrow_forward,
     };
   }
 
-  String _actionButtonLabel(BirthdayStatus status, Person? person) {
+  String _actionButtonLabel(BirthdayStatus status, Person person) {
     return switch (status) {
       BirthdayStatus.messageNotPrepared => 'Draft Greeting',
       BirthdayStatus.messageDrafted => 'Review Draft',
       BirthdayStatus.messageReviewed || BirthdayStatus.readyForDelivery =>
-        'Send via ${person?.preferredDeliveryChannel.displayName ?? 'WhatsApp'}',
-      BirthdayStatus.completed => 'User Confirmed Sent',
+        'Send via ${person.preferredDeliveryChannel.displayName}',
       BirthdayStatus.handedOff => 'Confirm Sent',
       _ => 'Review & Send',
     };
@@ -529,16 +533,16 @@ class DashboardScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Birthday birthday,
-    Person? person, {
+    Person person, {
     required bool isToday,
   }) {
     final now = DateTime.now();
     final days = birthday.daysUntil(now);
     final subtitle =
-        '${person == null ? 'Friend' : relationshipCardLabel(person.relationship, person.relationshipCloseness)} • ${DateFormat.MMMd().format(birthday.date)}';
+        '${relationshipCardLabel(person.relationship, person.relationshipCloseness)} • ${DateFormat.MMMd().format(birthday.date)}';
 
     return CelebrationCard(
-      name: person?.name ?? 'Unknown',
+      name: person.name,
       subtitle: subtitle,
       daysUntil: days,
       isToday: isToday,

@@ -4,57 +4,74 @@
     {
       "collectionGroup": "installations",
       "fieldPath": "cleanupAt",
-      "indexes": []
+      "indexes": [],
+      "ttl": true
     },
     {
       "collectionGroup": "armBudgets",
       "fieldPath": "cleanupAt",
-      "indexes": []
+      "indexes": [],
+      "ttl": true
     },
     {
       "collectionGroup": "occurrenceClaims",
       "fieldPath": "cleanupAt",
-      "indexes": []
+      "indexes": [],
+      "ttl": true
     },
     {
       "collectionGroup": "occurrenceKeys",
       "fieldPath": "cleanupAt",
-      "indexes": []
+      "indexes": [],
+      "ttl": true
     },
     {
       "collectionGroup": "destinationGuards",
       "fieldPath": "cleanupAt",
-      "indexes": []
+      "indexes": [],
+      "ttl": true
     },
     {
       "collectionGroup": "testClaims",
       "fieldPath": "cleanupAt",
-      "indexes": []
+      "indexes": [],
+      "ttl": true
     },
     {
       "collectionGroup": "armOutcomes",
       "fieldPath": "cleanupAt",
-      "indexes": []
+      "indexes": [],
+      "ttl": true
     },
     {
       "collectionGroup": "claimRequests",
       "fieldPath": "cleanupAt",
-      "indexes": []
+      "indexes": [],
+      "ttl": true
     },
     {
       "collectionGroup": "deletionTombstones",
       "fieldPath": "cleanupAt",
-      "indexes": []
+      "indexes": [],
+      "ttl": true
     },
     {
       "collectionGroup": "coordinationOperationReceipts",
       "fieldPath": "cleanupAt",
-      "indexes": []
+      "indexes": [],
+      "ttl": true
     },
     {
       "collectionGroup": "coordinationLatestReceipts",
       "fieldPath": "cleanupAt",
-      "indexes": []
+      "indexes": [],
+      "ttl": true
+    },
+    {
+      "collectionGroup": "deletionReceipts",
+      "fieldPath": "cleanupAt",
+      "indexes": [],
+      "ttl": true
     }
   ]
 }

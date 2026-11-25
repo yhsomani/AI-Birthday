@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:google_sign_in/google_sign_in.dart' hide GoogleIdentity;
 import 'package:http/http.dart' as http;
@@ -8,7 +9,7 @@ import '../application/google_auth_gateway.dart';
 import '../domain/google_identity.dart';
 import 'package:ai_birthday/core/config/firebase_config.dart';
 
-/// Production Google Sign-In and Firebase Auth gateway (SSOT §12, FR-001).
+/// Production Google Sign-In and Firebase Auth gateway (legacy SSOT §12 (PRODUCT.md §16.7), FR-001).
 ///
 /// Features:
 /// - Real Google Sign-In with serverClientId on Android/iOS via GoogleSignIn 7.x.
@@ -17,19 +18,19 @@ import 'package:ai_birthday/core/config/firebase_config.dart';
 /// - Zero synthetic accounts, zero fake local OTP generation.
 class LiveGoogleAuthGateway implements GoogleAuthGateway {
   LiveGoogleAuthGateway({
-    required SecureStoreDriver store,
+    required this._store,
     http.Client? httpClient,
-    AppLogger? logger,
+    this._logger,
     String? firebaseApiKey,
-  }) : _store = store,
-       _http = httpClient ?? http.Client(),
-       _logger = logger,
+    this._requestTimeout = const Duration(seconds: 30),
+  }) : _http = httpClient ?? http.Client(),
        _firebaseApiKey = firebaseApiKey ?? _defaultFirebaseApiKey;
 
   final SecureStoreDriver _store;
   final http.Client _http;
   final AppLogger? _logger;
   final String _firebaseApiKey;
+  final Duration _requestTimeout;
   bool _initialized = false;
 
   static const String _serverClientId = FirebaseConfig.webClientId;
@@ -160,16 +161,27 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
 
       final http.Response res;
       try {
-        res = await _http.post(
-          Uri.parse(
-            'https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=$_firebaseApiKey',
-          ),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'postBody': 'id_token=$idToken&providerId=google.com',
-            'requestUri': 'http://localhost',
-            'returnSecureToken': true,
-          }),
+        res = await _http
+            .post(
+              Uri.parse(
+                'https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=$_firebaseApiKey',
+              ),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'postBody': 'id_token=$idToken&providerId=google.com',
+                'requestUri': 'http://localhost',
+                'returnSecureToken': true,
+              }),
+            )
+            .timeout(_requestTimeout);
+      } on TimeoutException catch (e) {
+        _logger?.warning(
+          'AuthGateway',
+          'Firebase IdP exchange timed out',
+          error: e,
+        );
+        return const SignInFailed(
+          'Sign-in timed out. Please check your connection and try again.',
         );
       } catch (e) {
         _logger?.warning(
@@ -317,14 +329,16 @@ class LiveGoogleAuthGateway implements GoogleAuthGateway {
     }
 
     try {
-      final res = await _http.post(
-        Uri.parse(
-          'https://securetoken.googleapis.com/v1/token?key=$_firebaseApiKey',
-        ),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body:
-            'grant_type=refresh_token&refresh_token=${Uri.encodeComponent(refreshToken.trim())}',
-      );
+      final res = await _http
+          .post(
+            Uri.parse(
+              'https://securetoken.googleapis.com/v1/token?key=$_firebaseApiKey',
+            ),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body:
+                'grant_type=refresh_token&refresh_token=${Uri.encodeComponent(refreshToken.trim())}',
+          )
+          .timeout(_requestTimeout);
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;

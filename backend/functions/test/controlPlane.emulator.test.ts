@@ -709,6 +709,15 @@ describe('Firestore transaction adapter', () => {
         )
       ).kind,
     ).toBe('REGISTERED_STANDBY');
+    await db.collection('users').doc(uid).collection('backup').doc('current').set({
+      generationId: 'g1',
+    });
+    await db
+      .collection('users')
+      .doc(uid)
+      .collection('entitlement')
+      .doc('status')
+      .set({ canUseAi: true });
     const request = {
       contractVersion: 1 as const,
       requestId: '00000000-0000-4000-8000-000000000901',
@@ -868,6 +877,26 @@ describe('Firestore transaction adapter', () => {
     expect(
       (await db.collection('coordinationPresence').doc(uid).get()).exists,
     ).toBe(false);
+    expect(
+      (
+        await db
+          .collection('users')
+          .doc(uid)
+          .collection('backup')
+          .doc('current')
+          .get()
+      ).exists,
+    ).toBe(true);
+    expect(
+      (
+        await db
+          .collection('users')
+          .doc(uid)
+          .collection('entitlement')
+          .doc('status')
+          .get()
+      ).exists,
+    ).toBe(true);
 
     const replacement = await releaseService.registerAndroidInstallation(
       uid,
@@ -1195,6 +1224,41 @@ describe('Firestore transaction adapter', () => {
     expect((await tombstones.doc(readyUid).get()).get('stage')).toBe(
       'VERIFYING',
     );
+  });
+
+  it('purges the uid purchase-ownership docs and leaves other accounts untouched (A4-002)', async () => {
+    const uid = 'emulator-deletion-ownership-purge';
+    const ownership = db.collection('subscriptionPurchaseOwnership');
+    await db
+      .collection('deletionTombstones')
+      .doc(uid)
+      .set({
+        schemaVersion: SCHEMA_VERSION,
+        requestKey: deriveDeletionReceiptKey(
+          '00000000-0000-4000-8000-000000001002',
+        ),
+        stage: 'PURGING',
+        drainUntilMs: nowMs - 1,
+        nextSweepAtMs: nowMs,
+        sweepAttemptCount: 0,
+        createdAtMs: nowMs - 2,
+        updatedAtMs: nowMs,
+      });
+    for (let index = 0; index < 3; index += 1) {
+      await ownership.doc('hash-owned-' + String(index)).set({ uid });
+    }
+    await ownership.doc('hash-other-account').set({ uid: 'someone-else' });
+
+    const orchestrator = new DeletionOrchestrator(db, {} as Auth, () => nowMs);
+    expect(await orchestrator.sweep(20)).toMatchObject({ drainsAdvanced: 1 });
+
+    expect(
+      (await ownership.where('uid', '==', uid).limit(1).get()).empty,
+    ).toBe(true);
+    expect((await ownership.doc('hash-other-account').get()).exists).toBe(true);
+    expect(
+      (await db.collection('deletionTombstones').doc(uid).get()).get('stage'),
+    ).toBe('AUTH_DELETION_PENDING');
   });
 
   it('repairs a crash after deletion entered PURGING', async () => {

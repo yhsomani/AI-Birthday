@@ -44,6 +44,18 @@ describe('strict content-minimized callable schemas', () => {
         destinationPrehashAliases: ['+919999999999'],
       }).success,
     ).toBe(false);
+    expect(
+      birthdayClaimSchema.safeParse({
+        ...valid,
+        claimRequestId: 'ABCDEF01-ABCD-4DEF-8ABC-ABCDEF000001',
+      }).success,
+    ).toBe(false);
+    expect(
+      birthdayClaimSchema.safeParse({
+        ...valid,
+        claimRequestId: '00000000-0000-1000-8000-000000000001',
+      }).success,
+    ).toBe(false);
   });
 
   it('keeps TEST separate from recipient occurrence and birthday fields', () => {
@@ -62,6 +74,12 @@ describe('strict content-minimized callable schemas', () => {
       testClaimSchema.safeParse({
         ...valid,
         recipientPrehashAliases: ['ab'.repeat(32)],
+      }).success,
+    ).toBe(false);
+    expect(
+      testClaimSchema.safeParse({
+        ...valid,
+        testRequestId: 'ABCDEF01-ABCD-4DEF-8ABC-ABCDEF000002',
       }).success,
     ).toBe(false);
   });

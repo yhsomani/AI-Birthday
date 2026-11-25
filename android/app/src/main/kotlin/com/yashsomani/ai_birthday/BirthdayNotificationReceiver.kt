@@ -29,6 +29,7 @@ class BirthdayNotificationReceiver : BroadcastReceiver() {
         const val CHANNEL_DESCRIPTION = "Alerts and reminders for upcoming birthdays"
         const val ACTION_BIRTHDAY_REMINDER = "com.yashsomani.ai_birthday.BIRTHDAY_REMINDER"
         const val EXTRA_ID = "notification_id"
+        const val EXTRA_TIMESTAMP_MS = "timestamp_ms"
         const val EXTRA_TITLE = "title"
         const val EXTRA_BODY = "body"
         const val EXTRA_PERSON_ID = "person_id"
@@ -44,6 +45,7 @@ class BirthdayNotificationReceiver : BroadcastReceiver() {
         private const val JSON_TITLE = "title"
         private const val JSON_BODY = "body"
         private const val JSON_PERSON_ID = "personId"
+        private val consumedTriggerLock = Any()
 
         fun persistedTriggerToJson(trigger: PersistedTrigger): JSONObject = JSONObject().apply {
             put(JSON_ID, trigger.id)
@@ -64,6 +66,51 @@ class BirthdayNotificationReceiver : BroadcastReceiver() {
                 body = item.optString(JSON_BODY, ""),
                 personId = if (item.has(JSON_PERSON_ID)) item.optString(JSON_PERSON_ID) else null,
             )
+        }
+
+        /** Removes a due trigger durably before posting, preventing replay after clock rollback. */
+        fun consumePersistedTrigger(
+            context: Context,
+            id: Int,
+            timestampMs: Long?,
+        ): Boolean = synchronized(consumedTriggerLock) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val raw = prefs.getString(KEY_SCHEDULED_TRIGGERS_JSON, null) ?: return false
+            val triggers = try {
+                JSONArray(raw)
+            } catch (e: Exception) {
+                Log.e(TAG, "Persisted reminder payload is invalid; clearing it.", e)
+                prefs.edit()
+                    .remove(KEY_SCHEDULED_TRIGGERS_JSON)
+                    .remove(KEY_SCHEDULED_ALARM_IDS)
+                    .commit()
+                return false
+            }
+
+            val now = System.currentTimeMillis()
+            val hasDueMatch = (0 until triggers.length()).any { index ->
+                val trigger = triggers.optJSONObject(index)?.let(::parsePersistedTrigger)
+                trigger != null &&
+                    trigger.id == id &&
+                    trigger.timestampMs <= now &&
+                    (timestampMs == null || trigger.timestampMs == timestampMs)
+            }
+            if (!hasDueMatch) return false
+
+            val remaining = JSONArray()
+            for (index in 0 until triggers.length()) {
+                val item = triggers.optJSONObject(index) ?: continue
+                val trigger = parsePersistedTrigger(item)
+                if (trigger?.id != id) remaining.put(item)
+            }
+            val alarmIds = prefs.getStringSet(KEY_SCHEDULED_ALARM_IDS, emptySet())
+                .orEmpty()
+                .toMutableSet()
+            alarmIds.remove(id.toString())
+            prefs.edit()
+                .putString(KEY_SCHEDULED_TRIGGERS_JSON, remaining.toString())
+                .putStringSet(KEY_SCHEDULED_ALARM_IDS, alarmIds)
+                .commit()
         }
 
         fun reschedulePersisted(context: Context) {
@@ -95,6 +142,7 @@ class BirthdayNotificationReceiver : BroadcastReceiver() {
                 val reminderIntent = Intent(context, BirthdayNotificationReceiver::class.java).apply {
                     action = ACTION_BIRTHDAY_REMINDER
                     putExtra(EXTRA_ID, trigger.id)
+                    putExtra(EXTRA_TIMESTAMP_MS, trigger.timestampMs)
                     putExtra(EXTRA_TITLE, trigger.title)
                     putExtra(EXTRA_BODY, trigger.body)
                     putExtra(EXTRA_PERSON_ID, trigger.personId)
@@ -139,6 +187,18 @@ class BirthdayNotificationReceiver : BroadcastReceiver() {
         // AlarmManager entries are cleared by Android across reboot/package replacement.
         // Restore the persisted future reminder payloads before returning.
         if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            reschedulePersisted(context)
+            return
+        }
+
+        // Keep RTC alarms registered when the wall clock or exact-alarm access
+        // changes. Flutter reconciles the schedule on resume to recalculate
+        // recipient/device-local calendar times.
+        if (action == Intent.ACTION_TIME_CHANGED ||
+            action == Intent.ACTION_TIMEZONE_CHANGED ||
+            action == Intent.ACTION_DATE_CHANGED ||
+            action == "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED"
+        ) {
             reschedulePersisted(context)
             return
         }
@@ -191,6 +251,18 @@ class BirthdayNotificationReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
+
+        val timestampMs = if (intent.hasExtra(EXTRA_TIMESTAMP_MS)) {
+            intent.getLongExtra(EXTRA_TIMESTAMP_MS, 0L)
+        } else {
+            null
+        }
+        if (action == ACTION_BIRTHDAY_REMINDER &&
+            !consumePersistedTrigger(context, notificationId, timestampMs)
+        ) {
+            Log.w(TAG, "Ignoring consumed or stale reminder id=$notificationId")
+            return
+        }
 
         notificationManager.notify(notificationId, notification)
         Log.i(TAG, "Posted notification successfully: id=$notificationId")

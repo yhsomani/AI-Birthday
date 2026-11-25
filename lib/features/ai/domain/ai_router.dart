@@ -1,4 +1,4 @@
-/// Authoritative AI Router implementing the routing rule defined in SSOT §5.
+/// Authoritative AI Router implementing the routing rule defined in legacy SSOT §5 (PRODUCT.md §16.7).
 library;
 
 import 'dart:async';
@@ -10,7 +10,7 @@ import 'package:ai_birthday/features/ai/domain/ai_prompt_builder.dart';
 import 'package:ai_birthday/features/ai/domain/ai_provider.dart';
 import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 
-/// Routes AI requests according to the SSOT §5 logic:
+/// Routes AI requests according to the legacy SSOT §5 (PRODUCT.md §16.7) logic:
 /// 1. Active application entitlement is required before credential access or
 ///    provider selection; a personal Gemini API key never bypasses Pro.
 /// 2. After entitlement passes, use the personal Gemini API key when configured,
@@ -20,17 +20,13 @@ import 'package:ai_birthday/features/subscription/domain/entitlement.dart';
 ///    returns a typed locked/unavailable error.
 class AiRouter {
   AiRouter({
-    required CredentialStorage credentialStorage,
-    required AiMessageProvider userGeminiProvider,
-    AiMessageProvider? nanoProvider,
-    Future<GeminiNanoStatus> Function()? nanoStatusChecker,
+    required this._credentialStorage,
+    required this._userGeminiProvider,
+    this._nanoProvider,
+    this._nanoStatusChecker,
     AppLogger? logger,
     this.generationTimeout = const Duration(seconds: 30),
-  }) : _credentialStorage = credentialStorage,
-       _userGeminiProvider = userGeminiProvider,
-       _nanoProvider = nanoProvider,
-       _nanoStatusChecker = nanoStatusChecker,
-       _logger = logger ?? ConsoleAppLogger();
+  }) : _logger = logger ?? ConsoleAppLogger();
 
   final CredentialStorage _credentialStorage;
   final AiMessageProvider _userGeminiProvider;
@@ -58,12 +54,12 @@ class AiRouter {
       );
     }
 
-    final hasUserKey = await _credentialStorage.hasGeminiApiKey();
+    final hasUserKey = await _withTimeout(_credentialStorage.hasGeminiApiKey());
 
     // If explicit Nano requested or no user key configured, check Nano
     if (forceNano || !hasUserKey) {
       final nanoStatus = _nanoStatusChecker != null
-          ? await _nanoStatusChecker()
+          ? await _withTimeout(_nanoStatusChecker())
           : GeminiNanoStatus.unavailable;
 
       if (nanoStatus == GeminiNanoStatus.available && _nanoProvider != null) {
@@ -78,13 +74,13 @@ class AiRouter {
       }
     }
 
-    // 2. User Gemini API key check
+    // User Gemini API key route (header step 2)
     if (hasUserKey) {
       _logger.info('AiRouter', 'Routing request to User Gemini API');
       return _withTimeout(_userGeminiProvider.generateMessage(request));
     }
 
-    // 3. Neither provider is available
+    // No provider available
     _logger.info('AiRouter', 'AI request failed: No provider available');
     throw const AppFailure.credentialMissing(
       action:
@@ -92,16 +88,15 @@ class AiRouter {
     );
   }
 
-  /// Bounds a single AI request so a stalled provider (no response, no error)
-  /// cannot hold a durable job in `running` forever. Timeouts map to the
-  /// retryable [AppFailureCode.aiTimeout] so the job worker retries it.
-  Future<AiGenerationResult> _withTimeout(
-    Future<AiGenerationResult> request,
-  ) async {
+  /// Bounds one awaited step (provider call, credential read, or Nano status
+  /// probe) so a stalled call (no response, no error) cannot hold a durable job
+  /// in `running` forever. Timeouts map to the retryable
+  /// [AppFailureCode.aiTimeout] so the job worker retries it.
+  Future<T> _withTimeout<T>(Future<T> request) async {
     try {
       return await request.timeout(generationTimeout);
     } on TimeoutException {
-      _logger.info('AiRouter', 'AI request timed out; will retry.');
+      _logger.info('AiRouter', 'AI router step timed out; will retry.');
       throw const AppFailure.timeout();
     }
   }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// A calm, accessible empty-state view.
 ///
 /// Not a placeholder: it is the correct rendered state whenever the feature
-/// has no data (SSOT §15, empty state). Semantically bundled for screen
+/// has no data (legacy SSOT §15 (PRODUCT.md §16.7), empty state). Semantically bundled for screen
 /// readers; supports large text scaling and high contrast automatically.
 class EmptyState extends StatelessWidget {
   const EmptyState({

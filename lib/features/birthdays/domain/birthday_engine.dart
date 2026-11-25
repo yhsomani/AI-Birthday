@@ -1,6 +1,6 @@
 import 'package:timezone/timezone.dart' as tz;
 
-/// How a Feb 29 birthday is treated in a non-leap year (SSOT §14).
+/// How a Feb 29 birthday is treated in a non-leap year (legacy SSOT §14 (PRODUCT.md §16.7)).
 enum LeapDayResolution {
   /// Celebrate on Feb 28 (default when a preference has explicitly been saved).
   feb28,
@@ -53,7 +53,7 @@ class NextBirthday {
   final bool isLeapDayAdjusted;
 }
 
-/// Pure, timezone-aware birthday calculations (SSOT §14).
+/// Pure, timezone-aware birthday calculations (legacy SSOT §14 (PRODUCT.md §16.7)).
 ///
 /// Recurrence operates on calendar dates: a birthday is the year-day
 /// (month, day) in the recipient timezone. Non-leap years resolve Feb 29 per

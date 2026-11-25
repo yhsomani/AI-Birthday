@@ -79,7 +79,6 @@ test('deletion client preserves the native deletion security contract', () => {
   assert.match(source, /associated with this deletion request/u);
   assert.match(source, /#retry-sign-out/u);
   assert.match(source, /#clear-receipt/u);
-  assert.equal(source.match(/clearPendingReceipt\(\)/gu)?.length, 3);
   assert.doesNotMatch(source, /\.addScope\(/u);
   assert.doesNotMatch(source, /credentialFromResult/u);
   assert.doesNotMatch(source, /(?:localStorage|indexedDB|document\.cookie)/u);
@@ -87,6 +86,25 @@ test('deletion client preserves the native deletion security contract', () => {
   assert.doesNotMatch(source, /JSON\.stringify\([^)]*receipt/iu);
   assert.doesNotMatch(source, /(?:console|logger)\s*\./u);
   assert.doesNotMatch(source, /innerHTML/u);
+  assert.equal(source.match(/clearPendingReceipt\(\)/gu)?.length, 3);
+});
+
+test('uses the single typed deletion-contract source and no-store clean routes', () => {
+  const firebase = JSON.parse(read('../firebase.json'));
+  const noStoreSources = firebase.hosting.headers
+    .filter(({ headers: values }) =>
+      values.some(
+        ({ key, value }) =>
+          key === 'Cache-Control' && value === 'no-store',
+      ),
+    )
+    .map(({ source }) => source);
+  for (const route of ['/', '/delete/**', '/privacy/**', '/terms/**', '/support/**']) {
+    assert.ok(noStoreSources.includes(route), `${route} should be no-store`);
+  }
+  assert.ok(read('src/deletion-contract.ts').length > 0);
+  assert.throws(() => read('src/deletion-contract.js'));
+  assert.match(read('.gitignore'), /^\/public\/runtime-config\.json$/mu);
 });
 
 test('missing release configuration visibly disables every secure workflow control', () => {
@@ -164,6 +182,20 @@ test('Firebase Hosting deploy is release-gated and applies security headers', ()
     );
   assert.match(headers['Content-Security-Policy'], /frame-ancestors 'none'/u);
   assert.match(headers['Content-Security-Policy'], /form-action 'none'/u);
+  // Firebase Auth popup sign-in loads gapi from apis.google.com (_loadGapi) and
+  // opens the auth iframe on the firebaseapp.com authDomain.
+  const directives = Object.fromEntries(
+    headers['Content-Security-Policy']
+      .split(';')
+      .map(part => part.trim().split(/\s+/u))
+      .map(([name, ...sources]) => [name, sources]),
+  );
+  assert.ok(directives['script-src'].includes('https://apis.google.com'));
+  assert.ok(directives['script-src'].includes("'self'"));
+  assert.ok(directives['frame-src'].includes('https://*.firebaseapp.com'));
+  assert.ok(directives['connect-src'].includes('https://*.googleapis.com'));
+  assert.ok(!directives['script-src'].includes("'unsafe-inline'"));
+  assert.ok(!directives['script-src'].includes("'unsafe-eval'"));
   assert.equal(headers['Referrer-Policy'], 'no-referrer');
   assert.equal(headers['X-Content-Type-Options'], 'nosniff');
   assert.equal(headers['X-Frame-Options'], 'DENY');

@@ -1,4 +1,4 @@
-/// Message draft entity and draft states (SSOT §16).
+/// Message draft entity and draft states (legacy SSOT §16 (PRODUCT.md §16.7)).
 library;
 
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
@@ -21,13 +21,14 @@ enum DraftStatus {
   };
 
   static DraftStatus fromString(String? value) {
-    if (value == null) return DraftStatus.draft;
-    // ⚡ Bolt: Hoist invariant .toLowerCase() out of loop to avoid O(N) redundant string allocations
+    if (value == null) {
+      throw const FormatException('Draft status cannot be null.');
+    }
     final target = value.toLowerCase();
-    return DraftStatus.values.firstWhere(
-      (e) => e.name.toLowerCase() == target,
-      orElse: () => DraftStatus.draft,
-    );
+    for (final status in DraftStatus.values) {
+      if (status.name.toLowerCase() == target) return status;
+    }
+    throw FormatException('Unknown draft status: $value');
   }
 }
 
@@ -43,6 +44,7 @@ class MessageDraft {
     this.status = DraftStatus.draft,
     this.providerType = 'manual',
     this.variationIndex = 0,
+    this.revision = 0,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -69,6 +71,11 @@ class MessageDraft {
   /// Index of the variation if multiple drafts were generated.
   final int variationIndex;
 
+  /// Monotonic persisted write counter. The repository increments it on every
+  /// save and uses it (not [updatedAt], which has 1 s precision) for stale-write
+  /// detection. The value on a draft being saved is ignored.
+  final int revision;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -82,6 +89,7 @@ class MessageDraft {
     DraftStatus? status,
     String? providerType,
     int? variationIndex,
+    int? revision,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -95,6 +103,7 @@ class MessageDraft {
       status: status ?? this.status,
       providerType: providerType ?? this.providerType,
       variationIndex: variationIndex ?? this.variationIndex,
+      revision: revision ?? this.revision,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -110,6 +119,7 @@ class MessageDraft {
     'status': status.name,
     'providerType': providerType,
     'variationIndex': variationIndex,
+    'revision': revision,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
   };
@@ -122,9 +132,12 @@ class MessageDraft {
       body: json['body'] as String,
       tone: MessageTone.fromString(json['tone'] as String?),
       length: MessageLength.fromString(json['length'] as String?),
-      status: DraftStatus.fromString(json['status'] as String?),
+      status: DraftStatus.fromString(
+        json['status'] as String? ?? DraftStatus.draft.name,
+      ),
       providerType: (json['providerType'] as String?) ?? 'manual',
       variationIndex: (json['variationIndex'] as int?) ?? 0,
+      revision: (json['revision'] as int?) ?? 0,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );

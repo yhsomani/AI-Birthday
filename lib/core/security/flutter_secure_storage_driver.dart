@@ -5,7 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/core/security/credential_storage.dart';
 
-class FlutterSecureStorageDriver implements SecureStoreDriver {
+class FlutterSecureStorageDriver implements StrictReadSecureStoreDriver {
   const FlutterSecureStorageDriver([
     this._storage = const FlutterSecureStorage(),
     this._logger,
@@ -17,15 +17,26 @@ class FlutterSecureStorageDriver implements SecureStoreDriver {
   @override
   Future<String?> read(String key) async {
     try {
+      return await readOrThrow(key);
+    } catch (_) {
+      // Already logged by readOrThrow; optional values degrade to "missing".
+      return null;
+    }
+  }
+
+  @override
+  Future<String?> readOrThrow(String key) async {
+    try {
       return await _storage.read(key: key);
     } catch (e, st) {
+      // Key names embed account identifiers, so they are never logged.
       _logger?.error(
         'SecureStore',
-        'Failed to read key: $key',
+        'Failed to read secure value.',
         error: e,
         stackTrace: st,
       );
-      return null;
+      rethrow;
     }
   }
 
@@ -36,7 +47,7 @@ class FlutterSecureStorageDriver implements SecureStoreDriver {
     } catch (e, st) {
       _logger?.error(
         'SecureStore',
-        'Failed to write secure key: $key',
+        'Failed to write secure value.',
         error: e,
         stackTrace: st,
       );
@@ -51,7 +62,7 @@ class FlutterSecureStorageDriver implements SecureStoreDriver {
     } catch (e, st) {
       _logger?.error(
         'SecureStore',
-        'Failed to delete secure key: $key',
+        'Failed to delete secure value.',
         error: e,
         stackTrace: st,
       );

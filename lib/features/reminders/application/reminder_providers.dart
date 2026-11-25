@@ -12,7 +12,7 @@ final notificationSchedulerGatewayProvider =
       return const AndroidNotificationSchedulerGateway();
     });
 
-/// Application reminder service orchestrating reminder planning and device sync (SSOT §17).
+/// Application reminder service orchestrating reminder planning and device sync (legacy SSOT §17 (PRODUCT.md §16.7)).
 final reminderServiceProvider = Provider<ReminderService>((ref) {
   final gateway = ref.watch(notificationSchedulerGatewayProvider);
   final logger = ref.watch(loggerProvider);

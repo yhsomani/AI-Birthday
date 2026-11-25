@@ -39,6 +39,7 @@ dependencies:
   drift_flutter: ^0.2.4
   flutter_secure_storage: ^9.2.4
   clock: ^1.1.1
+  crypto: ^3.0.6
   intl: ^0.20.2
   uuid: ^4.5.1
   timezone: ^0.10.1

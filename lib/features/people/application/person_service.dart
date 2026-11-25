@@ -12,11 +12,33 @@ import '../domain/person_input_validator.dart';
 import '../domain/person_enums.dart' show AutoSendPolicy;
 import 'package:ai_birthday/core/config/product_capabilities.dart';
 
-/// Application service for recipient lifecycle (SSOT §7).
+/// One import row rejected by validation, with every reason it failed.
+class PersonImportFailure {
+  const PersonImportFailure({
+    required this.index,
+    required this.name,
+    required this.reasons,
+  });
+
+  /// Zero-based position of the row in the submitted list.
+  final int index;
+  final String name;
+  final List<String> reasons;
+}
+
+/// Outcome of a per-row import: what was saved and what was skipped.
+class PersonImportResult {
+  const PersonImportResult({required this.imported, required this.failures});
+
+  final List<Person> imported;
+  final List<PersonImportFailure> failures;
+}
+
+/// Application service for recipient lifecycle (legacy SSOT §7 (PRODUCT.md §16.7)).
 ///
 /// Owns validation, id generation, the sync envelope (version bumps) and
 /// sanitized observability. Delivery policy is never changed here: only
-/// [AutoSendPolicy.manualOnly] is supported by the product (SSOT §9).
+/// [AutoSendPolicy.manualOnly] is supported by the product (legacy SSOT §9 (PRODUCT.md §16.7)).
 class PersonService {
   PersonService(
     this._store,
@@ -24,10 +46,9 @@ class PersonService {
     this._logger, {
     DateTime Function()? now,
     String Function()? newId,
-    Future<void> Function()? onChanged,
+    this._onChanged,
   }) : _now = now ?? clock.clock.now,
-       _newId = newId ?? (() => const Uuid().v4()),
-       _onChanged = onChanged;
+       _newId = newId ?? (() => const Uuid().v4());
 
   final PeopleStore _store;
   final PersonInputValidator _validator;
@@ -86,11 +107,38 @@ class PersonService {
   }
 
   /// Validates and persists an imported batch as one atomic aggregate write.
+  ///
+  /// Strict: a single invalid draft rejects the whole batch. Review-and-import
+  /// flows that must not lose valid rows use [importValidRows] instead.
   Future<List<Person>> importBatch(List<PersonDraft> drafts) async {
-    final people = <Person>[];
-    final birthdays = <Birthday>[];
     for (final draft in drafts) {
       _ensureValid(draft);
+    }
+    final result = await importValidRows(drafts);
+    return result.imported;
+  }
+
+  /// Validates each draft on its own, imports every valid one as one atomic
+  /// write and reports invalid rows individually (audit A1-006).
+  ///
+  /// Storage failures still reject the whole write and rethrow, because the
+  /// valid rows then share one rolled-back transaction.
+  Future<PersonImportResult> importValidRows(List<PersonDraft> drafts) async {
+    final people = <Person>[];
+    final birthdays = <Birthday>[];
+    final failures = <PersonImportFailure>[];
+    for (final (index, draft) in drafts.indexed) {
+      final validation = _validator.validate(draft, requireBirthday: true);
+      if (!validation.isValid) {
+        failures.add(
+          PersonImportFailure(
+            index: index,
+            name: draft.name,
+            reasons: [for (final e in validation.fieldErrors.values) e.label],
+          ),
+        );
+        continue;
+      }
       final person = draft.toPerson(id: _newId(), now: _now());
       final safePerson = person.copyWith(
         autoPrepare: ProductCapabilities.autoPrepare && person.autoPrepare,
@@ -103,7 +151,16 @@ class PersonService {
       if (birthday != null) birthdays.add(birthday);
     }
 
-    if (people.isEmpty) return const [];
+    if (failures.isNotEmpty) {
+      _logger.warning(
+        'people',
+        'import rows rejected by validation',
+        params: {'rejected': failures.length, 'accepted': people.length},
+      );
+    }
+    if (people.isEmpty) {
+      return PersonImportResult(imported: const [], failures: failures);
+    }
 
     await _store.saveImportBatch(people: people, birthdays: birthdays);
     _logger.info(
@@ -112,7 +169,10 @@ class PersonService {
       params: {'count': people.length},
     );
     await _onChanged?.call();
-    return List.unmodifiable(people);
+    return PersonImportResult(
+      imported: List.unmodifiable(people),
+      failures: List.unmodifiable(failures),
+    );
   }
 
   Future<void> remove(String id) async {
@@ -149,8 +209,7 @@ class PersonService {
     final dateChanged =
         prior != null &&
         (prior.cycleYear != next.year ||
-            prior.date.month != next.nextDate.month ||
-            prior.date.day != next.nextDate.day);
+            !prior.isSameCalendarDate(next.nextDate));
     final status = dateChanged
         ? (next.isToday ? BirthdayStatus.reminderDue : BirthdayStatus.upcoming)
         : prior?.status ??

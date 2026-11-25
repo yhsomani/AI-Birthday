@@ -1,4 +1,4 @@
-/// WhatsApp Click-to-Chat handoff builder adhering strictly to SSOT §9.
+/// WhatsApp Click-to-Chat handoff builder adhering strictly to legacy SSOT §9 (PRODUCT.md §16.7).
 ///
 /// Principles:
 /// - Uses official WhatsApp Click-to-Chat URLs (`https://wa.me/<number>?text=<encoded_text>`).
