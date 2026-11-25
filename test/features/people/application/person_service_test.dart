@@ -54,6 +54,58 @@ void main() {
   });
 
   test(
+    'import batch persists validated people and birthdays atomically',
+    () async {
+      final imported = await service.importBatch([validDraft()]);
+
+      expect(imported, hasLength(1));
+      expect(imported.single.id, 'fixed-person-id');
+      expect(imported.single.autoSendPolicy, AutoSendPolicy.manualOnly);
+      expect(await service.getById('fixed-person-id'), isNotNull);
+      final birthday = (await db.select(db.birthdays).get()).single;
+      expect(birthday.personId, 'fixed-person-id');
+      expect(birthday.cycleYear, 2025);
+    },
+  );
+
+  test(
+    'invalid row prevents the entire import batch from being saved',
+    () async {
+      await expectLater(
+        service.importBatch([
+          validDraft(),
+          const PersonDraft(
+            name: 'Invalid Date',
+            birthdayMonth: 2,
+            birthdayDay: 29,
+          ),
+        ]),
+        throwsA(isA<AppFailure>()),
+      );
+
+      expect(await db.select(db.persons).get(), isEmpty);
+      expect(await db.select(db.birthdays).get(), isEmpty);
+    },
+  );
+
+  test('birthday write failure rolls back every imported person', () async {
+    await db.customStatement('''
+      CREATE TRIGGER reject_imported_birthday BEFORE INSERT ON birthdays
+      BEGIN
+        SELECT RAISE(ABORT, 'birthday write failed');
+      END;
+    ''');
+
+    await expectLater(
+      service.importBatch([validDraft()]),
+      throwsA(isA<Exception>()),
+    );
+
+    expect(await db.select(db.persons).get(), isEmpty);
+    expect(await db.select(db.birthdays).get(), isEmpty);
+  });
+
+  test(
     'person and birthday creation roll back together on birthday failure',
     () async {
       await db.customStatement('''

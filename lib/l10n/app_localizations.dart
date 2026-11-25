@@ -94,11 +94,11 @@ abstract class AppLocalizations {
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[Locale('en')];
 
-  /// Bottom navigation destination: birthday dashboard
+  /// Bottom navigation destination: today's birthday overview
   ///
   /// In en, this message translates to:
-  /// **'Dashboard'**
-  String get navDashboard;
+  /// **'Today'**
+  String get navToday;
 
   /// Bottom navigation destination: tracked people list
   ///
@@ -112,17 +112,11 @@ abstract class AppLocalizations {
   /// **'Calendar'**
   String get navCalendar;
 
-  /// Bottom navigation destination: message history
+  /// Bottom navigation destination: message and delivery activity
   ///
   /// In en, this message translates to:
-  /// **'History'**
-  String get navHistory;
-
-  /// Bottom navigation destination: settings
-  ///
-  /// In en, this message translates to:
-  /// **'Settings'**
-  String get navSettings;
+  /// **'Activity'**
+  String get navActivity;
 }
 
 class _AppLocalizationsDelegate

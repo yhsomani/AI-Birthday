@@ -100,9 +100,10 @@ void main() {
       expect(materialApp.themeMode, ThemeMode.system);
 
       // Verify navigation destinations
-      expect(find.text('Dashboard'), findsOneWidget);
+      expect(find.text('Today'), findsOneWidget);
       expect(find.text('People'), findsOneWidget);
-      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('Activity'), findsOneWidget);
+      expect(find.byTooltip('Settings'), findsWidgets);
 
       // Drain StreamProvider cancellation timers before test concludes
       await tester.pumpWidget(const SizedBox.shrink());

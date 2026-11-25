@@ -40,6 +40,7 @@ class DashboardScreen extends ConsumerWidget {
             // to one size in this Flutter).
             title: const Text('AI-Birthday'),
             actions: [
+              const SettingsActionButton(),
               IconButton(
                 icon: const Icon(Icons.person_add_outlined),
                 tooltip: 'Add Birthday Contact',
@@ -183,13 +184,40 @@ class DashboardScreen extends ConsumerWidget {
                           Card(
                             child: Padding(
                               padding: const EdgeInsets.all(AppSpacing.xl),
-                              child: Center(
-                                child: Text(
-                                  'No upcoming birthdays tracked in the next 30 days.',
-                                  style: TextStyle(
-                                    color: theme.colorScheme.onSurfaceVariant,
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.event_available_outlined,
+                                    size: 32,
+                                    color: theme.colorScheme.primary,
                                   ),
-                                ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Text(
+                                    'No birthdays in the next 30 days',
+                                    style: theme.textTheme.titleMedium,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Text(
+                                    'Your full calendar is still available, or review your people if a birthday is missing.',
+                                    style: TextStyle(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  OutlinedButton.icon(
+                                    onPressed: () => context.go('/calendar'),
+                                    icon: const Icon(
+                                      Icons.calendar_month_outlined,
+                                    ),
+                                    label: const Text('Open calendar'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => context.go('/people'),
+                                    child: const Text('Review people'),
+                                  ),
+                                ],
                               ),
                             ),
                           )
@@ -561,7 +589,7 @@ class DashboardScreen extends ConsumerWidget {
                 OutlinedButton.icon(
                   onPressed: () {
                     HapticFeedback.lightImpact();
-                    context.go('/settings');
+                    context.push('/settings');
                   },
                   icon: const Icon(Icons.tune_outlined, size: 18),
                   label: const Text('App Settings'),

@@ -66,7 +66,7 @@ Definitive additions consolidate:
 4. Delete/tombstone/undo/restore behavior is inconsistent; aggregate and retention decisions are open.
 5. Existing duplicate Person/adapters and date helper paths require authorized implementation reconciliation, not documentation claims.
 6. AI provider invalid-key/Nano fallback, model lifecycle and physical-device verification remain incomplete.
-7. Auto-prepare and automatic personal SMS require separate consent/product/platform approval.
+7. Auto-prepare remains a separate decision; Android automatic SMS is in product scope but requires consent, exact-occurrence approval, platform-policy and release approval before activation.
 8. Cloud backup, Functions, Hosting, public deletion and control plane require deployment evidence.
 9. Real local-user database inventory is unavailable; migration decisions cannot be claim-complete.
 10. Android/iOS scope, languages/geography, commercial model, support model, retention and analytics are owner decisions.

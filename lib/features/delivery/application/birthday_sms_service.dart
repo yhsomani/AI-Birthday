@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:ai_birthday/app/providers.dart' show credentialStorageProvider;
 import 'package:ai_birthday/core/config/product_capabilities.dart';
@@ -11,6 +12,8 @@ import '../../message_studio/domain/models/message_draft.dart';
 import '../../people/domain/models/person.dart';
 import '../../people/domain/person_enums.dart';
 import '../data/native_sms_gateway.dart';
+
+String _newSmsScheduleToken() => const Uuid().v4();
 
 /// Global automatic SMS settings.
 class AutomaticSmsSettings {
@@ -57,7 +60,7 @@ class AutomaticSmsSettingsController extends Notifier<AutomaticSmsSettings> {
     final storage = ref.read(credentialStorageProvider);
     final rawPref = await storage.readString(_storageKey);
     if (!isSupported) {
-      await gateway.cancelAllSmsJobs();
+      await _cancelAllSmsJobs(gateway);
       await storage.writeString(_storageKey, 'false');
       state = AutomaticSmsSettings(
         enabled: false,
@@ -84,7 +87,7 @@ class AutomaticSmsSettingsController extends Notifier<AutomaticSmsSettings> {
       if (!ProductCapabilities.automaticSms || !state.isSupported) {
         state = state.copyWith(enabled: false);
         await storage.writeString(_storageKey, 'false');
-        await gateway.cancelAllSmsJobs();
+        await _cancelAllSmsJobs(gateway);
         return;
       }
       bool hasPerm = await gateway.hasSmsPermission();
@@ -100,7 +103,7 @@ class AutomaticSmsSettingsController extends Notifier<AutomaticSmsSettings> {
       state = state.copyWith(enabled: true, hasSmsPermission: true);
     } else {
       await storage.writeString(_storageKey, 'false');
-      await gateway.cancelAllSmsJobs();
+      await _cancelAllSmsJobs(gateway);
       state = state.copyWith(enabled: false);
     }
   }
@@ -110,8 +113,18 @@ class AutomaticSmsSettingsController extends Notifier<AutomaticSmsSettings> {
     final isSupported =
         ProductCapabilities.automaticSms && await gateway.isSupported();
     final hasPerm = isSupported ? await gateway.hasSmsPermission() : false;
-    if (!isSupported) await gateway.cancelAllSmsJobs();
+    if (!isSupported) await _cancelAllSmsJobs(gateway);
     state = state.copyWith(isSupported: isSupported, hasSmsPermission: hasPerm);
+  }
+
+  Future<void> _cancelAllSmsJobs(NativeSmsGateway gateway) async {
+    if (await gateway.cancelAllSmsJobs()) return;
+    ref
+        .read(loggerProvider)
+        .warning(
+          'sms_automation',
+          'Could not persist cancellation of all SMS jobs',
+        );
   }
 }
 
@@ -130,11 +143,34 @@ class BirthdaySmsService {
     required this.gateway,
     required this.logger,
     this.engine = const BirthdayEngine(),
-  });
+    String Function()? scheduleTokenGenerator,
+  }) : _scheduleTokenGenerator = scheduleTokenGenerator ?? _newSmsScheduleToken;
 
   final NativeSmsGateway gateway;
   final AppLogger logger;
   final BirthdayEngine engine;
+  final String Function() _scheduleTokenGenerator;
+
+  String _jobIdFor(Birthday birthday) =>
+      'sms_${birthday.id}_${birthday.cycleYear}';
+
+  Future<bool> _cancelPersonSmsJobs(
+    String personId, {
+    String? exceptJobId,
+  }) async {
+    final cancelled = await gateway.cancelSmsJobsForPerson(
+      personId,
+      exceptJobId: exceptJobId,
+    );
+    if (!cancelled) {
+      logger.warning(
+        'sms_automation',
+        'Could not persist cancellation of pending SMS jobs for person',
+        params: {'personId': personId},
+      );
+    }
+    return cancelled;
+  }
 
   /// Pure computation of midnight send timestamp for a given person and birthday.
   DateTime? computeSendTime({
@@ -177,9 +213,7 @@ class BirthdaySmsService {
     final isSupported =
         ProductCapabilities.automaticSms && await gateway.isSupported();
     if (!isSupported || !globalSmsEnabled) {
-      if (birthday != null) {
-        await gateway.cancelSmsJob('sms_${birthday.id}');
-      }
+      await _cancelPersonSmsJobs(person.id);
       return false;
     }
 
@@ -203,9 +237,7 @@ class BirthdaySmsService {
         hasBirthday;
 
     if (!isEligible) {
-      if (birthday != null) {
-        await gateway.cancelSmsJob('sms_${birthday.id}');
-      }
+      await _cancelPersonSmsJobs(person.id);
       return false;
     }
 
@@ -218,17 +250,27 @@ class BirthdaySmsService {
 
     // A legacy unresolved leap-day or an elapsed occurrence cancels stale work.
     if (sendTime == null || sendTime.isBefore(refDate)) {
-      await gateway.cancelSmsJob('sms_${birthday.id}');
+      await _cancelPersonSmsJobs(person.id);
+      return false;
+    }
+
+    final jobId = _jobIdFor(birthday);
+    final clearedObsoleteJobs = await _cancelPersonSmsJobs(
+      person.id,
+      exceptJobId: jobId,
+    );
+    if (!clearedObsoleteJobs) {
       return false;
     }
 
     final job = ScheduledSmsJob(
-      jobId: 'sms_${birthday.id}',
+      jobId: jobId,
       personId: person.id,
       birthdayId: birthday.id,
       phoneNumber: person.phoneNumber!.trim(),
       message: draft.body.trim(),
       timestampMs: sendTime.millisecondsSinceEpoch,
+      scheduleToken: _scheduleTokenGenerator(),
       isApproved: true,
       status: 'scheduled',
     );

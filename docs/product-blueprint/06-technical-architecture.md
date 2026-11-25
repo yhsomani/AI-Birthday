@@ -38,7 +38,7 @@ flowchart TB
     ID[Identity]
     BILL[Purchase verification]
     SYNC[Owner-scoped backup]
-    CTRL[Separate Autopilot control plane]
+    CTRL["In-scope Autopilot control plane (separate deployment)"]
     WEB[Public legal / help / deletion site]
   end
   EXT[Gemini API / WhatsApp / SMS / Share]
@@ -177,7 +177,7 @@ Release pipeline:
 - Decide whether sync is a backup/restore feature or a bidirectional multi-device synchronization product.
 - Decide whether delivery history is append-only event storage or derived from current status plus audit events.
 - Define supported Android OS/device matrix for Gemini Nano and exact alarms.
-- Approve backend product boundary and deployment owner for Birthday Autopilot.
+- Approve public Hosting identity and deployment owner for the in-scope Birthday Autopilot service.
 
 ## 11. People/Birthday detailed target design
 

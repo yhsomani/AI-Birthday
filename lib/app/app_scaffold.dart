@@ -66,7 +66,7 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
             NavigationDestination(
               icon: const Icon(Icons.cake_outlined),
               selectedIcon: const Icon(Icons.cake),
-              label: l10n.navDashboard,
+              label: l10n.navToday,
             ),
             NavigationDestination(
               icon: const Icon(Icons.people_outline),
@@ -81,12 +81,7 @@ class _AppScaffoldState extends ConsumerState<AppScaffold> {
             NavigationDestination(
               icon: const Icon(Icons.history_outlined),
               selectedIcon: const Icon(Icons.history),
-              label: l10n.navHistory,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.tune_outlined),
-              selectedIcon: const Icon(Icons.tune),
-              label: l10n.navSettings,
+              label: l10n.navActivity,
             ),
           ],
         ),

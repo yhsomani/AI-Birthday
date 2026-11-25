@@ -10,12 +10,11 @@ import 'package:intl/intl.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
-import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart'
-    as b_models;
 import 'package:ai_birthday/features/people/data/contact_csv_service.dart';
 import 'package:ai_birthday/features/people/data/person_providers.dart'
-    show personServiceProvider, resyncReminderSchedule;
+    show personServiceProvider;
 import 'package:ai_birthday/features/people/domain/models/person.dart';
+import 'package:ai_birthday/features/people/domain/person_input.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 class PeopleScreen extends ConsumerStatefulWidget {
@@ -30,6 +29,8 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  RelationshipCategory? _relationshipFilter;
+  int? _birthdayMonthFilter;
 
   @override
   void dispose() {
@@ -495,65 +496,45 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
 
     if (confirmed != true || !context.mounted) return;
 
-    final peopleRepo = ref.read(peopleRepositoryProvider);
-    final now = DateTime.now();
-    final people = <Person>[];
-    final birthdays = <b_models.Birthday>[];
-
-    for (final index in selectedIndices) {
-      final candidate = parsedCandidates[index];
-      if (!candidate.isImportable) continue;
-      final person = candidate.toPerson();
-      final next = _engine.computeNext(
-        month: person.birthdayMonth!,
-        day: person.birthdayDay!,
-        birthYear: person.birthYear,
-        timezoneName: person.timezone,
-        leapDay: person.leapDayResolution,
-        reference: now,
-      );
-      if (next == null) continue;
-      people.add(person);
-      birthdays.add(
-        b_models.Birthday(
-          id: 'birthday-${person.id}',
-          personId: person.id,
-          cycleYear: next.year,
-          date: next.nextDate,
-          status: next.isToday
-              ? b_models.BirthdayStatus.reminderDue
-              : b_models.BirthdayStatus.upcoming,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-    }
+    final importDrafts = [
+      for (final index in selectedIndices)
+        if (parsedCandidates[index].isImportable)
+          PersonDraft.fromPerson(parsedCandidates[index].toPerson()),
+    ];
 
     try {
-      await peopleRepo.saveImportBatch(people: people, birthdays: birthdays);
-    } catch (_) {
+      final imported = await ref
+          .read(personServiceProvider)
+          .importBatch(importDrafts);
+      if (!context.mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Imported ${imported.length} of ${importDrafts.length}; ${repairIssues.length + parsedCandidates.where((c) => !c.isImportable).length} rows remain for repair.',
+          ),
+        ),
+      );
+    } catch (error, stackTrace) {
+      ref
+          .read(loggerProvider)
+          .warning(
+            'people',
+            'CSV contact import failed.',
+            params: {'count': importDrafts.length},
+            error: error,
+            stackTrace: stackTrace,
+          );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Import failed. 0 of ${people.length} contacts were saved; no partial import occurred. You can retry the exact batch.',
+              'Import failed. 0 of ${importDrafts.length} contacts were saved; no partial import occurred. You can retry the exact batch.',
             ),
           ),
         );
       }
-      return;
     }
-
-    if (!context.mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    await resyncReminderSchedule(ProviderScope.containerOf(context));
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          'Imported ${people.length} of ${people.length}; ${repairIssues.length + parsedCandidates.where((c) => !c.isImportable).length} rows remain for repair.',
-        ),
-      ),
-    );
   }
 
   Future<void> _syncDeviceContacts(
@@ -717,8 +698,9 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('People & Contacts'),
+        title: const Text('People'),
         actions: [
+          const SettingsActionButton(),
           IconButton(
             icon: const Icon(Icons.person_add_outlined),
             tooltip: 'Add Person',
@@ -843,9 +825,19 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           final searchRegex = trimmed.isEmpty
               ? null
               : RegExp(RegExp.escape(trimmed), caseSensitive: false);
-          final filtered = trimmed.isEmpty
-              ? people
-              : people.where((p) => searchRegex!.hasMatch(p.name)).toList();
+          final filtered = people.where((person) {
+            final matchesQuery =
+                trimmed.isEmpty ||
+                searchRegex!.hasMatch(person.name) ||
+                searchRegex.hasMatch(person.relationship.displayName);
+            final matchesRelationship =
+                _relationshipFilter == null ||
+                person.relationship == _relationshipFilter;
+            final matchesMonth =
+                _birthdayMonthFilter == null ||
+                person.birthdayMonth == _birthdayMonthFilter;
+            return matchesQuery && matchesRelationship && matchesMonth;
+          }).toList();
 
           return Column(
             children: [
@@ -873,6 +865,78 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final relationshipFilter =
+                        DropdownButtonFormField<RelationshipCategory?>(
+                          key: const ValueKey('people-relationship-filter'),
+                          initialValue: _relationshipFilter,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Relationship',
+                            isDense: true,
+                          ),
+                          items: [
+                            const DropdownMenuItem<RelationshipCategory?>(
+                              value: null,
+                              child: Text('All relationships'),
+                            ),
+                            for (final relationship
+                                in RelationshipCategory.values)
+                              DropdownMenuItem(
+                                value: relationship,
+                                child: Text(relationship.displayName),
+                              ),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _relationshipFilter = value),
+                        );
+                    final monthFilter = DropdownButtonFormField<int>(
+                      key: const ValueKey('people-month-filter'),
+                      initialValue: _birthdayMonthFilter ?? 0,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Birthday month',
+                        isDense: true,
+                      ),
+                      items: [
+                        const DropdownMenuItem(
+                          value: 0,
+                          child: Text('Any month'),
+                        ),
+                        for (var month = 1; month <= 12; month++)
+                          DropdownMenuItem(
+                            value: month,
+                            child: Text(
+                              DateFormat.MMMM().format(DateTime(2000, month)),
+                            ),
+                          ),
+                      ],
+                      onChanged: (value) => setState(
+                        () => _birthdayMonthFilter = value == 0 ? null : value,
+                      ),
+                    );
+                    if (constraints.maxWidth < 440) {
+                      return Column(
+                        children: [
+                          relationshipFilter,
+                          const SizedBox(height: 8),
+                          monthFilter,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: relationshipFilter),
+                        const SizedBox(width: 12),
+                        Expanded(child: monthFilter),
+                      ],
+                    );
+                  },
                 ),
               ),
               Expanded(
@@ -1037,6 +1101,8 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
   }
 
   Widget _noSearchResults(String query) {
+    final hasFilters =
+        _relationshipFilter != null || _birthdayMonthFilter != null;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -1051,13 +1117,29 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Nothing matches "$query". Try a different name.',
+              query.isNotEmpty
+                  ? 'Nothing matches "$query". Try another name or clear the filters.'
+                  : hasFilters
+                  ? 'No people match the selected relationship and birthday month.'
+                  : 'Add a contact or import birthdays from your phone or a CSV file.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
                 color: context.colors.textSecondary,
               ),
             ),
+            if (query.isNotEmpty || hasFilters) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => setState(() {
+                  _searchController.clear();
+                  _query = '';
+                  _relationshipFilter = null;
+                  _birthdayMonthFilter = null;
+                }),
+                child: const Text('Clear search and filters'),
+              ),
+            ],
           ],
         ),
       ),

@@ -361,33 +361,17 @@ class MainActivity : FlutterActivity() {
                             return@setMethodCallHandler
                         }
                         try {
-                            val jobId = jobMap["jobId"] as? String ?: ""
                             val timestampMs = (jobMap["timestampMs"] as? Number)?.toLong() ?: 0L
-                            val prefs = getSharedPreferences(BirthdaySmsReceiver.PREFS_NAME, Context.MODE_PRIVATE)
-                            val raw = prefs.getString(BirthdaySmsReceiver.KEY_SCHEDULED_SMS_JOBS_JSON, "[]") ?: "[]"
-                            val array = try { org.json.JSONArray(raw) } catch (_: Exception) { org.json.JSONArray() }
+                            val persisted = BirthdaySmsReceiver.persistScheduledJob(
+                                this,
+                                org.json.JSONObject(jobMap),
+                                timestampMs
+                            )
+                            if (!persisted) {
+                                result.success(false)
+                                return@setMethodCallHandler
+                            }
 
-                            // Update or append
-                            val newArray = org.json.JSONArray()
-                            var replaced = false
-                            for (i in 0 until array.length()) {
-                                val item = array.optJSONObject(i) ?: continue
-                                if (item.optString("jobId") == jobId) {
-                                    newArray.put(org.json.JSONObject(jobMap))
-                                    replaced = true
-                                } else {
-                                    newArray.put(item)
-                                }
-                            }
-                            if (!replaced) {
-                                newArray.put(org.json.JSONObject(jobMap))
-                            }
-                            prefs.edit().putString(BirthdaySmsReceiver.KEY_SCHEDULED_SMS_JOBS_JSON, newArray.toString()).apply()
-
-                            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-                            if (alarmManager != null && timestampMs > System.currentTimeMillis()) {
-                                BirthdaySmsReceiver.scheduleAlarm(this, alarmManager, jobId, timestampMs)
-                            }
                             result.success(true)
                         } catch (e: Exception) {
                             result.error("SCHEDULE_FAILED", e.message, null)
@@ -395,39 +379,33 @@ class MainActivity : FlutterActivity() {
                     }
                     "cancelSmsJob" -> {
                         val jobId = call.argument<String>("jobId") ?: ""
-                        if (jobId.isNotEmpty()) {
-                            BirthdaySmsReceiver.cancelAlarm(this, jobId)
-                            val prefs = getSharedPreferences(BirthdaySmsReceiver.PREFS_NAME, Context.MODE_PRIVATE)
-                            val raw = prefs.getString(BirthdaySmsReceiver.KEY_SCHEDULED_SMS_JOBS_JSON, "[]") ?: "[]"
-                            val array = try { org.json.JSONArray(raw) } catch (_: Exception) { org.json.JSONArray() }
-                            val newArray = org.json.JSONArray()
-                            for (i in 0 until array.length()) {
-                                val item = array.optJSONObject(i) ?: continue
-                                if (item.optString("jobId") == jobId) {
-                                    item.put("status", "cancelled")
-                                }
-                                newArray.put(item)
-                            }
-                            prefs.edit().putString(BirthdaySmsReceiver.KEY_SCHEDULED_SMS_JOBS_JSON, newArray.toString()).apply()
+                        if (jobId.isBlank()) {
+                            result.error("INVALID_ARGS", "Missing SMS job ID.", null)
+                        } else if (BirthdaySmsReceiver.cancelPersistedJob(this, jobId)) {
+                            result.success(true)
+                        } else {
+                            result.error("CANCEL_FAILED", "Could not persist SMS job cancellation.", null)
                         }
-                        result.success(true)
                     }
                     "cancelAllSmsJobs" -> {
-                        val prefs = getSharedPreferences(BirthdaySmsReceiver.PREFS_NAME, Context.MODE_PRIVATE)
-                        val raw = prefs.getString(BirthdaySmsReceiver.KEY_SCHEDULED_SMS_JOBS_JSON, "[]") ?: "[]"
-                        val array = try { org.json.JSONArray(raw) } catch (_: Exception) { org.json.JSONArray() }
-                        val newArray = org.json.JSONArray()
-                        for (i in 0 until array.length()) {
-                            val item = array.optJSONObject(i) ?: continue
-                            val jobId = item.optString("jobId")
-                            if (jobId.isNotEmpty()) {
-                                BirthdaySmsReceiver.cancelAlarm(this, jobId)
-                            }
-                            item.put("status", "cancelled")
-                            newArray.put(item)
+                        if (BirthdaySmsReceiver.cancelAllPersisted(this)) {
+                            result.success(true)
+                        } else {
+                            result.error("CANCEL_FAILED", "Could not persist SMS job cancellations.", null)
                         }
-                        prefs.edit().putString(BirthdaySmsReceiver.KEY_SCHEDULED_SMS_JOBS_JSON, newArray.toString()).apply()
-                        result.success(true)
+                    }
+                    "cancelSmsJobsForPerson" -> {
+                        val personId = call.argument<String>("personId") ?: ""
+                        if (personId.isBlank()) {
+                            result.error("INVALID_ARGS", "Missing person ID.", null)
+                        } else {
+                            val exceptJobId = call.argument<String>("exceptJobId")
+                            if (BirthdaySmsReceiver.cancelPersistedJobsForPerson(this, personId, exceptJobId)) {
+                                result.success(true)
+                            } else {
+                                result.error("CANCEL_FAILED", "Could not persist SMS job reconciliation.", null)
+                            }
+                        }
                     }
                     "getSmsAttemptsLog" -> {
                         val prefs = getSharedPreferences(BirthdaySmsReceiver.PREFS_NAME, Context.MODE_PRIVATE)

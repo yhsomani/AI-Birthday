@@ -54,15 +54,15 @@ Needs: remember family/friends/colleagues; prepare on time; use private relation
 - **Messaging app/share target:** receives user-initiated content; app cannot infer delivery.
 - **Support operator (proposed):** resolves requests through least-privilege, non-content workflows.
 - **Release/operations operator (proposed):** manages environments, observability, incidents and deletion completion.
-- **Autopilot operator (conditional):** separate control-plane role, not authorized by the core product definition.
+- **Autopilot operator (proposed):** restricted service role for installation leases and delivery coordination; never a source of message content or phone numbers.
 
 ## 5. Problem, value proposition and positioning
 
 **Problem:** important birthdays are scattered across contacts/calendars/messages; generic reminders stop at awareness; thoughtful messages take effort; AI tools can invent facts or lose user control; external communication status is often misreported.
 
-**Value proposition:** one private, reliable place to maintain the people who matter, know the exact next action, prepare a grounded greeting quickly, and hand it to the user’s communication channel without pretending the app sent it.
+**Value proposition:** one private, reliable place to maintain the people who matter, know the exact next action, prepare a grounded greeting quickly, and retain user control over delivery. Manual handoff is always distinct from any future occurrence-scoped, explicitly approved automatic-SMS action.
 
-**Positioning boundary:** personal birthday preparation assistant, not a CRM, campaign sender, calendar replacement, AI chat app, social network or autonomous messaging platform.
+**Positioning boundary:** personal birthday preparation assistant, not a CRM, bulk/campaign sender, calendar replacement, AI chat app, social network or autonomous WhatsApp platform. Automatic SMS, where permitted, is limited to a per-recipient opt-in and exact-occurrence message approval.
 
 Competitive review is an unresolved discovery task. A team may compare personal calendars, contact reminders, notes, reminder apps and general AI writing tools, but no market-superiority or competitor claim belongs in requirements without evidence.
 
@@ -80,18 +80,21 @@ Competitive review is an unresolved discovery task. A team may compare personal 
 | DOM-08 | Delivery/history | Truthful user action | WhatsApp/SMS/copy/share, handoff, confirmation, history |
 | DOM-09 | Account/subscription | Trusted optional access | identity/session, Play purchase, entitlement, restore |
 | DOM-10 | Continuity/privacy | Recover/control personal data | backup/restore, export, sign-out, deletion, retention |
-| DOM-11 | Automation/reliability | Safe deferred work | durable jobs, retry/cancel, auto-prepare, conditional auto-SMS |
+| DOM-11 | Automation/reliability | Safe deferred work | durable jobs, retry/cancel, occurrence-scoped auto-SMS with explicit approval; auto-prepare remains a separate decision |
 | DOM-12 | Platform operations | Sustainable product | logs, monitoring, support, releases, incidents |
 | DOM-13 | Public support (conditional) | Legal/help/deletion entry | hosting, privacy/terms/support/status |
-| DOM-14 | Control plane (separate) | Conditional sender coordination | installation lease, claim/fence, attempts, deletion gating |
+| DOM-14 | Autopilot control plane | Coordinate approved Android work without personal content | installation lease, claim/fence, attempts, deletion gating; not an SMS transport |
 
 ## 7. Scope policy
 
 ### Committed core scope baseline
 People; birthday occurrence; dashboard/calendar; reminders; manual Studio/drafts; entitlement-gated AI; WhatsApp/SMS composer/copy/share; truthful history; settings/accessibility; optional identity/backup/export/deletion; reliable jobs and operations.
 
-### Conditional scope
-On-device Nano; automatic personal SMS; auto-preparation; cloud backup production; public legal/support/deletion site; Birthday Autopilot; additional import formats; localization beyond approved launch languages.
+### Approved product scope with gated activation
+Android Birthday Autopilot and automatic SMS with explicit per-person opt-in and exact-message review. Keep production sending disabled until safety, policy, and device gates pass; retain manual SMS handoff in Play if policy does not permit automatic sending.
+
+### Other conditional scope
+On-device Nano; auto-preparation; cloud backup production; public legal/support/deletion site and its identity; additional import formats; localization beyond approved launch languages.
 
 ### Excluded unless separately approved
 Autonomous WhatsApp; bulk/campaign messaging; social network/directory; public profiles; general AI chat; scraped messaging data; unrequested calendar/social/email integration; speculative CRM/collaboration; multi-user families/teams; analytics of private content; unsupported platform parity claims.

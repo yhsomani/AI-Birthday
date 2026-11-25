@@ -52,7 +52,7 @@ class PersonService {
           ? person.autoSendPolicy
           : AutoSendPolicy.manualOnly,
     );
-    final birthday = await _nextBirthday(safePerson);
+    final birthday = _birthdayFor(safePerson, null);
     await _store.saveAggregate(safePerson, birthday: birthday);
     _logger.info(
       'people',
@@ -85,6 +85,36 @@ class PersonService {
     return safeUpdated;
   }
 
+  /// Validates and persists an imported batch as one atomic aggregate write.
+  Future<List<Person>> importBatch(List<PersonDraft> drafts) async {
+    final people = <Person>[];
+    final birthdays = <Birthday>[];
+    for (final draft in drafts) {
+      _ensureValid(draft);
+      final person = draft.toPerson(id: _newId(), now: _now());
+      final safePerson = person.copyWith(
+        autoPrepare: ProductCapabilities.autoPrepare && person.autoPrepare,
+        autoSendPolicy: ProductCapabilities.automaticSms
+            ? person.autoSendPolicy
+            : AutoSendPolicy.manualOnly,
+      );
+      final birthday = _birthdayFor(safePerson, null);
+      people.add(safePerson);
+      if (birthday != null) birthdays.add(birthday);
+    }
+
+    if (people.isEmpty) return const [];
+
+    await _store.saveImportBatch(people: people, birthdays: birthdays);
+    _logger.info(
+      'people',
+      'imported contacts',
+      params: {'count': people.length},
+    );
+    await _onChanged?.call();
+    return List.unmodifiable(people);
+  }
+
   Future<void> remove(String id) async {
     _logger.info('people', 'removed person', params: {'personId': id});
     await _store.softDeleteAggregate(id);
@@ -101,6 +131,11 @@ class PersonService {
   Future<Birthday?> _nextBirthday(Person person) async {
     if (!person.hasBirthday) return null;
     final prior = await _store.getBirthdayForPerson(person.id);
+    return _birthdayFor(person, prior);
+  }
+
+  Birthday? _birthdayFor(Person person, Birthday? prior) {
+    if (!person.hasBirthday) return null;
     final now = _now();
     final next = const BirthdayEngine().computeNext(
       month: person.birthdayMonth!,

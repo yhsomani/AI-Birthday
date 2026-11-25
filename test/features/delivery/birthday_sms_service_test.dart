@@ -14,6 +14,8 @@ class FakeNativeSmsGateway implements NativeSmsGateway {
   bool permission = true;
   final List<ScheduledSmsJob> scheduledJobs = [];
   final List<String> cancelledJobs = [];
+  final List<String> cancelledPeople = [];
+  final Map<String, String?> retainedJobByPerson = {};
   bool allCancelled = false;
   String attemptsLogJson = '[]';
 
@@ -44,6 +46,19 @@ class FakeNativeSmsGateway implements NativeSmsGateway {
   Future<bool> cancelAllSmsJobs() async {
     allCancelled = true;
     scheduledJobs.clear();
+    return true;
+  }
+
+  @override
+  Future<bool> cancelSmsJobsForPerson(
+    String personId, {
+    String? exceptJobId,
+  }) async {
+    cancelledPeople.add(personId);
+    retainedJobByPerson[personId] = exceptJobId;
+    scheduledJobs.removeWhere(
+      (job) => job.personId == personId && job.jobId != exceptJobId,
+    );
     return true;
   }
 
@@ -166,6 +181,28 @@ void main() {
     });
   });
 
+  test(
+    'ScheduledSmsJob preserves its schedule token in the native payload',
+    () {
+      final job = ScheduledSmsJob(
+        jobId: 'sms_b-100_2026',
+        personId: 'p-eligible',
+        birthdayId: 'b-100',
+        phoneNumber: '+15551234567',
+        message: 'Happy Birthday!',
+        timestampMs: 1,
+        scheduleToken: 'schedule-token-1',
+        isApproved: true,
+      );
+
+      expect(job.toMap()['scheduleToken'], 'schedule-token-1');
+      expect(
+        ScheduledSmsJob.fromMap(job.toMap()).scheduleToken,
+        'schedule-token-1',
+      );
+    },
+  );
+
   group('BirthdaySmsService - Strict Eligibility & Reconciliation', () {
     final now = DateTime(2026, 10, 18, 10, 0);
 
@@ -212,7 +249,7 @@ void main() {
 
         expect(scheduled, isFalse);
         expect(gateway.scheduledJobs, isEmpty);
-        expect(gateway.cancelledJobs, contains('sms_b-100'));
+        expect(gateway.cancelledPeople, contains('p-eligible'));
       },
     );
 
@@ -233,7 +270,7 @@ void main() {
 
       expect(scheduled, isFalse);
       expect(gateway.scheduledJobs, isEmpty);
-      expect(gateway.cancelledJobs, contains('sms_b-100'));
+      expect(gateway.cancelledPeople, contains('p-eligible'));
     });
 
     test('rejects scheduling if person is manualOnly', () async {
@@ -251,7 +288,7 @@ void main() {
 
       expect(scheduled, isFalse);
       expect(gateway.scheduledJobs, isEmpty);
-      expect(gateway.cancelledJobs, contains('sms_b-100'));
+      expect(gateway.cancelledPeople, contains('p-eligible'));
     });
 
     test(
@@ -271,7 +308,7 @@ void main() {
 
         expect(scheduled, isFalse);
         expect(gateway.scheduledJobs, isEmpty);
-        expect(gateway.cancelledJobs, contains('sms_b-100'));
+        expect(gateway.cancelledPeople, contains('p-eligible'));
       },
     );
 
@@ -310,8 +347,38 @@ void main() {
 
       expect(scheduled, isFalse);
       expect(gateway.scheduledJobs, isEmpty);
-      expect(gateway.cancelledJobs, contains('sms_b-100'));
+      expect(gateway.cancelledPeople, contains('p-eligible'));
     });
+
+    test(
+      'cancels pending schedules for a person across birthday cycles',
+      () async {
+        gateway.scheduledJobs.add(
+          ScheduledSmsJob(
+            jobId: 'sms_b-100_2026',
+            personId: personEligible.id,
+            birthdayId: birthday.id,
+            phoneNumber: personEligible.phoneNumber!,
+            message: draftApproved.body,
+            timestampMs: now.millisecondsSinceEpoch,
+            scheduleToken: 'stale-cycle-token',
+            isApproved: true,
+          ),
+        );
+
+        await service.reconcileRecipientSms(
+          person: personEligible,
+          birthday: birthday.copyWith(cycleYear: 2027),
+          draft: draftApproved,
+          globalSmsEnabled: false,
+          reference: now,
+        );
+
+        expect(gateway.cancelledPeople, contains('p-eligible'));
+        expect(gateway.retainedJobByPerson['p-eligible'], isNull);
+        expect(gateway.scheduledJobs, isEmpty);
+      },
+    );
 
     test(
       'cancels scheduled alarm if platform does not support SMS (e.g. Play build)',
@@ -328,12 +395,12 @@ void main() {
 
         expect(scheduled, isFalse);
         expect(gateway.scheduledJobs, isEmpty);
-        expect(gateway.cancelledJobs, contains('sms_b-100'));
+        expect(gateway.cancelledPeople, contains('p-eligible'));
       },
     );
 
     test(
-      'v1 cancels direct SMS when legacy opt-in and approval are present',
+      'keeps direct SMS gated even when consent and approval are present',
       () async {
         final scheduled = await service.reconcileRecipientSms(
           person: personEligible,
@@ -345,7 +412,7 @@ void main() {
 
         expect(scheduled, isFalse);
         expect(gateway.scheduledJobs, isEmpty);
-        expect(gateway.cancelledJobs, contains('sms_b-100'));
+        expect(gateway.cancelledPeople, contains('p-eligible'));
       },
     );
   });

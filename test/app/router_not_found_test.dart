@@ -55,7 +55,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Screen not found'), findsNothing);
-    expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
     expect(find.text('People'), findsOneWidget);
 
     // Drain drift stream-query cleanup timers before the tree is disposed.

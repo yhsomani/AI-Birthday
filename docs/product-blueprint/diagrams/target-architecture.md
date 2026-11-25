@@ -25,6 +25,6 @@ flowchart LR
   APP --> SYNC["Opt-in backup / restore"]
   SYNC --> FIRESTORE[("Owner-scoped Firestore")]
   AUTH["Google / Firebase identity"] --> SYNC
-  CTRL["Separate Autopilot control plane"] -. isolated boundary .-> FIRESTORE
+  CTRL["In-scope Autopilot control plane"] -. "separate service deployment" .-> FIRESTORE
   WEB["Public legal/help/deletion site"] -. callable boundary .-> CTRL
 ```

@@ -16,6 +16,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_birthday/core/database/app_database.dart' as appdb;
 import 'package:ai_birthday/features/jobs/data/jobs_repository.dart';
 import 'package:ai_birthday/features/jobs/domain/job.dart';
+import 'package:ai_birthday/features/people/data/person_repository.dart';
+import 'package:ai_birthday/features/people/domain/models/person.dart';
 
 void main() {
   late Directory tempDir;
@@ -148,6 +150,56 @@ void main() {
       expect(event.draftId, isNull);
       expect(event.outcome, 'launched');
       await db.close();
+    },
+  );
+
+  test(
+    'legacy compatibility migration preserves birthday, dates, and notes',
+    () async {
+      final oldDb = appdb.AppDatabase(NativeDatabase(dbFile));
+      final now = DateTime.utc(2025, 1, 1);
+      final person = Person(
+        id: 'legacy-person',
+        name: 'Birthday default set to today',
+        birthdayMonth: 12,
+        birthdayDay: 31,
+        notes: 'Imported from phone contacts; birthday default set to today',
+        createdAt: now,
+        updatedAt: now,
+      );
+      await DriftPeopleStore(oldDb).save(person);
+      await oldDb
+          .into(oldDb.birthdays)
+          .insert(
+            appdb.BirthdaysCompanion.insert(
+              id: 'legacy-birthday',
+              personId: person.id,
+              cycleYear: 2025,
+              date: DateTime(2025, 12, 31),
+              status: 'upcoming',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await oldDb.customStatement('DROP TABLE jobs');
+      await oldDb.customStatement('DROP TABLE delivery_events');
+      await oldDb.customStatement('PRAGMA user_version = 2');
+      await oldDb.close();
+
+      final migrated = appdb.AppDatabase(NativeDatabase(dbFile));
+      final savedPerson = await (migrated.select(
+        migrated.persons,
+      )..where((row) => row.id.equals(person.id))).getSingle();
+      expect(savedPerson.birthdayMonth, 12);
+      expect(savedPerson.birthdayDay, 31);
+      expect(savedPerson.notes, person.notes);
+
+      final savedBirthday = await (migrated.select(
+        migrated.birthdays,
+      )..where((row) => row.id.equals('legacy-birthday'))).getSingleOrNull();
+      expect(savedBirthday, isNotNull);
+      expect(savedBirthday!.personId, person.id);
+      await migrated.close();
     },
   );
 }

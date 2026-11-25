@@ -102,12 +102,11 @@ flowchart TD
 - Night Quiet Hours window (defaults to 22:00 – 08:00) prevents notifications from disturbing sleep.
 - Android 13+ runtime notification permissions (`POST_NOTIFICATIONS`) and Android 12+ exact alarm scheduling (`SCHEDULE_EXACT_ALARM`).
 
-### 7. Native Automatic Birthday SMS (Personal / Sideload Distribution)
-- **Distribution Separation**:
-  - **Play-Safe Flavor (`play`)**: Omits `android.permission.SEND_SMS` entirely for Google Play Store policy compliance. Uses external SMS composer handoff.
-  - **Personal Flavor (`personal`)**: Declares `android.permission.SEND_SMS` and supports autonomous midnight SMS delivery via Android `SmsManager`.
-- **Pre-Approval & Strict Consent**: AI-generated drafts are never automatically sent without human review. The user must explicitly approve the draft (`DraftStatus.approvedForAutoSms`) and opt-in the recipient. Any edits to an approved draft immediately revoke approval.
-- **Midnight Scheduling & Stale Expiration**: Alarms are scheduled for 00:00 midnight in the recipient's local timezone with a 12-hour expiration guard to prevent sending stale messages. Resilient across device reboots (`BOOT_COMPLETED`) and package updates (`MY_PACKAGE_REPLACED`).
+### 7. Automatic Birthday SMS (Gated; Not Currently Available)
+- The automatic-SMS capability is disabled by default in Dart and hard-disabled in the Android sender. Scheduling or delivery is not currently available in either flavor.
+- The `play` flavor excludes `android.permission.SEND_SMS`; the `personal` flavor declares it but remains disabled. Manual SMS composer handoff is a separate user-initiated flow.
+- The planned Android capability requires explicit opt-in for each recipient and approval of the exact message before any occurrence can be scheduled. Edits, destination changes, or revocation must cancel and invalidate pending work.
+- Google Play eligibility is not established by this repository. If policy/review does not allow automatic SMS in Play, that flavor must retain manual handoff; automatic sending may only be enabled in explicitly eligible variants after policy, safety, and physical-device validation.
 
 ---
 
@@ -144,7 +143,7 @@ flowchart TD
    ```
 
 5. **Build and install flavors:**
-   - **Personal flavor (with automatic midnight SMS):**
+   - **Personal flavor (automatic SMS remains disabled):**
      ```bash
      flutter build apk --flavor personal --debug
      # Or using the root installation script:

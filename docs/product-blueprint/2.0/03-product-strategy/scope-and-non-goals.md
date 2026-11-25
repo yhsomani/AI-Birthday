@@ -14,4 +14,4 @@ Autonomous WhatsApp; bulk/campaign sending; public profiles/social network; CRM 
 
 ## Conflicting public/product scope
 
-Birthday Autopilot public Hosting is a separate identity and product proposition. DEC-044 must approve separation, deprecation or a distinct roadmap. Until then it is not part of core AI-Birthday.
+Birthday Autopilot is in AI-Birthday scope. Its existing server control plane is a separate deployment boundary; the public Hosting identity, legal/support ownership, and release remain unresolved and require separate approval.

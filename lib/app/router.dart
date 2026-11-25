@@ -74,6 +74,11 @@ GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
         builder: (context, state) =>
             PersonFormScreen(personId: state.pathParameters['id']),
       ),
+      GoRoute(
+        path: '/settings',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SettingsScreen(),
+      ),
 
       // Bottom Navigation Stateful Shell
       StatefulShellRoute.indexedStack(
@@ -109,14 +114,6 @@ GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
               GoRoute(
                 path: '/history',
                 builder: (context, state) => const HistoryScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/settings',
-                builder: (context, state) => const SettingsScreen(),
               ),
             ],
           ),

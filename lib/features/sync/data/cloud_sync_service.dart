@@ -243,19 +243,23 @@ class CloudSyncService {
         )
         .timeout(const Duration(seconds: 30));
     if (response.statusCode != 200) return 0;
-    final Object? decoded;
-    try {
-      decoded = jsonDecode(response.body);
-    } catch (_) {
-      // HTTP 200 with an unparsable body: mirror the former "200 == saved" rule.
-      return writes.length;
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('CLOUD_COMMIT_INVALID_RESPONSE');
     }
-    if (decoded is! Map<String, dynamic>) return writes.length;
     final results = decoded['writeResults'];
-    if (results is! List) return writes.length;
+    if (results is! List || results.length != writes.length) {
+      throw const FormatException('CLOUD_COMMIT_INVALID_WRITE_RESULTS');
+    }
     var ok = 0;
     for (final result in results) {
-      if (result is Map<String, dynamic> && result['error'] != null) continue;
+      if (result is! Map<String, dynamic>) {
+        throw const FormatException('CLOUD_COMMIT_INVALID_WRITE_RESULT');
+      }
+      if (result['error'] != null) continue;
+      if (result['updateTime'] is! String) {
+        throw const FormatException('CLOUD_COMMIT_MISSING_UPDATE_TIME');
+      }
       ok++;
     }
     return ok;
@@ -594,9 +598,10 @@ class CloudSyncService {
       );
       return CloudSyncResult(
         success: false,
-        error:
-            'Cloud backup could not be completed. Check your connection and try again.',
-        errorCode: 'network',
+        error: error is FormatException
+            ? 'Cloud backup returned an invalid response. Check backup status before retrying.'
+            : 'Cloud backup could not be completed. Check your connection and try again.',
+        errorCode: error is FormatException ? 'invalid_response' : 'network',
         retryable: true,
         timestamp: now,
       );

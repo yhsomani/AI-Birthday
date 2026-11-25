@@ -14,6 +14,7 @@ class FakePeopleStore implements PeopleStore {
 
   final DateTime Function() _now;
   final Map<String, Person> _people = {};
+  final Map<String, Birthday> _birthdays = {};
   final StreamController<List<Person>> _controller =
       StreamController<List<Person>>.broadcast();
 
@@ -58,11 +59,41 @@ class FakePeopleStore implements PeopleStore {
   @override
   Future<void> saveAggregate(Person person, {Birthday? birthday}) async {
     _people[person.id] = person;
+    if (birthday != null) _birthdays[birthday.id] = birthday;
     _emit();
   }
 
   @override
-  Future<Birthday?> getBirthdayForPerson(String personId) async => null;
+  Future<void> saveImportBatch({
+    required List<Person> people,
+    required List<Birthday> birthdays,
+  }) async {
+    final ids = people.map((person) => person.id).toSet();
+    if (ids.length != people.length ||
+        birthdays.any((birthday) => !ids.contains(birthday.personId))) {
+      throw ArgumentError('Import batch contains duplicate or orphan records.');
+    }
+    for (final person in people) {
+      if (_people.containsKey(person.id)) {
+        throw StateError('Imported person already exists.');
+      }
+    }
+    for (final person in people) {
+      _people[person.id] = person;
+    }
+    for (final birthday in birthdays) {
+      _birthdays[birthday.id] = birthday;
+    }
+    _emit();
+  }
+
+  @override
+  Future<Birthday?> getBirthdayForPerson(String personId) async {
+    for (final birthday in _birthdays.values) {
+      if (birthday.personId == personId) return birthday;
+    }
+    return null;
+  }
 
   @override
   Future<void> softDelete(String id) async {

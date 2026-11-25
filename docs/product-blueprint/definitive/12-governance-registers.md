@@ -95,9 +95,9 @@ The parent blueprint records DEC-001–DEC-035. The following are the definitive
 | DEC-045 | Phone normalization | User-selected country for local numbers; canonical E.164; no inferred geolocation | Open recommendation | Product/Data |
 | DEC-046 | Local DB encryption/Android backup | Threat/model trade-off and key recovery before adopting/claiming | Open | Security/Product |
 | DEC-047 | Auto-prepare | Exclude until consent, eligibility, quota, retry, retention and UX approved | Blocked | Product/Privacy/AI |
-| DEC-048 | Automatic SMS | Separate opt-in/flavor/store-policy product with hard disable | Blocked | Product/Legal/Platform |
+| DEC-048 | Automatic SMS | Approved Android scope with per-person opt-in and exact-occurrence approval; manual handoff in Play if policy disallows automation; fail-closed until evidence | Scope approved; activation gated | Product approved; Legal/Platform/Release pending |
 | DEC-049 | Public Hosting/deletion | Conditional on legal/support/identity/anti-abuse/deployment evidence | Blocked | Release/Legal/Ops |
-| DEC-050 | Birthday Autopilot | Separate product ownership and contracts; absent from core readiness | Blocked | Founder/Platform |
+| DEC-050 | Birthday Autopilot | Include in AI-Birthday; integrate the server control plane without contact/phone/message content; Hosting identity and production deployment remain separate approvals | Scope approved; integration/deployment pending | Product approved; Platform/Legal/Release pending |
 | DEC-051 | Telemetry/analytics | No private-content telemetry default; approve event/consent/retention plan | Open | Privacy/Product |
 | DEC-052 | Support/deletion operating model | Name owner, hours/SLA, access and evidence retention before launch | Open | Operations |
 | DEC-053 | Performance/availability budgets | Establish baselines on supported device/data/provider matrix, then approve | Open | Engineering/QA/Product |

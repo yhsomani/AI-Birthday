@@ -17,7 +17,7 @@ flowchart TB
   API --> AUTH[Firebase Identity]
   API --> PLAY[Google Play]
   API --> FS[(Owner backup / entitlement)]
-  CP[Conditional Autopilot control plane] -. separate authorization .-> API
+  CP[In-scope Autopilot control plane] -. "separate service deployment" .-> API
   OPS[Restricted operations] --> API
   OBS[Privacy-safe observability] --> OPS
 ```

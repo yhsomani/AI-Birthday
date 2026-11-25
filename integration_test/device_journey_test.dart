@@ -79,12 +79,12 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
     expect(find.textContaining('November'), findsWidgets);
 
-    await tester.tap(find.text('History').last);
+    await tester.tap(find.text('Activity').last);
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
-    expect(find.text('History & Activity'), findsOneWidget);
+    expect(find.text('Activity'), findsWidgets);
     expect(find.text('Copied to Clipboard'), findsOneWidget);
 
-    await tester.tap(find.text('Settings').last);
+    await tester.tap(find.byTooltip('Settings').last);
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
     expect(find.text('Settings'), findsWidgets);
     expect(find.text('Automatic SMS'), findsNothing);

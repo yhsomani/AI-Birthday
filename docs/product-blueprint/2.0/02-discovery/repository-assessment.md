@@ -10,8 +10,8 @@
 |---|---|---|---|---|
 | `lib/` | Flutter application | product behavior, team-maintained | IR; current executable source | retain; requirements must map, no direct docs edits |
 | `android/` | Kotlin/Gradle adapters | notifications, contacts, Nano, disabled SMS | IR | retain; product capability matrix required |
-| `backend/functions/` | TypeScript server | Play verification, deletion and Autopilot control plane | IR, deployment unverified | retain pending DEC-044 boundary |
-| `backend/hosting/` | public web | Autopilot/privacy/support/delete | IR/CF; not deployed per repo docs | preserve; separate/deprecate/release-gate |
+| `backend/functions/` | TypeScript server | Play verification, deletion and Autopilot coordination control plane | IR, deployment unverified; Autopilot scope approved | retain; integrate only through approved local-data boundary and staged release gates |
+| `backend/hosting/` | public web | Autopilot/privacy/support/delete | IR/CF; not deployed per repo docs; public identity unresolved | preserve; approve identity/legal/support/deployment separately |
 | `backend/firestore.rules` | authz config | owner-scoped backup, server-only entitlement/control | IR | retain with security tests |
 | `test/`, `integration_test/` | Flutter verification | unit/widget/E2E/golden assertions | VF; current run not re-executed here | retain |
 | `backend/functions/test` | Vitest/emulator | server/race/policy assertions | VF | retain |

@@ -39,7 +39,10 @@ class HistoryScreen extends ConsumerWidget {
     final handoffsAsync = ref.watch(latestHandoffsForDraftsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('History & Activity')),
+      appBar: AppBar(
+        title: const Text('Activity'),
+        actions: const [SettingsActionButton()],
+      ),
       body: draftsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => EmptyState(

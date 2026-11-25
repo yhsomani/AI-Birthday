@@ -42,32 +42,44 @@ Future<void> resyncReminderSchedule(ProviderContainer container) async {
 
     // Reconcile automated SMS jobs only for a separately approved build.
     if (ProductCapabilities.automaticSms) {
-      try {
-        final smsSettings = container.read(automaticSmsSettingsProvider);
-        if (smsSettings.enabled) {
-          final smsService = container.read(birthdaySmsServiceProvider);
-          final birthdaysRepo = container.read(birthdaysRepositoryProvider);
-          final draftsRepo = container.read(draftsRepositoryProvider);
-          for (final p in people) {
-            final birthday = await birthdaysRepo.getBirthdayForPerson(p.id);
+      final smsSettings = container.read(automaticSmsSettingsProvider);
+      if (smsSettings.enabled) {
+        final smsService = container.read(birthdaySmsServiceProvider);
+        final birthdaysRepo = container.read(birthdaysRepositoryProvider);
+        final draftsRepo = container.read(draftsRepositoryProvider);
+        for (final person in people) {
+          try {
+            final birthday = await birthdaysRepo.getBirthdayForPerson(
+              person.id,
+            );
             final draft = birthday?.draftId != null
                 ? await draftsRepo.getDraft(birthday!.draftId!)
                 : null;
             await smsService.reconcileRecipientSms(
-              person: p,
+              person: person,
               birthday: birthday,
               draft: draft,
             );
+          } catch (error, stackTrace) {
+            container
+                .read(loggerProvider)
+                .warning(
+                  'people',
+                  'Automatic SMS schedule reconciliation failed for a recipient.',
+                  params: {'personId': person.id},
+                  error: error,
+                  stackTrace: stackTrace,
+                );
           }
         }
-      } catch (_) {}
+      }
     }
   } catch (error, stackTrace) {
     container
         .read(loggerProvider)
         .warning(
           'people',
-          'Reminder schedule refresh failed after a contact import.',
+          'Contact schedule refresh failed after a contact change.',
           error: error,
           stackTrace: stackTrace,
         );

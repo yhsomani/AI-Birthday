@@ -24,6 +24,10 @@ abstract class PeopleStore {
   Future<Person?> getById(String id);
   Future<void> save(Person person);
   Future<void> saveAggregate(Person person, {Birthday? birthday});
+  Future<void> saveImportBatch({
+    required List<Person> people,
+    required List<Birthday> birthdays,
+  });
   Future<Birthday?> getBirthdayForPerson(String personId);
   Future<void> softDelete(String id);
   Future<void> softDeleteAggregate(String id);
@@ -114,6 +118,29 @@ class DriftPeopleStore implements PeopleStore {
         await _database
             .into(_database.birthdays)
             .insertOnConflictUpdate(_birthdayRow(birthday));
+      }
+    });
+  }
+
+  @override
+  Future<void> saveImportBatch({
+    required List<Person> people,
+    required List<Birthday> birthdays,
+  }) async {
+    final personIds = people.map((person) => person.id).toSet();
+    if (personIds.length != people.length ||
+        birthdays.any((birthday) => !personIds.contains(birthday.personId))) {
+      throw ArgumentError('Import batch contains duplicate or orphan records.');
+    }
+
+    await _database.transaction(() async {
+      for (final person in people) {
+        await _database.into(_database.persons).insert(_toRow(person));
+      }
+      for (final birthday in birthdays) {
+        await _database
+            .into(_database.birthdays)
+            .insert(_birthdayRow(birthday));
       }
     });
   }

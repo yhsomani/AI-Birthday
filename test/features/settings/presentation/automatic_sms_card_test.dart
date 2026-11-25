@@ -47,6 +47,17 @@ class TestNativeSmsGateway implements NativeSmsGateway {
   }
 
   @override
+  Future<bool> cancelSmsJobsForPerson(
+    String personId, {
+    String? exceptJobId,
+  }) async {
+    jobs.removeWhere(
+      (job) => job.personId == personId && job.jobId != exceptJobId,
+    );
+    return true;
+  }
+
+  @override
   Future<String> getSmsAttemptsLog() async => logs;
 }
 

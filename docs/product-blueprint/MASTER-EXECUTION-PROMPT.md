@@ -58,7 +58,7 @@ Preserve these decisions as approved product constraints. Do not reinterpret, re
 - AI creates drafts. It must not silently send messages or invent recipient-specific facts.
 - WhatsApp is a user-controlled Click-to-Chat handoff. Opening WhatsApp or pre-filling a message is not proof that the user sent it. Explicit user confirmation is distinct from provider delivery evidence.
 - Cloud backup is opt-in and account-scoped. Current Firestore fields are not an end-to-end encrypted zero-PII envelope. Never claim otherwise without new implementation evidence.
-- The Birthday Autopilot/control-plane backend and public Hosting surface are separate product/deployment boundaries. Their source presence does not prove mobile integration or production deployment.
+- Birthday Autopilot is in AI-Birthday product scope. Its server control plane remains a separate deployment boundary, and the public Hosting identity remains a separate decision. Source presence does not prove mobile integration or production deployment.
 - Android capabilities and current Flutter implementation do not establish iOS support. Platform scope remains an explicit product decision unless approved evidence says otherwise.
 
 If a newer explicit owner decision conflicts with this baseline, stop and create a decision-reversal proposal showing the old decision, new wording, evidence, user impact, migration impact and required approvals. Do not apply the reversal until the product owner explicitly approves it.

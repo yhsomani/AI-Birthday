@@ -21,7 +21,7 @@ The loop is the organizing principle for product scope, navigation, lifecycle st
 | User-reviewed messaging is a core product boundary | FACT — repository + prior decision | README, SSOT and delivery audit |
 | AI access is subscription-gated for all providers | FACT — prior decision + current executable evidence | Explicit product decision; current router behavior, tests and Settings copy enforce it. Legacy SSOT/root architecture text and router comments were stale; the SSOT and root architecture text are reconciled in blueprint revision 0.1.4. Router source comments remain a documentation-only audit finding |
 | Cloud backup is optional | FACT — repository direction | README and architecture |
-| Birthday Autopilot is a separate server-side coordination surface | FACT — repository | Backend README and knowledge portal |
+| Birthday Autopilot is an approved in-scope capability with a separate server-side coordination surface | EPD + FACT — user scope and repository | User-approved scope; backend README and knowledge portal confirm source presence, not integration or deployment |
 | There is a validated market need, market size or willingness to pay | OPEN | No customer research or market evidence reviewed in this baseline |
 | Subscription is the final commercial model and pricing is viable | OPEN | Code contains purchase/entitlement mechanisms; commercial validation and pricing approval are absent |
 
@@ -36,9 +36,9 @@ The loop is the organizing principle for product scope, navigation, lifecycle st
 2. The user can understand who needs attention and when.
 3. The user can prepare a suitable message with or without AI.
 4. AI-generated content is grounded only in user-supplied or explicitly permitted facts.
-5. The user reviews and personally initiates every external message.
+5. The user reviews every message; automatic SMS, if activated, is restricted to an explicitly approved occurrence and exact message.
 6. The app records only what it can truthfully know.
-7. Local core workflows remain useful without sign-in or cloud connectivity.
+7. Local core workflows remain useful without sign-in or cloud connectivity; optional Autopilot availability cannot block manual workflows.
 8. Users can understand, export, back up and delete their data.
 
 These are proposed outcome statements; quantitative targets require baseline measurement and stakeholder approval.
@@ -68,13 +68,13 @@ A person who wants to remember birthdays across family, friends, colleagues and 
 | Google Play | Purchase and subscription source of truth | External dependency |
 | WhatsApp / SMS app / Android share sheet | Receives a user-initiated handoff | External dependency |
 | Support operator | Handles support requests under a defined support policy | Proposed; operational model open |
-| Autopilot service operator | Operates a separate coordination control plane | Separate system; deployment and product ownership open |
+| Autopilot service operator | Operates the isolated coordination service for approved Android work | In-product scope approved; public Hosting identity, service ownership and deployment remain open |
 
 No demographic persona, income profile, market segment size or behavioral statistic is asserted without research.
 
 ## 5. Product principles
 
-1. **User control:** no silent external messaging; every message is user-reviewed.
+1. **User control:** no unapproved external messaging; manual handoff is user-initiated and automatic SMS requires explicit recipient opt-in plus approval of the exact occurrence and message.
 2. **Truthful state:** opened, copied, handed off, user-confirmed and delivered are distinct states.
 3. **Privacy by default:** keep personal data local unless the user explicitly enables a cloud or external operation.
 4. **AI is optional:** manual message composition remains available when AI is locked, unavailable or offline.
@@ -100,9 +100,9 @@ No demographic persona, income profile, market segment size or behavioral statis
 - Diagnostics and support pathways.
 
 ### Separate or conditional surfaces
-- **Birthday Autopilot control plane:** distinct backend capability with sender leases, claims, arm/retry fences and deletion operations. It is not equivalent to the core mobile WhatsApp workflow. Productization, supported channels, legal basis, deployment and mobile integration require separate approval.
+- **Birthday Autopilot:** approved in-product Android capability using a distinct backend coordination service with sender leases, claims, arm/retry fences and deletion operations. It is not equivalent to the core mobile WhatsApp workflow. Integration and activation remain gated on safety, policy, device and deployment evidence; public Hosting identity and operational ownership remain unresolved.
 - **Public legal/help/deletion site:** supporting web surface; release is blocked until external identity, legal, privacy, support, reCAPTCHA and deployment configuration gates are met.
-- **Automatic SMS in personal flavor:** platform-specific, permission-sensitive capability. It must be separately consented, reviewed, rate-limited and distribution-policy validated. It is not a default cross-platform capability.
+- **Automatic SMS:** Android-only, platform- and distribution-policy-sensitive capability. It requires per-person opt-in and approval of the exact occurrence, destination and message; keep it disabled until safety, policy and release gates pass. Use manual SMS handoff in Play if policy does not permit automation.
 
 ### Explicit non-goals unless approved
 - Autonomous WhatsApp sending or WhatsApp account automation.

@@ -333,6 +333,10 @@ void main() {
         (await harness.peopleRepo.getPeople()).single.id,
       );
       expect(imported!.leapDayResolution, LeapDayResolution.mar1);
+      expect(
+        await harness.birthdaysRepo.getBirthdayForPerson(imported.id),
+        isNotNull,
+      );
     });
   });
 }

@@ -1,5 +1,7 @@
 # Architectural & Design Decisions Register
 
+> Historical design decisions are not current implementation or verification claims. The current shell IA and automatic-SMS state are documented in `screen-inventory.md` and the product-blueprint governance registers.
+
 ## Decision 1: Adaptation of Modern Analytics Dashboard Paradigm
 - **Context**: The master prompt requested transforming the visual sophistication to match a modern analytics dashboard, adapted specifically for a personal AI birthday assistant.
 - **Decision**: Adopted a clean, high-density executive layout with top KPI metric strips (e.g. *Today's Celebrations*, *Action Needed*, *Total Network Tracked*), urgent alert callouts with immediate actions (e.g. *Send via WhatsApp* for birthdays within 7 days), and structured cards bounded by subtle 1px borders (`#E2E8F0`).
@@ -17,4 +19,4 @@
 
 ## Decision 4: Android Carrier Compliance & Consent Boundary
 - **Context**: Automatic SMS vs WhatsApp delivery channels have distinct permission and Google Play compliance implications.
-- **Decision**: WhatsApp handoff remains the default delivery vehicle with explicit user tap-to-send intent (`whatsapp://send`). Automatic SMS features include explicit carrier compliance notices and toggle guards, preserving the boundary between `personal` and `play` distribution flavors.
+- **Decision**: Manual SMS/WhatsApp handoff remains user initiated. Automatic SMS is in Android product scope only with explicit per-person opt-in and approval of the exact message. It is currently disabled by Dart/native gates; Play retains manual SMS if policy does not allow automatic sending.

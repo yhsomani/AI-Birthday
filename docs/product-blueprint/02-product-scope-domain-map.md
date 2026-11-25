@@ -132,7 +132,7 @@ No social features, contact enrichment, email/calendar integrations, campaign me
 ## 6. Open domain questions
 
 - Are Android and iOS both target products, or is Android the only supported platform for the next release?
-- Is Birthday Autopilot intended to be a separately sold product, an internal service, or a future optional capability?
-- Is automatic SMS a supported product tier or a personal sideload-only experiment?
+- What public identity, legal/support ownership and release boundary should apply to the existing Hosting surface for in-scope Birthday Autopilot?
+- Which Android distribution channels are policy-eligible for automatic SMS, and what manual-SMS fallback is required in each?
 - Which languages and locale/date formats are required for launch?
 - Which data categories are included in cloud backup and how are deletes propagated?

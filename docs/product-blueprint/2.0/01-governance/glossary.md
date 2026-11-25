@@ -8,5 +8,5 @@
 - **Nano:** supported on-device Gemini capability; availability is device-dependent.
 - **Local-first:** SQLite is the operational store; cloud is optional unless a separately approved dependency exists.
 - **Backup generation:** owner-scoped Firestore snapshot; not end-to-end encrypted in current code.
-- **Autopilot/control plane:** separate server coordination concept for autonomous SMS; not part of approved core v1 and not integrated by the Flutter client.
+- **Autopilot/control plane:** approved optional Android capability with an isolated server-side coordination service; Flutter integration and deployment are not yet verified, and automatic SMS remains disabled pending safety, policy and release gates.
 - **Canonical:** the one authoritative definition for the identified concern.

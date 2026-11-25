@@ -12,7 +12,7 @@ The authoritative detailed feature fields are F-001–F-109 in [definitive/02 �
 | F-060–064 | delivery/history | manual handoffs; immutable history gaps | retain/redesign event/revision model |
 | F-070–082 | account/entitlement | implemented, deployment/store evidence pending | retain; close contracts/evidence |
 | F-090–095 | backup/privacy | implemented partial; retention/integrity/delete gaps | redesign before expanded production claim |
-| F-096–098 | jobs/automation | durable jobs; no full fences; SMS/auto-prep disabled | retain manual jobs; block product automation |
-| F-100–109 | operations/public/control | server/site/control-plane exist; not proven deployed/integrated | separate product/release-gate |
+| F-096–098 | jobs/automation | durable jobs; no full fences; automatic SMS disabled; auto-prepare disabled | harden job ownership and SMS safety before activation; auto-prepare remains a separate decision |
+| F-100–109 | operations/public/control | server/site/control-plane exist; not proven deployed/integrated | Autopilot is in scope; integrate behind security/policy/deployment gates; public Hosting identity remains unresolved |
 
-Current removals recommended: README product claim for active automatic personal SMS (`DR`); any BYOK bypass/old routing copies (`DR`); public promises of unsupported support/retention SLAs (`DR`); Stripe client billing (`DR`, already absent).
+Current removals recommended: unsupported claim that automatic personal SMS is already active (`DR`, corrected in README); any BYOK bypass/old routing copies (`DR`); public promises of unsupported support/retention SLAs (`DR`); Stripe client billing (`DR`, already absent).

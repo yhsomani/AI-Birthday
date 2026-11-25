@@ -15,7 +15,7 @@ flowchart LR
   Q --> O[Operational readiness]
   O --> L[Release gate]
   L --> M[Monitor/improve]
-  X -. approval .-> AP[Conditional Autopilot/public/auto-SMS]
+  X -. deployment and activation approval .-> AP[In-scope Autopilot; gated public service and auto-SMS]
   AP -. no dependency on core .-> Q
 ```
 

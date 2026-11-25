@@ -37,7 +37,7 @@
 | BR-029 | Purchase entitlement is granted only from trusted server verification, not client flags or token presence | Subscription | P0 | FR-023 | Purchase verification negative tests |
 | BR-030 | Sign-out and account deletion are different operations; local data retention/cleanup must be explained separately | Account | P1 | FR-027 | Journey and deletion tests |
 | BR-031 | Account deletion request acceptance is not deletion completion | Account/Backend | P0 | FR-027 | Receipt-state tests |
-| BR-032 | Birthday Autopilot control-plane capabilities are not part of core mobile workflow until explicit product integration and deployment approval | Platform | P0 | FR-028 | Endpoint caller matrix and deployment evidence |
+| BR-032 | Birthday Autopilot is an optional in-scope Android capability; its control plane must remain isolated, and integration/activation requires explicit safety, policy and deployment approval without blocking manual workflows | Platform | P0 | FR-028 | Endpoint caller matrix, offline/manual fallback, policy and deployment evidence |
 | BR-033 | A job must be idempotent, bounded in retries and cancellable where its side effect has not started | Jobs | P1 | FR-026 | Duplicate delivery and cancellation tests |
 | BR-034 | Notification permission denial must not block manual access to birthday information | Reminders | P0 | FR-009 | Permission-denied journey |
 | BR-035 | Product status labels must reflect canonical state and cannot be inferred from UI navigation alone | Experience | P0 | FR-020 | Cross-screen status consistency tests |

@@ -112,25 +112,17 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
     super.initState();
     final id = widget.personId;
     if (id != null) {
-      ref.read(personByIdProvider(id).future).then((person) async {
+      ref.read(personByIdProvider(id).future).then((person) {
         if (!mounted) return;
-        final memPerson = await ref
-            .read(peopleRepositoryProvider)
-            .getPerson(id);
-        if (memPerson != null) {
-          _existingPerson = memPerson;
-        }
-        var p = person;
-        p ??= memPerson;
-        if (!mounted) return;
-        if (p == null) {
+        if (person == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('This person could not be found.')),
           );
           context.pop();
           return;
         }
-        setState(() => _populate(p!));
+        _existingPerson = person;
+        setState(() => _populate(person));
       });
     }
   }

@@ -23,8 +23,8 @@ AI-Birthday v1 is an **Android, local-first personal birthday assistant**. The s
 - Stripe/client-secret billing was removed entirely. Google Play is the sole purchase channel.
 - Debug/local entitlement grants were removed from production UI and the test hook is debug/runtime guarded.
 - Automatic background preparation is compile-time disabled and hidden from normal UX.
-- Direct/background automatic SMS is compile-time and native-layer disabled; manual SMS composer remains.
-- Birthday Autopilot control-plane UI is not represented as part of the core product.
+- Direct/background automatic SMS is compile-time and native-layer disabled; the Play flavor excludes `SEND_SMS`. Product scope now includes a gated Android Autopilot flow with explicit recipient opt-in and exact-message approval; no production send capability is available yet.
+- The server-only Autopilot control plane is not integrated into the Flutter/Android app or deployed. Product-scope approval does not authorize deployment or production SMS.
 - Public Hosting/support/deletion is not represented as deployed; release remains configuration-gated.
 
 ## 2. Implemented production corrections

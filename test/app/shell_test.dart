@@ -17,8 +17,7 @@ import 'package:ai_birthday/features/settings/presentation/settings_screen.dart'
 
 import 'pump_app.dart';
 
-/// Bottom-nav label lookup scoped to the [NavigationBar] — the Settings and
-/// Calendar screens repeat these words in their AppBars.
+/// Bottom-nav label lookup scoped to the [NavigationBar].
 Finder navLabel(String label) =>
     find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
 
@@ -26,7 +25,9 @@ int selectedIndex(WidgetTester tester) =>
     tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
 
 void main() {
-  testWidgets('bottom nav switches between all five branches', (tester) async {
+  testWidgets('bottom nav switches between all four primary branches', (
+    tester,
+  ) async {
     await pumpCompletedApp(tester);
 
     expect(find.byType(DashboardScreen), findsOneWidget);
@@ -35,9 +36,8 @@ void main() {
     const steps = <(String, int, Type)>[
       ('People', 1, PeopleScreen),
       ('Calendar', 2, CalendarScreen),
-      ('History', 3, HistoryScreen),
-      ('Settings', 4, SettingsScreen),
-      ('Dashboard', 0, DashboardScreen),
+      ('Activity', 3, HistoryScreen),
+      ('Today', 0, DashboardScreen),
     ];
     var previous = DashboardScreen;
     for (final (label, index, screen) in steps) {
@@ -66,7 +66,7 @@ void main() {
   ) async {
     await pumpCompletedApp(tester);
 
-    await tester.tap(navLabel('Dashboard'));
+    await tester.tap(navLabel('Today'));
     await tester.pumpAndSettle();
 
     expect(selectedIndex(tester), 0);
@@ -95,11 +95,11 @@ void main() {
     await drainApp(tester);
   });
 
-  testWidgets('History empty state offers an add-person CTA', (tester) async {
+  testWidgets('Activity empty state offers an add-person CTA', (tester) async {
     await pumpCompletedApp(tester);
     await tester.pumpAndSettle();
 
-    await tester.tap(navLabel('History'));
+    await tester.tap(navLabel('Activity'));
     await tester.pumpAndSettle();
 
     expect(find.text('No activity yet'), findsOneWidget);
@@ -120,14 +120,11 @@ void main() {
     await pumpCompletedApp(tester);
 
     expect(
-      tester.getSemantics(navLabel('Dashboard')),
+      tester.getSemantics(navLabel('Today')),
       isSemantics(isButton: true, isSelected: true, hasTapAction: true),
     );
     // NavigationBar annotates destinations with an M3 "Tab N of M" suffix.
-    expect(
-      tester.getSemantics(navLabel('Dashboard')).label,
-      contains('Dashboard'),
-    );
+    expect(tester.getSemantics(navLabel('Today')).label, contains('Today'));
     expect(
       tester.getSemantics(navLabel('People')),
       isSemantics(isButton: true, isSelected: false, hasTapAction: true),
@@ -149,15 +146,9 @@ void main() {
     await pumpCompletedApp(tester, size: const Size(400, 2400));
     expect(tester.takeException(), isNull, reason: 'dashboard at 200%');
 
-    // Every nav label stays inside the (M3 default) bar bounds at 200% scale.
+    // Every nav label stays inside the responsive bar bounds at 200% scale.
     final barRect = tester.getRect(find.byType(NavigationBar));
-    for (final label in const [
-      'Dashboard',
-      'People',
-      'Calendar',
-      'History',
-      'Settings',
-    ]) {
+    for (final label in const ['Today', 'People', 'Calendar', 'Activity']) {
       final rect = tester.getRect(navLabel(label));
       expect(rect.top, greaterThanOrEqualTo(barRect.top), reason: '$label top');
       expect(
@@ -166,6 +157,28 @@ void main() {
         reason: '$label bottom',
       );
     }
+
+    await drainApp(tester);
+  });
+
+  testWidgets('Settings opens from the shell and returns to the current tab', (
+    tester,
+  ) async {
+    await pumpCompletedApp(tester);
+
+    await tester.tap(find.byTooltip('Settings').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DashboardScreen), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(selectedIndex(tester), 0);
+    expect(tester.takeException(), isNull);
 
     await drainApp(tester);
   });

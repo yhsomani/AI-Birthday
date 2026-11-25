@@ -14,8 +14,8 @@ Important relationships are time-sensitive, but birthdays are scattered across d
 
 ## Strategic boundaries
 
-The product is a personal assistant, not a social network, CRM, campaign sender, autonomous WhatsApp system, analytics platform, AI chat product, calendar replacement or cloud-first contact manager. (`EPD/ER`; high confidence.)
+The product is a local-first personal assistant, not a social network, CRM, bulk/campaign sender, autonomous WhatsApp system, analytics platform, AI chat product, calendar replacement or cloud-first contact manager. The user approved Android Birthday Autopilot with explicit recipient opt-in and exact-message approval; the current implementation remains gated. (`EPD`; high confidence for scope, not deployment.)
 
 ## Opportunity and validation
 
-`PC` adjacent opportunities include richer import review, guided accessibility, privacy-safe analytics and separate Autopilot. None may enter core until user need, consent, security, reliability, commercial and operational cases are approved. Market size, demand, price and competitors remain `UA`; interview/survey/conversion evidence must precede claims.
+Richer import review, guided accessibility and privacy-safe analytics remain `PC`; they require user-need, consent, security, reliability, commercial and operational validation before scope. Birthday Autopilot is no longer an adjacent-product assumption: its in-product scope is user-approved, while integration, store eligibility and deployment are unresolved. Market size, demand, price and competitors remain `UA`; interview/survey/conversion evidence must precede claims.

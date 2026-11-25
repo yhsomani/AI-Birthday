@@ -19,7 +19,7 @@ flowchart TD
   C --> J
   J --> O
   PUB[DOM-13 Public] -. separate approval .-> O
-  CP[DOM-14 Control Plane] -. separate product .-> O
+  CP[DOM-14 Autopilot Control Plane] -. "in-scope capability, separate deployment" .-> O
 ```
 
-Hard prerequisites: Person validation → birthday identity → cross-view occurrence → reminders/studio. Entitlement/store truth → AI. Privacy/retention → backup/delete. Supported platform/release evidence → any production claim. Control plane/Autopilot must not become a hidden dependency of core v1.
+Hard prerequisites: Person validation → birthday identity → cross-view occurrence → reminders/studio. Entitlement/store truth → AI. Privacy/retention → backup/delete. Supported platform/release evidence → any production claim. Autopilot is optional and its server control plane must remain isolated; local tracking and manual delivery must work when it is unavailable.

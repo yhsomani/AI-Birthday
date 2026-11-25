@@ -430,6 +430,55 @@ void main() {
       },
     );
 
+    test(
+      'malformed successful commit response never publishes a backup generation',
+      () async {
+        final now = DateTime.now();
+        await db
+            .into(db.persons)
+            .insert(
+              PersonsCompanion.insert(
+                id: 'p-invalid-response',
+                name: 'Preserved locally',
+                relationship: 'Friend',
+                relationshipCloseness: 'close',
+                preferredLanguage: 'en',
+                preferredTone: 'warm',
+                importantFacts: '',
+                preferredDeliveryChannel: 'whatsapp',
+                autoSendPolicy: 'manualOnly',
+                createdAt: now,
+                updatedAt: now,
+                version: 1,
+              ),
+            );
+
+        var publishRequested = false;
+        final client = MockClient((request) async {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          final writes = body['writes'] as List;
+          publishRequested = writes.any(
+            (write) => (((write as Map)['update'] as Map)['name'] as String)
+                .endsWith('/backup/current'),
+          );
+          return http.Response('{}', 200);
+        });
+        final service = CloudSyncService(
+          db: db,
+          store: store,
+          httpClient: client,
+        );
+
+        final result = await service.sync(_signedInAuth);
+
+        expect(result.success, isFalse);
+        expect(result.errorCode, 'invalid_response');
+        expect(result.error, contains('invalid response'));
+        expect(publishRequested, isFalse);
+        expect(await service.getLastSyncTime('uid-test'), isNull);
+      },
+    );
+
     test('a failed row write never publishes the pointer (F05)', () async {
       final now = DateTime.now();
       await db

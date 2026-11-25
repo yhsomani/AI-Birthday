@@ -124,7 +124,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final peopleAsync = ref.watch(personListProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Calendar')),
+      appBar: AppBar(
+        title: const Text('Calendar'),
+        actions: const [SettingsActionButton()],
+      ),
       body: peopleAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) => EmptyState(

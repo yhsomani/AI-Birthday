@@ -14,6 +14,7 @@ class ScheduledSmsJob {
     required this.phoneNumber,
     required this.message,
     required this.timestampMs,
+    required this.scheduleToken,
     required this.isApproved,
     this.status = 'scheduled',
     this.failureReason,
@@ -25,6 +26,7 @@ class ScheduledSmsJob {
   final String phoneNumber;
   final String message;
   final int timestampMs;
+  final String scheduleToken;
   final bool isApproved;
   final String status;
   final String? failureReason;
@@ -36,6 +38,7 @@ class ScheduledSmsJob {
     'phoneNumber': phoneNumber,
     'message': message,
     'timestampMs': timestampMs,
+    'scheduleToken': scheduleToken,
     'isApproved': isApproved,
     'status': status,
     if (failureReason != null) 'failureReason': failureReason,
@@ -49,6 +52,7 @@ class ScheduledSmsJob {
       phoneNumber: map['phoneNumber'] as String? ?? '',
       message: map['message'] as String? ?? '',
       timestampMs: (map['timestampMs'] as num?)?.toInt() ?? 0,
+      scheduleToken: map['scheduleToken'] as String? ?? '',
       isApproved: map['isApproved'] as bool? ?? false,
       status: map['status'] as String? ?? 'scheduled',
       failureReason: map['failureReason'] as String?,
@@ -76,6 +80,9 @@ abstract interface class NativeSmsGateway {
   /// Cancels all scheduled automated SMS jobs.
   Future<bool> cancelAllSmsJobs();
 
+  /// Cancels pending jobs for [personId], optionally preserving the active occurrence.
+  Future<bool> cancelSmsJobsForPerson(String personId, {String? exceptJobId});
+
   /// Retrieves the JSON array string of recent SMS execution and callback attempts.
   Future<String> getSmsAttemptsLog();
 }
@@ -83,10 +90,10 @@ abstract interface class NativeSmsGateway {
 /// Concrete Android implementation communicating over MethodChannel.
 class AndroidNativeSmsGateway implements NativeSmsGateway {
   const AndroidNativeSmsGateway({
-    MethodChannel channel = const MethodChannel(
+    this._channel = const MethodChannel(
       'com.yashsomani.ai_birthday/sms_automation',
     ),
-  }) : _channel = channel;
+  });
 
   final MethodChannel _channel;
 
@@ -159,6 +166,23 @@ class AndroidNativeSmsGateway implements NativeSmsGateway {
     if (!_isLiveAndroid) return true;
     try {
       final res = await _channel.invokeMethod<bool>('cancelAllSmsJobs');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> cancelSmsJobsForPerson(
+    String personId, {
+    String? exceptJobId,
+  }) async {
+    if (!_isLiveAndroid) return true;
+    try {
+      final res = await _channel.invokeMethod<bool>('cancelSmsJobsForPerson', {
+        'personId': personId,
+        'exceptJobId': ?exceptJobId,
+      });
       return res ?? false;
     } catch (_) {
       return false;

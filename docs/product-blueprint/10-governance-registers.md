@@ -11,8 +11,8 @@
 | DEC-005 | Invalid configured key is an error, not missing configuration | Adopt | Proposed | AI owner |
 | DEC-006 | Cloud backup is opt-in | Existing direction | Proposed | Product/privacy approval |
 | DEC-007 | Backup is not described as end-to-end encrypted without evidence | Required claim boundary | Confirmed by current architecture docs | Security owner |
-| DEC-008 | Personal automated SMS is a separate distribution capability | Existing source flavor split | Proposed | Product/legal/store review |
-| DEC-009 | Birthday Autopilot is a separate product surface from core WhatsApp handoff | Existing backend docs | Proposed boundary | Stakeholder decision |
+| DEC-008 | Android automatic SMS is in product scope with recipient-specific approval; eligible distribution remains policy-gated | User-approved scope; current source gates remain disabled | Scope approved; activation gated | Product scope approved; Legal/Platform/Release review |
+| DEC-009 | Birthday Autopilot is part of AI-Birthday; the server control plane and public Hosting surface retain separate deployment/identity gates | User-approved scope; backend integration/deployment unverified | Scope approved; integration pending | Product approved; Platform/Legal/Release review |
 | DEC-010 | Public Hosting is not production until external gates are evidenced | Backend/hosting READMEs | Current evidence | Release owner |
 | DEC-011 | Supported platform scope | Android evidenced; broader scope not approved | Open | Product owner |
 | DEC-012 | Leap-day occurrence policy | Approved: each Feb 29 Person has a user-selected policy of Feb 28 or Mar 1 in non-leap years; leap years remain Feb 29 | Approved product decision; preference field, UX and legacy backfill remain design work | Product / Birthday |

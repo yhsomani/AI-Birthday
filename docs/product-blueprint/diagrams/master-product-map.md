@@ -42,7 +42,7 @@ flowchart TD
   D6 --> JOBS["Durable jobs"]
   D6 --> QA["Quality / accessibility"]
   D6 --> OPS["Monitoring / support"]
-  P -. separate product boundary .-> CTRL["Birthday Autopilot control plane"]
+  P -. "in-scope capability; separate service deployment" .-> CTRL["Birthday Autopilot control plane"]
   CTRL --> LEASE["Sender leases / claims / fences"]
   CTRL --> WEB["Public legal / support / deletion surface"]
   D1 --> D2

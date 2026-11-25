@@ -42,6 +42,6 @@ Some streams can run in parallel after requirements stabilize: UX research, thre
 
 **Slice 3 — Continuity:** account, opt-in backup/restore, deletion and recovery.
 
-**Slice 4 — Conditional automation:** only after separate product, consent, platform-policy and operational approval.
+**Slice 4 — Gated Autopilot:** Android integration is in product scope; implement only after the safety contract, recipient consent, platform-policy review and operational gates are satisfied. Product-scope approval alone does not authorize production sending or deployment.
 
 This sequencing is a recommendation. It does not imply current implementation is absent or that work must be rebuilt. Existing source must be mapped to approved contracts before deciding whether to retain, repair or replace it.

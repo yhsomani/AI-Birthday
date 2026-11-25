@@ -161,8 +161,8 @@ Global AC suffixes: `AC-S` safe state/no data loss; `AC-T` truthful state/no fal
 ### F-063 Immutable delivery/history timeline
 **Purpose:** understand what actually happened. **Data:** exact draft revision, channel, action, result, user confirmation, timestamps, failure reason class. **UI:** filters person/channel/outcome/date; empty; no PII in overview beyond needed. **Business:** history is read model, not second truth. **AC:** append-only order and Dashboard agree; no “delivered” absent proof. **Priority:** P1/P6.
 
-### F-064 Conditional automatic personal SMS
-**Purpose:** optional execution for separately approved personal flavor. **Pre:** flavor, platform policy, Android permission, per-recipient/revision approval, non-stale authorization, bounded retry. **Behavior:** durable job/OS schedule, revision hash, idempotency key; edit/revoke/deletion cancels. **UI:** explicit risk/consent, pending/cancel/attempt state. **AC:** one send at most; stale/revoked cannot send; Play/unsupported flavor has no capability. **Priority:** P2/P9, blocked on approval.
+### F-064 Gated Android automatic SMS
+**Purpose:** approved Android product capability for a reviewed birthday occurrence. **Pre:** eligible distribution variant and platform policy, Android permission, explicit per-recipient opt-in, approval bound to the exact occurrence/message/destination/time, non-stale authorization, bounded retry. **Behavior:** durable job/OS schedule, revision token, idempotency key; edit/revoke/deletion cancels. **UI:** explicit risk/consent, pending/cancel/attempt state. **AC:** one send at most; stale/revoked cannot send; Play uses manual SMS handoff if policy/review does not permit automation. **Priority:** P2; implementation and activation remain release-gated.
 
 ---
 
@@ -237,8 +237,8 @@ Global AC suffixes: `AC-S` safe state/no data loss; `AC-T` truthful state/no fal
 ### F-104 Billing/deployment reconciliation operations
 **Purpose:** resolve charged-but-locked, failed deletion and stuck jobs safely. **Behavior:** authorized support workflow by opaque IDs/receipts, no private content, idempotent correction/audit. **AC:** correction cannot be performed through user-controlled field and is separately logged. **Priority:** P1/P11 conditional.
 
-### F-109 Birthday Autopilot control plane (separate product)
-**Purpose:** conditional sender installation/lease/claim/fence/attempt/delete coordination. **Pre:** explicit separate product, channel/legal/deployment/mobile integration approval. **Behavior:** strict schema, identity/App Check, fencing, replay/rate limits and deletion. **Boundary:** existence of endpoints never changes core WhatsApp sending. **AC:** isolated deployment and caller matrix; core works when absent. **Priority:** P2/P9 blocked.
+### F-109 Birthday Autopilot control plane (in-scope capability; separate service deployment)
+**Purpose:** coordinate approved Android occurrence work through installation leases, claims, fencing, attempts, and deletion. **Pre:** mobile caller integration, consent/approval contracts, legal/store review, staging evidence, and explicit deployment approval. **Behavior:** strict schema, identity/App Check, fencing, replay/rate limits and deletion; never transport phone numbers or message content. **Boundary:** manual handoff remains distinct; existence of endpoints never proves execution or delivery. **AC:** isolated deployment and caller matrix; core local/manual workflows work when the service is absent. **Priority:** P2; implementation/deployment gated.
 
 ---
 

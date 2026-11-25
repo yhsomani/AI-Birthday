@@ -24,7 +24,6 @@ import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/features/people/domain/person_enums.dart';
 import 'package:ai_birthday/features/delivery/application/birthday_sms_service.dart';
-import 'package:ai_birthday/features/settings/presentation/settings_screen.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 class MessageStudioScreen extends ConsumerStatefulWidget {
@@ -1135,13 +1134,10 @@ class _MessageStudioScreenState extends ConsumerState<MessageStudioScreen>
     context.push('/people/edit/${_person!.id}');
   }
 
-  /// Opens Settings as a modal page so the user can unlock Pro or configure
-  /// a personal Gemini API key and return directly to their message draft.
+  /// Opens Settings through the app router and returns to the current draft.
   void _openSettings() {
     HapticFeedback.lightImpact();
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
+    context.push('/settings');
   }
 
   Future<void> _approveForAutoSms() async {
