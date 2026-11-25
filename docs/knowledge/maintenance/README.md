@@ -44,4 +44,4 @@ For the registry: check JSON parsing, unique `id`, existing `parent`, acyclic hi
 
 ## Current evidence snapshot
 
-Review: 2026-10-14 · Base commit: `75b9d91aadcc1c4136fdcb2c06340d3744bc50a4`. [Observed main CI run](https://github.com/yhsomani/AI-Birthday/actions/runs/38461085640) completed successfully. Source and tests were inspected remotely; local compilation, emulators and physical-device tests were **not** rerun during generation of this knowledge set.
+Review: 2026-11-25 · Checkout commit: `20a598e9789a19e2a35a2b693e63c098473cc68d`. No current external CI run was inspected. Local test, analyzer, APK and browser evidence is bounded and documented in the [coverage report](../project-coverage-report.md); production services were not called. Update stable IDs and linked evidence only after checking current source, not historical claims.

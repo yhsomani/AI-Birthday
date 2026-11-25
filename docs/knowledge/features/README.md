@@ -9,7 +9,7 @@ AI-Birthday (APP)
 ├── First-run experience (ONB)
 │   ├── Intro/walkthrough, skip, add/import actions (ONB-FLOW)
 │   └── Completion flag and first-run redirect (ONB-GATE)
-├── Navigation shell (NAV) — five persistent tabs + detail routes
+├── Navigation shell (NAV) — four persistent destinations + detail routes
 ├── Dashboard (DASH) — Today, Upcoming, Action Needed, quick actions
 ├── People (PEOPLE)
 │   ├── Create/edit/soft delete/undo (PEOPLE-CRUD)
@@ -52,13 +52,15 @@ AI-Birthday (APP)
 │   end-to-end scheduled generation still unverified
 ├── Separate public web site (WEB)
 │   └── Deletion reauth/receipt (WEB-DELETE)
-└── Separate coordination backend (CTRL)
+└── Separate coordination backend (CTRL; not integrated with Flutter sender flow)
     ├── Lease, claim, arm, retry fencing (CTRL-CLAIM)
     ├── Deletion and maintenance orchestration (CTRL-DELETE)
     └── Purchase verification (CTRL-PURCHASE)
 ```
 
 The [machine-readable registry](../feature-registry.json) contains stable parent/child IDs, actual file paths, relevant tests, intent references and evidence limitations. The hierarchy stops at *meaningful* functional responsibilities; a validation condition or state transition may be a nano feature without requiring an individual Markdown file.
+
+The current registry is the complete counted feature inventory for this snapshot. Its `parent` field defines hierarchy; source/test evidence and status remain on each node. A source node marked implemented does not mean deployed, production-ready, or runtime-verified. Detail nodes added in the current review cover search/filter, import diagnostics, recurrence/quiet hours, draft race guards, entitlement/provider selection, send confirmation, backup validation, job recovery, and known missing integration/release pieces.
 
 ## Deep decomposition: People → Import → CSV
 

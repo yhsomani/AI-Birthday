@@ -2,18 +2,18 @@
 
 [Knowledge home](../README.md) · [Business rules](../business-rules/README.md) · [Integrations](../integrations/README.md)
 
-**Observed local database schema version:** ``5`` in [AppDatabase](../../../lib/core/database/app_database.dart). The six declared local tables below are based on its actual definitions. This guide does not claim all properties or migrations have been independently tested.
+**Observed local database schema version:** ``6`` in [AppDatabase](../../../lib/core/database/app_database.dart). The six declared local tables below are based on its actual definitions. This guide does not claim all migration paths have been independently tested.
 
 ## SQLite table inventory
 
 | Table | Business responsibility | Producing / consuming subsystem | Critical caveat |
 |---|---|---|---|
-| `Persons` | Recipient identity, month/day, preferences and user-entered facts | People service, CSV import, backup/restore | Local operational record; version and deletedAt tombstone present |
-| `Birthdays` | Cycle-specific occurrence with state, date, person ID and optional draft link | BirthdayLifecycleService, Dashboard, Studio | Different sync-envelope completeness than Persons |
-| `MessageDrafts` | Editable body, tone, provider, status and timestamps | Studio, AI durable job handler, History | Draft editorial status distinct from delivery confirmation evidence |
-| `ReminderSettingsEntries` | Reminder kinds, quiet hours and preferences | ReminderSettingsController, backup/restore | Scheduling side effect is on Android platform, not in SQLite |
-| `DeliveryEvents` | Handoff record and channel/time evidence | Studio, History | Opening another app does not establish sent/delivered |
-| `Jobs` | Durable operation type/status/attempts/retry due and payload | JobWorker, AI/Cloud handlers | Sensitive tokens should not be persisted in job payload |
+| `Persons` | Recipient identity, month/day/year, leap-day choice, phone/email, relationship, language/tone, facts/notes, channel/timezone, preparation/send preferences, version/tombstone/timestamps | People service, CSV/device import, backup/restore | Primary key `id`; no SQL FK declared in this table |
+| `Birthdays` | Cycle-specific occurrence, person ID, cycle year/date/status and optional draft link | Birthday lifecycle, Dashboard, Calendar, Studio | Primary key `id`; person/cycle relationship is represented by fields |
+| `MessageDrafts` | Birthday/person IDs, body, tone/length/status/provider, variation index and timestamps | Studio, AI job handler, History | Primary key `id`; editorial status is distinct from delivery evidence |
+| `ReminderSettingsEntries` | Settings key, enabled flag, reminder-kind encoding and quiet-hours minutes | Reminder controller, backup/restore | Primary key `key`; OS alarms are external side effects |
+| `DeliveryEvents` | Birthday/draft IDs, channel/outcome and handoff timestamp | Studio, History | Primary key `id`; launch does not prove sent/delivered |
+| `Jobs` | Type/status/subject, non-secret payload, attempt limits, error/result refs and lifecycle/retry times | JobWorker, AI/Cloud handlers | Primary key `id`; tokens/credentials must not be in payload |
 
 ## Conceptual entity relationships
 
@@ -46,6 +46,18 @@ flowchart TD
 | Google auth and purchase tokens | Secure auth session/checkout | Firebase Auth, Play, backend verifier | Check expiry and account binding; log non-sensitive metadata only |
 | Coordination sender aliases/claims | Separate backend Firestore and server-only logic | Authenticated App Check callables | Not part of local recipient schema; no asserted deployed production integration |
 
+## Firestore path-family inventory
+
+The following are source-defined path templates, not evidence that a Firebase project is deployed. The 28 templates are grouped by owner; their access rules are in [Firestore rules](../../../backend/firestore.rules), their coordination names in [paths.ts](../../../backend/functions/src/persistence/paths.ts), and their subscription ownership path in [subscription verification](../../../backend/functions/src/services/subscriptionVerification.ts).
+
+| Owner / boundary | Path families | Count | Source-level purpose |
+|---|---|---:|---|
+| Server coordination | `accounts/{uid}`; nested `installations`, `occurrenceClaims`, `testClaims`, `occurrenceKeys`, `destinationGuards`, `claimRequests`, `armOutcomes`, `armBudgets`; root `deletionTombstones`, `coordinationPresence`, `coordinationOperationFences`, `coordinationOperationReceipts`, `coordinationLatestReceipts`; `globalControl/current`; `deletionReceipts/{key}` | 16 | Sender coordination, deletion fencing/receipts and bounded operation state; server-only |
+| Purchase verification | `subscriptionPurchaseOwnership/{ownershipKey}` | 1 | Server-owned token/ownership binding; exact token values are not documented here |
+| User-scoped application data | `users/{uid}/entitlement`; `users/{uid}/backup`; `users/{uid}/generations`; generation children `people`, `birthdays`, `drafts`, `reminderSettings`; direct user children `people`, `birthdays`, `drafts`, `reminderSettings` | 11 | Entitlement projection and opt-in backup snapshots; rules scope data to the authenticated owner |
+
+The count is a count of **path templates**, not a count of Firestore documents, indexes, or deployed collections. The six SQLite tables remain the only locally declared Drift tables in schema v6. Cloud backup is opt-in and owner-scoped, but the inspected snapshot is not an end-to-end encrypted envelope.
+
 ## Source-level transaction and recovery boundaries
 
 1. **Person create/edit:** form → PersonService → repository → Drift; ensure birthday occurrence reconciliation and reminder planning. See [person service](../../../lib/features/people/application/person_service.dart).
@@ -54,9 +66,9 @@ flowchart TD
 4. **Cloud backup:** [CloudSyncService](../../../lib/features/sync/data/cloud_sync_service.dart) writes immutable generation records, manifest and advances ``backup/current`` only after writes. Restore checks manifest/count and applies to local storage; runtime fault-injection remains necessary.
 5. **Local delete:** People soft-delete sets tombstone/version; cloud restore should not resurrect deleted people or orphaned drafts. Check [cloud tests](../../../test/features/sync/data/cloud_sync_service_test.dart) and [repository tests](../../../test/core/database/drift_repositories_test.dart).
 
-## Model duplication to resolve before refactoring
+## Model duplication and ownership
 
-Both [Person model A](../../../lib/features/people/domain/person.dart) and [Person model B](../../../lib/features/people/domain/models/person.dart) define ``Person`` in different namespaces with overlapping fields and behavior. Before choosing a canonical one, compare callers, persistence codecs and import/export paths; characterize all field round-trips; document migration and compatibility. Treat duplication as source-confirmed, but downstream data-loss scenarios as *risk pending verification*.
+Both [Person model A](../../../lib/features/people/domain/person.dart) and [Person model B](../../../lib/features/people/domain/models/person.dart) still define ``Person`` in different namespaces. Current source imports both variants: form/service/repository/reminder/calendar paths use the former, while Drift, dashboard, Studio, SMS and import paths use the latter. This is a confirmed parallel-model architecture; do not assume one is dead or that persistence is lossless across conversions. The migration includes schema-v6 additions for leap-day resolution and delivery-event draft/outcome fields, plus indexes; see `app_database.dart` and the migration tests.
 
 ## Data-lineage acceptance conditions
 

@@ -7,7 +7,7 @@
 ```mermaid
 flowchart TD
   User["User"] --> Flutter["Flutter MaterialApp.router"]
-  Flutter --> Router["go_router + 5-tab shell"]
+  Flutter --> Router["go_router + four-destination shell"]
   Flutter --> River["Riverpod providers"]
   River --> Life["Birthday lifecycle + reminder/AI/job services"]
   River --> Repos["Repositories"]
@@ -26,7 +26,7 @@ flowchart TD
   Site["Public Hosting: legal, support, deletion"] --> Extra
 ```
 
-**Evidence:** [boot](../../../lib/main.dart), [app](../../../lib/app/app.dart), [providers](../../../lib/app/providers.dart), [router](../../../lib/app/router.dart), [Drift schema](../../../lib/core/database/app_database.dart), [native](../../../android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt), [Cloud Functions](../../../backend/functions/src/functions/index.ts). Edges above summarize identified architecture; individual paths still need integration verification.
+**Evidence:** [boot](../../../lib/main.dart), [app](../../../lib/app/app.dart), [providers](../../../lib/app/providers.dart), [router](../../../lib/app/router.dart), [Drift schema](../../../lib/core/database/app_database.dart), [native](../../../android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt), [Cloud Functions](../../../backend/functions/src/functions/index.ts). Edges above summarize source-level architecture; the sender coordination APIs have no Flutter client wiring in the inspected source, and external deployment remains unverified. The current cross-boundary edges are enumerated in the [cross-dependency graph](../cross-dependency-graph.md).
 
 ### Ownership rules
 

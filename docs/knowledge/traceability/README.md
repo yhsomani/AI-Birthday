@@ -2,7 +2,7 @@
 
 [Knowledge home](../README.md) · [Feature registry](../feature-registry.json) · [Business rules](../business-rules/README.md)
 
-**Evidence date:** 2026-10-14. **Base SHA:** ``2abcc1aaa24a69c0aff5bddbc13c5f05d0ed14f8``. ``SPEC-*`` are documentation mapping keys based on SSOT sections, **not** original product requirement IDs. The ``FR-*`` labels are from the existing [archived requirements traceability](../../archive/REQUIREMENTS_TRACEABILITY.md), whose coverage statuses may now be stale.
+**Evidence date:** 2026-11-25. **Checkout SHA:** ``20a598e9789a19e2a35a2b693e63c098473cc68d``. ``SPEC-*`` are documentation mapping keys based on SSOT sections, **not** original product requirement IDs. The ``FR-*`` labels are from the existing [archived requirements traceability](../../archive/REQUIREMENTS_TRACEABILITY.md), whose coverage statuses may now be stale. Use the linked [full current-checkout CSV](../traceability-matrix.csv) for feature, route, action, API/data and test edges.
 
 ## Mapped requirements
 

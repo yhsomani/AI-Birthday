@@ -2,7 +2,7 @@
 
 [Knowledge home](../README.md) · [Journey scenarios](../journeys/README.md) · [Feature decomposition](../features/deep-dives/navigation-ux.md)
 
-**Scope:** Flutter `go_router` and the material bottom navigation source at commit `2abcc1aaa24a69c0aff5bddbc13c5f05d0ed14f8`. Edges are source-level evidence of routes or UI action handlers, **not** automated end-to-end runtime proof.
+**Scope:** Flutter `go_router` and the Material bottom navigation source at checkout `20a598e9789a19e2a35a2b693e63c098473cc68d` (2026-11-25). Edges are source-level evidence of routes or UI action handlers, **not** automated end-to-end runtime proof.
 
 ## Route inventory (10 declared destinations)
 
@@ -13,7 +13,7 @@
 | `/people` | [PeopleScreen](../../../lib/features/people/presentation/people_screen.dart) | Indexed tab 2 | PEOPLE |
 | `/calendar` | [CalendarScreen](../../../lib/features/calendar/presentation/calendar_screen.dart) | Indexed tab 3 | CAL |
 | `/history` | [HistoryScreen](../../../lib/features/history/presentation/history_screen.dart) | Indexed tab 4 | HISTORY |
-| `/settings` | [SettingsScreen](../../../lib/features/settings/presentation/settings_screen.dart) | Indexed tab 5 | SETTINGS |
+| `/settings` | [SettingsScreen](../../../lib/features/settings/presentation/settings_screen.dart) | Root route above shell; opened from Settings action | SETTINGS |
 | `/people/add` | [PersonFormScreen](../../../lib/features/people/presentation/person_form_screen.dart) | Create form above shell | PEOPLE-CRUD |
 | `/people/edit/:id` | [PersonFormScreen](../../../lib/features/people/presentation/person_form_screen.dart) | Editor above shell | PEOPLE-CRUD |
 | `/message-studio/:birthdayId` | [MessageStudioScreen](../../../lib/features/message_studio/presentation/message_studio_screen.dart) | Cycle-linked Studio above shell | STUDIO |
@@ -32,7 +32,10 @@ flowchart TD
  DASH <--> PEOPLE["/people"]
  DASH <--> CAL["/calendar"]
  DASH <--> HIST["/history"]
- DASH <--> SETTINGS["/settings"]
+ DASH --> SETTINGS["/settings (above shell)"]
+ PEOPLE --> SETTINGS
+ CAL --> SETTINGS
+ HIST --> SETTINGS
  PEOPLE --> ADD["/people/add"]
  PEOPLE --> EDIT["/people/edit/:id"]
  PEOPLE --> PERSONSTUDIO["/message-studio/person/:personId"]
@@ -45,7 +48,7 @@ flowchart TD
  FALLBACK --> DASH
 ```
 
-The five tab destinations are implemented as a `StatefulShellRoute.indexedStack`, which retains branch navigators. Navigation from notifications is handled in [AppScaffold](../../../lib/app/app_scaffold.dart) using `getInitialNotificationPersonId` and a notification-open callback. Onboarding is conditional on the saved flag in [credential storage](../../../lib/core/security/credential_storage.dart).
+The four tab destinations (Today, People, Calendar, Activity) are implemented as a `StatefulShellRoute.indexedStack`, which retains branch navigators. Settings is a separate root-level route, not a tab. Navigation from notifications is handled in [AppScaffold](../../../lib/app/app_scaffold.dart) using `getInitialNotificationPersonId` and a notification-open callback. Onboarding is conditional on the saved flag in [credential storage](../../../lib/core/security/credential_storage.dart).
 
 ## Route contract: journey, state, error and exit
 

@@ -2,7 +2,7 @@
 
 [Knowledge home](../README.md) · [Features](../features/README.md) · [Business rules](../business-rules/README.md) · [Traceability](../traceability/README.md)
 
-**Original repository revision reviewed:** `2abcc1aaa24a69c0aff5bddbc13c5f05d0ed14f8` (merged PR #340). **Original review date:** 2026-10-14. **Change mode:** documentation only. AI entitlement behavior and its test assertion were rechecked during Phase 2.4.3; the remaining ledger is historical unless explicitly updated. Existing 50-node registry remains the canonical feature inventory. This extension adds rules, source mappings, eight individual deep-feature READMEs and a full route catalog, but does not claim an exhaustive atomic feature census.
+**Current checkout:** `20a598e9789a19e2a35a2b693e63c098473cc68d` (2026-11-25). **Change mode:** documentation only for this reverse-engineering assignment. The registry now contains the counted feature hierarchy; local execution and browser observations, plus their limits, are in the [coverage report](../project-coverage-report.md). Historical CI observations below remain historical and are not represented as current CI evidence.
 
 ## Historical CI observation — 2026-10-14 snapshot
 

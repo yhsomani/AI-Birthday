@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/core/platform/gemini_nano_platform.dart';
@@ -37,6 +38,7 @@ void main() {
       List<Override> extraOverrides = const [],
       Size size = const Size(800, 2000),
       double textScale = 1.0,
+      bool useRouter = false,
     }) async {
       final now = DateTime.now();
       final person = Person(
@@ -81,12 +83,33 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
+      final router = useRouter
+          ? GoRouter(
+              initialLocation: '/message-studio/b-test',
+              routes: [
+                GoRoute(
+                  path: '/message-studio/:birthdayId',
+                  builder: (context, state) => MessageStudioScreen(
+                    birthdayId: state.pathParameters['birthdayId']!,
+                  ),
+                ),
+                GoRoute(
+                  path: '/settings',
+                  builder: (context, state) => const SettingsScreen(),
+                ),
+              ],
+            )
+          : null;
+      if (router != null) addTearDown(router.dispose);
+
       await tester.pumpWidget(
         ProviderScope(
           overrides: [...harness.providerOverrides, ...extraOverrides],
-          child: const MaterialApp(
-            home: MessageStudioScreen(birthdayId: 'b-test'),
-          ),
+          child: router == null
+              ? const MaterialApp(
+                  home: MessageStudioScreen(birthdayId: 'b-test'),
+                )
+              : MaterialApp.router(routerConfig: router),
         ),
       );
       await tester.pumpAndSettle();
@@ -226,7 +249,12 @@ void main() {
     testWidgets(
       'tapping Unlock with Pro opens Settings as modal and pops back cleanly',
       (tester) async {
-        await pumpStudio(tester, phone: '+14155552671', pro: false);
+        await pumpStudio(
+          tester,
+          phone: '+14155552671',
+          pro: false,
+          useRouter: true,
+        );
 
         expect(find.text('Unlock with Pro'), findsOneWidget);
         await tester.tap(find.text('Unlock with Pro'));

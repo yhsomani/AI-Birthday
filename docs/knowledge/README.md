@@ -2,18 +2,24 @@
 
 > [Project home](../../README.md) · [Product intent](../../SSOT.md) · [Architecture baseline](../../ARCHITECTURE.md) · [Feature registry](feature-registry.json)
 
-**Evidence snapshot:** `main` at `75b9d91aadcc1c4136fdcb2c06340d3744bc50a4` (2026-10-14 review). The registry currently describes **50 nodes**, including the application root, domains, and child capabilities. This is a **source-review baseline**, not a claim that 50 features were tested in production or that every line was individually audited.
+**Evidence snapshot:** `20a598e9789a19e2a35a2b693e63c098473cc68d` (2026-11-25 checkout). The machine-readable feature registry preserves prior IDs and adds source-grounded deeper capabilities. It describes code, tests, and explicit unknowns; it is not proof of production deployment or user demand. The checkout already has local modifications in `.gitignore`, shell goldens, and one test file; this documentation does not alter them.
 
 ## Start here
 
 | Question | Read |
 |---|---|
 | What does the product do? | [Product requirement / SSOT](../../SSOT.md) |
+| What is the complete interconnected project graph? | [Master project mind map](master-project-mindmap.md) · [machine graph](master-project-graph.json) |
 | What exists, down to micro / nano capabilities? | [Functional tree and feature contracts](features/README.md) |
 | Which UI screen do I open, and what happens next? | [Navigation and user journeys](journeys/README.md) |
+| Which interactions are present on each screen? | [Screen and interaction inventory](screen-interaction-inventory.md) |
 | What calls what? Where is data stored? | [Architecture and data lineage](architecture/README.md) |
+| Which cross-module edges and data paths exist? | [Cross-dependency graph](cross-dependency-graph.md) · [Data-flow map](data-flow-map.md) |
 | What is not done, contradictory, or unverified? | [Gap and improvement register](gaps/README.md) |
 | How are findings linked to source and tests? | [Machine-readable registry](feature-registry.json) |
+| What is the source/test evidence for a claim? | [Evidence register](evidence-register.md) |
+| How much of the repository was inspected and validated? | [Coverage report](project-coverage-report.md) |
+| Where is the full journey-to-test trace? | [Traceability matrix](traceability-matrix.csv) |
 | How do we update this documentation? | [Maintenance guide](maintenance/README.md) |
 | Which exact validations and business rules apply? | [Business rules](business-rules/README.md) |
 | How do requirements map to functions and tests? | [Requirement traceability](traceability/README.md) |
@@ -37,6 +43,8 @@ People → Birthday → Reminder → Prepare → AI/Manual → Review → Send �
 
 **Additional backend product surface.** `backend/functions/` also contains a separately documented *Birthday Autopilot* server coordination control plane, and `backend/hosting/` provides public/legal/deletion routes. Their READMEs explicitly say production deployment is not evidenced. Do **not** equate the coordination capability with the current mobile app's WhatsApp workflow; see [architecture](architecture/README.md) and [gaps](gaps/README.md).
 
+**Current navigation evidence:** the Flutter shell has four persistent destinations (Today, People, Calendar, Activity). Settings is a separate route above the shell. The public Hosting pages advertise broader Android/iOS automation, but source gates default off, the control-plane/mobile sender integration is not present, and release configuration/deployment are not evidenced. Treat the product/legal copy versus executable capability as a documented conflict, not a feature claim.
+
 ## Product capability map (containment, not execution)
 
 ```mermaid
@@ -50,8 +58,8 @@ flowchart TD
   P --> P1["People CRUD & import/export"]
   P --> P2["Recurrence & rollover"]
   P --> P3["Reminders & calendar"]
-  X --> X1["Onboarding & dashboard"]
-  X --> X2["History & settings"]
+  X --> X1["Onboarding & Today / four-destination shell"]
+  X --> X2["Activity & Settings route"]
   M --> M1["Message Studio / drafts"]
   M --> M2["AI: BYOK or Nano"]
   M --> M3["WhatsApp/SMS/Share handoff"]
@@ -75,7 +83,7 @@ A feature tree answers **what contains what**; the [journey](journeys/README.md)
 | `source-reviewed` | Code and test locations were read or their existence cross-checked; tests not executed locally in this session. |
 | `CI observed` | A published GitHub Actions run was inspected; does not establish physical-device or deployment correctness. |
 
-The latest `main` CI run inspected at this snapshot [completed successfully](https://github.com/yhsomani/AI-Birthday/actions/runs/38461085640) for commit `75b9d91`. Do not promote that result to evidence of live Play Billing, real WhatsApp sending, Google cloud provisioning, device reboot alarms, or deployed Hosting.
+Current-session local evidence is summarized in the [coverage report](project-coverage-report.md). No current external CI run was inspected. Do not promote a local build, widget test, or page preview to evidence of live Play Billing, real message delivery, deployed Firebase, or production Hosting.
 
 ## Repository index
 
@@ -97,9 +105,9 @@ docs/audit/                    Previous investigations; status may be stale
 
 ## Authority and limitations
 
-- For *intended* product behavior use [SSOT.md](../../SSOT.md); for *implemented* behavior inspect source at the cited path; for *observed tests* consult the relevant CI run.
+- For *intended* product behavior use [SSOT.md](../../SSOT.md); for *implemented* behavior inspect source at the cited path; for *observed tests* consult the exact execution result in the [coverage report](project-coverage-report.md).
 - Historical `PROJECT.md` milestone labels and archived audit completion statements are not automatically current.
-- This documentation was produced using remote source inspection, not a local Flutter/Android/emulator run.
+- A local Flutter test/build and Android emulator launch were observed in this session; emulator interaction beyond first-run display was blocked by input-injection permissions. The browser review covered only the separate local Hosting site, not a Flutter web build.
 - Verification and unresolved distinctions are recorded in [gaps](gaps/README.md). Avoid inferring production-readiness from source presence.
 
 **Next step:** select a node in [the feature tree](features/README.md), follow the linked Dart/Kotlin/TypeScript file, and use the associated journey and tests to verify the behavior in an appropriate runtime.

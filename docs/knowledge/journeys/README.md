@@ -11,13 +11,13 @@
 | `/people` | People list, search and import (main tab) | [router.dart](../../../lib/app/router.dart) |
 | `/calendar` | Month view (main tab) | [router.dart](../../../lib/app/router.dart) |
 | `/history` | Draft and delivery history (main tab) | [router.dart](../../../lib/app/router.dart) |
-| `/settings` | Account, AI, backup, reminders, subscription (main tab) | [router.dart](../../../lib/app/router.dart) |
+| `/settings` | Account, AI, backup, reminders, subscription (route above shell) | [router.dart](../../../lib/app/router.dart) |
 | `/people/add` | Create person | [router.dart](../../../lib/app/router.dart) |
 | `/people/edit/:id` | Edit person | [router.dart](../../../lib/app/router.dart) |
 | `/message-studio/:birthdayId` | Open cycle-linked Studio | [router.dart](../../../lib/app/router.dart) |
 | `/message-studio/person/:personId` | Open person-linked Studio, including notification deep link | [router.dart](../../../lib/app/router.dart), [shell](../../../lib/app/app_scaffold.dart) |
 
-Unmatched locations render the not-found screen with return-to-dashboard action. The initial location is Dashboard; incomplete onboarding redirects to `/onboarding` if the credential storage guard is present.
+Unmatched locations render the not-found screen with return-to-dashboard action. The initial location is Dashboard; incomplete onboarding redirects to `/onboarding` if the credential storage guard is present. The stateful shell has four persistent branches: Dashboard/Today, People, Calendar and History/Activity. Settings is pushed above the shell, not a fifth tab.
 
 ```mermaid
 flowchart TD
@@ -28,7 +28,10 @@ flowchart TD
   DASH <--> PEOPLE["/people"]
   DASH <--> CAL["/calendar"]
   DASH <--> HISTORY["/history"]
-  DASH <--> SETTINGS["/settings"]
+  DASH --> SETTINGS["/settings (overlay route)"]
+  PEOPLE --> SETTINGS
+  CAL --> SETTINGS
+  HISTORY --> SETTINGS
   PEOPLE --> ADD["/people/add"]
   PEOPLE --> EDIT["/people/edit/:id"]
   DASH --> STUDIO["/message-studio/:birthdayId"]
@@ -41,6 +44,8 @@ flowchart TD
 ```
 
 **Important:** arrows represent identified source-level navigation opportunities and shell tab access; they are not proof every UI branch was exercised. Source: [router](../../../lib/app/router.dart), [people screen](../../../lib/features/people/presentation/people_screen.dart), [calendar](../../../lib/features/calendar/presentation/calendar_screen.dart), [history](../../../lib/features/history/presentation/history_screen.dart).
+
+The stable journey IDs and outcome/error branches are mirrored in the [machine graph](../master-project-graph.json). The [screen interaction inventory](../screen-interaction-inventory.md) records each screen's primary actionable controls and their evidence.
 
 ## J-01 — First launch
 

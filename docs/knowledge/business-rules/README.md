@@ -2,7 +2,7 @@
 
 [Knowledge home](../README.md) · [Feature registry](../feature-registry.json) · [Traceability](../traceability/README.md) · [Verification](../verification/README.md)
 
-**Baseline:** ``main`` at ``2abcc1aaa24a69c0aff5bddbc13c5f05d0ed14f8``. This catalog records source-observed rules and clearly separates runtime verification. A test-file reference does **not** imply that the individual rule has a passing named assertion without inspecting that assertion.
+**Evidence snapshot:** ``20a598e9789a19e2a35a2b693e63c098473cc68d`` (2026-11-25 checkout). This catalog records source-observed rules and clearly separates runtime verification. A test-file reference does **not** imply that the individual rule has a passing named assertion without inspecting that assertion.
 
 ## Canonical rules
 

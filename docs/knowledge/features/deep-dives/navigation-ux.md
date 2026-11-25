@@ -4,7 +4,7 @@
 
 ## Purpose, scope and implementation status
 
-The Flutter router owns navigation; a `StatefulShellRoute.indexedStack` maintains five main tabs. First-run onboarding is gated by a stored preference. Modal/detail screens live above the tab shell. UX intent is to reduce cognitive load and guide users from seeing an upcoming birthday to preparing and sending a greeting.
+The Flutter router owns navigation; a `StatefulShellRoute.indexedStack` maintains four main destinations: Today, People, Calendar and Activity. Settings, forms and Message Studio live above the tab shell. First-run onboarding is gated by a stored preference. UX intent is to guide users from seeing an upcoming birthday to preparing and sending a greeting.
 
 ## Feature and execution map
 
@@ -17,7 +17,10 @@ flowchart TD
  HOME <--> PEOPLE["/people"]
  HOME <--> CAL["/calendar"]
  HOME <--> HIST["/history"]
- HOME <--> SET["/settings"]
+ HOME --> SET["/settings (above shell)"]
+ PEOPLE --> SET
+ CAL --> SET
+ HIST --> SET
  PEOPLE --> ADD["/people/add"]
  PEOPLE --> EDIT["/people/edit/:id"]
  HOME --> STUDIO["/message-studio/:birthdayId"]
@@ -30,7 +33,7 @@ flowchart TD
 |---|---|---|
 | ONB-GATE | Check secure completion flag and redirect first-run user | [App router](../../../../lib/app/router.dart) |
 | ONB-FLOW | Walkthrough, Next/Skip, add/import onramps | [OnboardingScreen](../../../../lib/features/onboarding/presentation/onboarding_screen.dart) |
-| NAV | Indexed five-tab shell, not-found fallback, detail routes | [router](../../../../lib/app/router.dart), [scaffold](../../../../lib/app/app_scaffold.dart) |
+| NAV | Indexed four-destination shell, not-found fallback, detail routes | [router](../../../../lib/app/router.dart), [scaffold](../../../../lib/app/app_scaffold.dart) |
 | DASH | Combine people and birthday streams, sort today/upcoming and action needed | [DashboardScreen](../../../../lib/features/dashboard/presentation/dashboard_screen.dart) |
 | CAL | Navigate month, open a day, initiate person-linked Studio | [CalendarScreen](../../../../lib/features/calendar/presentation/calendar_screen.dart) |
 | HISTORY | Show saved drafts, handoff events and sent confirmation status | [HistoryScreen](../../../../lib/features/history/presentation/history_screen.dart) |
@@ -45,4 +48,4 @@ flowchart TD
 
 **Tests:** [shell](../../../../test/app/shell_test.dart), [not found](../../../../test/app/router_not_found_test.dart), [onboarding](../../../../test/features/onboarding/presentation/onboarding_screen_test.dart), [dashboard visibility](../../../../test/features/dashboard/presentation/dashboard_visibility_test.dart), [calendar](../../../../test/features/calendar/presentation/calendar_screen_test.dart), [contrast](../../../../test/ui/contrast_test.dart). **Unverified:** full cross-screen real navigation, accessibility on screen reader, Android insets/IME, golden snapshots in CI. **TO-BE:** decompose large Settings and Studio presentations into micro-components once regression baselines are captured.
 
-> **Evidence boundary:** The implementation was reviewed in repository source at commit `2abcc1aaa24a69c0aff5bddbc13c5f05d0ed14f8`. Runtime, device, deployed backend and physical delivery behavior are not independently established by these notes.
+> **Evidence boundary:** The implementation was reviewed in repository source at checkout `20a598e9789a19e2a35a2b693e63c098473cc68d` on 2026-11-25. This updates route counts only; it does not establish production delivery or deployment.

@@ -2,7 +2,7 @@
 
 [Knowledge home](../README.md) · [Architecture](../architecture/README.md) · [Data ownership](../data-model/README.md) · [Verification](../verification/README.md)
 
-**Source baseline:** `2abcc1aaa24a69c0aff5bddbc13c5f05d0ed14f8`. **Important:** a declared endpoint is not proof a matching mobile call is wired, that a function is deployed, or that it is safe to invoke against live accounts.
+**Source baseline:** checkout `20a598e9789a19e2a35a2b693e63c098473cc68d` (2026-11-25). **Important:** a declared endpoint is not proof a matching mobile call is wired, that a function is deployed, or that it is safe to invoke against live accounts. The Functions source exports 18 callable functions and two scheduled functions; Hosting calls deletion-start and receipt-check operations, Flutter calls purchase verification, and no Flutter sender-registration/claim/arm client path was found.
 
 ## Mobile integrations
 
