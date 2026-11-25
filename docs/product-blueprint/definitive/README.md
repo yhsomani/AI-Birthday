@@ -22,17 +22,17 @@
 
 ## Diagrams
 
-- [Master product mind map](diagrams/master-product-map.mmd)
-- [Domain ecosystem map](diagrams/domain-ecosystem-map.mmd)
-- [People and birthday domain map](diagrams/people-birthday-map.mmd)
-- [Studio, AI and delivery domain map](diagrams/studio-ai-delivery-map.mmd)
-- [Account, continuity and privacy domain map](diagrams/account-continuity-map.mmd)
-- [Experience and journey map](diagrams/ux-journey-map.mmd)
-- [Technical architecture and security map](diagrams/technical-system-map.mmd)
-- [Data relationship map](diagrams/data-relationship-map.mmd)
-- [API/integration map](diagrams/api-integration-map.mmd)
-- [Quality/release map](diagrams/quality-release-map.mmd)
-- [Roadmap map](diagrams/roadmap-map.mmd)
+- [Master product mind map](diagrams/master-product-map.md)
+- [Domain ecosystem map](diagrams/domain-ecosystem-map.md)
+- [People and birthday domain map](diagrams/people-birthday-map.md)
+- [Studio, AI and delivery domain map](diagrams/studio-ai-delivery-map.md)
+- [Account, continuity and privacy domain map](diagrams/account-continuity-map.md)
+- [Experience and journey map](diagrams/ux-journey-map.md)
+- [Technical architecture and security map](diagrams/technical-system-map.md)
+- [Data relationship map](diagrams/data-relationship-map.md)
+- [API/integration map](diagrams/api-integration-map.md)
+- [Quality/release map](diagrams/quality-release-map.md)
+- [Roadmap map](diagrams/roadmap-map.md)
 
 ## Relationship to prior artifacts
 

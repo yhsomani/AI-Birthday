@@ -53,8 +53,8 @@ flowchart TB
   APP --> AND --> OS
   APP --> ID
   APP --> SYNC
-  CTRL -. separate product boundary .- CLOUD
-  WEB -. supporting surface .- CLOUD
+  CTRL -. "separate product boundary" .-> APP
+  WEB -. "supporting surface" .-> APP
 ```
 
 ## 3. Layer responsibilities

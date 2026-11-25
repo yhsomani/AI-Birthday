@@ -1,9 +1,10 @@
 # AI-Birthday — Product Blueprint
 
-> **Consolidated product baseline:** Start with the [Definitive Product Blueprint](definitive/README.md) for the complete product ecosystem, atomic feature contracts, technical/data/API architecture, user journeys, quality plan, roadmap, governance registers and mind maps. Earlier files below remain evidence and phase history.
+> **Current navigation and governance baseline (2026-11-25):** Start with the [Product Blueprint 2.0 master index](2.0/01-governance/master-index.md). It reconciles the latest `main` source, required evidence policy, independent specialist reviews, conflicts and release blockers. The [Definitive Product Blueprint](definitive/README.md) remains the detailed v1.0 feature/contract baseline and is linked rather than silently rewritten. Earlier files remain dated evidence and phase history.
 
-**Blueprint version:** 0.1.9  
-**Status:** Discovery baseline, Phase 2.1.1 Flutter audit, Phase 2.2 CI/documentation revalidation, Phase 2.3 People/Birthday contracts, Phase 2.3.1 approved product decisions, Phase 2.4 architecture, Phase 2.4.1 decision recommendations and Phase 2.4.2 repository/data-inventory evidence; Phase 2.4.3 documentation consistency corrections completed; owner approvals, actual local-database inventory and remaining domain-contract work remain pending — not implementation-ready  
+**Current navigation version:** 2.0-draft (2026-11-25); preserved historical phase index: 0.1.9
+
+**Status:** Current-main discovery, evidence reconciliation and independent specialist review completed; stakeholder approvals, actual local-database inventory and external runtime/deployment evidence remain pending — not implementation-ready
 **Review date:** 2026-11-24  
 **Source review baseline:** application source inspected in Phase 2.3 at 93e803aee3064b046ac9b9093cfd35e4b1a0ae62. Phase 2.3.1/2.4 documentation is based on governance head 6657322ac1679b6a0954c04340ab27b2d29924d0; no application source was re-reviewed or changed in Phase 2.4. Earlier audit reports retain their original evidence baselines  
 **Scope:** Product discovery, product definition, requirements, architecture, UX, governance, planning and evidence-based implementation audit. No application implementation is authorized by this blueprint.
@@ -24,8 +25,8 @@
 | Test strategy and release gates | [08 — Quality and verification](08-quality-and-verification.md) |
 | Dependency-aware delivery roadmap | [09 — Product roadmap](09-product-roadmap.md) |
 | Decisions, assumptions, risks and traceability | [10 — Governance registers](10-governance-registers.md) |
-| Product ecosystem mind map | [Master product map](diagrams/master-product-map.mmd) |
-| Target architecture map | [Architecture map](diagrams/target-architecture.mmd) |
+| Product ecosystem mind map | [Master product map](diagrams/master-product-map.md) |
+| Target architecture map | [Architecture map](diagrams/target-architecture.md) |
 | Phase 2 audit index | [Phase 2 — Evidence-based repository audit](phase-2-audit/README.md) |
 | Phase 2.1 source-to-test audit | [Phase 2.1 — Source-to-test audit](phase-2.1-audit/README.md) |
 | Phase 2.2 revalidation and contract gaps | [Phase 2.2 — Current CI and documentation revalidation](phase-2.2-audit/README.md) |
@@ -35,7 +36,7 @@
 | Phase 2.4.2 decision approval and data inventory | [Phase 2.4.2 — Approval and inventory](phase-2.4.2-decision-approval-and-data-inventory/README.md) |
 | Master execution prompt | [Master Product Discovery, Blueprint and Documentation Execution Prompt](MASTER-EXECUTION-PROMPT.md) |
 | Phase 2.4.3 documentation consistency and execution | [Phase 2.4.3 — Consistency audit and controlled execution](phase-2.4.3-documentation-consistency-and-execution/README.md) |
-| AI entitlement routing diagram | [AI entitlement-first routing](diagrams/ai-entitlement-routing.mmd) |
+| AI entitlement routing diagram | [AI entitlement-first routing](diagrams/ai-entitlement-routing.md) |
 
 
 | Phase 2.1.1 Flutter feature audit | [Flutter Feature Audit](phase-2.1-audit/flutter-feature-audit.md) |
