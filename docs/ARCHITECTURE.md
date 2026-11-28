@@ -4,7 +4,7 @@
 
 **Scope.** Structure, boundaries, contracts and decisions. Product behaviour belongs in PRODUCT.md, security controls in SECURITY.md, the issue register and remediation status in IMPLEMENTATION.md, and runbooks in OPERATIONS.md. This document points to those instead of repeating them.
 
-**Status & evidence (2026-11-28).** The working tree includes the responsive UI and delivery handoff updates described here. `flutter analyze` is clean; `flutter test --exclude-tags golden` passes 743 tests; shell goldens pass against the redesigned navigation. Android/Kotlin compilation was not available because no Java runtime is installed; no device UI, release APK/AAB, `npm audit`, or CSP browser test was run. Backend and public site deployment are not evidenced (see [§11](#11-infrastructure-and-deployment-architecture)).
+**Status & evidence (2026-11-28).** The working tree includes the responsive UI and delivery handoff updates described here. `flutter analyze` is clean; `flutter test --exclude-tags golden` passes 743 tests; shell goldens pass against the redesigned navigation. The Play debug APK built and launched on Android 15; full device journeys, release APK/AAB, `npm audit`, CSP browser testing, and backend/public-site deployment are not evidenced (see [§11](#11-infrastructure-and-deployment-architecture)).
 
 **Conventions.**
 - Tags: `[IMPLEMENTED]`, `[PARTIAL]`, `[NOT IMPLEMENTED]`, `[APPROVED]`, `[PROPOSED]`, `[OPEN]`, `[DEPRECATED]`.

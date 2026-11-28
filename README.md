@@ -2,7 +2,7 @@
 
 AI-Birthday is a **local-first Android app that helps you remember people's birthdays and send personal wishes**. It keeps your birthday records on the device, reminds you in time, helps you draft a message (manually or with AI you control), and hands the message to WhatsApp, Messages/SMS, Instagram, Snapchat, LinkedIn, or the native share sheet **for you to review and send**. WhatsApp and SMS open pre-filled; social apps use their targeted Android text-sharing entry point where supported. It never claims a message was delivered unless you confirm it.
 
-> **Status (working tree, 2026-11-28).** `flutter analyze` is clean; the full Flutter suite passes (743 tests, excluding goldens) and both shell goldens pass against the redesigned navigation. Android/Kotlin compilation could not be run because this environment has no Java runtime. Firebase Functions and Hosting verification counts below are from the earlier recorded snapshot; deployment is not evidenced. See [IMPLEMENTATION.md](IMPLEMENTATION.md) for verification limits.
+> **Status (working tree, 2026-11-28).** `flutter analyze` is clean; the full Flutter suite passes (743 tests, excluding goldens) and both shell goldens pass against the redesigned navigation. The Play debug APK built and launched on a connected Android 15 device; release builds and full device journeys remain unverified. Firebase Functions and Hosting verification counts below are from the earlier recorded snapshot; deployment is not evidenced. See [IMPLEMENTATION.md](IMPLEMENTATION.md) for verification limits.
 
 ## Main capabilities
 
