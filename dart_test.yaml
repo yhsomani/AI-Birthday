@@ -4,3 +4,9 @@ tags:
   # CI runs `flutter test --coverage --exclude-tags golden`.
   # Regenerate with `flutter test --update-goldens test/ui/goldens`.
   golden:
+  e2e:
+  tier1:
+  tier2:
+  tier3:
+  tier4:
+  device:

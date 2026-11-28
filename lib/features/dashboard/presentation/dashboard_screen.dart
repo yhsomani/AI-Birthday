@@ -54,10 +54,10 @@ class DashboardScreen extends ConsumerWidget {
           birthdaysAsync.when(
             data: (birthdays) {
               return peopleAsync.when(
-                loading: () => const SliverFillRemaining(
+                loading: () => SliverFillRemaining(
                   child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(40),
+                    child: Semantics(
+                      label: 'Loading birthdays',
                       child: CircularProgressIndicator(),
                     ),
                   ),
@@ -127,135 +127,150 @@ class DashboardScreen extends ConsumerWidget {
                       16,
                       AppSpacing.bottomClearance,
                     ),
-                    sliver: SliverList.list(
-                      children: [
-                        // 1. Above-The-Fold Command Center Summary (What / Why / Next)
-                        _buildCommandHeader(
-                          context,
-                          todayCount: todayBirthdays.length,
-                          actionNeededCount: actionNeededBirthdays.length,
-                          totalTracked: people.length,
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-
-                        // 2. Action Needed Section (High-Intent Next Steps)
-                        if (actionNeededBirthdays.isNotEmpty) ...[
-                          AppSectionHeader(
-                            title: 'Action Needed',
-                            count: actionNeededBirthdays.length,
-                            isAccent: true,
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          ...actionNeededBirthdays.map((b) {
-                            final person = peopleMap[b.personId]!;
-                            return _buildActionCard(context, ref, b, person);
-                          }),
-                          const SizedBox(height: AppSpacing.lg),
-                        ],
-
-                        // 3. Today's Celebrations Section
-                        if (celebrateToday.isNotEmpty) ...[
-                          AppSectionHeader(
-                            title: "Today's Birthdays",
-                            count: celebrateToday.length,
-                            isAccent: true,
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          ...celebrateToday.map((b) {
-                            final person = peopleMap[b.personId]!;
-                            return _buildCelebrationCard(
+                    sliver: SliverToBoxAdapter(
+                      child: AppResponsiveContainer(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // 1. Above-The-Fold Command Center Summary (What / Why / Next)
+                            _buildCommandHeader(
                               context,
-                              ref,
-                              b,
-                              person,
-                              isToday: true,
-                            );
-                          }),
-                          const SizedBox(height: AppSpacing.lg),
-                        ],
+                              todayCount: todayBirthdays.length,
+                              actionNeededCount: actionNeededBirthdays.length,
+                              totalTracked: people.length,
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
 
-                        // 4. Upcoming Timeline Section
-                        AppSectionHeader(
-                          title: 'Upcoming Birthdays',
-                          count: upcomingBirthdays.length,
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        if (upcomingBirthdays.isEmpty)
-                          Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.xl),
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    Icons.event_available_outlined,
-                                    size: 32,
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  Text(
-                                    'No birthdays in the next 30 days',
-                                    style: theme.textTheme.titleMedium,
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  Text(
-                                    'Your full calendar is still available, or review your people if a birthday is missing.',
-                                    style: TextStyle(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: AppSpacing.md),
-                                  OutlinedButton.icon(
-                                    onPressed: () => context.go('/calendar'),
-                                    icon: const Icon(
-                                      Icons.calendar_month_outlined,
-                                    ),
-                                    label: const Text('Open calendar'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () => context.go('/people'),
-                                    child: const Text('Review people'),
-                                  ),
-                                ],
+                            // 2. Action Needed Section (High-Intent Next Steps)
+                            if (actionNeededBirthdays.isNotEmpty) ...[
+                              AppSectionHeader(
+                                title: 'Action Needed',
+                                count: actionNeededBirthdays.length,
+                                isAccent: true,
                               ),
-                            ),
-                          )
-                        else
-                          ...upcomingBirthdays.take(5).map((b) {
-                            final person = peopleMap[b.personId]!;
-                            return _buildCelebrationCard(
-                              context,
-                              ref,
-                              b,
-                              person,
-                              isToday: false,
-                            );
-                          }),
-                        if (upcomingBirthdays.length > 5)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton.icon(
-                              onPressed: () => context.go('/calendar'),
-                              icon: const Icon(Icons.calendar_month_outlined),
-                              label: const Text('See all birthdays'),
-                            ),
-                          ),
-                        const SizedBox(height: AppSpacing.lg),
+                              const SizedBox(height: AppSpacing.xs),
+                              ...actionNeededBirthdays.map((b) {
+                                final person = peopleMap[b.personId]!;
+                                return _buildActionCard(
+                                  context,
+                                  ref,
+                                  b,
+                                  person,
+                                );
+                              }),
+                              const SizedBox(height: AppSpacing.lg),
+                            ],
 
-                        // 5. Quick Actions Bar
-                        _buildQuickActions(context),
-                        const SizedBox(height: AppSpacing.xl),
-                      ],
+                            // 3. Today's Celebrations Section
+                            if (celebrateToday.isNotEmpty) ...[
+                              AppSectionHeader(
+                                title: "Today's Birthdays",
+                                count: celebrateToday.length,
+                                isAccent: true,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              ...celebrateToday.map((b) {
+                                final person = peopleMap[b.personId]!;
+                                return _buildCelebrationCard(
+                                  context,
+                                  ref,
+                                  b,
+                                  person,
+                                  isToday: true,
+                                );
+                              }),
+                              const SizedBox(height: AppSpacing.lg),
+                            ],
+
+                            // 4. Upcoming Timeline Section
+                            AppSectionHeader(
+                              title: 'Upcoming Birthdays',
+                              count: upcomingBirthdays.length,
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            if (upcomingBirthdays.isEmpty)
+                              Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.xl),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.event_available_outlined,
+                                        size: 32,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                      const SizedBox(height: AppSpacing.sm),
+                                      Text(
+                                        'No birthdays in the next 30 days',
+                                        style: theme.textTheme.titleMedium,
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: AppSpacing.xs),
+                                      Text(
+                                        'Your full calendar is still available, or review your people if a birthday is missing.',
+                                        style: TextStyle(
+                                          color: theme
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: AppSpacing.md),
+                                      OutlinedButton.icon(
+                                        onPressed: () =>
+                                            context.go('/calendar'),
+                                        icon: const Icon(
+                                          Icons.calendar_month_outlined,
+                                        ),
+                                        label: const Text('Open calendar'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => context.go('/people'),
+                                        child: const Text('Review people'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            else
+                              ...upcomingBirthdays.take(5).map((b) {
+                                final person = peopleMap[b.personId]!;
+                                return _buildCelebrationCard(
+                                  context,
+                                  ref,
+                                  b,
+                                  person,
+                                  isToday: false,
+                                );
+                              }),
+                            if (upcomingBirthdays.length > 5)
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: () => context.go('/calendar'),
+                                  icon: const Icon(
+                                    Icons.calendar_month_outlined,
+                                  ),
+                                  label: const Text('See all birthdays'),
+                                ),
+                              ),
+                            const SizedBox(height: AppSpacing.lg),
+
+                            // 5. Quick Actions Bar
+                            _buildQuickActions(context),
+                            const SizedBox(height: AppSpacing.xl),
+                          ],
+                        ),
+                      ),
                     ),
                   );
                 },
               );
             },
-            loading: () => const SliverFillRemaining(
+            loading: () => SliverFillRemaining(
               child: Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
+                child: Semantics(
+                  label: 'Loading birthdays',
                   child: CircularProgressIndicator(),
                 ),
               ),
@@ -288,31 +303,20 @@ class DashboardScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final dateFormatted = DateFormat.yMMMMd().format(DateTime.now());
 
-    return Container(
+    return EditorialCard(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
-          width: 1,
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            runSpacing: AppSpacing.xs,
             children: [
-              Flexible(
-                child: Text(
-                  dateFormatted.toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.8,
-                    color: AppColors.primaryTerracotta,
-                  ),
+              Text(
+                dateFormatted.toUpperCase(),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: context.colors.primary,
+                  letterSpacing: 0.8,
                 ),
               ),
               Text(
@@ -401,8 +405,8 @@ class DashboardScreen extends ConsumerWidget {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: AppColors.primaryTerracottaContainer,
-                  foregroundColor: AppColors.primaryTerracotta,
+                  backgroundColor: context.colors.primaryContainer,
+                  foregroundColor: context.colors.onPrimaryContainer,
                   child: Text(
                     person.name.isNotEmpty ? person.name[0].toUpperCase() : '?',
                     style: const TextStyle(fontWeight: FontWeight.bold),
@@ -422,12 +426,12 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                       Text(
                         isToday
-                            ? 'Birthday is today! 🎂'
+                            ? 'Birthday is today.'
                             : 'Birthday in $days ${days == 1 ? 'day' : 'days'} (${DateFormat.MMMd().format(birthday.date)})',
                         style: TextStyle(
                           fontSize: 13,
                           color: isToday
-                              ? AppColors.primaryTerracotta
+                              ? context.colors.primary
                               : context.colors.textSecondary,
                           fontWeight: isToday
                               ? FontWeight.w600

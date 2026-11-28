@@ -1,8 +1,8 @@
 # AI-Birthday
 
-AI-Birthday is a **local-first Android app that helps you remember people's birthdays and send personal wishes**. It keeps your birthday records on the device, reminds you in time, helps you draft a message (manually or with AI you control), and hands the message to WhatsApp, SMS or the share sheet **for you to review and send**. It never claims a message was delivered unless you confirm it.
+AI-Birthday is a **local-first Android app that helps you remember people's birthdays and send personal wishes**. It keeps your birthday records on the device, reminds you in time, helps you draft a message (manually or with AI you control), and hands the message to WhatsApp, Messages/SMS, Instagram, Snapchat, LinkedIn, or the native share sheet **for you to review and send**. WhatsApp and SMS open pre-filled; social apps use their targeted Android text-sharing entry point where supported. It never claims a message was delivered unless you confirm it.
 
-> **Status (snapshot `c4aace16` plus uncommitted fixes, 2026-11-25).** The Flutter app builds and its automated tests pass (`flutter analyze` clean; 653 Flutter tests; 91 backend unit tests; 12 hosting tests). The Firebase backend and the public Hosting site are source-complete but **their deployment is not evidenced** in this repository. No device or emulator end-to-end run, release build or production verification was performed. See [IMPLEMENTATION.md](IMPLEMENTATION.md) for exactly what is verified and what is not.
+> **Status (working tree, 2026-11-28).** `flutter analyze` is clean; the full Flutter suite passes (743 tests, excluding goldens) and both shell goldens pass against the redesigned navigation. Android/Kotlin compilation could not be run because this environment has no Java runtime. Firebase Functions and Hosting verification counts below are from the earlier recorded snapshot; deployment is not evidenced. See [IMPLEMENTATION.md](IMPLEMENTATION.md) for verification limits.
 
 ## Main capabilities
 
@@ -13,7 +13,7 @@ AI-Birthday is a **local-first Android app that helps you remember people's birt
 | Reminders | Local notifications with exact alarms, quiet hours, re-planned at app start and on resume |
 | Message Studio | Autosaved drafts, durable AI jobs, tone and length controls, manual writing always available |
 | AI (entitlement-first) | Bring-your-own Gemini key or on-device Gemini Nano, both only with an active app entitlement; bounded timeouts and typed failures |
-| Delivery | WhatsApp, SMS composer and share/copy hand-offs; an explicit, separate "I sent it" confirmation; Activity history |
+| Delivery | WhatsApp and SMS composer with pre-filled messages; targeted Android text-sharing handoffs for Instagram, Snapchat and LinkedIn; share/copy fallbacks; explicit "I sent it" confirmation; Activity history |
 | Account (optional) | Google sign-in, Play Billing with server-side verification, opt-in cloud backup and restore (owner-scoped Firestore, **not** end-to-end encrypted) |
 | Backend and site (separate) | Firebase Functions (purchase verification, account deletion, a sender-coordination control plane with no mobile caller) and a static Hosting site (privacy, terms, support, account deletion) |
 
@@ -57,12 +57,13 @@ Google sign-in, Firebase and Play Billing require project-specific configuration
 
 | Document | Purpose |
 |---|---|
-| [PRODUCT.md](PRODUCT.md) | Single source of truth for intended behaviour: vision, users, journeys, features, requirements, UX, business rules, decisions and open decisions |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System, data and API architecture, data flows, integrations, ADRs |
-| [SECURITY.md](SECURITY.md) | Trust boundaries, privacy, access control, threat model, security gaps |
-| [IMPLEMENTATION.md](IMPLEMENTATION.md) | Verified implementation status, issue register, tests, technical debt, release readiness |
-| [OPERATIONS.md](OPERATIONS.md) | Setup, build, test, database migrations, CI/CD, deployment, runbooks, documentation maintenance |
-| [PROJECT_MINDMAP.md](PROJECT_MINDMAP.md) | Generated master graph: hierarchy, journeys, navigation, API and module dependencies |
+| [docs/PRODUCT.md](docs/PRODUCT.md) | Single source of truth for intended behaviour: vision, users, journeys, features, requirements, UX, business rules, decisions and open decisions |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System, data and API architecture, data flows, integrations, ADRs |
+| [docs/SECURITY.md](docs/SECURITY.md) | Trust boundaries, privacy, access control, threat model, security gaps |
+| [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Verified implementation status, issue register, tests, technical debt, release readiness |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Setup, build, test, database migrations, CI/CD, deployment, runbooks, documentation maintenance |
+| [docs/PROJECT_MINDMAP.md](docs/PROJECT_MINDMAP.md) | Generated master graph: hierarchy, journeys, navigation, API and module dependencies |
+| [docs/AUDIT_AND_READINESS_REPORT.md](docs/AUDIT_AND_READINESS_REPORT.md) | Phase 1–4 product reassessment, consolidation record, and implementation readiness sign-off |
 | [backend/README.md](backend/README.md), [backend/hosting/README.md](backend/hosting/README.md) | Package-level guides for the Functions and Hosting packages |
 | [docs/graph/](docs/graph/) | Supporting feature registry, project graph data, traceability matrix, documentation migration record |
 

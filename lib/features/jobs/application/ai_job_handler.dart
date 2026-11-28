@@ -129,7 +129,7 @@ class AiGenerationJobHandler implements JobHandler {
   Future<JobOutcome> run(JobRecord job) async {
     final payload = AiJobPayload.fromJson(job.payload);
 
-    final person = await _peopleRepository.getPerson(payload.personId);
+    final person = await _peopleRepository.getPersonById(payload.personId);
     if (person == null) {
       return JobFailed(
         retryable: false,

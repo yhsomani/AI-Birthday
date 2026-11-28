@@ -10,11 +10,10 @@ import 'package:ai_birthday/features/ai/domain/ai_provider.dart';
 /// Concrete on-device AI provider using Gemini Nano / AICore / ML Kit GenAI.
 class GeminiNanoProvider implements AiMessageProvider {
   GeminiNanoProvider({
-    required GeminiNanoPlatform platform,
+    required this._platform,
     AiPromptBuilder? promptBuilder,
     AppLogger? logger,
-  }) : _platform = platform,
-       _promptBuilder = promptBuilder ?? const AiPromptBuilder(),
+  }) : _promptBuilder = promptBuilder ?? const AiPromptBuilder(),
        _logger = logger ?? ConsoleAppLogger();
 
   final GeminiNanoPlatform _platform;

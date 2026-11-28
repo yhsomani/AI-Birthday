@@ -7,18 +7,16 @@ import '../../reminders/application/reminder_settings_controller.dart';
 import '../application/person_service.dart';
 import '../domain/person.dart';
 import '../domain/person_input_validator.dart';
-import 'person_repository.dart';
 import '../../../app/providers.dart'
-    show birthdaysRepositoryProvider, draftsRepositoryProvider;
+    show
+        birthdaysRepositoryProvider,
+        draftsRepositoryProvider,
+        peopleRepositoryProvider;
 import '../../delivery/application/birthday_sms_service.dart';
-
-final peopleStoreProvider = Provider<PeopleStore>(
-  (ref) => DriftPeopleStore(ref.watch(databaseProvider)),
-);
 
 final personServiceProvider = Provider<PersonService>(
   (ref) => PersonService(
-    ref.watch(peopleStoreProvider),
+    ref.watch(peopleRepositoryProvider),
     const PersonInputValidator(),
     ref.watch(loggerProvider),
     onChanged: () async {
@@ -40,7 +38,9 @@ Future<void> resyncReminderSchedule(ProviderContainer container) async {
     await container
         .read(reminderSettingsProvider.notifier)
         .replan(reason: 'people_changed');
-    final people = await container.read(peopleStoreProvider).getAll();
+    final people = await container
+        .read(peopleRepositoryProvider)
+        .listActivePeople();
 
     // Reconcile automated SMS jobs only for a separately approved build.
     if (ProductCapabilities.automaticSms) {

@@ -14,7 +14,7 @@ import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/features/people/application/person_service.dart';
 import 'package:ai_birthday/features/people/data/person_providers.dart'
     show resyncReminderSchedule;
-import 'package:ai_birthday/features/people/data/person_repository.dart';
+import 'package:ai_birthday/features/people/data/drift_people_repository.dart';
 import 'package:ai_birthday/features/people/domain/person_input.dart';
 import 'package:ai_birthday/features/people/domain/person_input_validator.dart';
 import 'package:ai_birthday/features/reminders/application/notification_scheduler_gateway.dart';
@@ -117,7 +117,7 @@ void main() {
 
   Future<void> seedPerson() async {
     final service = PersonService(
-      DriftPeopleStore(database),
+      DriftPeopleRepository(database),
       const PersonInputValidator(),
       const NoopLogger(),
       now: () => day1,
@@ -355,7 +355,7 @@ void main() {
           // same hook directly after the write.
           final created =
               await PersonService(
-                DriftPeopleStore(database),
+                DriftPeopleRepository(database),
                 const PersonInputValidator(),
                 const NoopLogger(),
                 now: () => day1,
@@ -370,7 +370,10 @@ void main() {
           expect(created.id, isNotEmpty);
         });
 
-        expect(await DriftPeopleStore(database).getAll(), hasLength(1));
+        expect(
+          await DriftPeopleRepository(database).listActivePeople(),
+          hasLength(1),
+        );
         expect(c.read(reminderSettingsProvider).syncError, contains('retried'));
         expect(
           logger.records.where((r) => r.category == 'reminders'),

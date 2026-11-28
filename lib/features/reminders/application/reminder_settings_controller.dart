@@ -4,9 +4,9 @@ import 'package:drift/drift.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/providers.dart' show peopleRepositoryProvider;
 import '../../../core/core_providers.dart';
 import '../../../core/database/app_database.dart' as db;
-import '../../people/data/person_providers.dart';
 import '../domain/quiet_hours.dart';
 import '../domain/reminder_kind.dart';
 import 'reminder_plan_stamp.dart';
@@ -272,7 +272,9 @@ class ReminderSettingsController extends Notifier<ReminderSettings> {
     var ok = false;
     var mayHaveAlarms = previous?.enabled ?? false;
     try {
-      final people = await ref.read(peopleStoreProvider).getAll();
+      final people = await ref
+          .read(peopleRepositoryProvider)
+          .listActivePeople();
       final settings = state;
       mayHaveAlarms = mayHaveAlarms || settings.enabled;
       ok = await ref

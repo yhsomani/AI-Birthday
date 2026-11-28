@@ -7,6 +7,7 @@ import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/core/core_providers.dart' hide loggerProvider;
 import 'package:ai_birthday/core/database/app_database.dart';
 import 'package:ai_birthday/core/database/drift_repositories.dart';
+import 'package:ai_birthday/features/people/data/drift_people_repository.dart';
 import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/core/security/credential_storage.dart';
 import 'package:ai_birthday/features/subscription/application/subscription_service.dart';

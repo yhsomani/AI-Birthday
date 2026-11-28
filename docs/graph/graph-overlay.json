@@ -1019,6 +1019,19 @@
    ]
   },
   {
+   "id": "EXT-014",
+   "kind": "integration",
+   "label": "Targeted Android text-share handoff to selected social app",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/delivery/data/platform_handoff_builder.dart",
+    "lib/features/delivery/data/native_share_service.dart",
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt",
+    "android/app/src/main/AndroidManifest.xml"
+   ]
+  },
+  {
    "id": "FLOW-001",
    "kind": "data-flow",
    "label": "Launch -> database preflight -> onboarding guard -> shell",
@@ -1039,7 +1052,7 @@
    "evidence": [
     "lib/core/database/drift_repositories.dart",
     "lib/features/people/application/person_service.dart",
-    "lib/features/people/data/person_repository.dart"
+    "lib/features/people/data/drift_people_repository.dart"
    ]
   },
   {
@@ -1354,7 +1367,7 @@
    "evidence": [
     "lib/features/people/domain/person.dart",
     "lib/core/database/drift_repositories.dart",
-    "lib/features/people/data/person_repository.dart"
+    "lib/features/people/data/drift_people_repository.dart"
    ]
   },
   {
@@ -1422,7 +1435,7 @@
    "confidence": "HIGH",
    "evidence": [
     "lib/app/router.dart",
-    "lib/shared/design_system/settings_action_button.dart"
+    "lib/shared/design_system/widgets/settings_action_button.dart"
    ]
   },
   {
@@ -2507,7 +2520,7 @@
    "to": "DB-001",
    "type": "WRITES",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ]
   },
   {
@@ -2651,7 +2664,7 @@
    "to": "SCR-008",
    "type": "NAVIGATES_TO",
    "evidence": [
-    "lib/shared/design_system/settings_action_button.dart"
+    "lib/shared/design_system/widgets/settings_action_button.dart"
    ]
   },
   {
@@ -2747,7 +2760,7 @@
    "to": "DB-001",
    "type": "WRITES",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ]
   },
   {
@@ -2895,6 +2908,15 @@
    ]
   },
   {
+   "from": "SEND-SHARE",
+   "to": "EXT-014",
+   "type": "CALLS",
+   "evidence": [
+    "lib/features/delivery/data/native_share_service.dart",
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt"
+   ]
+  },
+  {
    "from": "FLOW-001",
    "to": "SVC-001",
    "type": "DEPENDS_ON",
@@ -2915,7 +2937,7 @@
    "to": "DB-001",
    "type": "WRITES",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ]
   },
   {

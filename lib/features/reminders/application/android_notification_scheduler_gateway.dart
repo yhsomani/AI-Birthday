@@ -12,7 +12,9 @@ import 'notification_scheduler_gateway.dart';
 /// NotificationManager. Gracefully handles host platforms (tests, desktop)
 /// without error.
 class AndroidNotificationSchedulerGateway
-    implements NotificationSchedulerGateway {
+    implements
+        NotificationSchedulerGateway,
+        ClearableNotificationSchedulerGateway {
   const AndroidNotificationSchedulerGateway({
     this._channel = const MethodChannel(
       'com.yashsomani.ai_birthday/notifications',
@@ -163,6 +165,12 @@ class AndroidNotificationSchedulerGateway
         }
       }
     });
+  }
+
+  @override
+  void clearNotificationOpenedHandler() {
+    if (!_isLiveAndroid) return;
+    _channel.setMethodCallHandler(null);
   }
 }
 

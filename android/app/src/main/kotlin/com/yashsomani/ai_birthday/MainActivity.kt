@@ -7,6 +7,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.BroadcastReceiver
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
@@ -279,19 +280,57 @@ class MainActivity : FlutterActivity() {
         // Setup Share MethodChannel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SHARE_CHANNEL)
             .setMethodCallHandler { call, result ->
-                if (call.method == "shareText") {
-                    val text = call.argument<String>("text") ?: ""
-                    val title = call.argument<String>("title") ?: "Share Birthday Message"
-                    val sendIntent = Intent().apply {
-                        action = Intent.ACTION_SEND
-                        putExtra(Intent.EXTRA_TEXT, text)
-                        type = "text/plain"
+                when (call.method) {
+                    "shareText" -> {
+                        val text = call.argument<String>("text") ?: ""
+                        val title = call.argument<String>("title") ?: "Share Birthday Message"
+                        val sendIntent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TEXT, text)
+                            type = "text/plain"
+                        }
+                        val shareIntent = Intent.createChooser(sendIntent, title)
+                        startActivity(shareIntent)
+                        result.success(true)
                     }
-                    val shareIntent = Intent.createChooser(sendIntent, title)
-                    startActivity(shareIntent)
-                    result.success(true)
-                } else {
-                    result.notImplemented()
+                    "shareToPlatform" -> {
+                        val platform = call.argument<String>("platform")
+                        val text = call.argument<String>("text")
+                        val targetPackage = when (platform) {
+                            "instagram" -> "com.instagram.android"
+                            "snapchat" -> "com.snapchat.android"
+                            "linkedin" -> "com.linkedin.android"
+                            else -> null
+                        }
+                        if (targetPackage == null || text.isNullOrBlank()) {
+                            result.error(
+                                "INVALID_SHARE_REQUEST",
+                                "A supported platform and non-empty message are required.",
+                                null
+                            )
+                            return@setMethodCallHandler
+                        }
+                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, text)
+                            setPackage(targetPackage)
+                        }
+                        if (packageManager.resolveActivity(
+                                sendIntent,
+                                PackageManager.MATCH_DEFAULT_ONLY
+                            ) == null
+                        ) {
+                            result.success(false)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            startActivity(sendIntent)
+                            result.success(true)
+                        } catch (_: ActivityNotFoundException) {
+                            result.success(false)
+                        }
+                    }
+                    else -> result.notImplemented()
                 }
             }
 

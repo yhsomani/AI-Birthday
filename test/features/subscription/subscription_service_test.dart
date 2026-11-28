@@ -145,7 +145,7 @@ void main() {
 
         expect(result, isFalse);
         expect(notifier.state, UserEntitlement.free);
-        expect(notifier.purchaseStatus, PurchaseStatus.idle);
+        expect(notifier.purchaseStatus, PurchaseStatus.error);
         notifier.dispose();
       },
     );
@@ -163,7 +163,7 @@ void main() {
 
         expect(result, isFalse);
         expect(notifier.state, UserEntitlement.free);
-        expect(notifier.purchaseStatus, PurchaseStatus.idle);
+        expect(notifier.purchaseStatus, PurchaseStatus.error);
         notifier.dispose();
       },
     );

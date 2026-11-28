@@ -8,7 +8,6 @@ import 'package:crypto/crypto.dart';
 
 import 'package:ai_birthday/core/database/app_database.dart' as db;
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
-import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_repository.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dart';
@@ -16,187 +15,7 @@ import 'package:ai_birthday/features/delivery/domain/repositories/delivery_event
 import 'package:ai_birthday/features/jobs/domain/job.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_repository.dart';
-import 'package:ai_birthday/features/people/domain/models/person.dart';
-import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
-import 'package:ai_birthday/features/people/domain/person_enums.dart'
-    show AutoSendPolicy;
-import 'package:ai_birthday/features/people/domain/repositories/people_repository.dart';
-
-/// Drift/SQLite-backed implementation of [PeopleRepository].
-class DriftPeopleRepository implements PeopleRepository {
-  DriftPeopleRepository(this._database);
-
-  final db.AppDatabase _database;
-
-  @override
-  Stream<List<Person>> watchPeople() {
-    final query = _database.select(_database.persons)
-      ..where((r) => r.deletedAt.isNull())
-      ..orderBy([
-        (t) => OrderingTerm(expression: t.name.lower()),
-        (t) => OrderingTerm(expression: t.id),
-      ]);
-    return query.watch().map((rows) => rows.map(_personFromRow).toList());
-  }
-
-  @override
-  Future<List<Person>> getPeople() async {
-    final query = _database.select(_database.persons)
-      ..where((r) => r.deletedAt.isNull())
-      ..orderBy([
-        (t) => OrderingTerm(expression: t.name.lower()),
-        (t) => OrderingTerm(expression: t.id),
-      ]);
-    final rows = await query.get();
-    return rows.map(_personFromRow).toList();
-  }
-
-  @override
-  Future<Person?> getPerson(String id) async {
-    final row = await (_database.select(
-      _database.persons,
-    )..where((r) => r.id.equals(id) & r.deletedAt.isNull())).getSingleOrNull();
-    return row == null ? null : _personFromRow(row);
-  }
-
-  @override
-  Future<void> savePerson(Person person) async {
-    // Never resurrect a tombstoned row: save preserves an existing
-    // `deletedAt` instead of forcing it null (audit F-1).
-    final existing = await _selectPersonRow(person.id);
-    await _database
-        .into(_database.persons)
-        .insertOnConflictUpdate(
-          db.PersonsCompanion(
-            id: Value(person.id),
-            name: Value(person.name),
-            birthdayMonth: Value(person.birthdayMonth),
-            birthdayDay: Value(person.birthdayDay),
-            birthYear: Value(person.birthYear),
-            leapDayResolution: Value(person.leapDayResolution?.name),
-            phoneNumber: Value(person.phoneNumber),
-            email: Value(person.email),
-            relationship: Value(person.relationship.name),
-            relationshipCloseness: Value(person.relationshipCloseness.name),
-            preferredLanguage: Value(person.preferredLanguage),
-            preferredTone: Value(person.preferredTone.name),
-            importantFacts: Value(person.importantFacts.join('\n')),
-            notes: Value(person.notes),
-            preferredDeliveryChannel: Value(
-              person.preferredDeliveryChannel.name,
-            ),
-            timezone: Value(person.timezone),
-            autoPrepare: Value(person.autoPrepare),
-            autoSendPolicy: Value(person.autoSendPolicy.name),
-            createdAt: Value(person.createdAt),
-            updatedAt: Value(person.updatedAt),
-            version: Value(person.version),
-            deletedAt: person.deletedAt != null
-                ? Value(person.deletedAt)
-                : (existing?.deletedAt == null
-                      ? const Value(null)
-                      : Value(existing!.deletedAt)),
-          ),
-        );
-  }
-
-  @override
-  Future<void> saveImportBatch({
-    required List<Person> people,
-    required List<Birthday> birthdays,
-  }) async {
-    if (people.length != birthdays.length) {
-      throw ArgumentError('Every imported person must have one birthday.');
-    }
-    final birthdayByPerson = {for (final b in birthdays) b.personId: b};
-    await _database.transaction(() async {
-      for (final person in people) {
-        await savePerson(person);
-        final birthday = birthdayByPerson[person.id];
-        if (birthday == null) {
-          throw StateError(
-            'Missing birthday for imported person ${person.id}.',
-          );
-        }
-        await _database
-            .into(_database.birthdays)
-            .insertOnConflictUpdate(
-              db.BirthdaysCompanion(
-                id: Value(birthday.id),
-                personId: Value(birthday.personId),
-                cycleYear: Value(birthday.cycleYear),
-                date: Value(birthday.date),
-                status: Value(birthday.status.name),
-                draftId: Value(birthday.draftId),
-                createdAt: Value(birthday.createdAt),
-                updatedAt: Value(birthday.updatedAt),
-              ),
-            );
-      }
-    });
-  }
-
-  @override
-  Future<void> deletePerson(String id) async {
-    // Tombstone with a version bump, matching the legacy store so the sync
-    // envelope stays consistent regardless of which writer deletes (audit F-4).
-    final existing = await _selectPersonRow(id);
-    final now = DateTime.now().toUtc();
-    await (_database.update(
-      _database.persons,
-    )..where((r) => r.id.equals(id))).write(
-      db.PersonsCompanion(
-        deletedAt: Value(now),
-        updatedAt: Value(now),
-        version: Value((existing?.version ?? 0) + 1),
-      ),
-    );
-  }
-
-  Future<db.Person?> _selectPersonRow(String id) async {
-    return (_database.select(
-      _database.persons,
-    )..where((r) => r.id.equals(id))).getSingleOrNull();
-  }
-
-  static Person _personFromRow(db.Person row) {
-    return Person(
-      id: row.id,
-      name: row.name,
-      birthdayMonth: row.birthdayMonth,
-      birthdayDay: row.birthdayDay,
-      birthYear: row.birthYear,
-      leapDayResolution: LeapDayResolution.fromString(row.leapDayResolution),
-      phoneNumber: row.phoneNumber,
-      email: row.email,
-      relationship: RelationshipCategory.fromString(row.relationship),
-      relationshipCloseness: RelationshipCloseness.fromString(
-        row.relationshipCloseness,
-      ),
-      preferredLanguage: row.preferredLanguage.isEmpty
-          ? 'en'
-          : row.preferredLanguage,
-      preferredTone: MessageTone.fromString(row.preferredTone),
-      importantFacts: row.importantFacts
-          .split('\n')
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList(),
-      notes: row.notes,
-      preferredDeliveryChannel: DeliveryChannel.fromString(
-        row.preferredDeliveryChannel,
-      ),
-      timezone: row.timezone,
-      autoPrepare: row.autoPrepare,
-      autoSendPolicy: AutoSendPolicy.parse(row.autoSendPolicy),
-      createdAt: row.createdAt.toUtc(),
-      updatedAt: row.updatedAt.toUtc(),
-      version: row.version,
-      deletedAt: row.deletedAt?.toUtc(),
-    );
-  }
-}
 
 /// Drift/SQLite-backed implementation of [BirthdaysRepository].
 class DriftBirthdaysRepository implements BirthdaysRepository {
@@ -206,7 +25,9 @@ class DriftBirthdaysRepository implements BirthdaysRepository {
 
   @override
   Stream<List<Birthday>> watchBirthdays() {
-    return _database.select(_database.birthdays).watch().map((rows) {
+    return (_database.select(
+      _database.birthdays,
+    )..where((r) => r.deletedAt.isNull())).watch().map((rows) {
       final list = rows.map(_birthdayFromRow).toList();
       list.sort(_byDateThenId);
       return list;
@@ -215,7 +36,9 @@ class DriftBirthdaysRepository implements BirthdaysRepository {
 
   @override
   Future<List<Birthday>> getBirthdays() async {
-    final rows = await _database.select(_database.birthdays).get();
+    final rows = await (_database.select(
+      _database.birthdays,
+    )..where((r) => r.deletedAt.isNull())).get();
     final list = rows.map(_birthdayFromRow).toList();
     list.sort(_byDateThenId);
     return list;
@@ -225,22 +48,22 @@ class DriftBirthdaysRepository implements BirthdaysRepository {
   Future<Birthday?> getBirthday(String id) async {
     final row = await (_database.select(
       _database.birthdays,
-    )..where((r) => r.id.equals(id))).getSingleOrNull();
+    )..where((r) => r.id.equals(id) & r.deletedAt.isNull())).getSingleOrNull();
     return row == null ? null : _birthdayFromRow(row);
   }
 
   @override
   Future<Birthday?> getBirthdayForPerson(String personId) async {
-    final row = await (_database.select(
-      _database.birthdays,
-    )
-      ..where((r) => r.personId.equals(personId))
-      ..orderBy([
-        (r) => OrderingTerm.desc(r.cycleYear),
-        (r) => OrderingTerm.desc(r.updatedAt),
-        (r) => OrderingTerm.desc(r.id),
-      ])
-      ..limit(1)).getSingleOrNull();
+    final row =
+        await (_database.select(_database.birthdays)
+              ..where((r) => r.personId.equals(personId) & r.deletedAt.isNull())
+              ..orderBy([
+                (r) => OrderingTerm.desc(r.cycleYear),
+                (r) => OrderingTerm.desc(r.updatedAt),
+                (r) => OrderingTerm.desc(r.id),
+              ])
+              ..limit(1))
+            .getSingleOrNull();
     return row == null ? null : _birthdayFromRow(row);
   }
 
@@ -360,9 +183,11 @@ class DriftBirthdaysRepository implements BirthdaysRepository {
   @override
   Future<void> disableBirthdayForPerson(String personId) async {
     await _database.transaction(() async {
-      final rows = await (_database.select(
-        _database.birthdays,
-      )..where((row) => row.personId.equals(personId))).get();
+      final rows =
+          await (_database.select(_database.birthdays)..where(
+                (row) => row.personId.equals(personId) & row.deletedAt.isNull(),
+              ))
+              .get();
       if (rows.isEmpty) return;
       final ids = rows.map((row) => row.id).toList();
       await (_database.delete(
@@ -409,7 +234,9 @@ class DriftDraftsRepository implements DraftsRepository {
 
   @override
   Stream<List<MessageDraft>> watchDrafts() {
-    return _database.select(_database.messageDrafts).watch().map((rows) {
+    return (_database.select(
+      _database.messageDrafts,
+    )..where((r) => r.deletedAt.isNull())).watch().map((rows) {
       final list = rows.map(_draftFromRow).toList();
       list.sort(_byUpdatedAtDescThenIdDesc);
       return list;
@@ -418,7 +245,9 @@ class DriftDraftsRepository implements DraftsRepository {
 
   @override
   Future<List<MessageDraft>> getAllDrafts() async {
-    final rows = await _database.select(_database.messageDrafts).get();
+    final rows = await (_database.select(
+      _database.messageDrafts,
+    )..where((r) => r.deletedAt.isNull())).get();
     final list = rows.map(_draftFromRow).toList();
     list.sort(_byUpdatedAtDescThenIdDesc);
     return list;
@@ -428,19 +257,24 @@ class DriftDraftsRepository implements DraftsRepository {
   Future<MessageDraft?> getDraft(String id) async {
     final row = await (_database.select(
       _database.messageDrafts,
-    )..where((r) => r.id.equals(id))).getSingleOrNull();
+    )..where((r) => r.id.equals(id) & r.deletedAt.isNull())).getSingleOrNull();
     return row == null ? null : _draftFromRow(row);
   }
 
   @override
   Future<MessageDraft?> getDraftForBirthday(String birthdayId) async {
-    final birthday = await (_database.select(
-      _database.birthdays,
-    )..where((row) => row.id.equals(birthdayId))).getSingleOrNull();
+    final birthday =
+        await (_database.select(_database.birthdays)..where(
+              (row) => row.id.equals(birthdayId) & row.deletedAt.isNull(),
+            ))
+            .getSingleOrNull();
     if (birthday?.draftId != null) {
-      final linked = await (_database.select(
-        _database.messageDrafts,
-      )..where((row) => row.id.equals(birthday!.draftId!))).getSingleOrNull();
+      final linked =
+          await (_database.select(_database.messageDrafts)..where(
+                (row) =>
+                    row.id.equals(birthday!.draftId!) & row.deletedAt.isNull(),
+              ))
+              .getSingleOrNull();
       return linked == null ? null : _draftFromRow(linked);
     }
 
@@ -451,6 +285,7 @@ class DriftDraftsRepository implements DraftsRepository {
               ..where(
                 (r) =>
                     r.birthdayId.equals(birthdayId) &
+                    r.deletedAt.isNull() &
                     r.status.equals(DraftStatus.confirmedSent.name).not(),
               )
               ..orderBy([
@@ -486,15 +321,21 @@ class DriftDraftsRepository implements DraftsRepository {
       }
 
       if (requireUnchanged) {
-        final birthday = await (_database.select(
-          _database.birthdays,
-        )..where((row) => row.id.equals(draft.birthdayId))).getSingleOrNull();
+        final birthday =
+            await (_database.select(_database.birthdays)..where(
+                  (row) =>
+                      row.id.equals(draft.birthdayId) & row.deletedAt.isNull(),
+                ))
+                .getSingleOrNull();
 
         db.MessageDraft? active;
         if (birthday?.draftId != null) {
           active =
-              await (_database.select(_database.messageDrafts)
-                    ..where((row) => row.id.equals(birthday!.draftId!)))
+              await (_database.select(_database.messageDrafts)..where(
+                    (row) =>
+                        row.id.equals(birthday!.draftId!) &
+                        row.deletedAt.isNull(),
+                  ))
                   .getSingleOrNull();
         } else {
           active =
@@ -502,6 +343,7 @@ class DriftDraftsRepository implements DraftsRepository {
                     ..where(
                       (row) =>
                           row.birthdayId.equals(draft.birthdayId) &
+                          row.deletedAt.isNull() &
                           row.status
                               .equals(DraftStatus.confirmedSent.name)
                               .not(),
@@ -582,16 +424,19 @@ class DriftDraftsRepository implements DraftsRepository {
 
   @override
   Future<int> pruneOrphanedDrafts() async {
-    final before =
-        (await _database.select(_database.messageDrafts).get()).length;
+    final before = (await (_database.select(
+      _database.messageDrafts,
+    )..where((r) => r.deletedAt.isNull())).get()).length;
 
-    final liveBirthdayIds = (await _database.select(_database.birthdays).get())
-        .map((r) => r.id)
-        .toList();
+    final liveBirthdayIds = (await (_database.select(
+      _database.birthdays,
+    )..where((r) => r.deletedAt.isNull())).get()).map((r) => r.id).toList();
 
     if (liveBirthdayIds.isEmpty) {
       await (_database.delete(_database.messageDrafts)..where(
-            (row) => row.status.equals(DraftStatus.confirmedSent.name).not(),
+            (row) =>
+                row.deletedAt.isNull() &
+                row.status.equals(DraftStatus.confirmedSent.name).not(),
           ))
           .go();
     } else {
@@ -599,6 +444,7 @@ class DriftDraftsRepository implements DraftsRepository {
       // confirmed-sent history remains immutable and visible in History.
       await (_database.delete(_database.messageDrafts)..where(
             (row) =>
+                row.deletedAt.isNull() &
                 row.birthdayId.isNotIn(liveBirthdayIds) &
                 row.status.equals(DraftStatus.confirmedSent.name).not(),
           ))
@@ -607,7 +453,9 @@ class DriftDraftsRepository implements DraftsRepository {
 
     // Legacy non-terminal duplicates can be removed, but confirmed history
     // and later editable revisions are intentionally append-only.
-    final remaining = await _database.select(_database.messageDrafts).get();
+    final remaining = await (_database.select(
+      _database.messageDrafts,
+    )..where((r) => r.deletedAt.isNull())).get();
     final canonicalRows = {
       for (final row in remaining.where((r) => r.id == r.birthdayId))
         row.birthdayId: row,
@@ -633,8 +481,9 @@ class DriftDraftsRepository implements DraftsRepository {
       )..where((r) => r.id.isIn(shadowedLegacyIds))).go();
     }
 
-    final after =
-        (await _database.select(_database.messageDrafts).get()).length;
+    final after = (await (_database.select(
+      _database.messageDrafts,
+    )..where((r) => r.deletedAt.isNull())).get()).length;
     return before - after;
   }
 
@@ -785,33 +634,33 @@ class DriftDeliveryEventsRepository implements DeliveryEventsRepository {
       if (DraftStatus.fromString(draft.status) == DraftStatus.confirmedSent) {
         return;
       }
-      final birthdayUpdated = await (_database.update(_database.birthdays)
-            ..where(
-              (row) =>
-                  row.id.equals(birthdayId) &
-                  row.status.equals(BirthdayStatus.handedOff.name) &
-                  row.draftId.equals(draftId),
-            ))
-          .write(
-        db.BirthdaysCompanion(
-          status: Value(BirthdayStatus.completed.name),
-          draftId: Value(draftId),
-          updatedAt: Value(at.toUtc()),
-        ),
-      );
-      final draftUpdated = await (_database.update(_database.messageDrafts)
-            ..where(
-              (row) =>
-                  row.id.equals(draftId) &
-                  row.birthdayId.equals(birthdayId) &
-                  row.revision.equals(expectedDraftRevision),
-            ))
-          .write(
-        db.MessageDraftsCompanion(
-          status: Value(DraftStatus.confirmedSent.name),
-          updatedAt: Value(at.toUtc()),
-        ),
-      );
+      final birthdayUpdated =
+          await (_database.update(_database.birthdays)..where(
+                (row) =>
+                    row.id.equals(birthdayId) &
+                    row.status.equals(BirthdayStatus.handedOff.name) &
+                    row.draftId.equals(draftId),
+              ))
+              .write(
+                db.BirthdaysCompanion(
+                  status: Value(BirthdayStatus.completed.name),
+                  draftId: Value(draftId),
+                  updatedAt: Value(at.toUtc()),
+                ),
+              );
+      final draftUpdated =
+          await (_database.update(_database.messageDrafts)..where(
+                (row) =>
+                    row.id.equals(draftId) &
+                    row.birthdayId.equals(birthdayId) &
+                    row.revision.equals(expectedDraftRevision),
+              ))
+              .write(
+                db.MessageDraftsCompanion(
+                  status: Value(DraftStatus.confirmedSent.name),
+                  updatedAt: Value(at.toUtc()),
+                ),
+              );
       if (birthdayUpdated != 1 || draftUpdated != 1) {
         throw StateError('The handoff changed during confirmation.');
       }

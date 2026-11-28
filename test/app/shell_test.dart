@@ -182,4 +182,77 @@ void main() {
 
     await drainApp(tester);
   });
+
+  testWidgets('840dp viewport switches to compact NavigationRail with labels', (
+    tester,
+  ) async {
+    await pumpCompletedApp(tester, size: const Size(840, 900));
+
+    expect(find.byType(NavigationBar), findsNothing);
+    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+    expect(rail.extended, isFalse);
+    expect(rail.labelType, NavigationRailLabelType.all);
+    expect(rail.selectedIndex, 0);
+    expect(tester.takeException(), isNull);
+
+    await drainApp(tester);
+  });
+
+  testWidgets(
+    '1024dp and 1280dp viewports use extended NavigationRail and switch tabs',
+    (tester) async {
+      for (final size in const [Size(1024, 768), Size(1280, 800)]) {
+        await pumpCompletedApp(tester, size: size);
+
+        expect(find.byType(NavigationBar), findsNothing);
+        final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+        expect(rail.extended, isTrue);
+        expect(rail.labelType, NavigationRailLabelType.none);
+
+        await tester.tap(
+          find.descendant(
+            of: find.byType(NavigationRail),
+            matching: find.text('People'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(PeopleScreen), findsOneWidget);
+        expect(
+          tester
+              .widget<NavigationRail>(find.byType(NavigationRail))
+              .selectedIndex,
+          1,
+        );
+        expect(tester.takeException(), isNull);
+
+        await drainApp(tester);
+      }
+    },
+  );
+
+  testWidgets(
+    'NavigationBar height clamps at extreme text scales (0.85x and 3.0x)',
+    (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 3.0;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await pumpCompletedApp(tester, size: const Size(400, 900));
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).height,
+        160.0,
+      );
+      expect(tester.takeException(), isNull);
+      await drainApp(tester);
+
+      tester.platformDispatcher.textScaleFactorTestValue = 0.85;
+      await pumpCompletedApp(tester, size: const Size(400, 900));
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).height,
+        80.0,
+      );
+      expect(tester.takeException(), isNull);
+      await drainApp(tester);
+    },
+  );
 }

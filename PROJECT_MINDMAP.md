@@ -2,7 +2,7 @@
 
 > **Generated document.** Do not edit by hand. Edit `docs/graph/feature-registry.json`, `docs/graph/graph-overlay.json` or `docs/graph/issue-register.json`, then run `python3 docs/graph/tools/build_graph.py && python3 docs/graph/tools/build_mindmap.py`. Validate with `python3 docs/graph/tools/validate_docs.py`.
 
-**Snapshot:** `c4aace16` plus uncommitted fixes (2026-11-25). **Graph size:** 639 nodes, 1436 typed edges, 25 branches. Status values describe repository source, not deployment or runtime proof (see [IMPLEMENTATION.md](IMPLEMENTATION.md) for verification evidence).
+**Snapshot:** `c4aace16` plus uncommitted fixes (2026-11-25). **Graph size:** 640 nodes, 1440 typed edges, 25 branches. Status values describe repository source, not deployment or runtime proof (see [IMPLEMENTATION.md](IMPLEMENTATION.md) for verification evidence).
 
 ## Contents
 
@@ -60,7 +60,7 @@ flowchart LR
   ROOT --> n_BRANCH_16["16 Database architecture<br/>6 nodes"]
   ROOT --> n_BRANCH_17["17 Data flows<br/>8 nodes"]
   ROOT --> n_BRANCH_18["18 State management<br/>7 nodes"]
-  ROOT --> n_BRANCH_19["19 External integrations<br/>13 nodes"]
+  ROOT --> n_BRANCH_19["19 External integrations<br/>14 nodes"]
   ROOT --> n_BRANCH_20["20 Security and permissions<br/>12 nodes"]
   ROOT --> n_BRANCH_21["21 Error handling<br/>8 nodes"]
   ROOT --> n_BRANCH_22["22 Testing<br/>5 nodes"]
@@ -93,7 +93,7 @@ flowchart LR
 | BRANCH-16 Database architecture | 6 | 6 | 0 | 0 | [ARCHITECTURE.md §7](ARCHITECTURE.md) |
 | BRANCH-17 Data flows | 8 | 7 | 1 | 0 | [ARCHITECTURE.md §9](ARCHITECTURE.md) |
 | BRANCH-18 State management | 7 | 7 | 0 | 0 | [ARCHITECTURE.md §9](ARCHITECTURE.md) |
-| BRANCH-19 External integrations | 13 | 11 | 2 | 0 | [ARCHITECTURE.md §10](ARCHITECTURE.md) |
+| BRANCH-19 External integrations | 14 | 12 | 2 | 0 | [ARCHITECTURE.md §10](ARCHITECTURE.md) |
 | BRANCH-20 Security and permissions | 12 | 10 | 1 | 1 | [SECURITY.md](SECURITY.md) |
 | BRANCH-21 Error handling | 8 | 8 | 0 | 0 | [IMPLEMENTATION.md](IMPLEMENTATION.md) |
 | BRANCH-22 Testing | 5 | 5 | 0 | 0 | [IMPLEMENTATION.md §6](IMPLEMENTATION.md) |
@@ -925,7 +925,7 @@ Status **IMPLEMENTED** (MEDIUM); 20 descendant nodes.
 flowchart LR
   n_SEND["SEND<br/>User-controlled delivery handoffs"]
   class n_SEND impl;
-  n_SEND_SHARE["SEND-SHARE<br/>System share and copy"]
+  n_SEND_SHARE["SEND-SHARE<br/>System share, copy and targeted platfor…"]
   n_SEND --> n_SEND_SHARE
   class n_SEND_SHARE impl;
   n_SEND_SMS["SEND-SMS<br/>SMS delivery handoff"]
@@ -979,7 +979,7 @@ flowchart LR
   n_STUDIO_AUTO_SMS_APPROVAL["STUDIO-AUTO-SMS-APPROVAL<br/>Approve/revoke a draft for automatic SM…"]
   n_SEND_SMS_AUTOMATION --> n_STUDIO_AUTO_SMS_APPROVAL
   class n_STUDIO_AUTO_SMS_APPROVAL part;
-  n_NATIVE_SHARE["NATIVE-SHARE<br/>ACTION_SEND chooser via MethodChannel"]
+  n_NATIVE_SHARE["NATIVE-SHARE<br/>Share chooser and package-targeted soci…"]
   n_SEND_SHARE --> n_NATIVE_SHARE
   class n_NATIVE_SHARE impl;
   n_STUDIO_COPY_EVENT["STUDIO-COPY-EVENT<br/>Clipboard copy recorded as copied outco…"]
@@ -1400,9 +1400,9 @@ flowchart LR
 | DEP-018 | PEOPLE depends on BIRTH | 12 | `lib/features/people/application/person_service.dart` |
 | DEP-019 | PEOPLE depends on REM | 1 | `lib/features/people/data/person_providers.dart` |
 | DEP-020 | PEOPLE depends on SEND | 8 | `lib/features/people/data/contact_csv_service.dart` |
-| DEP-021 | PEOPLE depends on STUDIO | 1 | `lib/features/people/data/person_repository.dart` |
+| DEP-021 | PEOPLE depends on STUDIO | 1 | `lib/features/people/data/drift_people_repository.dart` |
 | DEP-022 | REM depends on BIRTH | 1 | `lib/features/reminders/domain/reminder_schedule.dart` |
-| DEP-023 | REM depends on PEOPLE | 3 | `lib/features/reminders/application/reminder_service.dart` |
+| DEP-023 | REM depends on PEOPLE | 2 | `lib/features/reminders/application/reminder_service.dart` |
 | DEP-024 | SEND depends on BIRTH | 2 | `lib/features/delivery/application/birthday_sms_service.dart` |
 | DEP-025 | SEND depends on PEOPLE | 2 | `lib/features/delivery/application/birthday_sms_service.dart` |
 | DEP-026 | SEND depends on STUDIO | 1 | `lib/features/delivery/application/birthday_sms_service.dart` |

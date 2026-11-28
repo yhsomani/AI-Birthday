@@ -19,9 +19,13 @@ class _AutomaticSmsCardState extends ConsumerState<AutomaticSmsCard> {
   bool _isReconciling = false;
   List<Map<String, dynamic>>? _logs;
   bool _isLoadingLogs = false;
+  bool _logsFailed = false;
 
   Future<void> _loadLogs() async {
-    setState(() => _isLoadingLogs = true);
+    setState(() {
+      _isLoadingLogs = true;
+      _logsFailed = false;
+    });
     try {
       final gateway = ref.read(nativeSmsGatewayProvider);
       final raw = await gateway.getSmsAttemptsLog();
@@ -34,6 +38,7 @@ class _AutomaticSmsCardState extends ConsumerState<AutomaticSmsCard> {
         setState(() {
           _logs = list.reversed.toList();
           _isLoadingLogs = false;
+          _logsFailed = false;
         });
       }
     } catch (_) {
@@ -41,6 +46,7 @@ class _AutomaticSmsCardState extends ConsumerState<AutomaticSmsCard> {
         setState(() {
           _logs = [];
           _isLoadingLogs = false;
+          _logsFailed = true;
         });
       }
     }
@@ -51,7 +57,9 @@ class _AutomaticSmsCardState extends ConsumerState<AutomaticSmsCard> {
     HapticFeedback.lightImpact();
     try {
       final smsService = ref.read(birthdaySmsServiceProvider);
-      final people = await ref.read(peopleRepositoryProvider).getPeople();
+      final people = await ref
+          .read(peopleRepositoryProvider)
+          .listActivePeople();
       final birthdaysRepo = ref.read(birthdaysRepositoryProvider);
       final draftsRepo = ref.read(draftsRepositoryProvider);
 
@@ -214,21 +222,48 @@ class _AutomaticSmsCardState extends ConsumerState<AutomaticSmsCard> {
                     ),
                     TextButton.icon(
                       onPressed: _isLoadingLogs ? null : _loadLogs,
-                      icon: const Icon(Icons.receipt_long, size: 18),
+                      icon: _isLoadingLogs
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.receipt_long, size: 18),
                       label: const Text('Delivery Logs'),
                     ),
                   ],
                 ),
                 if (_logs != null) ...[
                   const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Recent Delivery Attempts (${_logs!.length})',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  Semantics(
+                    liveRegion: _isLoadingLogs || _logsFailed,
+                    child: Text(
+                      _isLoadingLogs
+                          ? 'Loading delivery logs…'
+                          : _logsFailed
+                          ? 'Could not load delivery logs. Try again.'
+                          : 'Recent Delivery Attempts (${_logs!.length})',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: _logsFailed && !_isLoadingLogs
+                            ? context.colors.danger
+                            : null,
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xs),
-                  if (_logs!.isEmpty)
+                  if (_isLoadingLogs)
+                    const LinearProgressIndicator()
+                  else if (_logsFailed)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: _isLoadingLogs ? null : _loadLogs,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Retry'),
+                      ),
+                    )
+                  else if (_logs!.isEmpty)
                     Text(
                       'No SMS execution attempts recorded yet.',
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -262,14 +297,18 @@ class _AutomaticSmsCardState extends ConsumerState<AutomaticSmsCard> {
                                   ? Icons.check
                                   : Icons.error_outline,
                               color: status == 'delivered'
-                                  ? Colors.green
+                                  ? context.colors.success
                                   : (status == 'submitted' ||
                                         status == 'acceptedByCarrier')
-                                  ? Colors.blue
-                                  : Colors.red,
+                                  ? context.colors.info
+                                  : context.colors.danger,
                               size: 18,
                             ),
-                            title: Text('$phone • $status'),
+                            title: Text(
+                              '$phone • $status',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             subtitle: Text(dateStr),
                           );
                         },

@@ -21,7 +21,7 @@ import 'package:ai_birthday/core/database/drift_repositories.dart';
 import 'package:ai_birthday/features/jobs/data/jobs_repository.dart';
 import 'package:ai_birthday/features/jobs/domain/job.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
-import 'package:ai_birthday/features/people/data/person_repository.dart';
+import 'package:ai_birthday/features/people/data/drift_people_repository.dart';
 import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
@@ -74,13 +74,13 @@ void main() {
     await v4.close();
 
     // Phase 2: reopen with the current schema. Drift sees user_version 4 and
-    // runs every upgrade through v9, including the birthday-cycle index migration.
+    // runs every upgrade through v10, including deleted_at tombstones.
     final db = appdb.AppDatabase(NativeDatabase(dbFile));
     expect(
       (await db.customSelect('PRAGMA user_version').get()).single.read<int>(
         'user_version',
       ),
-      9,
+      10,
     );
 
     // The jobs table is functional end-to-end through the repository.
@@ -119,123 +119,142 @@ void main() {
     await db.close();
   });
 
-  test('v7 and v8 -> v9 replace the shipped person-only unique index safely', () async {
-    Future<void> verifyUpgrade(int oldVersion) async {
-      final oldFile = File('${tempDir.path}/v$oldVersion.db');
-      final old = appdb.AppDatabase(NativeDatabase(oldFile));
-      final now = DateTime.utc(2026, 1, 1);
-      await old
-          .into(old.birthdays)
-          .insert(
-            appdb.BirthdaysCompanion.insert(
-              id: 'b-existing',
-              personId: 'p-existing',
-              cycleYear: 2025,
-              date: DateTime.utc(2025, 10, 15),
-              status: 'handedOff',
-              draftId: const Value('d-existing'),
-              createdAt: now,
-              updatedAt: now,
-            ),
-          );
-      await old
-          .into(old.messageDrafts)
-          .insert(
-            appdb.MessageDraftsCompanion.insert(
-              id: 'd-existing',
-              birthdayId: 'b-existing',
-              personId: 'p-existing',
-              body: 'Existing cycle draft',
-              tone: 'warm',
-              length: 'standard',
-              status: 'ready',
-              providerType: 'manual',
-              createdAt: now,
-              updatedAt: now,
-            ),
-          );
-      await DriftDeliveryEventsRepository(old).recordHandoff(
-        birthdayId: 'b-existing',
-        draftId: 'd-existing',
-        draftRevision: 4,
-        bodyHash: 'sha256-existing',
-        channel: DeliveryChannel.sms,
-        at: now,
-      );
-      await DriftJobsRepository(old).enqueue(
-        type: JobTypes.aiGenerate,
-        subjectId: 'b-existing',
-        payload: '{"birthdayId":"b-existing"}',
-      );
+  test(
+    'v7 and v8 -> v9 replace the shipped person-only unique index safely',
+    () async {
+      Future<void> verifyUpgrade(int oldVersion) async {
+        final oldFile = File('${tempDir.path}/v$oldVersion.db');
+        final old = appdb.AppDatabase(NativeDatabase(oldFile));
+        final now = DateTime.utc(2026, 1, 1);
+        await old
+            .into(old.birthdays)
+            .insert(
+              appdb.BirthdaysCompanion.insert(
+                id: 'b-existing',
+                personId: 'p-existing',
+                cycleYear: 2025,
+                date: DateTime.utc(2025, 10, 15),
+                status: 'handedOff',
+                draftId: const Value('d-existing'),
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+        await old
+            .into(old.messageDrafts)
+            .insert(
+              appdb.MessageDraftsCompanion.insert(
+                id: 'd-existing',
+                birthdayId: 'b-existing',
+                personId: 'p-existing',
+                body: 'Existing cycle draft',
+                tone: 'warm',
+                length: 'standard',
+                status: 'ready',
+                providerType: 'manual',
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+        await DriftDeliveryEventsRepository(old).recordHandoff(
+          birthdayId: 'b-existing',
+          draftId: 'd-existing',
+          draftRevision: 4,
+          bodyHash: 'sha256-existing',
+          channel: DeliveryChannel.sms,
+          at: now,
+        );
+        await DriftJobsRepository(old).enqueue(
+          type: JobTypes.aiGenerate,
+          subjectId: 'b-existing',
+          payload: '{"birthdayId":"b-existing"}',
+        );
 
-      await old.customStatement(
-        'DROP INDEX idx_birthdays_person_cycle_year_unique',
-      );
-      await old.customStatement(
-        'CREATE UNIQUE INDEX idx_birthdays_person_id_unique ON birthdays (person_id)',
-      );
-      if (oldVersion == 7) {
         await old.customStatement(
-          'ALTER TABLE delivery_events DROP COLUMN body_hash',
+          'DROP INDEX idx_birthdays_person_cycle_year_unique',
         );
         await old.customStatement(
-          'ALTER TABLE delivery_events DROP COLUMN draft_revision',
+          'CREATE UNIQUE INDEX idx_birthdays_person_id_unique ON birthdays (person_id)',
         );
+        if (oldVersion == 7) {
+          await old.customStatement(
+            'ALTER TABLE delivery_events DROP COLUMN body_hash',
+          );
+          await old.customStatement(
+            'ALTER TABLE delivery_events DROP COLUMN draft_revision',
+          );
+        }
+        await old.customStatement('PRAGMA user_version = $oldVersion');
+        await old.close();
+
+        final current = appdb.AppDatabase(NativeDatabase(oldFile));
+        expect(
+          (await current.customSelect('PRAGMA user_version').get()).single
+              .read<int>('user_version'),
+          10,
+        );
+        expect(
+          await current
+              .customSelect(
+                "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_birthdays_person_id_unique'",
+              )
+              .get(),
+          isEmpty,
+        );
+        final indexColumns = await current
+            .customSelect(
+              'PRAGMA index_info(idx_birthdays_person_cycle_year_unique)',
+            )
+            .get();
+        expect(indexColumns.map((row) => row.read<String>('name')).toList(), [
+          'person_id',
+          'cycle_year',
+        ]);
+        expect(
+          (await current.select(current.birthdays).get()).single.cycleYear,
+          2025,
+        );
+        expect(
+          (await current.select(current.messageDrafts).get()).single.birthdayId,
+          'b-existing',
+        );
+        final handoff = await DriftDeliveryEventsRepository(
+          current,
+        ).latestHandoffForBirthday('b-existing');
+        expect(handoff?.draftId, 'd-existing');
+        expect(handoff?.draftRevision, oldVersion == 7 ? null : 4);
+        expect(handoff?.bodyHash, oldVersion == 7 ? null : 'sha256-existing');
+        expect(
+          (await current.select(current.jobs).get()).single.subjectId,
+          'b-existing',
+        );
+
+        await DriftBirthdaysRepository(current).saveBirthday(
+          Birthday(
+            id: 'b-next-cycle',
+            personId: 'p-existing',
+            cycleYear: 2026,
+            date: DateTime.utc(2026, 10, 15),
+            status: BirthdayStatus.upcoming,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        expect(
+          await DriftBirthdaysRepository(current).getBirthday('b-existing'),
+          isNotNull,
+        );
+        expect(
+          await DriftBirthdaysRepository(current).getBirthday('b-next-cycle'),
+          isNotNull,
+        );
+        await current.close();
       }
-      await old.customStatement('PRAGMA user_version = $oldVersion');
-      await old.close();
 
-      final current = appdb.AppDatabase(NativeDatabase(oldFile));
-      expect(
-        (await current.customSelect('PRAGMA user_version').get()).single
-            .read<int>('user_version'),
-        9,
-      );
-      expect(
-        await current.customSelect(
-          "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_birthdays_person_id_unique'",
-        ).get(),
-        isEmpty,
-      );
-      final indexColumns = await current.customSelect(
-        'PRAGMA index_info(idx_birthdays_person_cycle_year_unique)',
-      ).get();
-      expect(
-        indexColumns.map((row) => row.read<String>('name')).toList(),
-        ['person_id', 'cycle_year'],
-      );
-      expect((await current.select(current.birthdays).get()).single.cycleYear, 2025);
-      expect(
-        (await current.select(current.messageDrafts).get()).single.birthdayId,
-        'b-existing',
-      );
-      final handoff = await DriftDeliveryEventsRepository(
-        current,
-      ).latestHandoffForBirthday('b-existing');
-      expect(handoff?.draftId, 'd-existing');
-      expect(handoff?.draftRevision, oldVersion == 7 ? null : 4);
-      expect(handoff?.bodyHash, oldVersion == 7 ? null : 'sha256-existing');
-      expect((await current.select(current.jobs).get()).single.subjectId, 'b-existing');
-
-      await DriftBirthdaysRepository(current).saveBirthday(
-        Birthday(
-          id: 'b-next-cycle',
-          personId: 'p-existing',
-          cycleYear: 2026,
-          date: DateTime.utc(2026, 10, 15),
-          status: BirthdayStatus.upcoming,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      expect(await DriftBirthdaysRepository(current).getBirthday('b-existing'), isNotNull);
-      expect(await DriftBirthdaysRepository(current).getBirthday('b-next-cycle'), isNotNull);
-      await current.close();
-    }
-
-    await verifyUpgrade(7);
-    await verifyUpgrade(8);
-  });
+      await verifyUpgrade(7);
+      await verifyUpgrade(8);
+    },
+  );
 
   test('v6 -> v9 re-derives calendar dates, dedupes birthdays, adds revision', () async {
     tz_data.initializeTimeZones();
@@ -254,7 +273,7 @@ void main() {
       ('p-dup', 10, 15, 'Asia/Tokyo', null),
       ('p-same-cycle', 11, 3, null, null),
     ]) {
-      await DriftPeopleStore(v6).save(
+      await DriftPeopleRepository(v6).savePerson(
         Person(
           id: id,
           name: id,
@@ -415,7 +434,7 @@ void main() {
       (await db.customSelect('PRAGMA user_version').get()).single.read<int>(
         'user_version',
       ),
-      9,
+      10,
     );
 
     (int, int, int) ymd(DateTime d) => (d.year, d.month, d.day);
@@ -464,9 +483,7 @@ void main() {
       {'ev-old': 'b-dup-old', 'ev-same': 'b-same-new'},
     );
     expect(
-      {
-        for (final job in await db.select(db.jobs).get()) job.id: job.subjectId,
-      },
+      {for (final job in await db.select(db.jobs).get()) job.id: job.subjectId},
       {'job-old': 'b-dup-old', 'job-keep': 'b-tokyo'},
     );
     expect((await repo.getBirthday('b-tokyo'))!.draftId, 'b-tokyo');
@@ -564,7 +581,7 @@ void main() {
         createdAt: now,
         updatedAt: now,
       );
-      await DriftPeopleStore(oldDb).save(person);
+      await DriftPeopleRepository(oldDb).savePerson(person);
       await oldDb
           .into(oldDb.birthdays)
           .insert(
@@ -597,6 +614,92 @@ void main() {
       expect(savedBirthday, isNotNull);
       expect(savedBirthday!.personId, person.id);
       await migrated.close();
+    },
+  );
+
+  test(
+    'v9 -> v10 adds deleted_at tombstones, preserves rows, and enables foreign_keys',
+    () async {
+      final v9 = appdb.AppDatabase(NativeDatabase(dbFile));
+      final now = DateTime.utc(2026, 2, 1);
+      await v9
+          .into(v9.birthdays)
+          .insert(
+            appdb.BirthdaysCompanion.insert(
+              id: 'b-v9',
+              personId: 'p-v9',
+              cycleYear: 2026,
+              date: DateTime.utc(2026, 5, 12),
+              status: 'upcoming',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await v9
+          .into(v9.messageDrafts)
+          .insert(
+            appdb.MessageDraftsCompanion.insert(
+              id: 'd-v9',
+              birthdayId: 'b-v9',
+              personId: 'p-v9',
+              body: 'Happy birthday!',
+              tone: 'warm',
+              length: 'standard',
+              status: 'draft',
+              providerType: 'manual',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await v9.customStatement('ALTER TABLE birthdays DROP COLUMN deleted_at');
+      await v9.customStatement(
+        'ALTER TABLE message_drafts DROP COLUMN deleted_at',
+      );
+      await v9.customStatement('PRAGMA user_version = 9');
+      await v9.close();
+
+      final db = appdb.AppDatabase(NativeDatabase(dbFile));
+      expect(
+        (await db.customSelect('PRAGMA user_version').get()).single.read<int>(
+          'user_version',
+        ),
+        10,
+      );
+      expect(
+        (await db.customSelect('PRAGMA foreign_keys').get()).single.read<int>(
+          'foreign_keys',
+        ),
+        1,
+      );
+
+      final birthdayCols =
+          (await db.customSelect('PRAGMA table_info(birthdays)').get())
+              .map((r) => r.read<String>('name'))
+              .toSet();
+      final draftCols =
+          (await db.customSelect('PRAGMA table_info(message_drafts)').get())
+              .map((r) => r.read<String>('name'))
+              .toSet();
+      expect(birthdayCols, contains('deleted_at'));
+      expect(draftCols, contains('deleted_at'));
+
+      final birthdaysRepo = DriftBirthdaysRepository(db);
+      final draftsRepo = DriftDraftsRepository(db);
+      expect((await birthdaysRepo.getBirthday('b-v9'))?.cycleYear, 2026);
+      expect((await draftsRepo.getDraft('d-v9'))?.body, 'Happy birthday!');
+
+      // Tombstoned birthday/draft rows are filtered out of active queries.
+      await db.customStatement(
+        "UPDATE birthdays SET deleted_at = 1769904000 WHERE id = 'b-v9'",
+      );
+      await db.customStatement(
+        "UPDATE message_drafts SET deleted_at = 1769904000 WHERE id = 'd-v9'",
+      );
+      expect(await birthdaysRepo.getBirthday('b-v9'), isNull);
+      expect(await birthdaysRepo.getBirthdays(), isEmpty);
+      expect(await draftsRepo.getDraft('d-v9'), isNull);
+      expect(await draftsRepo.getAllDrafts(), isEmpty);
+      await db.close();
     },
   );
 }

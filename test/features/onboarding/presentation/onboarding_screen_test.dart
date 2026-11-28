@@ -180,6 +180,138 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    testWidgets('page indicator dots expose Step N of 3 semantics', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(buildTestApp());
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Step 1 of 3'), findsOneWidget);
+
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Step 2 of 3'), findsOneWidget);
+
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Step 3 of 3'), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets(
+      'persistent storage failure offers Continue anyway bypass without trapping',
+      (tester) async {
+        final failingStorage = _FailingCompletionStorage();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              credentialStorageProvider.overrideWithValue(failingStorage),
+            ],
+            child: MaterialApp.router(routerConfig: testRouter),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Skip'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Continue anyway'), findsOneWidget);
+        await tester.tap(find.text('Continue anyway'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Dashboard Screen'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'renders all 3 pages cleanly at 320dp 2.0x and desktop widths',
+      (tester) async {
+        for (final (size, scale) in const [
+          (Size(320, 740), 2.0),
+          (Size(360, 740), 2.0),
+          (Size(1280, 800), 1.0),
+        ]) {
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1.0;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+          final router = GoRouter(
+            initialLocation: '/onboarding',
+            routes: [
+              GoRoute(
+                path: '/onboarding',
+                builder: (context, state) =>
+                    OnboardingScreen(key: ValueKey(size)),
+              ),
+              GoRoute(
+                path: '/dashboard',
+                builder: (context, state) =>
+                    const Scaffold(body: Text('Dashboard Screen')),
+              ),
+            ],
+          );
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                credentialStorageProvider.overrideWithValue(fakeStorage),
+              ],
+              child: MaterialApp.router(routerConfig: router),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+
+          await tester.tap(find.text('Next'));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+
+          await tester.tap(find.text('Next'));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
+
+    testWidgets('replay mode exits even when storage write fails', (
+      tester,
+    ) async {
+      final failingStorage = _FailingCompletionStorage();
+      final replayRouter = GoRouter(
+        initialLocation: '/onboarding?replay=true',
+        routes: [
+          GoRoute(
+            path: '/onboarding',
+            builder: (context, state) => OnboardingScreen(
+              isReplay: state.uri.queryParameters['replay'] == 'true',
+            ),
+          ),
+          GoRoute(
+            path: '/dashboard',
+            builder: (context, state) =>
+                const Scaffold(body: Text('Dashboard Screen')),
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            credentialStorageProvider.overrideWithValue(failingStorage),
+          ],
+          child: MaterialApp.router(routerConfig: replayRouter),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Dashboard Screen'), findsOneWidget);
+    });
   });
 }
 

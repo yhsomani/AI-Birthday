@@ -1,41 +1,37 @@
 import 'package:flutter/material.dart';
 
-/// Centralized spacing, elevation, and shape tokens for AI-Birthday.
+import 'tokens/app_radius.dart';
+import 'tokens/app_space.dart';
+
+/// Legacy spacing, elevation, and shape tokens kept for M2–M5 migration.
+@Deprecated('Use AppSpace and AppRadius via tokens/tokens.dart instead.')
 class AppSpacing {
   const AppSpacing._();
 
-  static const double xxs = 4.0;
-  static const double xs = 8.0;
-  static const double sm = 12.0;
-  static const double md = 16.0;
-  static const double lg = 20.0;
-  static const double xl = 24.0;
-  static const double xxl = 32.0;
+  static const double xxs = AppSpace.xs;
+  static const double xs = AppSpace.sm;
+  static const double sm = AppSpace.md;
+  static const double md = AppSpace.lg;
+  static const double lg = AppSpace.lgPlus;
+  static const double xl = AppSpace.xl;
+  static const double xxl = AppSpace.xxl;
 
   // Touch targets & interactive components
-  static const double touchTargetMin = 48.0;
-  static const double buttonHeight = 48.0;
-  static const double inputHeight = 52.0;
+  static const double touchTargetMin = AppSpace.touchTargetMin;
+  static const double buttonHeight = AppSpace.buttonHeight;
+  static const double inputHeight = AppSpace.inputHeight;
 
   // Bottom scroll clearance to guarantee FAB / NavigationBar never covers content
-  static const double bottomClearance = 88.0;
+  static const double bottomClearance = AppSpace.bottomClearance;
 
   // Radii
-  static const double radiusSm = 8.0;
-  static const double radiusMd = 12.0;
-  static const double radiusLg = 16.0;
-  static const double radiusXl = 20.0;
+  static const double radiusSm = AppRadius.sm;
+  static const double radiusMd = AppRadius.md;
+  static const double radiusLg = AppRadius.lg;
+  static const double radiusXl = AppRadius.xl;
 
-  static const BorderRadius roundedSm = BorderRadius.all(
-    Radius.circular(radiusSm),
-  );
-  static const BorderRadius roundedMd = BorderRadius.all(
-    Radius.circular(radiusMd),
-  );
-  static const BorderRadius roundedLg = BorderRadius.all(
-    Radius.circular(radiusLg),
-  );
-  static const BorderRadius roundedXl = BorderRadius.all(
-    Radius.circular(radiusXl),
-  );
+  static const BorderRadius roundedSm = AppRadius.roundedSm;
+  static const BorderRadius roundedMd = AppRadius.roundedMd;
+  static const BorderRadius roundedLg = AppRadius.roundedLg;
+  static const BorderRadius roundedXl = AppRadius.roundedXl;
 }

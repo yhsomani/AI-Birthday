@@ -329,8 +329,8 @@ void main() {
       await tester.tap(find.text('Import Selected (1)'));
       await tester.pumpAndSettle();
 
-      final imported = await harness.peopleRepo.getPerson(
-        (await harness.peopleRepo.getPeople()).single.id,
+      final imported = await harness.peopleRepo.getPersonById(
+        (await harness.peopleRepo.listActivePeople()).single.id,
       );
       expect(imported!.leapDayResolution, LeapDayResolution.mar1);
       expect(

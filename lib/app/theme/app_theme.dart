@@ -13,10 +13,10 @@ class AppTheme {
   const AppTheme._();
 
   /// Bundled display font (headlines, app bar titles).
-  static const String displayFont = 'BricolageGrotesque';
+  static const String displayFont = AppTypography.displayFont;
 
   /// Bundled body font.
-  static const String bodyFont = 'Outfit';
+  static const String bodyFont = AppTypography.bodyFont;
 
   /// Material 3 Light Theme
   static final ThemeData light = _buildTheme(Brightness.light);
@@ -43,33 +43,7 @@ class AppTheme {
       onError: palette.onDanger,
     );
 
-    TextStyle display(TextStyle? base, {FontWeight weight = FontWeight.w700}) =>
-        (base ?? const TextStyle()).copyWith(
-          fontFamily: displayFont,
-          fontWeight: weight,
-          letterSpacing: -0.5,
-        );
-
-    final baseTextTheme =
-        (isDark ? ThemeData.dark() : ThemeData.light()).textTheme;
-    final textTheme = baseTextTheme
-        .apply(fontFamily: bodyFont)
-        .copyWith(
-          displayLarge: display(baseTextTheme.displayLarge),
-          displayMedium: display(baseTextTheme.displayMedium),
-          displaySmall: display(baseTextTheme.displaySmall),
-          headlineLarge: display(baseTextTheme.headlineLarge),
-          headlineMedium: display(baseTextTheme.headlineMedium),
-          headlineSmall: display(baseTextTheme.headlineSmall),
-          titleLarge: display(
-            baseTextTheme.titleLarge,
-          ).copyWith(letterSpacing: -0.2),
-          titleMedium: baseTextTheme.titleMedium?.copyWith(
-            fontFamily: displayFont,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.2,
-          ),
-        );
+    final textTheme = AppTypography.buildTextTheme(brightness);
 
     return ThemeData(
       useMaterial3: true,
@@ -91,8 +65,8 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: palette.surface,
-        elevation: isDark ? 0 : 1,
-        shadowColor: Colors.black.withValues(alpha: 0.06),
+        elevation: 0,
+        shadowColor: palette.shadow.withValues(alpha: 0.06),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
           side: BorderSide(color: palette.border, width: 1),
@@ -140,7 +114,7 @@ class AppTheme {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderRadius: AppRadius.roundedSm,
           side: BorderSide(color: palette.border),
         ),
         side: BorderSide(color: palette.border),
@@ -232,6 +206,21 @@ class AppTheme {
           );
         }),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: palette.surface,
+        useIndicator: true,
+        indicatorColor: palette.primaryContainer,
+        selectedIconTheme: IconThemeData(color: palette.primary),
+        unselectedIconTheme: IconThemeData(color: palette.textSecondary),
+        selectedLabelTextStyle: textTheme.labelMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: palette.textPrimary,
+        ),
+        unselectedLabelTextStyle: textTheme.labelMedium?.copyWith(
+          fontWeight: FontWeight.w500,
+          color: palette.textSecondary,
+        ),
       ),
       dividerTheme: DividerThemeData(
         color: palette.border,

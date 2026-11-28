@@ -1,6 +1,6 @@
+import 'package:ai_birthday/app/providers.dart' show peopleRepositoryProvider;
 import 'package:ai_birthday/features/birthdays/domain/birthday_engine.dart';
 import 'package:ai_birthday/features/calendar/presentation/calendar_screen.dart';
-import 'package:ai_birthday/features/people/data/person_providers.dart';
 import 'package:ai_birthday/features/people/domain/person.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../people/support/fake_people_store.dart';
+import '../../people/support/fake_people_repository.dart';
 
 void main() {
   final fixedNow = DateTime(2026, 2, 10);
@@ -34,7 +34,10 @@ void main() {
     );
   }
 
-  Future<void> pumpHarness(WidgetTester tester, FakePeopleStore store) async {
+  Future<void> pumpHarness(
+    WidgetTester tester,
+    FakePeopleRepository repo,
+  ) async {
     tester.view.physicalSize = const Size(600, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -51,7 +54,7 @@ void main() {
     );
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [peopleStoreProvider.overrideWithValue(store)],
+        overrides: [peopleRepositoryProvider.overrideWithValue(repo)],
         child: MaterialApp.router(routerConfig: router),
       ),
     );
@@ -66,9 +69,9 @@ void main() {
   testWidgets('shows the visible month header with today marked', (
     tester,
   ) async {
-    final store = FakePeopleStore();
+    final store = FakePeopleRepository();
     addTearDown(store.close);
-    await store.save(
+    await store.savePerson(
       person(id: 'a', name: 'Ana', month: 2, day: 5, birthYear: 2025),
     );
     await pumpHarness(tester, store);
@@ -81,9 +84,9 @@ void main() {
   testWidgets('marks a birthday on its day and opens the day sheet', (
     tester,
   ) async {
-    final store = FakePeopleStore();
+    final store = FakePeopleRepository();
     addTearDown(store.close);
-    await store.save(
+    await store.savePerson(
       person(id: 'a', name: 'Ana', month: 2, day: 5, birthYear: 2025),
     );
 
@@ -99,9 +102,9 @@ void main() {
   testWidgets('resolves a Feb 29 birthday to Feb 28 in a non-leap year', (
     tester,
   ) async {
-    final store = FakePeopleStore();
+    final store = FakePeopleRepository();
     addTearDown(store.close);
-    await store.save(
+    await store.savePerson(
       person(
         id: 'b',
         name: 'Bri',
@@ -122,9 +125,9 @@ void main() {
   testWidgets('does not mark out-of-month birthdays and can navigate months', (
     tester,
   ) async {
-    final store = FakePeopleStore();
+    final store = FakePeopleRepository();
     addTearDown(store.close);
-    await store.save(person(id: 'c', name: 'Ced', month: 3, day: 3));
+    await store.savePerson(person(id: 'c', name: 'Ced', month: 3, day: 3));
 
     await pumpHarness(tester, store);
 
@@ -149,9 +152,9 @@ void main() {
   testWidgets(
     'Mar 1 policy places leap birthday in March and Today jumps back',
     (tester) async {
-      final store = FakePeopleStore();
+      final store = FakePeopleRepository();
       addTearDown(store.close);
-      await store.save(
+      await store.savePerson(
         person(
           id: 'leap',
           name: 'Leap',
@@ -178,9 +181,9 @@ void main() {
   testWidgets('day cells expose full dates at narrow large-text sizes', (
     tester,
   ) async {
-    final store = FakePeopleStore();
+    final store = FakePeopleRepository();
     addTearDown(store.close);
-    await store.save(person(id: 'a', name: 'Ana', month: 2, day: 5));
+    await store.savePerson(person(id: 'a', name: 'Ana', month: 2, day: 5));
     tester.view.physicalSize = const Size(320, 640);
     tester.platformDispatcher.textScaleFactorTestValue = 2;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -194,7 +197,7 @@ void main() {
     );
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [peopleStoreProvider.overrideWithValue(store)],
+        overrides: [peopleRepositoryProvider.overrideWithValue(store)],
         child: MaterialApp.router(routerConfig: router),
       ),
     );
@@ -220,9 +223,9 @@ void main() {
       },
     );
 
-    final store = FakePeopleStore();
+    final store = FakePeopleRepository();
     addTearDown(store.close);
-    await store.save(person(id: 'a', name: 'Ana', month: 2, day: 5));
+    await store.savePerson(person(id: 'a', name: 'Ana', month: 2, day: 5));
     await pumpHarness(tester, store);
 
     expect(hapticCalls, isEmpty);
@@ -253,9 +256,9 @@ void main() {
         },
       );
 
-      final store = FakePeopleStore();
+      final store = FakePeopleRepository();
       addTearDown(store.close);
-      await store.save(person(id: 'a', name: 'Ana', month: 2, day: 5));
+      await store.savePerson(person(id: 'a', name: 'Ana', month: 2, day: 5));
       await pumpHarness(tester, store);
 
       expect(hapticCalls, isEmpty);
@@ -278,9 +281,9 @@ void main() {
   testWidgets('does not show a negative age before the birth year', (
     tester,
   ) async {
-    final store = FakePeopleStore();
+    final store = FakePeopleRepository();
     addTearDown(store.close);
-    await store.save(
+    await store.savePerson(
       person(
         id: 'future-birth-year',
         name: 'Future Birthday',

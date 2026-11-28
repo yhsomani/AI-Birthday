@@ -19,6 +19,7 @@ import 'package:ai_birthday/features/jobs/application/job_worker.dart';
 import 'package:ai_birthday/features/jobs/data/jobs_repository.dart';
 import 'package:ai_birthday/features/jobs/domain/job.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
+import 'package:ai_birthday/features/people/data/drift_people_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
@@ -449,71 +450,77 @@ void main() {
     },
   );
 
-  test('timed-out attempt cannot apply its late result after retry succeeds', () async {
-    await seedPerson();
-    await seedBirthday();
-    final lateResult = Completer<AiGenerationResult>();
-    var calls = 0;
-    final fencedHandler = AiGenerationJobHandler(
-      peopleRepository: peopleRepo,
-      draftsRepository: draftsRepo,
-      birthdaysRepository: birthdaysRepo,
-      jobsRepository: jobsRepo,
-      generate: (request, {required bool forceNano}) async {
-        calls++;
-        if (calls == 1) return lateResult.future;
-        return const AiGenerationResult(
-          message: 'retry result',
+  test(
+    'timed-out attempt cannot apply its late result after retry succeeds',
+    () async {
+      await seedPerson();
+      await seedBirthday();
+      final lateResult = Completer<AiGenerationResult>();
+      var calls = 0;
+      final fencedHandler = AiGenerationJobHandler(
+        peopleRepository: peopleRepo,
+        draftsRepository: draftsRepo,
+        birthdaysRepository: birthdaysRepo,
+        jobsRepository: jobsRepo,
+        generate: (request, {required bool forceNano}) async {
+          calls++;
+          if (calls == 1) return lateResult.future;
+          return const AiGenerationResult(
+            message: 'retry result',
+            providerType: 'user_gemini',
+          );
+        },
+      );
+      final worker = JobWorker(
+        repository: jobsRepo,
+        handlers: {JobTypes.aiGenerate: fencedHandler},
+        handlerTimeout: const Duration(milliseconds: 20),
+        backoffStep: Duration.zero,
+      );
+      final completed = Completer<JobRecord>();
+      final subscription = worker.events.listen((job) {
+        if (job.status == JobStatus.succeeded && !completed.isCompleted) {
+          completed.complete(job);
+        }
+      });
+      worker.start();
+      final job = await worker.enqueue(
+        type: JobTypes.aiGenerate,
+        subjectId: 'b1',
+        payload: jsonEncode(
+          AiJobPayload(
+            birthdayId: 'b1',
+            personId: 'p1',
+            tone: MessageTone.warm,
+            length: MessageLength.standard,
+          ).toJson(),
+        ),
+        maxAttempts: 2,
+      );
+
+      final succeeded = await completed.future.timeout(
+        const Duration(seconds: 2),
+      );
+      expect(succeeded.attempts, 2);
+      expect(calls, 2);
+
+      lateResult.complete(
+        const AiGenerationResult(
+          message: 'stale first attempt',
           providerType: 'user_gemini',
-        );
-      },
-    );
-    final worker = JobWorker(
-      repository: jobsRepo,
-      handlers: {JobTypes.aiGenerate: fencedHandler},
-      handlerTimeout: const Duration(milliseconds: 20),
-      backoffStep: Duration.zero,
-    );
-    final completed = Completer<JobRecord>();
-    final subscription = worker.events.listen((job) {
-      if (job.status == JobStatus.succeeded && !completed.isCompleted) {
-        completed.complete(job);
-      }
-    });
-    worker.start();
-    final job = await worker.enqueue(
-      type: JobTypes.aiGenerate,
-      subjectId: 'b1',
-      payload: jsonEncode(
-        AiJobPayload(
-          birthdayId: 'b1',
-          personId: 'p1',
-          tone: MessageTone.warm,
-          length: MessageLength.standard,
-        ).toJson(),
-      ),
-      maxAttempts: 2,
-    );
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 30));
 
-    final succeeded = await completed.future.timeout(
-      const Duration(seconds: 2),
-    );
-    expect(succeeded.attempts, 2);
-    expect(calls, 2);
-
-    lateResult.complete(
-      const AiGenerationResult(
-        message: 'stale first attempt',
-        providerType: 'user_gemini',
-      ),
-    );
-    await Future<void>.delayed(const Duration(milliseconds: 30));
-
-    expect((await jobsRepo.getById(job.id))!.status, JobStatus.succeeded);
-    expect((await draftsRepo.getDraftForBirthday('b1'))!.body, 'retry result');
-    await subscription.cancel();
-    await worker.stop();
-  });
+      expect((await jobsRepo.getById(job.id))!.status, JobStatus.succeeded);
+      expect(
+        (await draftsRepo.getDraftForBirthday('b1'))!.body,
+        'retry result',
+      );
+      await subscription.cancel();
+      await worker.stop();
+    },
+  );
 
   test('producer failures propagate for the worker to classify', () async {
     await seedPerson();

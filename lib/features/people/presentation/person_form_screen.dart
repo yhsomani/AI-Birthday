@@ -345,467 +345,492 @@ class _PersonFormScreenState extends ConsumerState<PersonFormScreen> {
           ),
         ),
         body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 48),
-            children: [
-              // STEP 1: Core Essentials (Name & Birthday Date)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const AppSectionHeader(
-                        title: 'Essential Information',
-                        isAccent: true,
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _name,
-                        textCapitalization: TextCapitalization.words,
-                        maxLength: 120,
-                        onChanged: (_) => _markDirty(),
-                        decoration: InputDecoration(
-                          labelText: 'Name',
-                          hintText: 'e.g. Priya',
-                          errorText: _errorFor(PersonField.name),
+          child: AppResponsiveContainer(
+            maxWidth: 720,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 48),
+              children: [
+                // STEP 1: Core Essentials (Name & Birthday Date)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const AppSectionHeader(
+                          title: 'Essential Information',
+                          isAccent: true,
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<int>(
-                              isExpanded: true,
-                              initialValue: _month,
-                              items: [
-                                for (var m = 1; m <= 12; m++)
-                                  DropdownMenuItem(
-                                    value: m,
-                                    child: Text(_monthNames[m - 1]),
-                                  ),
-                              ],
-                              onChanged: _onMonthChanged,
-                              decoration: InputDecoration(
-                                labelText: 'Month',
-                                errorText: _errorFor(PersonField.birthday),
+                        Text(
+                          'Name and birthday are required. Other details are optional.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: context.colors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _name,
+                          textCapitalization: TextCapitalization.words,
+                          maxLength: 120,
+                          onChanged: (_) => _markDirty(),
+                          decoration: InputDecoration(
+                            labelText: 'Name',
+                            hintText: 'e.g. Priya',
+                            errorText: _errorFor(PersonField.name),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                isExpanded: true,
+                                initialValue: _month,
+                                items: [
+                                  for (var m = 1; m <= 12; m++)
+                                    DropdownMenuItem(
+                                      value: m,
+                                      child: Text(_monthNames[m - 1]),
+                                    ),
+                                ],
+                                onChanged: _onMonthChanged,
+                                decoration: InputDecoration(
+                                  labelText: 'Month',
+                                  errorText: _errorFor(PersonField.birthday),
+                                ),
                               ),
                             ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                isExpanded: true,
+                                initialValue: _day,
+                                items: [
+                                  for (final d in _dayOptions)
+                                    DropdownMenuItem(
+                                      value: d,
+                                      child: Text('$d'),
+                                    ),
+                                ],
+                                onChanged: (value) => setState(() {
+                                  _dirty = true;
+                                  _day = value;
+                                  if (_month != 2 || _day != 29) {
+                                    _leapDayResolution = null;
+                                  }
+                                }),
+                                decoration: const InputDecoration(
+                                  labelText: 'Day',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_month == 2 && _day == 29) ...[
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<LeapDayResolution>(
+                            isExpanded: true,
+                            initialValue: _leapDayResolution,
+                            decoration: InputDecoration(
+                              labelText: 'In non-leap years, celebrate on',
+                              helperText:
+                                  'Required and saved for Calendar and reminders.',
+                              errorText:
+                                  _errorFor(PersonField.birthday) ==
+                                      InputError.leapDayPolicyRequired.label
+                                  ? InputError.leapDayPolicyRequired.label
+                                  : null,
+                            ),
+                            items: [
+                              for (final policy in LeapDayResolution.values)
+                                DropdownMenuItem(
+                                  value: policy,
+                                  child: Text(policy.displayName),
+                                ),
+                            ],
+                            onChanged: (value) => setState(() {
+                              _dirty = true;
+                              _leapDayResolution = value;
+                            }),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<int>(
-                              isExpanded: true,
-                              initialValue: _day,
+                        ],
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _birthYear,
+                          keyboardType: TextInputType.number,
+                          maxLength: 4,
+                          onChanged: (_) => _markDirty(),
+                          decoration: InputDecoration(
+                            labelText: 'Birth year (optional)',
+                            hintText: 'e.g. 1991',
+                            errorText: _errorFor(PersonField.birthYear),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // STEP 2: Progressive Disclosure - Relationship & Tone
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: ExpansionTile(
+                    initiallyExpanded: _isEditing,
+                    title: const Text(
+                      'Relationship & Tone',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Customize message dynamics and tone',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
+                          children: [
+                            DropdownButtonFormField<p_rel.RelationshipCategory>(
+                              initialValue: _relationship,
                               items: [
-                                for (final d in _dayOptions)
-                                  DropdownMenuItem(value: d, child: Text('$d')),
+                                for (final category
+                                    in p_rel.RelationshipCategory.values)
+                                  DropdownMenuItem(
+                                    value: category,
+                                    child: Text(category.displayName),
+                                  ),
                               ],
                               onChanged: (value) => setState(() {
                                 _dirty = true;
-                                _day = value;
-                                if (_month != 2 || _day != 29) {
-                                  _leapDayResolution = null;
-                                }
+                                _relationship =
+                                    value ?? p_rel.RelationshipCategory.other;
                               }),
-                              decoration: const InputDecoration(
-                                labelText: 'Day',
+                              decoration: InputDecoration(
+                                labelText: 'Relationship',
+                                errorText: _errorFor(PersonField.relationship),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      if (_month == 2 && _day == 29) ...[
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<LeapDayResolution>(
-                          isExpanded: true,
-                          initialValue: _leapDayResolution,
-                          decoration: InputDecoration(
-                            labelText: 'In non-leap years, celebrate on',
-                            helperText:
-                                'Required and saved for Calendar and reminders.',
-                            errorText:
-                                _errorFor(PersonField.birthday) ==
-                                    InputError.leapDayPolicyRequired.label
-                                ? InputError.leapDayPolicyRequired.label
-                                : null,
-                          ),
-                          items: [
-                            for (final policy in LeapDayResolution.values)
-                              DropdownMenuItem(
-                                value: policy,
-                                child: Text(policy.displayName),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<MessageTone>(
+                              initialValue: _tone,
+                              items: [
+                                for (final tone in MessageTone.values)
+                                  DropdownMenuItem(
+                                    value: tone,
+                                    child: Text(tone.displayName),
+                                  ),
+                              ],
+                              onChanged: (value) => setState(() {
+                                _dirty = true;
+                                _tone = value ?? MessageTone.warm;
+                              }),
+                              decoration: const InputDecoration(
+                                labelText: 'Preferred tone',
                               ),
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<
+                              p_rel.RelationshipCloseness
+                            >(
+                              initialValue: _closeness,
+                              items: [
+                                for (final c
+                                    in p_rel.RelationshipCloseness.values)
+                                  DropdownMenuItem(
+                                    value: c,
+                                    child: Text(c.displayName),
+                                  ),
+                              ],
+                              onChanged: (value) => setState(() {
+                                _dirty = true;
+                                _closeness =
+                                    value ?? p_rel.RelationshipCloseness.casual;
+                              }),
+                              decoration: const InputDecoration(
+                                labelText: 'Closeness',
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              initialValue: _preferredLanguage,
+                              maxLength: 10,
+                              onChanged: (value) => setState(() {
+                                _dirty = true;
+                                _preferredLanguage = value;
+                              }),
+                              decoration: InputDecoration(
+                                labelText: 'Preferred language code',
+                                hintText: 'e.g. en, es-MX',
+                                errorText: _errorFor(PersonField.language),
+                              ),
+                            ),
                           ],
-                          onChanged: (value) => setState(() {
-                            _dirty = true;
-                            _leapDayResolution = value;
-                          }),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _birthYear,
-                        keyboardType: TextInputType.number,
-                        maxLength: 4,
-                        onChanged: (_) => _markDirty(),
-                        decoration: InputDecoration(
-                          labelText: 'Birth year (optional)',
-                          hintText: 'e.g. 1991',
-                          errorText: _errorFor(PersonField.birthYear),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // STEP 2: Progressive Disclosure - Relationship & Tone
-              Card(
-                clipBehavior: Clip.antiAlias,
-                child: ExpansionTile(
-                  initiallyExpanded: _isEditing,
-                  title: const Text(
-                    'Relationship & Tone',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                  ),
-                  subtitle: Text(
-                    'Customize message dynamics and tone',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.colors.textSecondary,
-                    ),
-                  ),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Column(
-                        children: [
-                          DropdownButtonFormField<p_rel.RelationshipCategory>(
-                            initialValue: _relationship,
-                            items: [
-                              for (final category
-                                  in p_rel.RelationshipCategory.values)
-                                DropdownMenuItem(
-                                  value: category,
-                                  child: Text(category.displayName),
-                                ),
-                            ],
-                            onChanged: (value) => setState(() {
-                              _dirty = true;
-                              _relationship =
-                                  value ?? p_rel.RelationshipCategory.other;
-                            }),
-                            decoration: InputDecoration(
-                              labelText: 'Relationship',
-                              errorText: _errorFor(PersonField.relationship),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          DropdownButtonFormField<MessageTone>(
-                            initialValue: _tone,
-                            items: [
-                              for (final tone in MessageTone.values)
-                                DropdownMenuItem(
-                                  value: tone,
-                                  child: Text(tone.displayName),
-                                ),
-                            ],
-                            onChanged: (value) => setState(() {
-                              _dirty = true;
-                              _tone = value ?? MessageTone.warm;
-                            }),
-                            decoration: const InputDecoration(
-                              labelText: 'Preferred tone',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          DropdownButtonFormField<p_rel.RelationshipCloseness>(
-                            initialValue: _closeness,
-                            items: [
-                              for (final c
-                                  in p_rel.RelationshipCloseness.values)
-                                DropdownMenuItem(
-                                  value: c,
-                                  child: Text(c.displayName),
-                                ),
-                            ],
-                            onChanged: (value) => setState(() {
-                              _dirty = true;
-                              _closeness =
-                                  value ?? p_rel.RelationshipCloseness.casual;
-                            }),
-                            decoration: const InputDecoration(
-                              labelText: 'Closeness',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            initialValue: _preferredLanguage,
-                            maxLength: 10,
-                            onChanged: (value) => setState(() {
-                              _dirty = true;
-                              _preferredLanguage = value;
-                            }),
-                            decoration: InputDecoration(
-                              labelText: 'Preferred language code',
-                              hintText: 'e.g. en, es-MX',
-                              errorText: _errorFor(PersonField.language),
-                            ),
-                          ),
-                        ],
+                // STEP 3: Progressive Disclosure - Contact & Delivery Details
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: ExpansionTile(
+                    initiallyExpanded:
+                        _phone.text.isNotEmpty || _email.text.isNotEmpty,
+                    title: const Text(
+                      'Contact & Delivery',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // STEP 3: Progressive Disclosure - Contact & Delivery Details
-              Card(
-                clipBehavior: Clip.antiAlias,
-                child: ExpansionTile(
-                  initiallyExpanded:
-                      _phone.text.isNotEmpty || _email.text.isNotEmpty,
-                  title: const Text(
-                    'Contact & Delivery',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                  ),
-                  subtitle: Text(
-                    'Phone for WhatsApp handoff and timezone',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.colors.textSecondary,
+                    subtitle: Text(
+                      'Phone for WhatsApp handoff and timezone',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.colors.textSecondary,
+                      ),
                     ),
-                  ),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Column(
-                        children: [
-                          TextField(
-                            controller: _phone,
-                            keyboardType: TextInputType.phone,
-                            onChanged: (_) => _markDirty(),
-                            decoration: InputDecoration(
-                              labelText: 'Phone number (optional)',
-                              hintText: 'e.g. +91 98765 43210',
-                              errorText: _errorFor(PersonField.phoneNumber),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: _phone,
+                              keyboardType: TextInputType.phone,
+                              onChanged: (_) => _markDirty(),
+                              decoration: InputDecoration(
+                                labelText: 'Phone number (optional)',
+                                hintText: 'e.g. +91 98765 43210',
+                                errorText: _errorFor(PersonField.phoneNumber),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _email,
-                            keyboardType: TextInputType.emailAddress,
-                            onChanged: (_) => _markDirty(),
-                            decoration: InputDecoration(
-                              labelText: 'Email (optional)',
-                              hintText: 'e.g. priya@example.com',
-                              errorText: _errorFor(PersonField.email),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _email,
+                              keyboardType: TextInputType.emailAddress,
+                              onChanged: (_) => _markDirty(),
+                              decoration: InputDecoration(
+                                labelText: 'Email (optional)',
+                                hintText: 'e.g. priya@example.com',
+                                errorText: _errorFor(PersonField.email),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          DropdownButtonFormField<d_chan.DeliveryChannel>(
-                            initialValue: _deliveryChannel,
-                            items: [
-                              for (final ch in d_chan.DeliveryChannel.values)
-                                DropdownMenuItem(
-                                  value: ch,
-                                  child: Text(ch.displayName),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<d_chan.DeliveryChannel>(
+                              initialValue: _deliveryChannel,
+                              items: [
+                                for (final ch in d_chan.DeliveryChannel.values)
+                                  DropdownMenuItem(
+                                    value: ch,
+                                    child: Text(ch.displayName),
+                                  ),
+                              ],
+                              onChanged: (value) => setState(() {
+                                _dirty = true;
+                                _deliveryChannel =
+                                    value ?? d_chan.DeliveryChannel.whatsapp;
+                              }),
+                              decoration: const InputDecoration(
+                                labelText: 'Preferred delivery channel',
+                              ),
+                            ),
+                            if (ProductCapabilities.autoPrepare)
+                              const SizedBox(height: 12),
+                            if (ProductCapabilities.autoPrepare)
+                              SwitchListTile.adaptive(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text(
+                                  'Prepare drafts automatically',
                                 ),
+                                subtitle: const Text(
+                                  'Drafts will be generated ahead of the birthday for your review',
+                                ),
+                                value: _autoPrepare,
+                                onChanged: (v) => setState(() {
+                                  _dirty = true;
+                                  _autoPrepare = v;
+                                }),
+                              ),
+                            if (ProductCapabilities.automaticSms) ...[
+                              const SizedBox(height: 12),
+                              SwitchListTile.adaptive(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('Automatic SMS at midnight'),
+                                subtitle: const Text(
+                                  'Requires phone number, pre-approved draft, and personal sideload SMS build',
+                                ),
+                                value:
+                                    _autoSendPolicy ==
+                                    AutoSendPolicy.automaticSmsApproved,
+                                onChanged: (v) => setState(() {
+                                  _dirty = true;
+                                  _autoSendPolicy = v
+                                      ? AutoSendPolicy.automaticSmsApproved
+                                      : AutoSendPolicy.manualOnly;
+                                }),
+                              ),
                             ],
-                            onChanged: (value) => setState(() {
-                              _dirty = true;
-                              _deliveryChannel =
-                                  value ?? d_chan.DeliveryChannel.whatsapp;
-                            }),
-                            decoration: const InputDecoration(
-                              labelText: 'Preferred delivery channel',
-                            ),
-                          ),
-                          if (ProductCapabilities.autoPrepare)
                             const SizedBox(height: 12),
-                          if (ProductCapabilities.autoPrepare)
-                            SwitchListTile.adaptive(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('Prepare drafts automatically'),
-                              subtitle: const Text(
-                                'Drafts will be generated ahead of the birthday for your review',
+                            TextField(
+                              controller: _timezone,
+                              textCapitalization: TextCapitalization.none,
+                              onChanged: (_) => _markDirty(),
+                              decoration: InputDecoration(
+                                labelText: 'Timezone (optional, IANA)',
+                                hintText: 'e.g. Asia/Kolkata',
+                                helperText:
+                                    'Used to compute birthdays in their location.',
+                                errorText: _errorFor(PersonField.timezone),
                               ),
-                              value: _autoPrepare,
-                              onChanged: (v) => setState(() {
-                                _dirty = true;
-                                _autoPrepare = v;
-                              }),
-                            ),
-                          if (ProductCapabilities.automaticSms) ...[
-                            const SizedBox(height: 12),
-                            SwitchListTile.adaptive(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('Automatic SMS at midnight'),
-                              subtitle: const Text(
-                                'Requires phone number, pre-approved draft, and personal sideload SMS build',
-                              ),
-                              value:
-                                  _autoSendPolicy ==
-                                  AutoSendPolicy.automaticSmsApproved,
-                              onChanged: (v) => setState(() {
-                                _dirty = true;
-                                _autoSendPolicy = v
-                                    ? AutoSendPolicy.automaticSmsApproved
-                                    : AutoSendPolicy.manualOnly;
-                              }),
                             ),
                           ],
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _timezone,
-                            textCapitalization: TextCapitalization.none,
-                            onChanged: (_) => _markDirty(),
-                            decoration: InputDecoration(
-                              labelText: 'Timezone (optional, IANA)',
-                              hintText: 'e.g. Asia/Kolkata',
-                              helperText:
-                                  'Used to compute birthdays in their location.',
-                              errorText: _errorFor(PersonField.timezone),
-                            ),
-                          ),
-                        ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // STEP 4: Progressive Disclosure - AI Personalization Facts & Notes
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: ExpansionTile(
+                    initiallyExpanded:
+                        _facts.isNotEmpty || _notes.text.isNotEmpty,
+                    title: const Text(
+                      'Facts & Context for AI',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // STEP 4: Progressive Disclosure - AI Personalization Facts & Notes
-              Card(
-                clipBehavior: Clip.antiAlias,
-                child: ExpansionTile(
-                  initiallyExpanded:
-                      _facts.isNotEmpty || _notes.text.isNotEmpty,
-                  title: const Text(
-                    'Facts & Context for AI',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                  ),
-                  subtitle: Text(
-                    'User-provided facts to personalize drafts',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.colors.textSecondary,
+                    subtitle: Text(
+                      'User-provided facts to personalize drafts',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.colors.textSecondary,
+                      ),
                     ),
-                  ),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Verified Facts:',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              TextButton.icon(
-                                onPressed: _addFact,
-                                icon: const Icon(Icons.add, size: 18),
-                                label: const Text('Add Fact'),
-                              ),
-                            ],
-                          ),
-                          if (_errorFor(PersonField.importantFacts) != null)
-                            Text(
-                              _errorFor(PersonField.importantFacts)!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.error,
-                              ),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Verified Facts:',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                TextButton.icon(
+                                  onPressed: _addFact,
+                                  icon: const Icon(Icons.add, size: 18),
+                                  label: const Text('Add Fact'),
+                                ),
+                              ],
                             ),
-                          for (final (index, controller) in _facts.indexed)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: TextField(
-                                controller: controller,
-                                maxLength: 200,
-                                onChanged: (_) => _markDirty(),
-                                decoration: InputDecoration(
-                                  labelText: 'Fact ${index + 1}',
-                                  hintText: 'e.g. Loves marathon running',
-                                  suffixIcon: IconButton(
-                                    icon: const Icon(Icons.close),
-                                    tooltip: 'Remove fact',
-                                    onPressed: () => _removeFact(index),
+                            if (_errorFor(PersonField.importantFacts) != null)
+                              Text(
+                                _errorFor(PersonField.importantFacts)!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.error,
+                                ),
+                              ),
+                            for (final (index, controller) in _facts.indexed)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: TextField(
+                                  controller: controller,
+                                  maxLength: 200,
+                                  onChanged: (_) => _markDirty(),
+                                  decoration: InputDecoration(
+                                    labelText: 'Fact ${index + 1}',
+                                    hintText: 'e.g. Loves marathon running',
+                                    suffixIcon: IconButton(
+                                      icon: const Icon(Icons.close),
+                                      tooltip: 'Remove fact',
+                                      onPressed: () => _removeFact(index),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          if (_facts.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Text(
-                                'No facts added yet. AI will never invent facts.',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontStyle: FontStyle.italic,
-                                  color: Colors.grey[600],
+                            if (_facts.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Text(
+                                  'No facts added yet. AI will never invent facts.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic,
+                                    color: context.colors.textSecondary,
+                                  ),
                                 ),
                               ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _notes,
+                              maxLines: 3,
+                              maxLength: 2000,
+                              onChanged: (_) => _markDirty(),
+                              decoration: InputDecoration(
+                                labelText: 'Notes (optional)',
+                                alignLabelWithHint: true,
+                                errorText: _errorFor(PersonField.notes),
+                              ),
                             ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _notes,
-                            maxLines: 3,
-                            maxLength: 2000,
-                            onChanged: (_) => _markDirty(),
-                            decoration: InputDecoration(
-                              labelText: 'Notes (optional)',
-                              alignLabelWithHint: true,
-                              errorText: _errorFor(PersonField.notes),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // PRIMARY SAVE ACTION
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+                    ],
                   ),
                 ),
-                onPressed: _saving ? null : _save,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (_saving) ...[
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(
-                      _saving ? 'Saving…' : 'Save',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                const SizedBox(height: 24),
+
+                // PRIMARY SAVE ACTION
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
                     ),
-                  ],
+                  ),
+                  onPressed: _saving ? null : _save,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (_saving) ...[
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        _saving ? 'Saving…' : 'Save',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 32),
-            ],
+                const SizedBox(height: 32),
+              ],
+            ),
           ),
         ),
       ),

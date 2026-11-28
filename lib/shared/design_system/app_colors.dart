@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Centralized semantic color tokens for AI-Birthday (legacy SSOT §3, §22 (PRODUCT.md §16.7)).
+/// Legacy static color palette kept only for M2–M5 migration compatibility.
 ///
-/// Clean, warm, and editorial. Strictly avoids generic neon gradients or arbitrary hues.
+/// New code must read colors via `context.colors` (`AppPalette`).
+@Deprecated('Use context.colors (AppPalette) via tokens/tokens.dart instead.')
 class AppColors {
   const AppColors._();
 

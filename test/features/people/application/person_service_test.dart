@@ -5,7 +5,7 @@ import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/people/application/person_service.dart';
 import 'package:drift/drift.dart' show Value;
-import 'package:ai_birthday/features/people/data/person_repository.dart';
+import 'package:ai_birthday/features/people/data/drift_people_repository.dart';
 import 'package:ai_birthday/features/people/domain/person.dart';
 import 'package:ai_birthday/features/people/domain/person_enums.dart';
 import 'package:ai_birthday/features/people/domain/person_input.dart';
@@ -20,9 +20,12 @@ void main() {
 
   setUp(() {
     db = AppDatabase(NativeDatabase.memory());
-    final store = DriftPeopleStore(db, now: () => DateTime.utc(2025, 6, 15, 9));
+    final repo = DriftPeopleRepository(
+      db,
+      now: () => DateTime.utc(2025, 6, 15, 9),
+    );
     service = PersonService(
-      store,
+      repo,
       const PersonInputValidator(),
       log,
       now: () => DateTime.utc(2025, 6, 15, 9),
@@ -288,7 +291,7 @@ void main() {
     expect(visible, isEmpty);
 
     // The row itself remains with a tombstone (soft delete).
-    final tombstoned = await service.getById(created.id);
+    final tombstoned = await service.getById(created.id, includeDeleted: true);
     expect(tombstoned, isNotNull);
     expect(tombstoned!.deletedAt, isNotNull);
   });
@@ -315,11 +318,11 @@ void main() {
         createdAt: DateTime.utc(2025, 6, 15, 9),
         updatedAt: DateTime.utc(2025, 6, 15, 9),
       );
-      final store = DriftPeopleStore(
+      final repo = DriftPeopleRepository(
         db,
         now: () => DateTime.utc(2025, 6, 15, 9),
       );
-      await store.save(noBdayPerson);
+      await repo.savePerson(noBdayPerson);
 
       // Edit notes and phone without adding birthday
       final updated = await service.update(

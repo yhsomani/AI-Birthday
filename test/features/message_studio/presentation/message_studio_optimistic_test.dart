@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_birthday/app/providers.dart';
 import 'package:ai_birthday/features/ai/data/user_gemini_api_provider.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
+import 'package:ai_birthday/features/delivery/data/native_share_service.dart';
 import 'package:ai_birthday/features/delivery/data/sms_delivery_service.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dart';
@@ -53,6 +54,22 @@ class RecordingSmsService extends SmsDeliveryService {
   }
 }
 
+class RecordingPlatformShareService extends NativeShareService {
+  DeliveryChannel? channel;
+  String? text;
+
+  @override
+  Future<bool> shareToPlatform({
+    required DeliveryChannel channel,
+    required String text,
+    String? title,
+  }) async {
+    this.channel = channel;
+    this.text = text;
+    return true;
+  }
+}
+
 const _aiPayload =
     '{"candidates":[{"content":{"parts":[{"text":"AI drafted message"}]}}]}';
 
@@ -76,6 +93,7 @@ void main() {
     Future<void> pumpStudio(
       WidgetTester tester, {
       required String? phone,
+      DeliveryChannel preferredChannel = DeliveryChannel.whatsapp,
       List<Override> extraOverrides = const [],
     }) async {
       final now = DateTime.now();
@@ -90,7 +108,7 @@ void main() {
         relationshipCloseness: RelationshipCloseness.close,
         preferredLanguage: 'en',
         preferredTone: MessageTone.warm,
-        preferredDeliveryChannel: DeliveryChannel.whatsapp,
+        preferredDeliveryChannel: preferredChannel,
         createdAt: now,
         updatedAt: now,
         version: 1,
@@ -219,6 +237,43 @@ void main() {
       expect(events, hasLength(1));
       expect(events.single.channel, DeliveryChannel.sms.name);
       expect(events.single.outcome, DeliveryOutcome.launchFailed.name);
+    });
+
+    testWidgets('Instagram preference uses native platform share handoff', (
+      tester,
+    ) async {
+      final platformShare = RecordingPlatformShareService();
+      await pumpStudio(
+        tester,
+        phone: '+14155552671',
+        preferredChannel: DeliveryChannel.instagram,
+        extraOverrides: [
+          nativeShareServiceProvider.overrideWithValue(platformShare),
+        ],
+      );
+
+      await tester.ensureVisible(editorFinder());
+      await tester.enterText(
+        editorFinder(),
+        'Happy Birthday!\nHope your day is wonderful.',
+      );
+      await tester.pump(const Duration(milliseconds: 900));
+      await tester.pumpAndSettle();
+
+      final openButton = find.text('Open Instagram');
+      await tester.ensureVisible(openButton);
+      await tester.tap(openButton);
+      await tester.pumpAndSettle();
+
+      expect(platformShare.channel, DeliveryChannel.instagram);
+      expect(
+        platformShare.text,
+        'Happy Birthday!\nHope your day is wonderful.',
+      );
+      final events = await harness.db.select(harness.db.deliveryEvents).get();
+      expect(events, hasLength(1));
+      expect(events.single.channel, DeliveryChannel.instagram.name);
+      expect(events.single.outcome, DeliveryOutcome.launched.name);
     });
 
     testWidgets(

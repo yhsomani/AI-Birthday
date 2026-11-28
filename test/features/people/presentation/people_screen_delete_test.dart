@@ -1,3 +1,4 @@
+import 'package:ai_birthday/app/providers.dart' show peopleRepositoryProvider;
 import 'package:ai_birthday/core/core_providers.dart';
 import 'package:ai_birthday/core/database/app_database.dart';
 import 'package:ai_birthday/core/database/drift_repositories.dart';
@@ -5,11 +6,12 @@ import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart'
     as b_models;
 import 'package:ai_birthday/features/people/application/person_service.dart';
+import 'package:ai_birthday/features/people/data/drift_people_repository.dart';
 import 'package:ai_birthday/features/people/data/person_providers.dart';
-import 'package:ai_birthday/features/people/data/person_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart'
     as domain;
 import 'package:ai_birthday/features/people/domain/person_input_validator.dart';
+import 'package:ai_birthday/features/people/domain/repositories/people_repository.dart';
 import 'package:ai_birthday/features/people/presentation/people_screen.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -142,7 +144,7 @@ void main() {
             databaseProvider.overrideWithValue(db),
             personServiceProvider.overrideWith(
               (ref) => _FailingPersonService(
-                ref.watch(peopleStoreProvider),
+                ref.watch(peopleRepositoryProvider),
                 ref.watch(loggerProvider),
               ),
             ),
@@ -186,7 +188,7 @@ void main() {
           loggerProvider.overrideWithValue(log),
           personServiceProvider.overrideWith(
             (ref) => _FailingRestoreService(
-              ref.watch(peopleStoreProvider),
+              ref.watch(peopleRepositoryProvider),
               ref.watch(loggerProvider),
             ),
           ),
@@ -211,8 +213,8 @@ void main() {
 }
 
 class _FailingPersonService extends PersonService {
-  _FailingPersonService(PeopleStore store, AppLogger logger)
-    : super(store, const PersonInputValidator(), logger);
+  _FailingPersonService(PeopleRepository repository, AppLogger logger)
+    : super(repository, const PersonInputValidator(), logger);
 
   @override
   Future<void> remove(String id) async {
@@ -221,8 +223,8 @@ class _FailingPersonService extends PersonService {
 }
 
 class _FailingRestoreService extends PersonService {
-  _FailingRestoreService(PeopleStore store, AppLogger logger)
-    : super(store, const PersonInputValidator(), logger);
+  _FailingRestoreService(PeopleRepository repository, AppLogger logger)
+    : super(repository, const PersonInputValidator(), logger);
 
   @override
   Future<void> restore(String id, {b_models.Birthday? birthday}) async {

@@ -1363,6 +1363,17 @@ class $BirthdaysTable extends Birthdays
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1373,6 +1384,7 @@ class $BirthdaysTable extends Birthdays
     draftId,
     createdAt,
     updatedAt,
+    deletedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1437,6 +1449,12 @@ class $BirthdaysTable extends Birthdays
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -1480,6 +1498,10 @@ class $BirthdaysTable extends Birthdays
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
     );
   }
 
@@ -1504,6 +1526,7 @@ class Birthday extends DataClass implements Insertable<Birthday> {
   final String? draftId;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? deletedAt;
   const Birthday({
     required this.id,
     required this.personId,
@@ -1513,6 +1536,7 @@ class Birthday extends DataClass implements Insertable<Birthday> {
     this.draftId,
     required this.createdAt,
     required this.updatedAt,
+    this.deletedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1531,6 +1555,9 @@ class Birthday extends DataClass implements Insertable<Birthday> {
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
     return map;
   }
 
@@ -1546,6 +1573,9 @@ class Birthday extends DataClass implements Insertable<Birthday> {
           : Value(draftId),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
     );
   }
 
@@ -1563,6 +1593,7 @@ class Birthday extends DataClass implements Insertable<Birthday> {
       draftId: serializer.fromJson<String?>(json['draftId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
     );
   }
   @override
@@ -1577,6 +1608,7 @@ class Birthday extends DataClass implements Insertable<Birthday> {
       'draftId': serializer.toJson<String?>(draftId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
     };
   }
 
@@ -1589,6 +1621,7 @@ class Birthday extends DataClass implements Insertable<Birthday> {
     Value<String?> draftId = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
   }) => Birthday(
     id: id ?? this.id,
     personId: personId ?? this.personId,
@@ -1598,6 +1631,7 @@ class Birthday extends DataClass implements Insertable<Birthday> {
     draftId: draftId.present ? draftId.value : this.draftId,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
   Birthday copyWithCompanion(BirthdaysCompanion data) {
     return Birthday(
@@ -1609,6 +1643,7 @@ class Birthday extends DataClass implements Insertable<Birthday> {
       draftId: data.draftId.present ? data.draftId.value : this.draftId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
   }
 
@@ -1622,7 +1657,8 @@ class Birthday extends DataClass implements Insertable<Birthday> {
           ..write('status: $status, ')
           ..write('draftId: $draftId, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
           ..write(')'))
         .toString();
   }
@@ -1637,6 +1673,7 @@ class Birthday extends DataClass implements Insertable<Birthday> {
     draftId,
     createdAt,
     updatedAt,
+    deletedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -1649,7 +1686,8 @@ class Birthday extends DataClass implements Insertable<Birthday> {
           other.status == this.status &&
           other.draftId == this.draftId &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
 }
 
 class BirthdaysCompanion extends UpdateCompanion<Birthday> {
@@ -1661,6 +1699,7 @@ class BirthdaysCompanion extends UpdateCompanion<Birthday> {
   final Value<String?> draftId;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
   final Value<int> rowid;
   const BirthdaysCompanion({
     this.id = const Value.absent(),
@@ -1671,6 +1710,7 @@ class BirthdaysCompanion extends UpdateCompanion<Birthday> {
     this.draftId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BirthdaysCompanion.insert({
@@ -1682,6 +1722,7 @@ class BirthdaysCompanion extends UpdateCompanion<Birthday> {
     this.draftId = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        personId = Value(personId),
@@ -1699,6 +1740,7 @@ class BirthdaysCompanion extends UpdateCompanion<Birthday> {
     Expression<String>? draftId,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1710,6 +1752,7 @@ class BirthdaysCompanion extends UpdateCompanion<Birthday> {
       if (draftId != null) 'draft_id': draftId,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1723,6 +1766,7 @@ class BirthdaysCompanion extends UpdateCompanion<Birthday> {
     Value<String?>? draftId,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
     Value<int>? rowid,
   }) {
     return BirthdaysCompanion(
@@ -1734,6 +1778,7 @@ class BirthdaysCompanion extends UpdateCompanion<Birthday> {
       draftId: draftId ?? this.draftId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1767,6 +1812,9 @@ class BirthdaysCompanion extends UpdateCompanion<Birthday> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1784,6 +1832,7 @@ class BirthdaysCompanion extends UpdateCompanion<Birthday> {
           ..write('draftId: $draftId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1920,6 +1969,17 @@ class $MessageDraftsTable extends MessageDrafts
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1934,6 +1994,7 @@ class $MessageDraftsTable extends MessageDrafts
     revision,
     createdAt,
     updatedAt,
+    deletedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2042,6 +2103,12 @@ class $MessageDraftsTable extends MessageDrafts
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -2099,6 +2166,10 @@ class $MessageDraftsTable extends MessageDrafts
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
     );
   }
 
@@ -2124,6 +2195,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
   final int revision;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? deletedAt;
   const MessageDraft({
     required this.id,
     required this.birthdayId,
@@ -2137,6 +2209,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
     required this.revision,
     required this.createdAt,
     required this.updatedAt,
+    this.deletedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2153,6 +2226,9 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
     map['revision'] = Variable<int>(revision);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
     return map;
   }
 
@@ -2170,6 +2246,9 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
       revision: Value(revision),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
     );
   }
 
@@ -2191,6 +2270,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
       revision: serializer.fromJson<int>(json['revision']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
     );
   }
   @override
@@ -2209,6 +2289,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
       'revision': serializer.toJson<int>(revision),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
     };
   }
 
@@ -2225,6 +2306,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
     int? revision,
     DateTime? createdAt,
     DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
   }) => MessageDraft(
     id: id ?? this.id,
     birthdayId: birthdayId ?? this.birthdayId,
@@ -2238,6 +2320,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
     revision: revision ?? this.revision,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
   MessageDraft copyWithCompanion(MessageDraftsCompanion data) {
     return MessageDraft(
@@ -2259,6 +2342,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
       revision: data.revision.present ? data.revision.value : this.revision,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
   }
 
@@ -2276,7 +2360,8 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
           ..write('variationIndex: $variationIndex, ')
           ..write('revision: $revision, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
           ..write(')'))
         .toString();
   }
@@ -2295,6 +2380,7 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
     revision,
     createdAt,
     updatedAt,
+    deletedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -2311,7 +2397,8 @@ class MessageDraft extends DataClass implements Insertable<MessageDraft> {
           other.variationIndex == this.variationIndex &&
           other.revision == this.revision &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
 }
 
 class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
@@ -2327,6 +2414,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
   final Value<int> revision;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
   final Value<int> rowid;
   const MessageDraftsCompanion({
     this.id = const Value.absent(),
@@ -2341,6 +2429,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
     this.revision = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MessageDraftsCompanion.insert({
@@ -2356,6 +2445,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
     this.revision = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        birthdayId = Value(birthdayId),
@@ -2380,6 +2470,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
     Expression<int>? revision,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2395,6 +2486,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
       if (revision != null) 'revision': revision,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2412,6 +2504,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
     Value<int>? revision,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
     Value<int>? rowid,
   }) {
     return MessageDraftsCompanion(
@@ -2427,6 +2520,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
       revision: revision ?? this.revision,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2470,6 +2564,9 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2491,6 +2588,7 @@ class MessageDraftsCompanion extends UpdateCompanion<MessageDraft> {
           ..write('revision: $revision, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4811,6 +4909,7 @@ typedef $$BirthdaysTableCreateCompanionBuilder =
       Value<String?> draftId,
       required DateTime createdAt,
       required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 typedef $$BirthdaysTableUpdateCompanionBuilder =
@@ -4823,6 +4922,7 @@ typedef $$BirthdaysTableUpdateCompanionBuilder =
       Value<String?> draftId,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 
@@ -4875,6 +4975,11 @@ class $$BirthdaysTableFilterComposer
     column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$BirthdaysTableOrderingComposer
@@ -4925,6 +5030,11 @@ class $$BirthdaysTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$BirthdaysTableAnnotationComposer
@@ -4959,6 +5069,9 @@ class $$BirthdaysTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
 }
 
 class $$BirthdaysTableTableManager
@@ -4997,6 +5110,7 @@ class $$BirthdaysTableTableManager
                 Value<String?> draftId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BirthdaysCompanion(
                 id: id,
@@ -5007,6 +5121,7 @@ class $$BirthdaysTableTableManager
                 draftId: draftId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -5019,6 +5134,7 @@ class $$BirthdaysTableTableManager
                 Value<String?> draftId = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BirthdaysCompanion.insert(
                 id: id,
@@ -5029,6 +5145,7 @@ class $$BirthdaysTableTableManager
                 draftId: draftId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -5067,6 +5184,7 @@ typedef $$MessageDraftsTableCreateCompanionBuilder =
       Value<int> revision,
       required DateTime createdAt,
       required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 typedef $$MessageDraftsTableUpdateCompanionBuilder =
@@ -5083,6 +5201,7 @@ typedef $$MessageDraftsTableUpdateCompanionBuilder =
       Value<int> revision,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 
@@ -5152,6 +5271,11 @@ class $$MessageDraftsTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -5224,6 +5348,11 @@ class $$MessageDraftsTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$MessageDraftsTableAnnotationComposer
@@ -5276,6 +5405,9 @@ class $$MessageDraftsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
 }
 
 class $$MessageDraftsTableTableManager
@@ -5321,6 +5453,7 @@ class $$MessageDraftsTableTableManager
                 Value<int> revision = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessageDraftsCompanion(
                 id: id,
@@ -5335,6 +5468,7 @@ class $$MessageDraftsTableTableManager
                 revision: revision,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -5351,6 +5485,7 @@ class $$MessageDraftsTableTableManager
                 Value<int> revision = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessageDraftsCompanion.insert(
                 id: id,
@@ -5365,6 +5500,7 @@ class $$MessageDraftsTableTableManager
                 revision: revision,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

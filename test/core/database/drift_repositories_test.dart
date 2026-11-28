@@ -7,6 +7,7 @@ import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
+import 'package:ai_birthday/features/people/data/drift_people_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart'
     as domain;
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
@@ -79,31 +80,31 @@ void main() {
           throwsA(isA<Exception>()),
         );
 
-        expect(await repo.getPeople(), isEmpty);
+        expect(await repo.listActivePeople(), isEmpty);
         expect(await db.select(db.birthdays).get(), isEmpty);
       },
     );
 
     test(
-      'deletePerson tombstones the row and bumps the sync version',
+      'softDeletePerson tombstones the row and bumps the sync version',
       () async {
         await repo.savePerson(person(version: 3));
 
-        await repo.deletePerson('p');
+        await repo.softDeletePerson('p', DateTime.utc(2025, 2, 1));
 
         final rows = await db.select(db.persons).get();
         expect(rows, hasLength(1));
         expect(rows.single.deletedAt, isNotNull);
         expect(rows.single.version, 4);
         // Tombstoned rows must no longer surface through the repository API.
-        expect(await repo.getPeople(), isEmpty);
-        expect(await repo.getPerson('p'), isNull);
+        expect(await repo.listActivePeople(), isEmpty);
+        expect(await repo.getPersonById('p'), isNull);
       },
     );
 
     test('savePerson never resurrects a tombstoned row', () async {
       await repo.savePerson(person());
-      await repo.deletePerson('p');
+      await repo.softDeletePerson('p', DateTime.utc(2025, 2, 1));
 
       // A later save touching the same id must keep the tombstone, not force
       // deletedAt back to null (audit F-1).
@@ -115,41 +116,44 @@ void main() {
       expect(row.deletedAt, isNotNull);
     });
 
-    test('getPeople is deterministically ordered by name then id', () async {
-      await repo.savePerson(person(id: 'p-b', name: 'Alex'));
-      await repo.savePerson(person(id: 'p-a', name: 'Alex'));
+    test(
+      'listActivePeople is deterministically ordered by name then id',
+      () async {
+        await repo.savePerson(person(id: 'p-b', name: 'Alex'));
+        await repo.savePerson(person(id: 'p-a', name: 'Alex'));
 
-      // Equal names must not flip order between emissions (query audit
-      // Phase 4: unique id tie-breaker).
-      final people = await repo.getPeople();
-      expect(people.map((p) => p.id).toList(), ['p-a', 'p-b']);
-    });
+        // Equal names must not flip order between emissions (query audit
+        // Phase 4: unique id tie-breaker).
+        final people = await repo.listActivePeople();
+        expect(people.map((p) => p.id).toList(), ['p-a', 'p-b']);
+      },
+    );
 
     test(
-      'getPeople sorts case-insensitively using database lower(name)',
+      'listActivePeople sorts case-insensitively using database lower(name)',
       () async {
         await repo.savePerson(person(id: 'p-1', name: 'charlie'));
         await repo.savePerson(person(id: 'p-2', name: 'Alice'));
         await repo.savePerson(person(id: 'p-3', name: 'bob'));
 
-        final people = await repo.getPeople();
+        final people = await repo.listActivePeople();
         expect(people.map((p) => p.name).toList(), ['Alice', 'bob', 'charlie']);
       },
     );
 
     test(
-      'watchPeople sorts case-insensitively using database lower(name)',
+      'watchActivePeople sorts case-insensitively using database lower(name)',
       () async {
         await repo.savePerson(person(id: 'p-1', name: 'bob'));
         await repo.savePerson(person(id: 'p-2', name: 'Alice'));
 
-        final firstEmission = await repo.watchPeople().first;
+        final firstEmission = await repo.watchActivePeople().first;
         expect(firstEmission.map((p) => p.name).toList(), ['Alice', 'bob']);
       },
     );
 
     test(
-      'savePerson and getPerson round-trip all fields including autoSendPolicy and deletedAt',
+      'savePerson and getPersonById round-trip all fields including autoSendPolicy and deletedAt',
       () async {
         final now = DateTime.utc(2025, 5, 20, 10, 30);
         final p = domain.Person(
@@ -178,7 +182,7 @@ void main() {
         );
 
         await repo.savePerson(p);
-        final loaded = await repo.getPerson('full-fields-1');
+        final loaded = await repo.getPersonById('full-fields-1');
         expect(loaded, isNotNull);
         expect(loaded!.id, 'full-fields-1');
         expect(loaded.name, 'Jordan Lee');
@@ -723,7 +727,7 @@ void main() {
       interceptor.selects = 0; // discount the seeding statements
       interceptor.inserts = 0;
       await const BirthdayLifecycleService().refresh(
-        people: await peopleRepo.getPeople(),
+        people: await peopleRepo.listActivePeople(),
         birthdaysRepository: birthdaysRepo,
       );
 

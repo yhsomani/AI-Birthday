@@ -4,6 +4,8 @@ library;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
+
 class NativeShareService {
   const NativeShareService();
 
@@ -23,5 +25,32 @@ class NativeShareService {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Opens a social app's native text-share entry point with [text] attached.
+  ///
+  /// These platforms do not expose a reliable public deep link that can select
+  /// an arbitrary recipient and prefill a DM. Android therefore targets the
+  /// selected app's ACTION_SEND handler instead of opening a misleading URL.
+  /// Returns false when that app has no compatible text-share activity.
+  Future<bool> shareToPlatform({
+    required DeliveryChannel channel,
+    required String text,
+    String? title,
+  }) async {
+    if (channel != DeliveryChannel.instagram &&
+        channel != DeliveryChannel.snapchat &&
+        channel != DeliveryChannel.linkedin) {
+      throw ArgumentError.value(channel, 'channel', 'Not a social platform');
+    }
+    if (text.trim().isEmpty) {
+      throw ArgumentError.value(text, 'text', 'Message cannot be empty');
+    }
+    return await _channel.invokeMethod<bool>('shareToPlatform', {
+          'platform': channel.name,
+          'text': text,
+          'title': title ?? 'Birthday greeting',
+        }) ??
+        false;
   }
 }

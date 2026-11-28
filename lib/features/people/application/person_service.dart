@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/errors/app_failure.dart';
 import '../../../core/logging/app_logger.dart';
-import '../data/person_repository.dart';
+import '../domain/repositories/people_repository.dart';
 import '../../birthdays/domain/birthday_engine.dart';
 import '../../birthdays/domain/models/birthday.dart';
 import '../domain/person.dart';
@@ -41,7 +41,7 @@ class PersonImportResult {
 /// [AutoSendPolicy.manualOnly] is supported by the product (legacy SSOT §9 (PRODUCT.md §16.7)).
 class PersonService {
   PersonService(
-    this._store,
+    this._repository,
     this._validator,
     this._logger, {
     DateTime Function()? now,
@@ -50,18 +50,19 @@ class PersonService {
   }) : _now = now ?? clock.clock.now,
        _newId = newId ?? (() => const Uuid().v4());
 
-  final PeopleStore _store;
+  final PeopleRepository _repository;
   final PersonInputValidator _validator;
   final AppLogger _logger;
   final DateTime Function() _now;
   final String Function() _newId;
   final Future<void> Function()? _onChanged;
 
-  Stream<List<Person>> watchAll() => _store.watchAll();
+  Stream<List<Person>> watchAll() => _repository.watchActivePeople();
 
-  Future<List<Person>> getAll() => _store.getAll();
+  Future<List<Person>> getAll() => _repository.listActivePeople();
 
-  Future<Person?> getById(String id) => _store.getById(id);
+  Future<Person?> getById(String id, {bool includeDeleted = false}) =>
+      _repository.getPersonById(id, includeDeleted: includeDeleted);
 
   /// Validates [draft] and persists it as a new recipient.
   Future<Person> create(PersonDraft draft) async {
@@ -74,7 +75,7 @@ class PersonService {
           : AutoSendPolicy.manualOnly,
     );
     final birthday = _birthdayFor(safePerson, null);
-    await _store.saveAggregate(safePerson, birthday: birthday);
+    await _repository.savePersonAndBirthday(safePerson, birthday);
     _logger.info(
       'people',
       'created person',
@@ -96,7 +97,7 @@ class PersonService {
           : AutoSendPolicy.manualOnly,
     );
     final birthday = await _nextBirthday(safeUpdated);
-    await _store.saveAggregate(safeUpdated, birthday: birthday);
+    await _repository.savePersonAndBirthday(safeUpdated, birthday);
     _logger.info(
       'people',
       'updated person',
@@ -162,7 +163,7 @@ class PersonService {
       return PersonImportResult(imported: const [], failures: failures);
     }
 
-    await _store.saveImportBatch(people: people, birthdays: birthdays);
+    await _repository.saveImportBatch(people: people, birthdays: birthdays);
     _logger.info(
       'people',
       'imported contacts',
@@ -177,20 +178,22 @@ class PersonService {
 
   Future<void> remove(String id) async {
     _logger.info('people', 'removed person', params: {'personId': id});
-    await _store.softDeleteAggregate(id);
+    await _repository.softDeletePerson(id, _now());
     await _onChanged?.call();
   }
 
   /// Restores a soft-deleted recipient, clearing its tombstone (undo).
   Future<void> restore(String id, {Birthday? birthday}) async {
     _logger.info('people', 'restored person', params: {'personId': id});
-    await _store.restoreAggregate(id, restoredBirthday: birthday);
+    final existing = await _repository.getPersonById(id, includeDeleted: true);
+    if (existing == null) return;
+    await _repository.restorePerson(existing, birthday);
     await _onChanged?.call();
   }
 
   Future<Birthday?> _nextBirthday(Person person) async {
     if (!person.hasBirthday) return null;
-    final prior = await _store.getBirthdayForPerson(person.id);
+    final prior = await _repository.getBirthdayForPerson(person.id);
     return _birthdayFor(person, prior);
   }
 

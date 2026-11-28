@@ -780,675 +780,338 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
-        children: [
-          // Section 1: Account
-          AppSectionHeader(title: 'Account', isAccent: true),
-          Card(child: const _AuthTile()),
-          const SizedBox(height: 20),
+      body: AppResponsiveContainer(
+        maxWidth: AppSpace.maxContentWidth,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
+          children: [
+            // Section 1: Account
+            AppSectionHeader(title: 'Account', isAccent: true),
+            Card(child: const _AuthTile()),
+            const SizedBox(height: 20),
 
-          // Section 5: Reminders & Quiet Hours (legacy SSOT §17 (PRODUCT.md §16.7))
-          AppSectionHeader(title: 'Reminders', isAccent: true),
-          Card(
-            clipBehavior: Clip.antiAlias,
-            child: ExpansionTile(
-              initiallyExpanded: !reminderSettings.enabled,
-              leading: Icon(
-                Icons.notifications_outlined,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: const Text('Reminders'),
-              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              expandedCrossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SwitchListTile(
-                  secondary: const Icon(Icons.notifications_outlined),
-                  title: const Text('Birthday reminders'),
-                  subtitle: const Text('Reminders before birthdays'),
-                  value: reminderSettings.enabled,
-                  onChanged: (on) async {
-                    HapticFeedback.lightImpact();
-                    if (on) {
-                      final granted = await ref
+            // Section 5: Reminders & Quiet Hours (legacy SSOT §17 (PRODUCT.md §16.7))
+            AppSectionHeader(title: 'Reminders', isAccent: true),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: ExpansionTile(
+                initiallyExpanded: !reminderSettings.enabled,
+                leading: Icon(
+                  Icons.notifications_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                title: const Text('Reminders'),
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SwitchListTile(
+                    secondary: const Icon(Icons.notifications_outlined),
+                    title: const Text('Birthday reminders'),
+                    subtitle: const Text('Reminders before birthdays'),
+                    value: reminderSettings.enabled,
+                    onChanged: (on) async {
+                      HapticFeedback.lightImpact();
+                      if (on) {
+                        final granted = await ref
+                            .read(notificationSchedulerGatewayProvider)
+                            .requestPermission();
+                        if (!granted) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Notification permission was not granted. Please enable notifications in device settings.',
+                                ),
+                              ),
+                            );
+                          }
+                          ref
+                              .read(reminderSettingsProvider.notifier)
+                              .setEnabled(false);
+                          return;
+                        }
+                      }
+                      ref
+                          .read(reminderSettingsProvider.notifier)
+                          .setEnabled(on);
+                    },
+                  ),
+                  if (reminderSettings.syncError != null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.errorContainer.withValues(alpha: 0.55),
+                        borderRadius: AppSpacing.roundedMd,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              reminderSettings.syncError!,
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onErrorContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (reminderSettings.enabled)
+                    FutureBuilder<bool>(
+                      key: ValueKey(
+                        'notification-permission-$_notificationPermissionRevision',
+                      ),
+                      future: ref
                           .read(notificationSchedulerGatewayProvider)
-                          .requestPermission();
-                      if (!granted) {
+                          .hasPermission(),
+                      builder: (context, snapshot) {
+                        if (snapshot.data != false) {
+                          return const SizedBox.shrink();
+                        }
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.errorContainer
+                                .withValues(alpha: 0.55),
+                            borderRadius: AppSpacing.roundedMd,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.notifications_off_outlined,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Notifications are blocked in system settings, so birthday reminders cannot be delivered right now.',
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onErrorContainer,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: _reenableNotifications,
+                                  icon: const Icon(
+                                    Icons.notifications_active_outlined,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Re-enable notifications'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  FutureBuilder<bool>(
+                    future: ref
+                        .read(notificationSchedulerGatewayProvider)
+                        .hasExactAlarmPermission(),
+                    builder: (context, snapshot) {
+                      final exactReady = snapshot.data != false;
+                      // Only surface the row when reminders are on and Android is
+                      // blocking precise alarms; a healthy state needs no row.
+                      if (exactReady || !reminderSettings.enabled) {
+                        return const SizedBox.shrink();
+                      }
+                      return ListTile(
+                        leading: Icon(
+                          exactReady
+                              ? Icons.schedule_outlined
+                              : Icons.warning_amber_rounded,
+                          color: exactReady
+                              ? context.colors.success
+                              : Theme.of(context).colorScheme.error,
+                        ),
+                        title: const Text('Precise reminder access'),
+                        subtitle: Text(
+                          exactReady
+                              ? 'Android can schedule reminders at their selected time.'
+                              : 'Android is blocking precise reminders. Enable access so scheduled birthdays are not left unscheduled.',
+                        ),
+                        trailing: exactReady
+                            ? const Icon(Icons.check_circle_outline)
+                            : TextButton(
+                                onPressed: _manageExactAlarmAccess,
+                                child: const Text('Fix'),
+                              ),
+                      );
+                    },
+                  ),
+                  if (reminderSettings.enabled) ...[
+                    const Divider(height: 16),
+                    for (final kind in ReminderKind.values)
+                      SwitchListTile(
+                        title: Text(kind.title),
+                        subtitle: Text(kind.when),
+                        value: reminderSettings.kinds.contains(kind),
+                        onChanged: (on) {
+                          HapticFeedback.lightImpact();
+                          ref
+                              .read(reminderSettingsProvider.notifier)
+                              .setKind(kind, on);
+                        },
+                      ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.bedtime_outlined),
+                      title: const Text('Quiet hours'),
+                      subtitle: Text(
+                        'No delivery between '
+                        '${_formatTime(reminderSettings.quietHours.start)} and '
+                        '${_formatTime(reminderSettings.quietHours.end)}',
+                      ),
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _editQuietHours(reminderSettings.quietHours);
+                      },
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.notifications_active_outlined),
+                      title: const Text('Send test notification'),
+                      subtitle: const Text(
+                        'Trigger immediate alert on this device',
+                      ),
+                      onTap: () async {
+                        HapticFeedback.lightImpact();
+                        final sent = await ref
+                            .read(notificationSchedulerGatewayProvider)
+                            .sendTestNotification(
+                              title: '🎉 Birthday Reminder Test',
+                              body:
+                                  'Notifications are working properly on your device!',
+                            );
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text(
-                                'Notification permission was not granted. Please enable notifications in device settings.',
+                                sent
+                                    ? 'Test notification sent to this device.'
+                                    : 'The test notification could not be delivered. Check notification access and try again.',
                               ),
+                              duration: const Duration(seconds: 3),
                             ),
                           );
                         }
-                        ref
-                            .read(reminderSettingsProvider.notifier)
-                            .setEnabled(false);
-                        return;
-                      }
-                    }
-                    ref.read(reminderSettingsProvider.notifier).setEnabled(on);
-                  },
-                ),
-                if (reminderSettings.syncError != null) ...[
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.errorContainer.withValues(alpha: 0.55),
-                      borderRadius: AppSpacing.roundedMd,
+                      },
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Section 1.4: Conditional personal-distribution automatic SMS.
+            if (ProductCapabilities.automaticSms) ...[
+              AppSectionHeader(title: 'Automatic Birthday SMS', isAccent: true),
+              const AutomaticSmsCard(),
+              const SizedBox(height: 20),
+            ],
+
+            // Section 1.5: Cloud Backup (legacy SSOT §13 (PRODUCT.md §16.7))
+            AppSectionHeader(title: 'Cloud Backup', isAccent: true),
+            CloudBackupCard(
+              lastSyncTime: _lastSyncTime,
+              cloudError: _cloudError,
+              restoreReport: _restoreReport,
+              restoreDetails: _restoreDetails,
+              isSyncing: _isSyncing,
+              isRestoring: _isRestoringCloudData,
+              onBackup: _handleCloudSync,
+              onRestore: _handleCloudRestore,
+            ),
+            const SizedBox(height: 20),
+
+            // Section 2: Subscription & Entitlement (legacy SSOT §11 (PRODUCT.md §16.7))
+            AppSectionHeader(
+              title: 'Subscription & Entitlement',
+              isAccent: true,
+            ),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
                         Icon(
-                          Icons.warning_amber_rounded,
-                          color: Theme.of(context).colorScheme.error,
+                          entitlement.canUseAi
+                              ? Icons.verified
+                              : Icons.lock_outline,
+                          color: entitlement.canUseAi
+                              ? context.colors.warning
+                              : context.colors.textSecondary,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            reminderSettings.syncError!,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onErrorContainer,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                if (reminderSettings.enabled)
-                  FutureBuilder<bool>(
-                    key: ValueKey(
-                      'notification-permission-$_notificationPermissionRevision',
-                    ),
-                    future: ref
-                        .read(notificationSchedulerGatewayProvider)
-                        .hasPermission(),
-                    builder: (context, snapshot) {
-                      if (snapshot.data != false) {
-                        return const SizedBox.shrink();
-                      }
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.errorContainer.withValues(alpha: 0.55),
-                          borderRadius: AppSpacing.roundedMd,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(
-                                  Icons.notifications_off_outlined,
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'Notifications are blocked in system settings, so birthday reminders cannot be delivered right now.',
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onErrorContainer,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton.icon(
-                                onPressed: _reenableNotifications,
-                                icon: const Icon(
-                                  Icons.notifications_active_outlined,
-                                  size: 16,
-                                ),
-                                label: const Text('Re-enable notifications'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                FutureBuilder<bool>(
-                  future: ref
-                      .read(notificationSchedulerGatewayProvider)
-                      .hasExactAlarmPermission(),
-                  builder: (context, snapshot) {
-                    final exactReady = snapshot.data != false;
-                    // Only surface the row when reminders are on and Android is
-                    // blocking precise alarms; a healthy state needs no row.
-                    if (exactReady || !reminderSettings.enabled) {
-                      return const SizedBox.shrink();
-                    }
-                    return ListTile(
-                      leading: Icon(
-                        exactReady
-                            ? Icons.schedule_outlined
-                            : Icons.warning_amber_rounded,
-                        color: exactReady
-                            ? context.colors.success
-                            : Theme.of(context).colorScheme.error,
-                      ),
-                      title: const Text('Precise reminder access'),
-                      subtitle: Text(
-                        exactReady
-                            ? 'Android can schedule reminders at their selected time.'
-                            : 'Android is blocking precise reminders. Enable access so scheduled birthdays are not left unscheduled.',
-                      ),
-                      trailing: exactReady
-                          ? const Icon(Icons.check_circle_outline)
-                          : TextButton(
-                              onPressed: _manageExactAlarmAccess,
-                              child: const Text('Fix'),
-                            ),
-                    );
-                  },
-                ),
-                if (reminderSettings.enabled) ...[
-                  const Divider(height: 16),
-                  for (final kind in ReminderKind.values)
-                    SwitchListTile(
-                      title: Text(kind.title),
-                      subtitle: Text(kind.when),
-                      value: reminderSettings.kinds.contains(kind),
-                      onChanged: (on) {
-                        HapticFeedback.lightImpact();
-                        ref
-                            .read(reminderSettingsProvider.notifier)
-                            .setKind(kind, on);
-                      },
-                    ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.bedtime_outlined),
-                    title: const Text('Quiet hours'),
-                    subtitle: Text(
-                      'No delivery between '
-                      '${_formatTime(reminderSettings.quietHours.start)} and '
-                      '${_formatTime(reminderSettings.quietHours.end)}',
-                    ),
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      _editQuietHours(reminderSettings.quietHours);
-                    },
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.notifications_active_outlined),
-                    title: const Text('Send test notification'),
-                    subtitle: const Text(
-                      'Trigger immediate alert on this device',
-                    ),
-                    onTap: () async {
-                      HapticFeedback.lightImpact();
-                      final sent = await ref
-                          .read(notificationSchedulerGatewayProvider)
-                          .sendTestNotification(
-                            title: '🎉 Birthday Reminder Test',
-                            body:
-                                'Notifications are working properly on your device!',
-                          );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              sent
-                                  ? 'Test notification sent to this device.'
-                                  : 'The test notification could not be delivered. Check notification access and try again.',
-                            ),
-                            duration: const Duration(seconds: 3),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Section 1.4: Conditional personal-distribution automatic SMS.
-          if (ProductCapabilities.automaticSms) ...[
-            AppSectionHeader(title: 'Automatic Birthday SMS', isAccent: true),
-            const AutomaticSmsCard(),
-            const SizedBox(height: 20),
-          ],
-
-          // Section 1.5: Cloud Backup (legacy SSOT §13 (PRODUCT.md §16.7))
-          AppSectionHeader(title: 'Cloud Backup', isAccent: true),
-          CloudBackupCard(
-            lastSyncTime: _lastSyncTime,
-            cloudError: _cloudError,
-            restoreReport: _restoreReport,
-            restoreDetails: _restoreDetails,
-            isSyncing: _isSyncing,
-            isRestoring: _isRestoringCloudData,
-            onBackup: _handleCloudSync,
-            onRestore: _handleCloudRestore,
-          ),
-          const SizedBox(height: 20),
-
-          // Section 2: Subscription & Entitlement (legacy SSOT §11 (PRODUCT.md §16.7))
-          AppSectionHeader(title: 'Subscription & Entitlement', isAccent: true),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        entitlement.canUseAi
-                            ? Icons.verified
-                            : Icons.lock_outline,
-                        color: entitlement.canUseAi
-                            ? context.colors.warning
-                            : context.colors.textSecondary,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          entitlementCheckState ==
-                                  EntitlementCheckState.checking
-                              ? 'Checking entitlement…'
-                              : switch (entitlementCheckState) {
-                                  EntitlementCheckState.cached =>
-                                    'Pro (cached verification)',
-                                  EntitlementCheckState.stale =>
-                                    'Pro verification stale',
-                                  EntitlementCheckState.expired =>
-                                    'Subscription expired',
-                                  _ => entitlement.status.displayName,
-                                },
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    entitlementSummary,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: context.colors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (!entitlement.canUseAi) ...[
-                    ValueListenableBuilder<PurchaseUiState>(
-                      valueListenable: entitlementNotifier.purchaseUiState,
-                      builder: (context, ui, _) {
-                        final busy = ui.isBusy;
-                        final price = ui.productPrice;
-                        return SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: busy ? null : _handlePurchasePro,
-                            icon: busy
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.star_outline),
-                            label: Text(switch (ui.status) {
-                              PurchaseStatus.purchasing =>
-                                'Opening Google Play...',
-                              PurchaseStatus.verifying =>
-                                'Verifying purchase...',
-                              _ =>
-                                price == null
-                                    ? 'Upgrade via Google Play'
-                                    : 'Upgrade via Google Play ($price/mo)',
-                            }),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  if (entitlement.canUseAi) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _handleManageSubscription,
-                        icon: const Icon(
-                          Icons.manage_accounts_outlined,
-                          size: 18,
-                        ),
-                        label: const Text('Manage Subscription in Google Play'),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  if (!entitlement.canUseAi &&
-                      ref
-                          .read(subscriptionNotifierProvider.notifier)
-                          .hasPendingVerification) ...[
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 16,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Purchase verification failed. Tap “Restore Purchases” to try again.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.colors.textSecondary,
+                            entitlementCheckState ==
+                                    EntitlementCheckState.checking
+                                ? 'Checking entitlement…'
+                                : switch (entitlementCheckState) {
+                                    EntitlementCheckState.cached =>
+                                      'Pro (cached verification)',
+                                    EntitlementCheckState.stale =>
+                                      'Pro verification stale',
+                                    EntitlementCheckState.expired =>
+                                      'Subscription expired',
+                                    _ => entitlement.status.displayName,
+                                  },
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                  ],
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
+                    Text(
+                      entitlementSummary,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (!entitlement.canUseAi) ...[
                       ValueListenableBuilder<PurchaseUiState>(
                         valueListenable: entitlementNotifier.purchaseUiState,
-                        builder: (context, ui, _) => TextButton.icon(
-                          onPressed: ui.isRestoring
-                              ? null
-                              : _handleRestorePurchases,
-                          icon: ui.isRestoring
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.refresh, size: 16),
-                          label: Text(
-                            ui.isRestoring
-                                ? 'Restoring...'
-                                : 'Restore Purchases',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Section 3: AI Provider & Personal Gemini API Key (legacy SSOT §5, §20 (PRODUCT.md §16.7))
-          AppSectionHeader(title: 'AI provider', isAccent: true),
-          Card(
-            clipBehavior: Clip.antiAlias,
-            child: ExpansionTile(
-              initiallyExpanded: !_hasKey,
-              leading: Icon(
-                Icons.key,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: const Text('Gemini API key'),
-              subtitle: Text(
-                _hasKey
-                    ? 'Saved securely; Pro entitlement is still required'
-                    : 'Add your own provider key after subscribing to Pro',
-              ),
-              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              expandedCrossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.key,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Personal Gemini API Key',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const Spacer(),
-                    _buildKeyStatusBadge(),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Don\'t have an API key? Get one from Google AI Studio to unlock personalized AI message drafting.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: context.colors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.tonalIcon(
-                      onPressed: () => _launchExternalUrl(_geminiApiKeyUrl),
-                      icon: const Icon(Icons.open_in_new, size: 16),
-                      label: const Text('Get Gemini API key ↗'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => _showGeminiSetupGuide(context),
-                      icon: const Icon(Icons.help_outline, size: 16),
-                      label: const Text('How to connect'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _apiKeyController,
-                  obscureText: _obscureKey,
-                  enableSuggestions: false,
-                  autocorrect: false,
-                  enableIMEPersonalizedLearning: false,
-                  onChanged: (_) {
-                    if (_connectionResult != null) {
-                      setState(() => _connectionResult = null);
-                    }
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Paste your Gemini API key',
-                    hintText: 'AIzaSy...',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureKey ? Icons.visibility : Icons.visibility_off,
-                      ),
-                      tooltip: _obscureKey ? 'Show API key' : 'Hide API key',
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        setState(() => _obscureKey = !_obscureKey);
-                      },
-                    ),
-                  ),
-                ),
-                if (_connectionResult != null) ...[
-                  const SizedBox(height: 12),
-                  _buildConnectionResultBanner(_connectionResult!),
-                ],
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.end,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (_hasKey)
-                      TextButton(
-                        onPressed: () {
-                          _apiKeyController.clear();
-                          _removeKey();
-                        },
-                        child: Text(
-                          'Remove Key',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ),
-                    OutlinedButton(
-                      onPressed: _saveKey,
-                      child: const Text('Save Key'),
-                    ),
-                    FilledButton.icon(
-                      onPressed: _isTestingKey ? null : _testConnection,
-                      icon: _isTestingKey
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.bolt, size: 18),
-                      label: Text(
-                        _isTestingKey ? 'Testing...' : 'Test Connection',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Divider(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('🔒 ', style: TextStyle(fontSize: 13)),
-                    Expanded(
-                      child: Text(
-                        'Stored securely on this device in hardware-backed encrypted storage. Sent directly to Google Gemini API only when generating messages, and never to AI-Birthday servers. Never included in sync or application logs.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: context.colors.textSecondary,
-                          height: 1.3,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Semantics(
-                  link: true,
-                  child: InkWell(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      _launchExternalUrl(_geminiBillingUrl);
-                    },
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 48),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.open_in_new,
-                              size: 14,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Gemini API billing, quotas & free limits ↗',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: theme.colorScheme.primary,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Section 4: On-Device AI / Gemini Nano (legacy SSOT §5, §25 (PRODUCT.md §16.7))
-          if (_nanoSupported) ...[
-            AppSectionHeader(title: 'On-Device Intelligence', isAccent: true),
-            Card(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: Icon(Icons.memory, color: context.colors.success),
-                    title: const Text('Gemini Nano (AICore)'),
-                    subtitle: Text(switch (_nanoState) {
-                      NanoState.available =>
-                        'Ready on device for offline generation.',
-                      NanoState.downloadable =>
-                        'Model available for download on this device.',
-                      NanoState.downloading => 'Downloading on-device model...',
-                      _ =>
-                        'Not available on this device hardware (requires Google AICore on Android 14+).',
-                    }),
-                    trailing: Chip(
-                      label: Text(
-                        switch (_nanoState) {
-                          NanoState.available => 'AVAILABLE',
-                          NanoState.downloadable => 'DOWNLOADABLE',
-                          NanoState.downloading => 'DOWNLOADING',
-                          _ => 'NOT AVAILABLE',
-                        },
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: _nanoState == NanoState.available
-                              ? context.colors.success
-                              : context.colors.textSecondary,
-                        ),
-                      ),
-                      backgroundColor: _nanoState == NanoState.available
-                          ? context.colors.success.withValues(alpha: 0.12)
-                          : Colors.grey.withValues(alpha: 0.12),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                  if (_nanoState == NanoState.downloadable ||
-                      _nanoState == NanoState.downloading)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          if (_nanoState == NanoState.downloadable)
-                            FilledButton.tonalIcon(
-                              onPressed: _isStartingNanoDownload
-                                  ? null
-                                  : _startNanoDownload,
-                              icon: _isStartingNanoDownload
+                        builder: (context, ui, _) {
+                          final busy = ui.isBusy;
+                          final price = ui.productPrice;
+                          return SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: busy ? null : _handlePurchasePro,
+                              icon: busy
                                   ? const SizedBox(
                                       width: 16,
                                       height: 16,
@@ -1456,33 +1119,286 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         strokeWidth: 2,
                                       ),
                                     )
-                                  : const Icon(
-                                      Icons.download_outlined,
-                                      size: 18,
-                                    ),
-                              label: Text(
-                                _isStartingNanoDownload
-                                    ? 'Starting download…'
-                                    : 'Download model',
+                                  : const Icon(Icons.star_outline),
+                              label: Text(switch (ui.status) {
+                                PurchaseStatus.purchasing =>
+                                  'Opening Google Play...',
+                                PurchaseStatus.verifying =>
+                                  'Verifying purchase...',
+                                _ =>
+                                  price == null
+                                      ? 'Upgrade via Google Play'
+                                      : 'Upgrade via Google Play ($price/mo)',
+                              }),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (entitlement.canUseAi) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _handleManageSubscription,
+                          icon: const Icon(
+                            Icons.manage_accounts_outlined,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Manage Subscription in Google Play',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (!entitlement.canUseAi &&
+                        ref
+                            .read(subscriptionNotifierProvider.notifier)
+                            .hasPendingVerification) ...[
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Purchase verification failed. Tap “Restore Purchases” to try again.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.colors.textSecondary,
                               ),
                             ),
-                          OutlinedButton.icon(
-                            onPressed: _isStartingNanoDownload
-                                ? null
-                                : _checkNanoState,
-                            icon: const Icon(Icons.refresh, size: 18),
-                            label: const Text('Refresh status'),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
+                    ],
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        ValueListenableBuilder<PurchaseUiState>(
+                          valueListenable: entitlementNotifier.purchaseUiState,
+                          builder: (context, ui, _) => TextButton.icon(
+                            onPressed: ui.isRestoring
+                                ? null
+                                : _handleRestorePurchases,
+                            icon: ui.isRestoring
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.refresh, size: 16),
+                            label: Text(
+                              ui.isRestoring
+                                  ? 'Restoring...'
+                                  : 'Restore Purchases',
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                    child: Text(
-                      'AI provider: your active AI-Birthday Pro access is required. When available, AI-Birthday uses your saved Gemini key; otherwise supported Android devices can use Gemini Nano on-device.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.colors.textSecondary,
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Section 3: AI Provider & Personal Gemini API Key (legacy SSOT §5, §20 (PRODUCT.md §16.7))
+            AppSectionHeader(title: 'AI provider', isAccent: true),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: ExpansionTile(
+                initiallyExpanded: !_hasKey,
+                leading: Icon(
+                  Icons.key,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                title: const Text('Gemini API key'),
+                subtitle: Text(
+                  _hasKey
+                      ? 'Saved securely; Pro entitlement is still required'
+                      : 'Add your own provider key after subscribing to Pro',
+                ),
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      Icon(
+                        Icons.key,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const Text(
+                        'Personal Gemini API Key',
+                        softWrap: true,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      _buildKeyStatusBadge(),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Don\'t have an API key? Get one from Google AI Studio to unlock personalized AI message drafting.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.colors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: () => _launchExternalUrl(_geminiApiKeyUrl),
+                        icon: const Icon(Icons.open_in_new, size: 16),
+                        label: const Text('Get Gemini API key ↗'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _showGeminiSetupGuide(context),
+                        icon: const Icon(Icons.help_outline, size: 16),
+                        label: const Text('How to connect'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _apiKeyController,
+                    obscureText: _obscureKey,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    enableIMEPersonalizedLearning: false,
+                    onChanged: (_) {
+                      if (_connectionResult != null) {
+                        setState(() => _connectionResult = null);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Paste your Gemini API key',
+                      hintText: 'AIzaSy...',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureKey ? Icons.visibility : Icons.visibility_off,
+                        ),
+                        tooltip: _obscureKey ? 'Show API key' : 'Hide API key',
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          setState(() => _obscureKey = !_obscureKey);
+                        },
+                      ),
+                    ),
+                  ),
+                  if (_connectionResult != null) ...[
+                    const SizedBox(height: 12),
+                    _buildConnectionResultBanner(_connectionResult!),
+                  ],
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (_hasKey)
+                        TextButton(
+                          onPressed: () {
+                            _apiKeyController.clear();
+                            _removeKey();
+                          },
+                          child: Text(
+                            'Remove Key',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      OutlinedButton(
+                        onPressed: _saveKey,
+                        child: const Text('Save Key'),
+                      ),
+                      FilledButton.icon(
+                        onPressed: _isTestingKey ? null : _testConnection,
+                        icon: _isTestingKey
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.bolt, size: 18),
+                        label: Text(
+                          _isTestingKey ? 'Testing...' : 'Test Connection',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('🔒 ', style: TextStyle(fontSize: 13)),
+                      Expanded(
+                        child: Text(
+                          'Stored securely on this device in hardware-backed encrypted storage. Sent directly to Google Gemini API only when generating messages, and never to AI-Birthday servers. Never included in sync or application logs.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.colors.textSecondary,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Semantics(
+                    link: true,
+                    child: InkWell(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _launchExternalUrl(_geminiBillingUrl);
+                      },
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 48),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.open_in_new,
+                                size: 14,
+                                color: theme.colorScheme.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Gemini API billing, quotas & free limits ↗',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.colorScheme.primary,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -1490,56 +1406,156 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-          ],
 
-          // Section 6: Help & Guide
-          AppSectionHeader(title: 'Help & Guide', isAccent: true),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.explore_outlined),
-                  title: const Text('Replay app onboarding'),
-                  subtitle: const Text(
-                    'Review the remember → prepare → review loop',
-                  ),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    context.push('/onboarding?replay=true');
-                  },
+            // Section 4: On-Device AI / Gemini Nano (legacy SSOT §5, §25 (PRODUCT.md §16.7))
+            if (_nanoSupported) ...[
+              AppSectionHeader(title: 'On-Device Intelligence', isAccent: true),
+              Card(
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: Icon(
+                        Icons.memory,
+                        color: context.colors.success,
+                      ),
+                      title: const Text('Gemini Nano (AICore)'),
+                      subtitle: Text(switch (_nanoState) {
+                        NanoState.available =>
+                          'Ready on device for offline generation.',
+                        NanoState.downloadable =>
+                          'Model available for download on this device.',
+                        NanoState.downloading =>
+                          'Downloading on-device model...',
+                        _ =>
+                          'Not available on this device hardware (requires Google AICore on Android 14+).',
+                      }),
+                      trailing: Chip(
+                        label: Text(
+                          switch (_nanoState) {
+                            NanoState.available => 'AVAILABLE',
+                            NanoState.downloadable => 'DOWNLOADABLE',
+                            NanoState.downloading => 'DOWNLOADING',
+                            _ => 'NOT AVAILABLE',
+                          },
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: _nanoState == NanoState.available
+                                ? context.colors.success
+                                : context.colors.textSecondary,
+                          ),
+                        ),
+                        backgroundColor: _nanoState == NanoState.available
+                            ? context.colors.success.withValues(alpha: 0.12)
+                            : Colors.grey.withValues(alpha: 0.12),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    if (_nanoState == NanoState.downloadable ||
+                        _nanoState == NanoState.downloading)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (_nanoState == NanoState.downloadable)
+                              FilledButton.tonalIcon(
+                                onPressed: _isStartingNanoDownload
+                                    ? null
+                                    : _startNanoDownload,
+                                icon: _isStartingNanoDownload
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.download_outlined,
+                                        size: 18,
+                                      ),
+                                label: Text(
+                                  _isStartingNanoDownload
+                                      ? 'Starting download…'
+                                      : 'Download model',
+                                ),
+                              ),
+                            OutlinedButton.icon(
+                              onPressed: _isStartingNanoDownload
+                                  ? null
+                                  : _checkNanoState,
+                              icon: const Icon(Icons.refresh, size: 18),
+                              label: const Text('Refresh status'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                      child: Text(
+                        'AI provider: your active AI-Birthday Pro access is required. When available, AI-Birthday uses your saved Gemini key; otherwise supported Android devices can use Gemini Nano on-device.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.colors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.privacy_tip_outlined),
-                  title: const Text('Privacy and local data'),
-                  subtitle: const Text(
-                    'People stay on this device unless you use an optional cloud or external AI/delivery feature.',
-                  ),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.support_agent_outlined),
-                  title: const Text('Verified support'),
-                  subtitle: const Text(
-                    'Public support and deletion pages are unavailable until their release configuration is deployed.',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
+              ),
+              const SizedBox(height: 20),
+            ],
 
-          Center(
-            child: Text(
-              'AI-Birthday',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            // Section 6: Help & Guide
+            AppSectionHeader(title: 'Help & Guide', isAccent: true),
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.explore_outlined),
+                    title: const Text('Replay app onboarding'),
+                    subtitle: const Text(
+                      'Review the remember → prepare → review loop',
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      context.push('/onboarding?replay=true');
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.privacy_tip_outlined),
+                    title: const Text('Privacy and local data'),
+                    subtitle: const Text(
+                      'People stay on this device unless you use an optional cloud or external AI/delivery feature.',
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.support_agent_outlined),
+                    title: const Text('Verified support'),
+                    subtitle: const Text(
+                      'Public support and deletion pages are unavailable until their release configuration is deployed.',
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-        ],
+            const SizedBox(height: 24),
+
+            Center(
+              child: Text(
+                'AI-Birthday',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1866,176 +1882,182 @@ class _GeminiSetupGuideSheet extends StatelessWidget {
       builder: (context, scrollController) {
         return SingleChildScrollView(
           controller: scrollController,
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[400],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
+          child: AppResponsiveContainer(
+            maxWidth: 640,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.auto_awesome,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'How to connect Gemini',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Step-by-step setup in Google AI Studio',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: context.colors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Step 1
-              _GuideStepTile(
-                stepNumber: '1',
-                title: 'Open Google AI Studio',
-                description:
-                    'Visit Google AI Studio in your browser and sign in with your Google Account.',
-                action: Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: FilledButton.tonalIcon(
-                    onPressed: onOpenAiStudio,
-                    icon: const Icon(Icons.open_in_new, size: 16),
-                    label: const Text('Open Google AI Studio ↗'),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-
-              // Step 2
-              const _GuideStepTile(
-                stepNumber: '2',
-                title: 'Create an API Key',
-                description:
-                    'Select "Create API key" in Google AI Studio. Follow the project and access options Google shows for your account.',
-              ),
-              const SizedBox(height: 18),
-
-              // Step 3
-              const _GuideStepTile(
-                stepNumber: '3',
-                title: 'Copy your API Key',
-                description:
-                    'Copy the new key, then return here and paste it into the field below. Google may use different key formats as its key system changes.',
-              ),
-              const SizedBox(height: 18),
-
-              // Step 4
-              const _GuideStepTile(
-                stepNumber: '4',
-                title: 'Paste and Test in Settings',
-                description:
-                    'Return to AI-Birthday, paste the key into the Gemini API Key field, then tap "Test Connection" to verify access before saving. "Save Key" also works, but the key is stored unverified until you test it.',
-              ),
-              const SizedBox(height: 24),
-
-              // Explanatory note container
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.5,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: theme.colorScheme.outlineVariant.withValues(
-                      alpha: 0.5,
+                      color: context.colors.border,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 16),
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 18,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Important Notes on Usage & Billing',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      '• Your key belongs exclusively to your personal Google Cloud project.\n'
-                      '• Google AI Studio includes a generous free tier for Gemini models.\n'
-                      '• Quotas, rate limits, and billing (if enabled) are controlled directly by Google in your account.\n'
-                      '• AI-Birthday connects directly to Google\'s API and never stores or forwards your key to any external server.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.4,
-                        color: theme.colorScheme.onSurfaceVariant,
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.auto_awesome,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 24,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: onOpenBilling,
-                        icon: const Icon(Icons.help_outline, size: 16),
-                        label: const Text(
-                          'Learn about Gemini API billing & quotas ↗',
-                        ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'How to connect Gemini',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Step-by-step setup in Google AI Studio',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: context.colors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Got it'),
+                // Step 1
+                _GuideStepTile(
+                  stepNumber: '1',
+                  title: 'Open Google AI Studio',
+                  description:
+                      'Visit Google AI Studio in your browser and sign in with your Google Account.',
+                  action: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: FilledButton.tonalIcon(
+                      onPressed: onOpenAiStudio,
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: const Text('Open Google AI Studio ↗'),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 18),
+
+                // Step 2
+                const _GuideStepTile(
+                  stepNumber: '2',
+                  title: 'Create an API Key',
+                  description:
+                      'Select "Create API key" in Google AI Studio. Follow the project and access options Google shows for your account.',
+                ),
+                const SizedBox(height: 18),
+
+                // Step 3
+                const _GuideStepTile(
+                  stepNumber: '3',
+                  title: 'Copy your API Key',
+                  description:
+                      'Copy the new key, then return here and paste it into the field below. Google may use different key formats as its key system changes.',
+                ),
+                const SizedBox(height: 18),
+
+                // Step 4
+                const _GuideStepTile(
+                  stepNumber: '4',
+                  title: 'Paste and Test in Settings',
+                  description:
+                      'Return to AI-Birthday, paste the key into the Gemini API Key field, then tap "Test Connection" to verify access before saving. "Save Key" also works, but the key is stored unverified until you test it.',
+                ),
+                const SizedBox(height: 24),
+
+                // Explanatory note container
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.5,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 18,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Important Notes on Usage & Billing',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '• Your key belongs exclusively to your personal Google Cloud project.\n'
+                        '• Google AI Studio includes a generous free tier for Gemini models.\n'
+                        '• Quotas, rate limits, and billing (if enabled) are controlled directly by Google in your account.\n'
+                        '• AI-Birthday connects directly to Google\'s API and never stores or forwards your key to any external server.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.4,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: onOpenBilling,
+                          icon: const Icon(Icons.help_outline, size: 16),
+                          label: const Text(
+                            'Learn about Gemini API billing & quotas ↗',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Got it'),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

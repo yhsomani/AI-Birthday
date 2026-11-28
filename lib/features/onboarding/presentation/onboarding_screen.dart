@@ -4,15 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:ai_birthday/app/providers.dart';
+import 'package:ai_birthday/app/router.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 
-/// Guided First-Run Onboarding Flow (legacy SSOT §3, §14, §15 (PRODUCT.md §16.7)).
+/// Guided 3-page First-Run Onboarding Flow.
 ///
-/// Introduces the 5-step loop (Remember → Prepare → Personalize → Review → Send),
-/// establishes the local-first privacy promise, and gives clear on-ramps to
-/// add birthdays or enable reminders.
+/// Introduces the 5-step loop (Remember -> Prepare -> Personalize -> Review -> Send),
+/// establishes the local-first privacy promise, and offers on-ramps to add
+/// birthdays or learn about optional reminders.
 class OnboardingScreen extends ConsumerStatefulWidget {
-  const OnboardingScreen({super.key});
+  const OnboardingScreen({super.key, this.isReplay = false});
+
+  final bool isReplay;
 
   @override
   ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -21,6 +24,7 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _saveFailed = false;
 
   static const int _totalPages = 3;
 
@@ -33,32 +37,38 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Future<void> _finishOnboarding() async {
     HapticFeedback.lightImpact();
     if (!await _saveCompletion()) return;
-    if (!mounted) return;
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.go('/dashboard');
-    }
+    _navigateAfterCompletion(null);
   }
 
-  /// Completes onboarding for a specific on-ramp (audit: onboarding the
-  /// destination tiles must not race _finishOnboarding's pop against their
-  /// push — pop() would dismiss the just-pushed route). Marks onboarding done,
-  /// lands on the People shell branch, then pushes the modal destination above
-  /// it so back always returns to a real home.
   Future<void> _finishTo(String destination) async {
     HapticFeedback.lightImpact();
     if (!await _saveCompletion()) return;
+    _navigateAfterCompletion(destination);
+  }
+
+  void _navigateAfterCompletion(String? destination) {
     if (!mounted) return;
-    context.go('/people');
-    if (destination != '/people') {
-      context.push(destination);
+    if (destination != null) {
+      context.go(AppRoutes.people);
+      if (destination != AppRoutes.people) {
+        context.push(destination);
+      }
+      return;
+    }
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.dashboard);
     }
   }
 
   Future<bool> _saveCompletion() async {
     try {
       await ref.read(credentialStorageProvider).setCompletedOnboarding(true);
+      ref.read(onboardingGateProvider).markSessionCompleted();
+      if (mounted && _saveFailed) {
+        setState(() => _saveFailed = false);
+      }
       return true;
     } catch (error, stackTrace) {
       ref
@@ -69,24 +79,39 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             error: error,
             stackTrace: stackTrace,
           );
+      if (widget.isReplay) {
+        ref.read(onboardingGateProvider).markSessionCompleted();
+        return true;
+      }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not save your progress. Please try again.'),
-          ),
-        );
+        setState(() => _saveFailed = true);
+        final l10n = context.l10n;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(l10n.onboardingSaveError)));
       }
       return false;
     }
   }
 
-  void _nextPage() {
+  void _continueBypassingSave() {
+    HapticFeedback.lightImpact();
+    ref.read(onboardingGateProvider).markSessionCompleted();
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    _navigateAfterCompletion(null);
+  }
+
+  void _nextPage(bool disableAnimations) {
     HapticFeedback.lightImpact();
     if (_currentPage < _totalPages - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+      if (disableAnimations) {
+        _pageController.jumpToPage(_currentPage + 1);
+      } else {
+        _pageController.nextPage(
+          duration: AppDuration.base,
+          curve: Curves.easeInOut,
+        );
+      }
     } else {
       _finishOnboarding();
     }
@@ -94,302 +119,412 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final palette = context.colors;
+    final l10n = context.l10n;
+    final disableAnimations =
+        MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: palette.background,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: palette.background.withValues(alpha: 0),
         elevation: 0,
         actions: [
           if (_currentPage < _totalPages - 1)
-            TextButton(onPressed: _finishOnboarding, child: const Text('Skip')),
+            TextButton(
+              onPressed: _finishOnboarding,
+              child: Text(l10n.onboardingSkip),
+            ),
         ],
       ),
       body: SafeArea(
         child: Column(
           children: [
+            if (_saveFailed)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpace.xl,
+                  vertical: AppSpace.xs,
+                ),
+                child: AppResponsiveContainer(
+                  child: Semantics(
+                    liveRegion: true,
+                    container: true,
+                    child: EditorialCard(
+                      backgroundColor: palette.warningContainer,
+                      borderColor: palette.warning,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpace.md,
+                        vertical: AppSpace.sm,
+                      ),
+                      child: Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: AppSpace.sm,
+                        runSpacing: AppSpace.xs,
+                        children: [
+                          Text(
+                            l10n.commonErrorTitle,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: palette.onWarningContainer,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          TextButton(
+                            onPressed: _continueBypassingSave,
+                            child: Text(l10n.commonContinueAnyway),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             Expanded(
               child: PageView(
                 controller: _pageController,
                 onPageChanged: (page) => setState(() => _currentPage = page),
                 children: [
-                  _buildWelcomePage(theme),
-                  _buildAddBirthdaysPage(theme),
-                  _buildRemindersPage(theme),
+                  _buildWelcomePage(context),
+                  _buildAddBirthdaysPage(context),
+                  _buildRemindersPage(context),
                 ],
               ),
             ),
-            _buildBottomControls(theme),
+            _buildBottomControls(context, disableAnimations),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildWelcomePage(ThemeData theme) {
+  Widget _buildWelcomePage(BuildContext context) {
+    final palette = context.colors;
+    final l10n = context.l10n;
+    final textTheme = Theme.of(context).textTheme;
+
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.primaryTerracottaContainer,
-                shape: BoxShape.circle,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.xl,
+          vertical: AppSpace.lg,
+        ),
+        child: AppResponsiveContainer(
+          maxWidth: 560,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: palette.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.cake_rounded,
+                  size: 40,
+                  color: palette.primary,
+                ),
               ),
-              child: const Icon(
-                Icons.cake_rounded,
-                size: 40,
-                color: AppColors.primaryTerracotta,
+              const SizedBox(height: AppSpace.xl),
+              Text(
+                l10n.onboardingPage1Title,
+                textAlign: TextAlign.center,
+                style: textTheme.headlineMedium,
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Never miss a birthday that matters.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
+              const SizedBox(height: AppSpace.md),
+              Text(
+                l10n.onboardingPage1Loop,
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: palette.primary,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Remember → Prepare → Personalize → Review → Send',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primaryTerracotta,
+              const SizedBox(height: AppSpace.xxl),
+              _buildFeatureRow(
+                context,
+                icon: Icons.timer_outlined,
+                title: l10n.onboardingPage1Feature1Title,
+                description: l10n.onboardingPage1Feature1Desc,
               ),
-            ),
-            const SizedBox(height: 32),
-            _buildFeatureRow(
-              icon: Icons.timer_outlined,
-              title: 'Always Prepared Ahead',
-              description:
-                  'Get smart reminders days in advance so you can craft thoughtful messages without rushing.',
-            ),
-            const SizedBox(height: 16),
-            _buildFeatureRow(
-              icon: Icons.edit_note_rounded,
-              title: 'Thoughtful, Personal Greetings',
-              description:
-                  'Generate warm drafts tailored to your shared memories and preferred tone.',
-            ),
-            const SizedBox(height: 16),
-            _buildFeatureRow(
-              icon: Icons.shield_outlined,
-              title: 'Local by Default',
-              description:
-                  'Your birthday data stays on this device unless you explicitly choose cloud backup or an external service.',
-            ),
-          ],
+              const SizedBox(height: AppSpace.lg),
+              _buildFeatureRow(
+                context,
+                icon: Icons.edit_note_rounded,
+                title: l10n.onboardingPage1Feature2Title,
+                description: l10n.onboardingPage1Feature2Desc,
+              ),
+              const SizedBox(height: AppSpace.lg),
+              _buildFeatureRow(
+                context,
+                icon: Icons.shield_outlined,
+                title: l10n.onboardingPage1Feature3Title,
+                description: l10n.onboardingPage1Feature3Desc,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildAddBirthdaysPage(ThemeData theme) {
+  Widget _buildAddBirthdaysPage(BuildContext context) {
+    final palette = context.colors;
+    final l10n = context.l10n;
+    final textTheme = Theme.of(context).textTheme;
+
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.accentForestContainer,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.people_alt_rounded,
-                size: 40,
-                color: AppColors.accentForest,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Bring in your birthdays',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Add your first birthday now or explore the command center.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 32),
-            Card(
-              child: ListTile(
-                leading: const Icon(
-                  Icons.person_add_rounded,
-                  color: AppColors.primaryTerracotta,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.xl,
+          vertical: AppSpace.lg,
+        ),
+        child: AppResponsiveContainer(
+          maxWidth: 560,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: palette.surfaceAlt,
+                  shape: BoxShape.circle,
                 ),
-                title: const Text(
-                  'Add Birthday Manually',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                child: Icon(
+                  Icons.people_alt_rounded,
+                  size: 40,
+                  color: palette.success,
                 ),
-                subtitle: const Text(
-                  'Enter name, date, relationship, and tone.',
-                ),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => _finishTo('/people/add'),
               ),
-            ),
-            const SizedBox(height: 12),
-            Card(
-              child: ListTile(
-                leading: const Icon(
-                  Icons.contact_phone_rounded,
-                  color: AppColors.accentForest,
-                ),
-                title: const Text(
-                  'Open Phone Contact Import',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: const Text(
-                  'Opens People, where Import from Phone asks for contacts permission and reviews matches before saving.',
-                ),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => _finishTo('/people'),
+              const SizedBox(height: AppSpace.xl),
+              Text(
+                l10n.onboardingPage2Title,
+                textAlign: TextAlign.center,
+                style: textTheme.headlineMedium,
               ),
-            ),
-          ],
+              const SizedBox(height: AppSpace.md),
+              Text(
+                l10n.onboardingPage2Subtitle,
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: palette.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpace.xxl),
+              EditorialCard(
+                onTap: () => _finishTo(AppRoutes.peopleAdd),
+                padding: const EdgeInsets.all(AppSpace.lg),
+                child: Row(
+                  children: [
+                    Icon(Icons.person_add_rounded, color: palette.primary),
+                    const SizedBox(width: AppSpace.lg),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.onboardingAddManualTitle,
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpace.xs),
+                          Text(
+                            l10n.onboardingAddManualSubtitle,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: palette.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      size: AppIconSize.sm,
+                      color: palette.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpace.md),
+              EditorialCard(
+                onTap: () => _finishTo(AppRoutes.people),
+                padding: const EdgeInsets.all(AppSpace.lg),
+                child: Row(
+                  children: [
+                    Icon(Icons.contact_phone_rounded, color: palette.success),
+                    const SizedBox(width: AppSpace.lg),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.onboardingImportContactsTitle,
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpace.xs),
+                          Text(
+                            l10n.onboardingImportContactsSubtitle,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: palette.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      size: AppIconSize.sm,
+                      color: palette.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildRemindersPage(ThemeData theme) {
+  Widget _buildRemindersPage(BuildContext context) {
+    final palette = context.colors;
+    final l10n = context.l10n;
+    final textTheme = Theme.of(context).textTheme;
+
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.accentAmberContainer,
-                shape: BoxShape.circle,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.xl,
+          vertical: AppSpace.lg,
+        ),
+        child: AppResponsiveContainer(
+          maxWidth: 560,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: palette.warningContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.notifications_active_rounded,
+                  size: 40,
+                  color: palette.onWarningContainer,
+                ),
               ),
-              child: const Icon(
-                Icons.notifications_active_rounded,
-                size: 40,
-                color: AppColors.accentAmber,
+              const SizedBox(height: AppSpace.xl),
+              Text(
+                l10n.onboardingPage3Title,
+                textAlign: TextAlign.center,
+                style: textTheme.headlineMedium,
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Prepared ahead of time',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
+              const SizedBox(height: AppSpace.md),
+              Text(
+                l10n.onboardingPage3Subtitle,
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: palette.textSecondary,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Reminders are optional and start only after you enable them in Settings. Greetings are always yours to review.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: theme.colorScheme.onSurfaceVariant,
+              const SizedBox(height: AppSpace.xxl),
+              _buildReminderTimelineStep(
+                context,
+                days: l10n.onboardingTimeline7Days,
+                label: l10n.onboardingTimeline7DaysDesc,
               ),
-            ),
-            const SizedBox(height: 32),
-            _buildReminderTimelineStep(
-              days: '7 Days',
-              label: 'Upcoming reminder: Plan gifts or special messages.',
-            ),
-            const SizedBox(height: 14),
-            _buildReminderTimelineStep(
-              days: '2 Days',
-              label:
-                  'Prepare: Open Message Studio and create or review your greeting.',
-            ),
-            const SizedBox(height: 14),
-            _buildReminderTimelineStep(
-              days: 'Today',
-              label:
-                  'Send day: Review your greeting, then hand it to WhatsApp and confirm if you sent it.',
-            ),
-          ],
+              const SizedBox(height: AppSpace.md),
+              _buildReminderTimelineStep(
+                context,
+                days: l10n.onboardingTimeline2Days,
+                label: l10n.onboardingTimeline2DaysDesc,
+              ),
+              const SizedBox(height: AppSpace.md),
+              _buildReminderTimelineStep(
+                context,
+                days: l10n.onboardingTimelineToday,
+                label: l10n.onboardingTimelineTodayDesc,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildReminderTimelineStep({
+  Widget _buildReminderTimelineStep(
+    BuildContext context, {
     required String days,
     required String label,
   }) {
+    final palette = context.colors;
+    final textTheme = Theme.of(context).textTheme;
+
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.md,
+            vertical: AppSpace.sm,
+          ),
           decoration: BoxDecoration(
-            color: AppColors.primaryTerracottaContainer,
-            borderRadius: BorderRadius.circular(8),
+            color: palette.primaryContainer,
+            borderRadius: AppRadius.roundedSm,
           ),
           child: Text(
             days,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primaryTerracotta,
+            style: textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: palette.onPrimaryContainer,
             ),
           ),
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Text(label, style: const TextStyle(fontSize: 13, height: 1.3)),
-        ),
+        const SizedBox(width: AppSpace.md),
+        Expanded(child: Text(label, style: textTheme.bodyMedium)),
       ],
     );
   }
 
-  Widget _buildFeatureRow({
+  Widget _buildFeatureRow(
+    BuildContext context, {
     required IconData icon,
     required String title,
     required String description,
   }) {
+    final palette = context.colors;
+    final textTheme = Theme.of(context).textTheme;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 22, color: AppColors.primaryTerracotta),
-        const SizedBox(width: 14),
+        Icon(icon, size: 22, color: palette.primary),
+        const SizedBox(width: AppSpace.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 description,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: context.colors.textSecondary,
+                style: textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
                   height: 1.3,
                 ),
               ),
@@ -400,40 +535,68 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
-  Widget _buildBottomControls(ThemeData theme) {
+  Widget _buildBottomControls(BuildContext context, bool disableAnimations) {
+    final palette = context.colors;
+    final l10n = context.l10n;
     final isLastPage = _currentPage == _totalPages - 1;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: List.generate(
-              _totalPages,
-              (index) => AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.only(right: 6),
-                width: _currentPage == index ? 24 : 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: _currentPage == index
-                      ? AppColors.primaryTerracotta
-                      : theme.colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(4),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpace.xl,
+        AppSpace.lg,
+        AppSpace.xl,
+        AppSpace.xl,
+      ),
+      child: AppResponsiveContainer(
+        child: SizedBox(
+          width: double.infinity,
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpace.md,
+            runSpacing: AppSpace.md,
+            children: [
+              Semantics(
+                label: l10n.onboardingPageIndicatorSemantics(
+                  _currentPage + 1,
+                  _totalPages,
+                ),
+                child: ExcludeSemantics(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(
+                      _totalPages,
+                      (index) => AnimatedContainer(
+                        duration: disableAnimations
+                            ? Duration.zero
+                            : AppDuration.fast,
+                        margin: const EdgeInsets.only(right: AppSpace.sm),
+                        width: _currentPage == index ? 24 : 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: _currentPage == index
+                              ? palette.primary
+                              : palette.border,
+                          borderRadius: AppRadius.roundedSm,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              FilledButton.icon(
+                onPressed: () => _nextPage(disableAnimations),
+                icon: Icon(
+                  isLastPage ? Icons.check : Icons.arrow_forward,
+                  size: 18,
+                ),
+                label: Text(
+                  isLastPage ? l10n.onboardingGetStarted : l10n.onboardingNext,
+                ),
+              ),
+            ],
           ),
-          FilledButton.icon(
-            onPressed: _nextPage,
-            icon: Icon(
-              isLastPage ? Icons.check : Icons.arrow_forward,
-              size: 18,
-            ),
-            label: Text(isLastPage ? 'Get Started' : 'Next'),
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -1,6 +1,6 @@
 import 'package:ai_birthday/core/core_providers.dart';
 import 'package:ai_birthday/core/database/app_database.dart';
-import 'package:ai_birthday/core/database/drift_repositories.dart';
+import 'package:ai_birthday/features/people/data/drift_people_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart'
     as domain;
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';

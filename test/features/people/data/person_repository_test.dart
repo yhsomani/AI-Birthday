@@ -1,10 +1,11 @@
 import 'package:ai_birthday/app/providers.dart' show peopleRepositoryProvider;
 import 'package:ai_birthday/core/core_providers.dart' show databaseProvider;
 import 'package:ai_birthday/core/database/app_database.dart' as db;
+import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_channel.dart';
-import 'package:ai_birthday/features/people/data/person_repository.dart';
+import 'package:ai_birthday/features/people/data/drift_people_repository.dart';
 import 'package:ai_birthday/features/people/data/person_providers.dart'
-    show peopleStoreProvider;
+    show personServiceProvider;
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/models/tone.dart';
 import 'package:ai_birthday/features/people/domain/person.dart';
@@ -15,11 +16,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
   late db.AppDatabase database;
-  late DriftPeopleStore store;
+  late DriftPeopleRepository repo;
 
   setUp(() {
     database = db.AppDatabase(NativeDatabase.memory());
-    store = DriftPeopleStore(database);
+    repo = DriftPeopleRepository(database);
   });
 
   tearDown(() async => database.close());
@@ -47,9 +48,9 @@ void main() {
 
   test('round-trips a person preserving enums, facts and envelope', () async {
     final p = person(month: 2, day: 29);
-    await store.save(p);
+    await repo.savePerson(p);
 
-    final loaded = await store.getById(p.id);
+    final loaded = await repo.getPersonById(p.id);
     expect(loaded, isNotNull);
     expect(loaded!.birthdayMonth, 2);
     expect(loaded.birthdayDay, 29);
@@ -64,51 +65,56 @@ void main() {
     expect(loaded.createdAt, DateTime.utc(2025, 1, 1, 8));
   });
 
-  test('application and repository providers share one people store', () async {
-    final container = ProviderContainer(
-      overrides: [databaseProvider.overrideWithValue(database)],
-    );
-    addTearDown(container.dispose);
+  test(
+    'application and repository providers share one people repository',
+    () async {
+      final container = ProviderContainer(
+        overrides: [databaseProvider.overrideWithValue(database)],
+      );
+      addTearDown(container.dispose);
 
-    final store = container.read(peopleStoreProvider);
-    final repository = container.read(peopleRepositoryProvider);
+      final service = container.read(personServiceProvider);
+      final repository = container.read(peopleRepositoryProvider);
 
-    expect(identical(repository, store), isTrue);
-    await repository.savePerson(person(id: 'shared', name: 'Shared'));
-    expect((await store.getAll()).single.name, 'Shared');
-  });
-
-  test('watchAll and getAll omit soft-deleted rows and sort by name', () async {
-    await store.save(person(id: 'b', name: 'Bri'));
-    await store.save(person(id: 'a', name: 'Ana'));
-    await store.save(person(id: 'z', name: 'Zoe'));
-    await store.softDelete('z');
-
-    final visible = await store.getAll();
-    expect(visible.map((p) => p.id), ['a', 'b']);
-
-    final all = await store.getAll(includeDeleted: true);
-    expect(all, hasLength(3));
-    final deleted = all.firstWhere((p) => p.id == 'z');
-    expect(deleted.deletedAt, isNotNull);
-    expect(deleted.version, 2);
-  });
+      await repository.savePerson(person(id: 'shared', name: 'Shared'));
+      expect((await service.getAll()).single.name, 'Shared');
+    },
+  );
 
   test(
-    'getAll and watchAll sort case-insensitively with id tie-breaker',
+    'watchActivePeople and listActivePeople omit soft-deleted rows and sort by name',
     () async {
-      await store.save(person(id: 'p-3', name: 'bob'));
-      await store.save(person(id: 'p-2', name: 'Alice'));
-      await store.save(person(id: 'p-1', name: 'alice'));
+      await repo.savePerson(person(id: 'b', name: 'Bri'));
+      await repo.savePerson(person(id: 'a', name: 'Ana'));
+      await repo.savePerson(person(id: 'z', name: 'Zoe'));
+      await repo.softDeletePerson('z', DateTime.utc(2025, 2, 1));
 
-      final all = await store.getAll();
+      final visible = await repo.listActivePeople();
+      expect(visible.map((p) => p.id), ['a', 'b']);
+
+      final all = await repo.listActivePeople(includeDeleted: true);
+      expect(all, hasLength(3));
+      final deleted = all.firstWhere((p) => p.id == 'z');
+      expect(deleted.deletedAt, isNotNull);
+      expect(deleted.version, 2);
+    },
+  );
+
+  test(
+    'listActivePeople and watchActivePeople sort case-insensitively with id tie-breaker',
+    () async {
+      await repo.savePerson(person(id: 'p-3', name: 'bob'));
+      await repo.savePerson(person(id: 'p-2', name: 'Alice'));
+      await repo.savePerson(person(id: 'p-1', name: 'alice'));
+
+      final all = await repo.listActivePeople();
       expect(all.map((p) => '${p.name}:${p.id}').toList(), [
         'alice:p-1',
         'Alice:p-2',
         'bob:p-3',
       ]);
 
-      final streamed = await store.watchAll().first;
+      final streamed = await repo.watchActivePeople().first;
       expect(streamed.map((p) => '${p.name}:${p.id}').toList(), [
         'alice:p-1',
         'Alice:p-2',
@@ -117,13 +123,14 @@ void main() {
     },
   );
 
-  test('watchAll emits updates', () async {
+  test('watchActivePeople emits updates', () async {
     final emissions = <List<Person>>[];
-    final sub = store.watchAll().listen(emissions.add);
-    await store.save(person(id: 'p1'));
-    await store.save(person(id: 'p2', name: 'Abe'));
-    await store.softDelete('p1');
-    await store.restore('p1');
+    final sub = repo.watchActivePeople().listen(emissions.add);
+    final p1 = person(id: 'p1');
+    await repo.savePerson(p1);
+    await repo.savePerson(person(id: 'p2', name: 'Abe'));
+    await repo.softDeletePerson('p1', DateTime.utc(2025, 2, 1));
+    await repo.restorePerson(p1, null);
 
     await Future<void>.delayed(Duration.zero);
     expect(emissions, isNotEmpty);
@@ -131,25 +138,26 @@ void main() {
     await sub.cancel();
   });
 
-  test('restore clears the tombstone', () async {
-    await store.save(person(id: 'p1'));
-    await store.softDelete('p1');
-    final hidden = await store.getById('p1');
+  test('restorePerson clears the tombstone', () async {
+    final p1 = person(id: 'p1');
+    await repo.savePerson(p1);
+    await repo.softDeletePerson('p1', DateTime.utc(2025, 2, 1));
+    final hidden = await repo.getPersonById('p1', includeDeleted: true);
     expect(hidden!.deletedAt, isNotNull);
     expect(hidden.version, 2);
 
-    await store.restore('p1');
-    final restored = await store.getById('p1');
+    await repo.restorePerson(p1, null);
+    final restored = await repo.getPersonById('p1');
     expect(restored!.deletedAt, isNull);
     expect(restored.version, 3);
   });
 
-  test('save is idempotent by id and replaces the row', () async {
-    await store.save(person(id: 'p1', name: 'Sam'));
+  test('savePerson is idempotent by id and replaces the row', () async {
+    await repo.savePerson(person(id: 'p1', name: 'Sam'));
     final updated = person(id: 'p1', name: 'Samantha');
-    await store.save(updated);
+    await repo.savePerson(updated);
 
-    final loaded = await store.getById('p1');
+    final loaded = await repo.getPersonById('p1');
     expect(loaded!.name, 'Samantha');
     expect(loaded.version, updated.version);
   });
@@ -158,24 +166,26 @@ void main() {
     'saving through repository cannot resurrect a tombstoned person',
     () async {
       final original = person(id: 'deleted', name: 'Deleted');
-      await store.save(original);
-      await store.deletePerson(original.id);
+      await repo.savePerson(original);
+      await repo.softDeletePerson(original.id, DateTime.utc(2025, 2, 1));
 
-      await store.savePerson(original.copyWith(name: 'Stale update'));
+      await repo.savePerson(original.copyWith(name: 'Stale update'));
 
-      expect(await store.getPeople(), isEmpty);
-      expect((await store.getById(original.id))!.deletedAt, isNotNull);
+      expect(await repo.listActivePeople(), isEmpty);
+      expect(
+        (await repo.getPersonById(
+          original.id,
+          includeDeleted: true,
+        ))!.deletedAt,
+        isNotNull,
+      );
     },
   );
 
-  test('softDelete stamps a timestamp via the injected clock', () async {
-    final clocked = DriftPeopleStore(
-      database,
-      now: () => DateTime.utc(2030, 3, 3),
-    );
-    await clocked.save(person(id: 'p1'));
-    await clocked.softDelete('p1');
-    final loaded = await clocked.getById('p1');
+  test('softDeletePerson stamps the supplied deletedAt timestamp', () async {
+    await repo.savePerson(person(id: 'p1'));
+    await repo.softDeletePerson('p1', DateTime.utc(2030, 3, 3));
+    final loaded = await repo.getPersonById('p1', includeDeleted: true);
     expect(loaded!.deletedAt, DateTime.utc(2030, 3, 3));
   });
 
@@ -192,8 +202,8 @@ void main() {
           createdAt: DateTime.utc(2025, 1, 1),
           updatedAt: DateTime.utc(2025, 1, 1),
         );
-        await store.save(p);
-        final loaded = await store.getById(p.id);
+        await repo.savePerson(p);
+        final loaded = await repo.getPersonById(p.id);
         expect(loaded!.relationshipCloseness, level, reason: level.name);
       }
     },
@@ -202,7 +212,7 @@ void main() {
   test(
     'legacy stored closeness values collapse onto the three levels (F10)',
     () async {
-      await store.save(person(id: 'legacy'));
+      await repo.savePerson(person(id: 'legacy'));
       final cases = {
         'family': RelationshipCloseness.close,
         'goodFriend': RelationshipCloseness.close,
@@ -218,9 +228,84 @@ void main() {
         )..where((t) => t.id.equals('legacy'))).write(
           db.PersonsCompanion(relationshipCloseness: drift.Value(entry.key)),
         );
-        final loaded = await store.getById('legacy');
+        final loaded = await repo.getPersonById('legacy');
         expect(loaded!.relationshipCloseness, entry.value, reason: entry.key);
       }
+    },
+  );
+
+  test(
+    'getBirthdayForPerson returns latest cycle when multiple cycles exist',
+    () async {
+      final now = DateTime.utc(2026, 1, 1);
+      await repo.savePerson(person(id: 'p-multi'));
+      await database
+          .into(database.birthdays)
+          .insert(
+            db.BirthdaysCompanion.insert(
+              id: 'b-2025',
+              personId: 'p-multi',
+              cycleYear: 2025,
+              date: DateTime.utc(2025, 4, 22),
+              status: 'completed',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await database
+          .into(database.birthdays)
+          .insert(
+            db.BirthdaysCompanion.insert(
+              id: 'b-2026',
+              personId: 'p-multi',
+              cycleYear: 2026,
+              date: DateTime.utc(2026, 4, 22),
+              status: 'upcoming',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      final latest = await repo.getBirthdayForPerson('p-multi');
+      expect(latest, isNotNull);
+      expect(latest!.id, 'b-2026');
+      expect(latest.cycleYear, 2026);
+    },
+  );
+
+  test(
+    'purgeExpiredTombstones removes expired tombstones and keeps recent/active rows',
+    () async {
+      final oldTime = DateTime.utc(2025, 1, 1);
+      final recentTime = DateTime.utc(2026, 1, 15);
+      final cutoff = DateTime.utc(2026, 1, 1);
+
+      await repo.savePersonAndBirthday(
+        person(id: 'expired'),
+        Birthday(
+          id: 'b-expired',
+          personId: 'expired',
+          cycleYear: 2025,
+          date: DateTime.utc(2025, 4, 22),
+          createdAt: oldTime,
+          updatedAt: oldTime,
+        ),
+      );
+      await repo.softDeletePerson('expired', oldTime);
+
+      await repo.savePerson(person(id: 'recent-del'));
+      await repo.softDeletePerson('recent-del', recentTime);
+
+      await repo.savePerson(person(id: 'active'));
+
+      final purged = await repo.purgeExpiredTombstones(cutoff);
+      expect(purged, 1);
+      expect(await repo.getPersonById('expired', includeDeleted: true), isNull);
+      expect(
+        await repo.getPersonById('recent-del', includeDeleted: true),
+        isNotNull,
+      );
+      expect(await repo.getPersonById('active'), isNotNull);
     },
   );
 }

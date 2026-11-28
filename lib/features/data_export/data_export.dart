@@ -59,6 +59,7 @@ const _fields = <ExportCategory, Map<String, String>>{
     'draft_id': 's?',
     'created_at': 'i',
     'updated_at': 'i',
+    'deleted_at': 'i?',
   },
   ExportCategory.drafts: {
     'id': 's',
@@ -73,6 +74,7 @@ const _fields = <ExportCategory, Map<String, String>>{
     'revision': 'i',
     'created_at': 'i',
     'updated_at': 'i',
+    'deleted_at': 'i?',
   },
   ExportCategory.reminders: {
     'key': 's',
@@ -192,7 +194,7 @@ class LocalDataExporter {
     if (selected.isEmpty) {
       throw const DataExportException('Select at least one category.');
     }
-    if (database.schemaVersion != 9) {
+    if (database.schemaVersion != 10) {
       throw const DataExportException(
         'The local data schema has changed; export is unavailable until reviewed.',
       );

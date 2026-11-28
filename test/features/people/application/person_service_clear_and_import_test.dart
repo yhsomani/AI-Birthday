@@ -1,7 +1,7 @@
 import 'package:ai_birthday/core/database/app_database.dart' hide Person;
 import 'package:ai_birthday/core/logging/app_logger.dart';
 import 'package:ai_birthday/features/people/application/person_service.dart';
-import 'package:ai_birthday/features/people/data/person_repository.dart';
+import 'package:ai_birthday/features/people/data/drift_people_repository.dart';
 import 'package:ai_birthday/features/people/domain/models/relationship.dart';
 import 'package:ai_birthday/features/people/domain/person_input.dart';
 import 'package:ai_birthday/features/people/domain/person_input_validator.dart';
@@ -17,7 +17,7 @@ void main() {
     nextId = 0;
     db = AppDatabase(NativeDatabase.memory());
     service = PersonService(
-      DriftPeopleStore(db, now: () => DateTime.utc(2025, 6, 15, 9)),
+      DriftPeopleRepository(db, now: () => DateTime.utc(2025, 6, 15, 9)),
       const PersonInputValidator(),
       const NoopLogger(),
       now: () => DateTime.utc(2025, 6, 15, 9),

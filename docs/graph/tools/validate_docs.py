@@ -29,8 +29,12 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[3]
 GRAPH = ROOT / 'docs' / 'graph'
-CANONICAL = ['README.md', 'PRODUCT.md', 'ARCHITECTURE.md', 'SECURITY.md', 'IMPLEMENTATION.md',
-             'OPERATIONS.md', 'PROJECT_MINDMAP.md', 'backend/README.md', 'backend/hosting/README.md']
+CANONICAL = ['README.md', 'docs/PRODUCT.md', 'docs/ARCHITECTURE.md', 'docs/SECURITY.md',
+             'docs/IMPLEMENTATION.md', 'docs/OPERATIONS.md', 'docs/PROJECT_MINDMAP.md',
+             'backend/README.md', 'backend/hosting/README.md']
+CANONICAL_ALIASES = {
+    Path(path).name: path for path in CANONICAL if path.startswith('docs/')
+}
 RETIRED_PREFIXES = ('docs/product-blueprint', 'docs/audit', 'docs/archive', 'docs/ui-redesign', 'docs/ui-ux',
                     'docs/knowledge', 'SSOT.md', 'PROJECT.md', 'DESIGN.md', 'DESIGN-SUMMARY.md',
                     'docs/ui-audit.md', 'docs/visibility-audit.md', 'docs/purchases-setup.md')
@@ -45,6 +49,19 @@ REGISTRY_STATUS = {'implemented', 'partially-implemented', 'not-implemented', 'b
 MERMAID_START = re.compile(r'^(flowchart|graph|sequenceDiagram|stateDiagram(-v2)?|erDiagram|classDiagram|mindmap|journey|gantt|timeline|pie|gitGraph|C4Context|quadrantChart|requirementDiagram)\b')
 GENERATED_EVIDENCE = {'docs/graph/graph-overlay.json', 'docs/graph/feature-registry.json', 'docs/graph/issue-register.json',
                       'docs/graph/master-project-graph.json'}
+
+
+def repo_path(path: str | Path) -> Path:
+    """Resolve repository-root paths and legacy root-level canonical doc links."""
+    candidate = (ROOT / path).resolve()
+    if candidate.exists():
+        return candidate
+    alias = CANONICAL_ALIASES.get(Path(path).name)
+    if alias is not None:
+        canonical = ROOT / alias
+        if canonical.exists():
+            return canonical
+    return candidate
 
 
 def slug(heading: str) -> str:
@@ -77,7 +94,7 @@ def validate_markdown(errors: list[str], stats: dict) -> None:
     for path in (ROOT / 'docs').rglob('*.html'):
         errors.append(f"{path.relative_to(ROOT)}: documentation web pages are not part of the Markdown documentation set")
     for rel in CANONICAL:
-        path = ROOT / rel
+        path = repo_path(rel)
         if not path.exists():
             errors.append(f'{rel}: canonical document is missing')
             continue
@@ -98,7 +115,10 @@ def validate_markdown(errors: list[str], stats: dict) -> None:
             target_part, _, anchor = url.partition('#')
             links += 1
             if target_part:
-                target = (path.parent / unquote(target_part.split('?')[0])).resolve()
+                relative_target = unquote(target_part.split('?')[0])
+                target = (path.parent / relative_target).resolve()
+                if not target.exists():
+                    target = repo_path(relative_target)
                 if not target.is_relative_to(ROOT):
                     errors.append(f'{rel}: link escapes repository: {url}')
                     continue
@@ -132,7 +152,7 @@ def validate_registry(errors: list[str], stats: dict) -> dict:
             errors.append(f'registry {f["id"]}: bad status {f.get("implementation_status")}')
         for field in ('source', 'tests'):
             for p in f.get(field, []):
-                if not (ROOT / p).is_file():
+                if not repo_path(p).is_file():
                     errors.append(f'registry {f["id"]}: missing {field} path {p}')
     for f in feats:
         seen = {f['id']}
@@ -153,7 +173,7 @@ def validate_registry(errors: list[str], stats: dict) -> dict:
 def evidence_exists(p: str) -> bool:
     if p in GENERATED_EVIDENCE:
         return True
-    return (ROOT / p).exists()
+    return repo_path(p).exists()
 
 
 def validate_graph(errors: list[str], stats: dict) -> dict:
@@ -233,7 +253,7 @@ def validate_traceability(errors: list[str], stats: dict, graph: dict) -> None:
                 if value.strip() not in ids:
                     errors.append(f'traceability {row["journey_id"]}: unknown ID {value.strip()} in {col}')
         for p in filter(None, (row.get('test_evidence') or '').split(';')):
-            if not (ROOT / p).is_file():
+            if not repo_path(p).is_file():
                 errors.append(f'traceability {row["journey_id"]}: missing test path {p}')
     stats['traceability_rows'] = len(rows)
 
@@ -247,8 +267,8 @@ def validate_status_consistency(errors: list[str], stats: dict) -> None:
     reg = {f['id']: f for f in json.loads((GRAPH / 'feature-registry.json').read_text(encoding='utf-8'))['features']}
     tag_re = re.compile(r'\[(?:IMPLEMENTED|PARTIAL|NOT IMPLEMENTED|UNREACHABLE|UNKNOWN|BROKEN|MOCKED)\]')
     checked = 0
-    for doc in ('PRODUCT.md', 'IMPLEMENTATION.md'):
-        path = ROOT / doc
+    for doc in ('docs/PRODUCT.md', 'docs/IMPLEMENTATION.md'):
+        path = repo_path(doc)
         if not path.exists():
             continue
         for n, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
@@ -264,7 +284,7 @@ def validate_status_consistency(errors: list[str], stats: dict) -> None:
     for f in reg.values():
         for s in f.get('spec', []):
             token = s.split(' ')[0]
-            if token.endswith(('.md', '.json', '.csv')) and not (ROOT / token).exists():
+            if token.endswith(('.md', '.json', '.csv')) and not repo_path(token).exists():
                 errors.append(f'registry {f["id"]}: spec path missing {token}')
             if re.search(r'docs/(product-blueprint|audit|archive|knowledge|ui-)', s):
                 errors.append(f'registry {f["id"]}: spec references a retired document: {s}')
@@ -274,7 +294,7 @@ def validate_status_consistency(errors: list[str], stats: dict) -> None:
 def validate_issue_table(errors: list[str], stats: dict) -> None:
     """IMPLEMENTATION.md section 4 issue statuses must equal docs/graph/issue-register.json."""
     issues = {i['id']: i for i in json.loads((GRAPH / 'issue-register.json').read_text(encoding='utf-8'))['issues']}
-    path = ROOT / 'IMPLEMENTATION.md'
+    path = repo_path('docs/IMPLEMENTATION.md')
     if not path.exists():
         return
     text = path.read_text(encoding='utf-8')
@@ -305,7 +325,8 @@ def validate_issue_table(errors: list[str], stats: dict) -> None:
 
 def validate_nano(errors: list[str], stats: dict) -> None:
     units = json.loads((GRAPH / 'nano-units.json').read_text(encoding='utf-8'))['units']
-    text = (ROOT / 'PRODUCT.md').read_text(encoding='utf-8') if (ROOT / 'PRODUCT.md').exists() else ''
+    product = repo_path('docs/PRODUCT.md')
+    text = product.read_text(encoding='utf-8') if product.exists() else ''
     for u in units:
         if f"`{u['id']}`" not in text:
             errors.append(f"nano unit {u['id']} is not documented in PRODUCT.md section 5.5")
@@ -314,7 +335,8 @@ def validate_nano(errors: list[str], stats: dict) -> None:
 
 def validate_issues(errors: list[str], stats: dict) -> None:
     issues = json.loads((GRAPH / 'issue-register.json').read_text(encoding='utf-8'))['issues']
-    text = (ROOT / 'IMPLEMENTATION.md').read_text(encoding='utf-8') if (ROOT / 'IMPLEMENTATION.md').exists() else ''
+    implementation = repo_path('docs/IMPLEMENTATION.md')
+    text = implementation.read_text(encoding='utf-8') if implementation.exists() else ''
     ids = set()
     for i in issues:
         if i['id'] in ids:
@@ -338,17 +360,18 @@ def validate_migration(errors: list[str], stats: dict) -> None:
     for r in rows:
         dest = r['destination_doc']
         if r['preservation_status'] == 'kept-in-place':
-            if not (ROOT / dest).exists() or dest.startswith(RETIRED_PREFIXES):
+            if not repo_path(dest).exists() or dest.startswith(RETIRED_PREFIXES):
                 errors.append(f'migration {r["item_id"]}: kept-in-place file missing or retired: {dest}')
             continue
         if r['preservation_status'].startswith('dropped'):
             if not r.get('rationale'):
                 errors.append(f'migration {r["item_id"]}: dropped without rationale')
             continue
-        if not (ROOT / dest).exists():
+        destination = repo_path(dest)
+        if not destination.exists():
             errors.append(f'migration {r["item_id"]}: destination {dest} missing')
             continue
-        anchors = cache.setdefault(dest, headings(ROOT / dest))
+        anchors = cache.setdefault(dest, headings(destination))
         if r['anchor'] not in anchors:
             errors.append(f'migration {r["item_id"]}: anchor #{r["anchor"]} not in {dest}')
     stats['migration_rows'] = len(rows)

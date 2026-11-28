@@ -49,11 +49,15 @@ final RegExp _emailRegExp = RegExp(
   caseSensitive: false,
 );
 final RegExp _credentialRegExp = RegExp(
-  r'\b(?:Bearer\s+)?(?:AIza[0-9A-Za-z_-]{20,}|ya29\.[0-9A-Za-z._-]{20,}|eyJ[0-9A-Za-z_-]{20,}\.[0-9A-Za-z_-]{10,}\.[0-9A-Za-z_-]{10,})\b',
+  r'(?:\bBearer\s+[A-Za-z0-9._~+/=-]{6,}|\bAIza[0-9A-Za-z_-]{20,}\b|\bya29\.[0-9A-Za-z._-]{20,}\b|\beyJ[0-9A-Za-z_-]{10,}\.[0-9A-Za-z_-]{10,}\.[0-9A-Za-z_-]{10,}\b|\bsk-[A-Za-z0-9_-]{16,}\b|\bgh[pousr]_[A-Za-z0-9]{20,}\b)',
 );
-final RegExp _phoneRegExp = RegExp(r'(?<!\w)\+?\d[\d ()-]{7,}\d(?!\w)');
+final RegExp _phoneRegExp = RegExp(
+  r'(?<!\w)(?!\d{4}-\d{2}-\d{2}\b)(?:\+\d[\d ()-]{6,}\d|\(\d{2,4}\)[\d ()-]{5,}\d|\d{3}[\s-]\d{3,4}[\s-]\d{4}|\d{10,15})(?!\w)',
+);
+// Match `key=value` unconditionally or `key: value` when quoted, JSON-keyed,
+// header-specific, or non-prose value (preserving e.g. `token: HTTP 400`).
 final RegExp _sensitiveAssignmentRegExp = RegExp(
-  r'''\b(?:email|phone(?:Number)?|address|token|apiKey|credential|secret|password|note|message|content|body)\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)''',
+  r'''(?:"(?:email|phone(?:_?number)?|address|(?:id_?|refresh_?|access_?)?token|api[-_]?key|x-goog-api-key|authorization|credential|secret|password|note|notes|message|content|body|subject|uid|user[-_]?id|fact|quote)"\s*:\s*(?:"[^"]*"|'[^']*'|[^\s,}\]]+)|\b(?:email|phone(?:_?number)?|address|(?:id_?|refresh_?|access_?)?token|api[-_]?key|x-goog-api-key|authorization|credential|secret|password|note|notes|message|content|body|subject|uid|user[-_]?id|fact|quote)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s,;&]+)|\b(?:email|phone(?:_?number)?|address|api[-_]?key|x-goog-api-key|authorization|credential|secret|password)\s*:\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)|\b(?:(?:id_?|refresh_?|access_?)?token|note|notes|message|content|body)\s*:\s*(?:"[^"]*"|'[^']*'|(?!HTTP\b)[^\s,;]+))''',
   caseSensitive: false,
 );
 
@@ -63,10 +67,22 @@ String _redactMessage(String message) => message
     .replaceAll(_phoneRegExp, '[REDACTED]')
     .replaceAll(_sensitiveAssignmentRegExp, '[REDACTED]');
 
-/// Redacts values whose key suggests sensitive content.
+/// Redacts values whose key suggests sensitive content, and recursively
+/// sanitizes string, map, and iterable values under benign keys.
 Object? _redactValue(String key, Object? value) {
   if (_sensitiveKeyRegExp.hasMatch(key)) {
     return '[REDACTED]';
+  }
+  if (value is String) {
+    return _redactMessage(value);
+  }
+  if (value is Map) {
+    return value.map(
+      (k, v) => MapEntry(k.toString(), _redactValue(k.toString(), v)),
+    );
+  }
+  if (value is Iterable) {
+    return value.map((item) => _redactValue(key, item)).toList();
   }
   return value;
 }
@@ -176,7 +192,7 @@ class ConsoleAppLogger implements AppLogger {
     LogRecord(
       level: LogLevel.verbose,
       category: category,
-      message: _redactMessage(message),
+      message: message,
       operationId: operationId,
       params: params,
     ),

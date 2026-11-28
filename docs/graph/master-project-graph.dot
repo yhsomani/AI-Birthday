@@ -348,7 +348,7 @@ digraph ProjectGraph {
   "DEP-020" [label="DEP-020\nPEOPLE depends on SEND (8 importing files)",fillcolor="#e7f6ec"];
   "DEP-021" [label="DEP-021\nPEOPLE depends on STUDIO (1 importing files)",fillcolor="#e7f6ec"];
   "DEP-022" [label="DEP-022\nREM depends on BIRTH (1 importing files)",fillcolor="#e7f6ec"];
-  "DEP-023" [label="DEP-023\nREM depends on PEOPLE (3 importing files)",fillcolor="#e7f6ec"];
+  "DEP-023" [label="DEP-023\nREM depends on PEOPLE (2 importing files)",fillcolor="#e7f6ec"];
   "DEP-024" [label="DEP-024\nSEND depends on BIRTH (2 importing files)",fillcolor="#e7f6ec"];
   "DEP-025" [label="DEP-025\nSEND depends on PEOPLE (2 importing files)",fillcolor="#e7f6ec"];
   "DEP-026" [label="DEP-026\nSEND depends on STUDIO (1 importing files)",fillcolor="#e7f6ec"];
@@ -384,6 +384,7 @@ digraph ProjectGraph {
   "EXT-011" [label="EXT-011\nSMS composer and gated Android SmsManager adapter",fillcolor="#fff3cd"];
   "EXT-012" [label="EXT-012\nAndroid share sheet and clipboard",fillcolor="#e7f6ec"];
   "EXT-013" [label="EXT-013\nFirebase App Check and reCAPTCHA Enterprise in public site",fillcolor="#fff3cd"];
+  "EXT-014" [label="EXT-014\nTargeted Android text-share handoff to selected social app",fillcolor="#e7f6ec"];
   "FLOW-001" [label="FLOW-001\nLaunch -> database preflight -> onboarding guard -> shell",fillcolor="#e7f6ec"];
   "FLOW-002" [label="FLOW-002\nPerson form/import -> validation -> application service -> r",fillcolor="#e7f6ec"];
   "FLOW-003" [label="FLOW-003\nPerson -> birthday occurrence -> reminder plan -> Android no",fillcolor="#e7f6ec"];
@@ -431,7 +432,7 @@ digraph ProjectGraph {
   "JOBS-RETRY-RECOVERY" [label="JOBS-RETRY-RECOVERY\nRecover interrupted jobs and retry within bounds",fillcolor="#e7f6ec"];
   "JOBS-SKIP-OUTCOME" [label="JOBS-SKIP-OUTCOME\nJobSkipped outcome recorded as succeeded with resultRef drop",fillcolor="#e7f6ec"];
   "L10N" [label="L10N\nLocalisation (gen-l10n)",fillcolor="#fff3cd"];
-  "NATIVE-SHARE" [label="NATIVE-SHARE\nACTION_SEND chooser via MethodChannel",fillcolor="#e7f6ec"];
+  "NATIVE-SHARE" [label="NATIVE-SHARE\nShare chooser and package-targeted social ACTION_SEND via Me",fillcolor="#e7f6ec"];
   "NAV" [label="NAV\nNavigation shell",fillcolor="#e7f6ec"];
   "NAV-NOT-FOUND" [label="NAV-NOT-FOUND\nUnknown-route screen (_NotFoundScreen)",fillcolor="#e7f6ec"];
   "NAV-NOTIFICATION-DEEPLINK" [label="NAV-NOTIFICATION-DEEPLINK\nNotification tap routes to Message Studio",fillcolor="#fff3cd"];
@@ -562,7 +563,7 @@ digraph ProjectGraph {
   "SEND" [label="SEND\nUser-controlled delivery handoffs",fillcolor="#e7f6ec"];
   "SEND-EXPLICIT-CONFIRMATION" [label="SEND-EXPLICIT-CONFIRMATION\nRequire user confirmation before recording sent",fillcolor="#e7f6ec"];
   "SEND-EXPLICIT-CONFIRMATION/n1" [label="SEND-EXPLICIT-CONFIRMATION/n1\nDialog 'Did you send the message?' → 'Not Sent Yet' / 'Yes, ",fillcolor="#e7f6ec"];
-  "SEND-SHARE" [label="SEND-SHARE\nSystem share and copy",fillcolor="#e7f6ec"];
+  "SEND-SHARE" [label="SEND-SHARE\nSystem share, copy and targeted platform handoff",fillcolor="#e7f6ec"];
   "SEND-SMS" [label="SEND-SMS\nSMS delivery handoff",fillcolor="#e7f6ec"];
   "SEND-SMS-AUTOMATION" [label="SEND-SMS-AUTOMATION\nSchedule direct background SMS",fillcolor="#fff3cd"];
   "SEND-SMS-COMPOSER" [label="SEND-SMS-COMPOSER\nOpen the user-controlled SMS composer",fillcolor="#e7f6ec"];
@@ -1201,6 +1202,7 @@ digraph ProjectGraph {
   "BRANCH-19" -> "EXT-011" [style=solid,color="#9aa5b1",label="",fontsize=7];
   "BRANCH-19" -> "EXT-012" [style=solid,color="#9aa5b1",label="",fontsize=7];
   "BRANCH-19" -> "EXT-013" [style=solid,color="#9aa5b1",label="",fontsize=7];
+  "BRANCH-19" -> "EXT-014" [style=solid,color="#9aa5b1",label="",fontsize=7];
   "BRANCH-20" -> "SEC-001" [style=solid,color="#9aa5b1",label="",fontsize=7];
   "BRANCH-20" -> "SEC-002" [style=solid,color="#9aa5b1",label="",fontsize=7];
   "BRANCH-20" -> "SEC-003" [style=solid,color="#9aa5b1",label="",fontsize=7];
@@ -1671,6 +1673,7 @@ digraph ProjectGraph {
   "JOBS-SKIP-OUTCOME" -> "TEST-001" [style=dotted,color="#318553",label="TESTED_BY",fontsize=7];
   "L10N" -> "A2-034" [style=bold,color="#b3261e",label="BLOCKED_BY",fontsize=7];
   "L10N" -> "A3-027" [style=bold,color="#b3261e",label="BLOCKED_BY",fontsize=7];
+  "NATIVE-SHARE" -> "TEST-001" [style=dotted,color="#318553",label="TESTED_BY",fontsize=7];
   "NAV" -> "A1-023" [style=bold,color="#b3261e",label="BLOCKED_BY",fontsize=7];
   "NAV" -> "A3-026" [style=bold,color="#b3261e",label="BLOCKED_BY",fontsize=7];
   "NAV" -> "A3-027" [style=bold,color="#b3261e",label="BLOCKED_BY",fontsize=7];
@@ -1902,8 +1905,10 @@ digraph ProjectGraph {
   "SEND-EXPLICIT-CONFIRMATION" -> "A2-026" [style=bold,color="#b3261e",label="BLOCKED_BY",fontsize=7];
   "SEND-EXPLICIT-CONFIRMATION" -> "SEND-EXPLICIT-CONFIRMATION/n1" [style=solid,color="#9aa5b1",label="",fontsize=7];
   "SEND-EXPLICIT-CONFIRMATION" -> "TEST-001" [style=dotted,color="#318553",label="TESTED_BY",fontsize=7];
+  "SEND-SHARE" -> "EXT-014" [style=solid,color="#c16a16",label="CALLS",fontsize=7];
   "SEND-SHARE" -> "NATIVE-SHARE" [style=solid,color="#9aa5b1",label="",fontsize=7];
   "SEND-SHARE" -> "STUDIO-COPY-EVENT" [style=solid,color="#9aa5b1",label="",fontsize=7];
+  "SEND-SHARE" -> "TEST-001" [style=dotted,color="#318553",label="TESTED_BY",fontsize=7];
   "SEND-SMS" -> "SEND-SMS-AUTOMATION" [style=solid,color="#9aa5b1",label="",fontsize=7];
   "SEND-SMS" -> "SEND-SMS-COMPOSER" [style=solid,color="#9aa5b1",label="",fontsize=7];
   "SEND-SMS" -> "SEND-SMS/n1" [style=solid,color="#9aa5b1",label="",fontsize=7];

@@ -5,12 +5,18 @@ library;
 enum DeliveryChannel {
   whatsapp,
   sms,
+  instagram,
+  snapchat,
+  linkedin,
   clipboard,
   share;
 
   String get displayName => switch (this) {
     DeliveryChannel.whatsapp => 'WhatsApp',
-    DeliveryChannel.sms => 'SMS',
+    DeliveryChannel.sms => 'Messages / SMS',
+    DeliveryChannel.instagram => 'Instagram',
+    DeliveryChannel.snapchat => 'Snapchat',
+    DeliveryChannel.linkedin => 'LinkedIn',
     DeliveryChannel.clipboard => 'Copy to Clipboard',
     DeliveryChannel.share => 'Share Sheet',
   };

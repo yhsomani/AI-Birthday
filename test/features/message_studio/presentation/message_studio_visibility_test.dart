@@ -134,7 +134,7 @@ void main() {
       );
 
       final smsText = find.text('Send via SMS');
-      expect(smsText, findsNWidgets(2));
+      expect(smsText, findsOneWidget);
       final primary = tester.widget<FilledButton>(
         find.ancestor(of: smsText.first, matching: find.byType(FilledButton)),
       );
@@ -326,7 +326,7 @@ void main() {
         await tester.tap(find.text('Use on-device AI (Gemini Nano)'));
         await tester.pumpAndSettle();
 
-        expect(find.text('Message drafted with AI ✨'), findsOneWidget);
+        expect(find.text('Message drafted with AI.'), findsOneWidget);
         expect(
           find.text('Happy Birthday! Wishing you a fantastic day!'),
           findsOneWidget,
@@ -417,13 +417,20 @@ void main() {
           phone: '+14155552671',
           status: BirthdayStatus.handedOff,
         );
+        await harness.deliveryEventsRepo.recordHandoff(
+          birthdayId: 'b-test',
+          channel: DeliveryChannel.whatsapp,
+          at: DateTime.now(),
+        );
 
         // Primary becomes Confirm Sent; the WhatsApp re-send affordance
         // disappears (SMS/Share remain as alternate channels, per Q).
         expect(find.text('Confirm Sent'), findsOneWidget);
         expect(find.text('Send on WhatsApp'), findsNothing);
 
-        await tester.tap(find.text('Confirm Sent'));
+        final confirmSent = find.text('Confirm Sent');
+        await tester.ensureVisible(confirmSent);
+        await tester.tap(confirmSent);
         await tester.pumpAndSettle();
 
         // The dialog asks the user, it never re-opens the external app.
@@ -435,8 +442,11 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 20));
         final events = await harness.db.select(harness.db.deliveryEvents).get();
-        expect(events, hasLength(1));
-        expect(events.single.outcome, 'notSent');
+        expect(events, hasLength(2));
+        expect(
+          events.map((event) => event.outcome),
+          containsAll(['launched', 'notSent']),
+        );
       },
     );
   });

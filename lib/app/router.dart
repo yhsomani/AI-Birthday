@@ -1,4 +1,4 @@
-/// Declarative routing configuration for AI-Birthday (legacy SSOT §3, §15, §16, §24, §28 (PRODUCT.md §16.7)).
+/// Declarative routing configuration for AI-Birthday.
 library;
 
 import 'package:flutter/material.dart';
@@ -11,6 +11,7 @@ import 'package:ai_birthday/features/calendar/presentation/calendar_screen.dart'
 import 'package:ai_birthday/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:ai_birthday/features/history/presentation/history_screen.dart';
 import 'package:ai_birthday/features/message_studio/presentation/message_studio_screen.dart';
+import 'package:ai_birthday/features/onboarding/application/onboarding_gate.dart';
 import 'package:ai_birthday/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:ai_birthday/features/people/presentation/people_screen.dart';
 import 'package:ai_birthday/features/people/presentation/person_form_screen.dart';
@@ -18,85 +19,95 @@ import 'package:ai_birthday/features/settings/presentation/settings_screen.dart'
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 import 'app_scaffold.dart';
 
+export 'package:ai_birthday/features/onboarding/application/onboarding_gate.dart';
+
+/// Canonical application route paths & builders.
+abstract final class AppRoutes {
+  static const String onboarding = '/onboarding';
+  static const String onboardingReplay = '/onboarding?replay=true';
+  static const String dashboard = '/dashboard';
+  static const String people = '/people';
+  static const String peopleAdd = '/people/add';
+  static const String calendar = '/calendar';
+  static const String history = '/history';
+  static const String settings = '/settings';
+
+  static String peopleEdit(String id) => '/people/edit/$id';
+  static String studioForBirthday(String birthdayId) =>
+      '/message-studio/$birthdayId';
+  static String studioForPerson(String personId) =>
+      '/message-studio/person/$personId';
+}
+
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
 );
 
-/// In-memory cache of the onboarding flag so navigation does not hit secure
-/// storage every time.
-///
-/// Only a positive result is cached (completion never reverts), so finishing
-/// onboarding is picked up by the very next redirect. A read *failure* is not
-/// "not onboarded": the user is let through and the read retried later,
-/// instead of being trapped in onboarding by a flaky Keystore.
-class OnboardingGate {
-  OnboardingGate(this._storage);
-
-  final CredentialStorage _storage;
-  bool _completed = false;
-
-  Future<bool> isCompleted() async {
-    if (_completed) return true;
-    try {
-      _completed = await _storage.hasCompletedOnboarding();
-    } catch (_) {
-      return true;
-    }
-    return _completed;
-  }
-}
-
-GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
-  final gate = credentialStorage == null
-      ? null
-      : OnboardingGate(credentialStorage);
+GoRouter createAppRouter([
+  CredentialStorage? credentialStorage,
+  OnboardingGate? gateOverride,
+]) {
+  final gate =
+      gateOverride ??
+      (credentialStorage == null ? null : OnboardingGate(credentialStorage));
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/dashboard',
+    initialLocation: AppRoutes.dashboard,
     // Unmatched locations get a real screen (not a blank/error page) with a
     // way back into the shell.
     errorBuilder: (context, state) => _NotFoundScreen(state),
     redirect: (context, state) async {
       if (gate == null) return null;
       final completed = await gate.isCompleted();
-      final isOnboarding = state.matchedLocation == '/onboarding';
+      final isOnboarding = state.matchedLocation == AppRoutes.onboarding;
       if (!completed && !isOnboarding) {
-        return '/onboarding';
+        return AppRoutes.onboarding;
       }
       if (completed &&
           isOnboarding &&
           state.uri.queryParameters['replay'] != 'true') {
-        return '/dashboard';
+        return AppRoutes.dashboard;
       }
       return null;
     },
     routes: [
       // First-run / Onboarding walkthrough
       GoRoute(
-        path: '/onboarding',
+        path: AppRoutes.onboarding,
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const OnboardingScreen(),
+        builder: (context, state) => OnboardingScreen(
+          isReplay: state.uri.queryParameters['replay'] == 'true',
+        ),
       ),
 
-      // Modal / Detail routes mounted above the shell
-      GoRoute(
-        path: '/message-studio/:birthdayId',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) {
-          final birthdayId = state.pathParameters['birthdayId'] ?? '';
-          return MessageStudioScreen(birthdayId: birthdayId);
-        },
-      ),
+      // Modal / Detail routes mounted above the shell.
+      // Specific `/message-studio/person/:personId` MUST precede
+      // `/message-studio/:birthdayId` to prevent `:birthdayId` from capturing
+      // `'person'` (NAV-ROUTE-COLLISION).
       GoRoute(
         path: '/message-studio/person/:personId',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) {
           final personId = state.pathParameters['personId'] ?? '';
+          if (personId.isEmpty) {
+            return _NotFoundScreen(state);
+          }
           return MessageStudioScreen(personId: personId);
         },
       ),
       GoRoute(
-        path: '/people/add',
+        path: '/message-studio/:birthdayId',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final birthdayId = state.pathParameters['birthdayId'] ?? '';
+          if (birthdayId.isEmpty || birthdayId == 'person') {
+            return _NotFoundScreen(state);
+          }
+          return MessageStudioScreen(birthdayId: birthdayId);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.peopleAdd,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const PersonFormScreen(),
       ),
@@ -107,12 +118,12 @@ GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
             PersonFormScreen(personId: state.pathParameters['id']),
       ),
       GoRoute(
-        path: '/settings',
+        path: AppRoutes.settings,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const SettingsScreen(),
       ),
 
-      // Bottom Navigation Stateful Shell
+      // Bottom Navigation / Rail Stateful Shell
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppScaffold(navigationShell: navigationShell),
@@ -120,7 +131,7 @@ GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/dashboard',
+                path: AppRoutes.dashboard,
                 builder: (context, state) => const DashboardScreen(),
               ),
             ],
@@ -128,7 +139,7 @@ GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/people',
+                path: AppRoutes.people,
                 builder: (context, state) => const PeopleScreen(),
               ),
             ],
@@ -136,7 +147,7 @@ GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/calendar',
+                path: AppRoutes.calendar,
                 builder: (context, state) => const CalendarScreen(),
               ),
             ],
@@ -144,7 +155,7 @@ GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/history',
+                path: AppRoutes.history,
                 builder: (context, state) => const HistoryScreen(),
               ),
             ],
@@ -158,11 +169,12 @@ GoRouter createAppRouter([CredentialStorage? credentialStorage]) {
 /// Riverpod provider for GoRouter instance with onboarding guard.
 final routerProvider = Provider<GoRouter>((ref) {
   final storage = ref.watch(credentialStorageProvider);
-  return createAppRouter(storage);
+  final gate = ref.watch(onboardingGateProvider);
+  return createAppRouter(storage, gate);
 });
 
 /// Fallback for any location that matches no route: show what was asked and
-/// hand the user back to the dashboard shell (they can return to their tab).
+/// hand the user back to the dashboard shell.
 class _NotFoundScreen extends StatelessWidget {
   const _NotFoundScreen(this.state);
 
@@ -170,20 +182,23 @@ class _NotFoundScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final location = state.uri.path == '/' ? '' : state.uri.path;
     return Scaffold(
-      appBar: AppBar(title: const Text('Screen not found')),
+      appBar: AppBar(title: Text(l10n.notFoundAppBarTitle)),
       body: SafeArea(
-        child: EmptyState(
-          icon: Icons.explore_off_outlined,
-          title: location.isEmpty
-              ? 'That screen does not exist.'
-              : 'No screen matches "$location".',
-          message: 'Let\'s get you back to your celebrations.',
-          action: FilledButton.icon(
-            onPressed: () => context.go('/dashboard'),
-            icon: const Icon(Icons.home_outlined),
-            label: const Text('Back to dashboard'),
+        child: AppResponsiveContainer(
+          child: EditorialEmptyState(
+            icon: Icons.explore_off_outlined,
+            title: location.isEmpty
+                ? l10n.notFoundEmptyPathTitle
+                : l10n.notFoundPathTitle(location),
+            message: l10n.notFoundMessage,
+            action: FilledButton.icon(
+              onPressed: () => context.go(AppRoutes.dashboard),
+              icon: const Icon(Icons.home_outlined),
+              label: Text(l10n.notFoundBackToDashboard),
+            ),
           ),
         ),
       ),

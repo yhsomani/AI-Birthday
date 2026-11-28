@@ -14,12 +14,16 @@ import 'package:ai_birthday/features/birthdays/application/birthday_lifecycle_se
 import 'package:ai_birthday/features/birthdays/domain/repositories/birthdays_repository.dart';
 import 'package:ai_birthday/features/delivery/data/whatsapp_handoff_builder.dart';
 import 'package:ai_birthday/features/delivery/data/native_share_service.dart';
+import 'package:ai_birthday/features/delivery/data/platform_handoff_builder.dart';
 import 'package:ai_birthday/features/delivery/data/sms_delivery_service.dart';
 import 'package:ai_birthday/features/delivery/domain/models/delivery_handoff.dart';
 import 'package:ai_birthday/features/delivery/domain/repositories/delivery_events_repository.dart';
+import 'package:ai_birthday/features/onboarding/application/onboarding_gate.dart';
 import 'package:ai_birthday/features/people/data/contact_csv_service.dart';
 import 'package:ai_birthday/features/people/data/device_contacts_service.dart';
-import 'package:ai_birthday/features/people/data/person_providers.dart';
+import 'package:ai_birthday/features/people/data/drift_people_repository.dart';
+import 'package:ai_birthday/features/people/data/person_providers.dart'
+    show resyncReminderSchedule;
 import 'package:ai_birthday/features/reminders/application/reminder_settings_controller.dart';
 import 'package:ai_birthday/features/message_studio/domain/models/message_draft.dart';
 import 'package:ai_birthday/features/message_studio/domain/repositories/drafts_repository.dart';
@@ -53,6 +57,11 @@ final credentialStorageProvider = Provider<CredentialStorage>((ref) {
   return SecureCredentialStorage(
     FlutterSecureStorageDriver(const FlutterSecureStorage(), logger),
   );
+});
+
+/// Shared onboarding gate for router redirects and onboarding persistence recovery.
+final onboardingGateProvider = Provider<OnboardingGate>((ref) {
+  return OnboardingGate(ref.watch(credentialStorageProvider));
 });
 
 /// Whether the user saved their own Gemini key. A personal key selects the AI
@@ -139,6 +148,11 @@ final entitlementProvider = Provider<UserEntitlement>((ref) {
 /// WhatsApp Handoff Builder provider.
 final whatsappHandoffBuilderProvider = Provider<WhatsAppHandoffBuilder>((ref) {
   return const WhatsAppHandoffBuilder();
+});
+
+/// Platform-specific direct-link and native-share plan provider.
+final platformHandoffBuilderProvider = Provider<PlatformHandoffBuilder>((ref) {
+  return const PlatformHandoffBuilder();
 });
 
 /// SMS Delivery Service provider (legacy SSOT §10 (PRODUCT.md §16.7)).
@@ -234,7 +248,7 @@ final aiRouterProvider = Provider<AiRouter>((ref) {
 
 /// People Repository provider backed by operational Drift/SQLite (legacy SSOT §13 (PRODUCT.md §16.7)).
 final peopleRepositoryProvider = Provider<PeopleRepository>((ref) {
-  return ref.watch(peopleStoreProvider) as PeopleRepository;
+  return DriftPeopleRepository(ref.watch(core.databaseProvider));
 });
 
 /// Birthdays Repository provider backed by operational Drift/SQLite (legacy SSOT §13 (PRODUCT.md §16.7)).
@@ -345,7 +359,7 @@ final latestHandoffsForDraftsProvider = StreamProvider<List<DeliveryHandoff>>((
 /// Stream of all tracked people.
 final peopleStreamProvider = StreamProvider<List<Person>>((ref) {
   final repo = ref.watch(peopleRepositoryProvider);
-  return repo.watchPeople();
+  return repo.watchActivePeople();
 });
 
 /// Stream of all tracked birthdays.
@@ -369,7 +383,7 @@ final birthdaysStreamProvider = StreamProvider<List<Birthday>>((ref) async* {
   ref.onDispose(midnight.cancel);
 
   // Reconcile the active occurrence before any screen consumes birthday data.
-  final people = await peopleRepo.getPeople();
+  final people = await peopleRepo.listActivePeople();
   await const BirthdayLifecycleService().refresh(
     people: people,
     birthdaysRepository: birthdayRepo,

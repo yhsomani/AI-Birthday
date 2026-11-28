@@ -60,6 +60,55 @@ void main() {
       expect(recording.records.single.message, isNot(contains(email)));
     });
 
+    test('preserves HTTP status prose and ISO dates while redacting secrets', () {
+      final lines = <String>[];
+      final logger = ConsoleAppLogger(level: LogLevel.verbose, sink: lines.add);
+
+      logger.warning(
+        'auth',
+        'Firebase IdP rejected token: HTTP 400 INVALID_ID_TOKEN',
+      );
+      logger.warning(
+        'auth',
+        'Firebase IdP rejected token: HTTP 401 API_KEY_INVALID',
+      );
+      logger.info('birthdays', 'Scheduled cycle date 2026-11-27 completed');
+      logger.error(
+        'ai',
+        'Auth header Bearer abcdef123456 failed with jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abc123def456',
+      );
+      logger.error(
+        'sync',
+        'api_key=AIzaSy123456789012345678901234567890 refresh_token=rt_secret {"id_token":"tok123"}',
+      );
+      logger.info(
+        'http',
+        'request detail',
+        params: {
+          'url':
+              'https://example.test/?key=AIzaSy123456789012345678901234567890',
+          'nested': {
+            'reason': 'email user@example.com bounced',
+            'items': ['Bearer secret_token_123'],
+          },
+        },
+      );
+
+      expect(lines[0], contains('HTTP 400'));
+      expect(lines[0], contains('INVALID_ID_TOKEN'));
+      expect(lines[1], contains('HTTP 401'));
+      expect(lines[1], contains('API_KEY_INVALID'));
+      expect(lines[2], contains('2026-11-27'));
+      expect(lines[3], isNot(contains('abcdef123456')));
+      expect(lines[3], isNot(contains('eyJhbGciOiJIUzI1NiJ9')));
+      expect(lines[4], isNot(contains('AIzaSy123456789012345678901234567890')));
+      expect(lines[4], isNot(contains('rt_secret')));
+      expect(lines[4], isNot(contains('tok123')));
+      expect(lines[5], isNot(contains('AIzaSy123456789012345678901234567890')));
+      expect(lines[5], isNot(contains('user@example.com')));
+      expect(lines[5], isNot(contains('secret_token_123')));
+    });
+
     test('forOperation binds every record to the operation id', () {
       final lines = <String>[];
       final logger = ConsoleAppLogger(level: LogLevel.verbose, sink: lines.add);

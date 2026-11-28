@@ -40,3 +40,18 @@ abstract class NotificationSchedulerGateway {
   /// Registers a listener invoked when a notification is tapped while the app is alive.
   void setNotificationOpenedHandler(void Function(String personId) onOpened) {}
 }
+
+/// Optional lifecycle capability for [NotificationSchedulerGateway]
+/// implementations that attach a live platform channel callback.
+abstract interface class ClearableNotificationSchedulerGateway {
+  void clearNotificationOpenedHandler();
+}
+
+extension NotificationSchedulerGatewayLifecycleX
+    on NotificationSchedulerGateway {
+  void clearNotificationOpenedHandler() {
+    if (this case final ClearableNotificationSchedulerGateway clearable) {
+      clearable.clearNotificationOpenedHandler();
+    }
+  }
+}

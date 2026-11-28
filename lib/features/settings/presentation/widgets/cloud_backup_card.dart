@@ -35,23 +35,21 @@ class CloudBackupCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 Icon(
                   Icons.cloud_upload_outlined,
                   color: context.colors.success,
                 ),
-                const SizedBox(width: 8),
-                // Expanded so the title wraps instead of overflowing at
-                // large text scales (audit 05 P2-3 sibling).
-                const Expanded(
-                  child: Text(
-                    'Cloud Backup (Firestore)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
+                const Text(
+                  'Cloud Backup (Firestore)',
+                  softWrap: true,
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 if (lastSyncTime != null) ...[
-                  const SizedBox(width: 8),
                   Chip(
                     label: Text(
                       'LAST SUCCESSFUL',
@@ -123,12 +121,15 @@ class CloudBackupCard extends StatelessWidget {
             ),
             if (restoreReport != null) ...[
               const SizedBox(height: 12),
-              Text(
-                restoreReport!,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: context.colors.success,
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  restoreReport!,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: context.colors.success,
+                  ),
                 ),
               ),
               if (restoreDetails.isNotEmpty)
@@ -161,25 +162,28 @@ class CloudBackupCard extends StatelessWidget {
             // closed and reopened. Tapping the button again retries.
             if (cloudError != null) ...[
               const SizedBox(height: 10),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 16,
-                    color: context.colors.danger,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '$cloudError Tap "Back Up Now" (or "Restore from Cloud") to retry.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.colors.danger,
+              Semantics(
+                liveRegion: true,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 16,
+                      color: context.colors.danger,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '$cloudError Tap "Back Up Now" (or "Restore from Cloud") to retry.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.colors.danger,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ],

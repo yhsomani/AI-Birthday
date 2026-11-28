@@ -9,11 +9,15 @@ void main() {
   Future<void> pumpSettings(
     WidgetTester tester, {
     ProviderContainer? container,
+    Size size = const Size(800, 2400),
+    double textScale = 1,
   }) async {
-    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
+    tester.platformDispatcher.textScaleFactorTestValue = textScale;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container ?? ProviderContainer(),
@@ -22,6 +26,29 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('settings stay readable from 320dp mobile to desktop widths', (
+    tester,
+  ) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    for (final (size, textScale, maximumWidth) in const [
+      (Size(320, 900), 2.0, 320.0),
+      (Size(1280, 1200), 1.0, 720.0),
+    ]) {
+      await pumpSettings(
+        tester,
+        container: container,
+        size: size,
+        textScale: textScale,
+      );
+
+      final contentWidth = tester.getSize(find.byType(Card).first).width;
+      expect(contentWidth, lessThanOrEqualTo(maximumWidth));
+      expect(contentWidth, greaterThan(maximumWidth - 64));
+      expect(tester.takeException(), isNull);
+    }
+  });
 
   testWidgets('reminders card is expandable and collapsible like Gemini card', (
     tester,

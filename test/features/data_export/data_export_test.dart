@@ -48,6 +48,8 @@ void main() {
       expect(person['relationship'], 'future-value');
       expect(person['deleted_at'], 4);
       expect(parsed['data']['birthdays'][0]['date'], '2026-03-01');
+      expect(parsed['data']['birthdays'][0]['deleted_at'], isNull);
+      expect(parsed['data']['drafts'][0]['deleted_at'], isNull);
       expect(encoded, isNot(contains('SECRET_SENTINEL')));
       expect(encoded, isNot(contains('account-secret')));
       expect(encoded, isNot(contains('payload')));

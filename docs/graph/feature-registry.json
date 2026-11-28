@@ -203,7 +203,7 @@
       "verification": "code-audit verified (A1-A4) and fix verified by automated tests in the working tree (flutter 653, functions 91, hosting 12 passing); device/runtime not verified",
       "source": [
         "lib/features/people/application/person_service.dart",
-        "lib/features/people/data/person_repository.dart",
+        "lib/core/database/drift_repositories.dart",
         "lib/features/people/domain/person_input.dart"
       ],
       "tests": [
@@ -742,15 +742,21 @@
     {
       "id": "SEND-SHARE",
       "parent": "SEND",
-      "name": "System share and copy",
+      "name": "System share, copy and targeted platform handoff",
       "implementation_status": "implemented",
       "verification": "source-reviewed; runtime not independently verified",
       "source": [
-        "lib/features/delivery/data/native_share_service.dart"
+        "lib/features/delivery/data/native_share_service.dart",
+        "lib/features/delivery/data/platform_handoff_builder.dart",
+        "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt"
       ],
-      "tests": [],
+      "tests": [
+        "test/delivery/platform_handoff_builder_test.dart",
+        "test/delivery/native_share_service_test.dart",
+        "test/features/message_studio/presentation/message_studio_optimistic_test.dart"
+      ],
       "spec": [],
-      "note": "",
+      "note": "WhatsApp/SMS are prefilled; Instagram, Snapchat and LinkedIn use package-targeted Android ACTION_SEND where supported. Direct recipient selection is not guaranteed.",
       "confidence": "MEDIUM",
       "issues": [
         "A2-011"
@@ -2232,7 +2238,7 @@
       "verification": "code-audit static trace of working tree (A1-A4); no runtime proof",
       "source": [
         "lib/core/database/drift_repositories.dart",
-        "lib/features/people/data/person_repository.dart"
+        "lib/features/people/data/drift_people_repository.dart"
       ],
       "tests": [
         "test/core/database/drift_repositories_test.dart"
@@ -2254,7 +2260,7 @@
       "source": [
         "lib/features/people/domain/models/person.dart",
         "lib/features/people/domain/person_input.dart",
-        "lib/features/people/data/person_repository.dart"
+        "lib/core/database/drift_repositories.dart"
       ],
       "tests": [
         "test/features/people/application/person_service_clear_and_import_test.dart"
@@ -2293,7 +2299,8 @@
       "implementation_status": "not-implemented",
       "verification": "code-audit static trace of working tree (A1-A4); no runtime proof",
       "source": [
-        "lib/features/people/data/person_repository.dart"
+        "lib/core/database/drift_repositories.dart",
+        "lib/features/people/application/person_service.dart"
       ],
       "tests": [],
       "spec": [],
@@ -3113,16 +3120,19 @@
     {
       "id": "NATIVE-SHARE",
       "parent": "SEND-SHARE",
-      "name": "ACTION_SEND chooser via MethodChannel",
+      "name": "Share chooser and package-targeted social ACTION_SEND via MethodChannel",
       "implementation_status": "implemented",
       "verification": "code-audit static trace of working tree (A1-A4); no runtime proof",
       "source": [
         "lib/features/delivery/data/native_share_service.dart",
         "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt"
       ],
-      "tests": [],
+      "tests": [
+        "test/delivery/native_share_service_test.dart",
+        "test/features/message_studio/presentation/message_studio_optimistic_test.dart"
+      ],
       "spec": [],
-      "note": "",
+      "note": "Native platform handoff is a targeted text-share fallback, not an arbitrary-recipient DM deep link.",
       "confidence": "MEDIUM",
       "issues": []
     },

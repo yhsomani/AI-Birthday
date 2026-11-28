@@ -1,91 +1,111 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:ai_birthday/features/reminders/application/reminder_providers.dart';
-import 'package:ai_birthday/l10n/app_localizations.dart';
+import 'package:ai_birthday/shared/design_system/design_system.dart';
 
-/// Material 3 bottom-navigation scaffold hosting the application shell (legacy SSOT §15, §24 (PRODUCT.md §16.7)).
-class AppScaffold extends ConsumerStatefulWidget {
+/// Material 3 responsive navigation scaffold hosting the 4-branch app shell.
+///
+/// Switches between a bottom [NavigationBar] (`< 840 dp`, clamped height for
+/// large text scaling), a compact [NavigationRail] with labels (`840–1023 dp`),
+/// and an extended [NavigationRail] (`>= 1024 dp`).
+class AppScaffold extends StatelessWidget {
   const AppScaffold({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
-  @override
-  ConsumerState<AppScaffold> createState() => _AppScaffoldState();
-}
-
-class _AppScaffoldState extends ConsumerState<AppScaffold> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final gateway = ref.read(notificationSchedulerGatewayProvider);
-      final initialPersonId = await gateway.getInitialNotificationPersonId();
-      if (initialPersonId != null && mounted) {
-        context.push('/message-studio/person/$initialPersonId');
-      }
-      gateway.setNotificationOpenedHandler((personId) {
-        if (mounted) {
-          context.push('/message-studio/person/$personId');
-        }
-      });
-    });
-  }
-
   void _onDestinationSelected(int index) {
     HapticFeedback.lightImpact();
-    widget.navigationShell.goBranch(
+    navigationShell.goBranch(
       index,
-      initialLocation: index == widget.navigationShell.currentIndex,
+      initialLocation: index == navigationShell.currentIndex,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    // NavigationBar's height is fixed by design (it never scales with text
-    // size), so at large text scales its labels wrap past the bar's bottom
-    // edge. Grow the bar linearly with the user's scale instead: at the 200%
-    // ceiling this accommodates even 3-4 line wrapped labels on narrow
-    // phones, and at 1.0x it is exactly the M3 80dp. (M3 itself clamps label
-    // scale to 1.3 but still wraps at narrow widths.)
+    final l10n = context.l10n;
     final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+    final barHeight = (80.0 * textScale.clamp(1.0, 2.0)).clamp(80.0, 160.0);
 
-    return Scaffold(
-      body: widget.navigationShell,
-      // RepaintBoundary isolates the bar's layer from body repaints (and
-      // makes shell goldens capture the bar alone, not the whole screen).
-      bottomNavigationBar: RepaintBoundary(
-        child: NavigationBar(
-          height: 80 * textScale,
-          selectedIndex: widget.navigationShell.currentIndex,
-          onDestinationSelected: _onDestinationSelected,
-          destinations: [
-            NavigationDestination(
-              icon: const Icon(Icons.cake_outlined),
-              selectedIcon: const Icon(Icons.cake),
-              label: l10n.navToday,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.people_outline),
-              selectedIcon: const Icon(Icons.people),
-              label: l10n.navPeople,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.calendar_month_outlined),
-              selectedIcon: const Icon(Icons.calendar_month),
-              label: l10n.navCalendar,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.history_outlined),
-              selectedIcon: const Icon(Icons.history),
-              label: l10n.navActivity,
-            ),
-          ],
-        ),
+    final destinations = [
+      (
+        icon: const Icon(Icons.cake_outlined),
+        selectedIcon: const Icon(Icons.cake),
+        label: l10n.navToday,
       ),
+      (
+        icon: const Icon(Icons.people_outline),
+        selectedIcon: const Icon(Icons.people),
+        label: l10n.navPeople,
+      ),
+      (
+        icon: const Icon(Icons.calendar_month_outlined),
+        selectedIcon: const Icon(Icons.calendar_month),
+        label: l10n.navCalendar,
+      ),
+      (
+        icon: const Icon(Icons.history_outlined),
+        selectedIcon: const Icon(Icons.history),
+        label: l10n.navActivity,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isExpanded = constraints.maxWidth >= AppSpace.expandedBreakpoint;
+        if (isExpanded) {
+          final isExtendedRail =
+              constraints.maxWidth >= AppSpace.extendedRailBreakpoint;
+          return Scaffold(
+            body: Row(
+              children: [
+                RepaintBoundary(
+                  child: NavigationRail(
+                    extended: isExtendedRail,
+                    labelType: isExtendedRail
+                        ? NavigationRailLabelType.none
+                        : NavigationRailLabelType.all,
+                    selectedIndex: navigationShell.currentIndex,
+                    onDestinationSelected: _onDestinationSelected,
+                    destinations: [
+                      for (final d in destinations)
+                        NavigationRailDestination(
+                          icon: d.icon,
+                          selectedIcon: d.selectedIcon,
+                          label: Text(d.label),
+                        ),
+                    ],
+                  ),
+                ),
+                const VerticalDivider(width: 1, thickness: 1),
+                Expanded(child: navigationShell),
+              ],
+            ),
+          );
+        }
+
+        return Scaffold(
+          body: navigationShell,
+          // RepaintBoundary isolates the bar's layer from body repaints (and
+          // makes shell goldens capture the bar alone, not the whole screen).
+          bottomNavigationBar: RepaintBoundary(
+            child: NavigationBar(
+              height: barHeight,
+              selectedIndex: navigationShell.currentIndex,
+              onDestinationSelected: _onDestinationSelected,
+              destinations: [
+                for (final d in destinations)
+                  NavigationDestination(
+                    icon: d.icon,
+                    selectedIcon: d.selectedIcon,
+                    label: d.label,
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

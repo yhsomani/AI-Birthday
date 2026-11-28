@@ -11,7 +11,7 @@
    "evidence": [
     "lib/features/birthdays/application/birthday_lifecycle_service.dart",
     "lib/features/people/application/person_service.dart",
-    "lib/features/people/data/person_repository.dart",
+    "lib/core/database/drift_repositories.dart",
     "lib/features/birthdays/domain/models/birthday.dart"
    ],
    "source_report": "A1"
@@ -102,7 +102,7 @@
    "title": "Two Drift persistence stacks on persons: DriftPeopleStore (written by PersonService, read by personListProvider → Calendar) and DriftPeopleRepository ",
    "resolution": "OPEN",
    "evidence": [
-    "lib/features/people/data/person_repository.dart",
+    "lib/features/people/data/drift_people_repository.dart",
     "lib/core/database/drift_repositories.dart",
     "lib/app/providers.dart"
    ],
@@ -140,7 +140,7 @@
    "title": "Soft delete keeps the Person row (name, phone, email, notes, facts) forever.",
    "resolution": "OPEN",
    "evidence": [
-    "lib/features/people/data/person_repository.dart",
+    "lib/core/database/drift_repositories.dart",
     "lib/features/people/presentation/people_screen.dart",
     "lib/core/database/drift_repositories.dart"
    ],
@@ -268,7 +268,7 @@
    "resolution": "OPEN",
    "evidence": [
     "lib/features/people/application/person_service.dart",
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ],
    "source_report": "A1"
   },
@@ -958,9 +958,9 @@
    "title": "Contrast failures confirmed by computation.",
    "resolution": "FIXED",
    "evidence": [
-    "lib/shared/design_system/countdown_chip.dart",
-    "lib/shared/design_system/celebration_card.dart",
-    "lib/shared/design_system/app_section_header.dart",
+    "lib/shared/design_system/widgets/countdown_chip.dart",
+    "lib/shared/design_system/widgets/celebration_card.dart",
+    "lib/shared/design_system/widgets/app_section_header.dart",
     "test/ui/contrast_test.dart"
    ],
    "source_report": "A3"
@@ -1245,7 +1245,8 @@
    "title": "Stray tracked files: dummy.png, get_issue.sh (a one-off grep for haptic feedback), and a root google-services.json (public client config;",
    "resolution": "OPEN",
    "evidence": [
-    "google-services.json"
+    "android/app/google-services.json",
+    "docs/IMPLEMENTATION.md"
    ],
    "source_report": "A3"
   },
@@ -1460,7 +1461,8 @@
    "title": "Four google-services.json for two different projects, none consumed by Gradle (no google-services plugin in android/app/build.gradle.kts/settings.grad",
    "resolution": "OPEN",
    "evidence": [
-    "google-services.json"
+    "android/app/google-services.json",
+    "firebase/google-services.json"
    ],
    "source_report": "A4"
   },

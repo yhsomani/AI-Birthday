@@ -93,6 +93,7 @@ class Birthdays extends Table {
   TextColumn get draftId => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -115,6 +116,7 @@ class MessageDrafts extends Table {
   IntColumn get revision => integer().withDefault(const Constant(0))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -211,7 +213,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -280,8 +282,17 @@ class AppDatabase extends _$AppDatabase {
           'ON birthdays (person_id, cycle_year)',
         );
       }
+      if (from < 10) {
+        if (!await _tableColumnExists('birthdays', 'deleted_at')) {
+          await m.addColumn(birthdays, birthdays.deletedAt);
+        }
+        if (!await _tableColumnExists('message_drafts', 'deleted_at')) {
+          await m.addColumn(messageDrafts, messageDrafts.deletedAt);
+        }
+      }
     },
     beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON');
       // Query audit: delivery_events is the only unbounded table and
       // birthday_id is its hot filter column (per-birthday handoff lookups).
       // IF NOT EXISTS keeps this idempotent for both fresh and existing DBs.
@@ -372,10 +383,12 @@ class AppDatabase extends _$AppDatabase {
       ]);
     }
 
+    final hasDeletedAt = await _tableColumnExists('birthdays', 'deleted_at');
     await m.alterTable(
       // ignore: experimental_member_use
       TableMigration(
         birthdays,
+        newColumns: [if (!hasDeletedAt) birthdays.deletedAt],
         columnTransformer: {
           birthdays.date: CustomExpression<String>(
             "strftime('%Y-%m-%d', date, 'unixepoch')",

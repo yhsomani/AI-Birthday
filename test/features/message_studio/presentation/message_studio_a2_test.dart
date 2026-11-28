@@ -266,7 +266,7 @@ void main() {
           tester.widget<TextField>(editorFinder()).controller!.text,
           'AI drafted message',
         );
-        expect(find.text('Message drafted with AI ✨'), findsOneWidget);
+        expect(find.text('Message drafted with AI.'), findsOneWidget);
       },
     );
 
@@ -357,7 +357,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.textContaining('AI result not applied'), findsOneWidget);
-        expect(find.text('Message drafted with AI ✨'), findsNothing);
+        expect(find.text('Message drafted with AI.'), findsNothing);
         expect(
           (await harness.draftsRepo.getDraft('b-test'))!.body,
           'Written elsewhere',

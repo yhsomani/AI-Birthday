@@ -1,81 +1,18 @@
-import 'dart:async';
-
 import 'package:ai_birthday/features/birthdays/domain/models/birthday.dart';
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 
 abstract interface class PeopleRepository {
-  Stream<List<Person>> watchPeople();
-  Future<List<Person>> getPeople();
-  Future<Person?> getPerson(String id);
+  Stream<List<Person>> watchActivePeople({bool includeDeleted = false});
+  Future<List<Person>> listActivePeople({bool includeDeleted = false});
+  Future<Person?> getPersonById(String id, {bool includeDeleted = false});
   Future<void> savePerson(Person person);
+  Future<void> savePersonAndBirthday(Person person, Birthday? birthday);
   Future<void> saveImportBatch({
     required List<Person> people,
     required List<Birthday> birthdays,
   });
-  Future<void> deletePerson(String id);
-}
-
-/// In-memory repository with seed data for fast testing and development.
-class InMemoryPeopleRepository implements PeopleRepository {
-  InMemoryPeopleRepository({List<Person>? initialPeople}) {
-    if (initialPeople != null) {
-      for (final p in initialPeople) {
-        _store[p.id] = p;
-      }
-    }
-  }
-
-  final Map<String, Person> _store = {};
-  final StreamController<List<Person>> _controller =
-      StreamController<List<Person>>.broadcast();
-
-  @override
-  Stream<List<Person>> watchPeople() async* {
-    yield _sortedPeople();
-    yield* _controller.stream;
-  }
-
-  @override
-  Future<List<Person>> getPeople() async => _sortedPeople();
-
-  @override
-  Future<Person?> getPerson(String id) async => _store[id];
-
-  @override
-  Future<void> savePerson(Person person) async {
-    _store[person.id] = person;
-    _controller.add(_sortedPeople());
-  }
-
-  @override
-  Future<void> saveImportBatch({
-    required List<Person> people,
-    required List<Birthday> birthdays,
-  }) async {
-    if (people.length != birthdays.length) {
-      throw ArgumentError('Every imported person must have one birthday.');
-    }
-    for (var i = 0; i < people.length; i++) {
-      _store[people[i].id] = people[i];
-    }
-    _controller.add(_sortedPeople());
-  }
-
-  @override
-  Future<void> deletePerson(String id) async {
-    _store.remove(id);
-    _controller.add(_sortedPeople());
-  }
-
-  List<Person> _sortedPeople() {
-    final list = _store.values.toList();
-    // Same order as the SQL queries: LOWER(name), then id.
-    // ⚡ Bolt: Cache lowercase name to avoid O(N log N) allocations during sorting
-    final lowerNames = {for (final p in list) p.id: p.name.toLowerCase()};
-    list.sort((a, b) {
-      final byName = lowerNames[a.id]!.compareTo(lowerNames[b.id]!);
-      return byName != 0 ? byName : a.id.compareTo(b.id);
-    });
-    return list;
-  }
+  Future<Birthday?> getBirthdayForPerson(String personId);
+  Future<void> softDeletePerson(String personId, DateTime deletedAt);
+  Future<void> restorePerson(Person person, Birthday? birthday);
+  Future<int> purgeExpiredTombstones(DateTime olderThan);
 }

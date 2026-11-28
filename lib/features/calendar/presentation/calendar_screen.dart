@@ -128,7 +128,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         title: const Text('Calendar'),
         actions: const [SettingsActionButton()],
       ),
-      body: peopleAsync.when(
+      body: AppResponsiveContainer(
+        child: peopleAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) => EmptyState(
           icon: Icons.cloud_off_outlined,
@@ -159,6 +160,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           }
           return _monthGrid(context, people);
         },
+        ),
       ),
     );
   }
@@ -183,9 +185,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final totalCells = lead + daysInMonth;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
+      child: EditorialCard(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
@@ -258,7 +262,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 ),
             ],
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

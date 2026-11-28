@@ -185,7 +185,7 @@
    "evidence": [
     "lib/features/birthdays/application/birthday_lifecycle_service.dart",
     "lib/features/people/application/person_service.dart",
-    "lib/features/people/data/person_repository.dart",
+    "lib/core/database/drift_repositories.dart",
     "lib/features/birthdays/domain/models/birthday.dart"
    ]
   },
@@ -297,7 +297,7 @@
    "branch": "BRANCH-24",
    "feature": "People data layer",
    "evidence": [
-    "lib/features/people/data/person_repository.dart",
+    "lib/features/people/data/drift_people_repository.dart",
     "lib/core/database/drift_repositories.dart",
     "lib/app/providers.dart"
    ]
@@ -344,7 +344,7 @@
    "branch": "BRANCH-24",
    "feature": "People delete / privacy",
    "evidence": [
-    "lib/features/people/data/person_repository.dart",
+    "lib/core/database/drift_repositories.dart",
     "lib/features/people/presentation/people_screen.dart",
     "lib/core/database/drift_repositories.dart"
    ]
@@ -505,7 +505,7 @@
    "feature": "People update",
    "evidence": [
     "lib/features/people/application/person_service.dart",
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ]
   },
   {
@@ -1372,9 +1372,9 @@
    "branch": "BRANCH-24",
    "feature": "Design system / a11y",
    "evidence": [
-    "lib/shared/design_system/countdown_chip.dart",
-    "lib/shared/design_system/celebration_card.dart",
-    "lib/shared/design_system/app_section_header.dart",
+    "lib/shared/design_system/widgets/countdown_chip.dart",
+    "lib/shared/design_system/widgets/celebration_card.dart",
+    "lib/shared/design_system/widgets/app_section_header.dart",
     "test/ui/contrast_test.dart"
    ]
   },
@@ -1734,7 +1734,8 @@
    "branch": "BRANCH-24",
    "feature": "Repo hygiene",
    "evidence": [
-    "google-services.json"
+    "android/app/google-services.json",
+    "docs/IMPLEMENTATION.md"
    ]
   },
   {
@@ -2003,7 +2004,8 @@
    "branch": "BRANCH-24",
    "feature": "Firebase config sprawl",
    "evidence": [
-    "google-services.json"
+    "android/app/google-services.json",
+    "firebase/google-services.json"
    ]
   },
   {
@@ -2404,7 +2406,7 @@
    "confidence": "HIGH",
    "evidence": [
     "lib/app/router.dart",
-    "lib/shared/design_system/settings_action_button.dart"
+    "lib/shared/design_system/widgets/settings_action_button.dart"
    ],
    "parent": "BRANCH-10",
    "branch": "BRANCH-10"
@@ -5061,8 +5063,8 @@
    "branch": "BRANCH-25",
    "evidence": [
     "lib/features/people/data/contact_csv_service.dart",
-    "lib/features/people/data/person_providers.dart",
-    "lib/features/people/data/person_repository.dart"
+    "lib/features/people/data/drift_people_repository.dart",
+    "lib/features/people/data/person_providers.dart"
    ]
   },
   {
@@ -5074,7 +5076,7 @@
    "parent": "BRANCH-25",
    "branch": "BRANCH-25",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/features/people/data/drift_people_repository.dart"
    ]
   },
   {
@@ -5092,14 +5094,13 @@
   {
    "id": "DEP-023",
    "kind": "cross-module-dependency",
-   "label": "REM depends on PEOPLE (3 importing files)",
+   "label": "REM depends on PEOPLE (2 importing files)",
    "status": "IMPLEMENTED",
    "confidence": "HIGH",
    "parent": "BRANCH-25",
    "branch": "BRANCH-25",
    "evidence": [
     "lib/features/reminders/application/reminder_service.dart",
-    "lib/features/reminders/application/reminder_settings_controller.dart",
     "lib/features/reminders/domain/reminder_schedule.dart"
    ]
   },
@@ -5539,6 +5540,21 @@
    "branch": "BRANCH-19"
   },
   {
+   "id": "EXT-014",
+   "kind": "integration",
+   "label": "Targeted Android text-share handoff to selected social app",
+   "status": "IMPLEMENTED",
+   "confidence": "MEDIUM",
+   "evidence": [
+    "lib/features/delivery/data/platform_handoff_builder.dart",
+    "lib/features/delivery/data/native_share_service.dart",
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt",
+    "android/app/src/main/AndroidManifest.xml"
+   ],
+   "parent": "BRANCH-19",
+   "branch": "BRANCH-19"
+  },
+  {
    "id": "FLOW-001",
    "kind": "data-flow",
    "label": "Launch -> database preflight -> onboarding guard -> shell",
@@ -5561,7 +5577,7 @@
    "evidence": [
     "lib/core/database/drift_repositories.dart",
     "lib/features/people/application/person_service.dart",
-    "lib/features/people/data/person_repository.dart"
+    "lib/features/people/data/drift_people_repository.dart"
    ],
    "parent": "BRANCH-17",
    "branch": "BRANCH-17"
@@ -5922,7 +5938,7 @@
    "evidence": [
     "lib/features/people/domain/person.dart",
     "lib/core/database/drift_repositories.dart",
-    "lib/features/people/data/person_repository.dart"
+    "lib/features/people/data/drift_people_repository.dart"
    ],
    "parent": "BRANCH-24",
    "branch": "BRANCH-24"
@@ -6271,16 +6287,19 @@
    "id": "NATIVE-SHARE",
    "kind": "sub-feature",
    "level": 3,
-   "label": "ACTION_SEND chooser via MethodChannel",
+   "label": "Share chooser and package-targeted social ACTION_SEND via MethodChannel",
    "status": "IMPLEMENTED",
    "confidence": "MEDIUM",
    "parent": "SEND-SHARE",
    "branch": "BRANCH-06",
    "evidence": [
     "lib/features/delivery/data/native_share_service.dart",
-    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt"
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt",
+    "test/delivery/native_share_service_test.dart",
+    "test/features/message_studio/presentation/message_studio_optimistic_test.dart"
    ],
-   "verification": "code-audit static trace of working tree (A1-A4); no runtime proof"
+   "verification": "code-audit static trace of working tree (A1-A4); no runtime proof",
+   "note": "Native platform handoff is a targeted text-share fallback, not an arbitrary-recipient DM deep link."
   },
   {
    "id": "NAV",
@@ -6532,7 +6551,7 @@
    "evidence": [
     "lib/features/people/domain/models/person.dart",
     "lib/features/people/domain/person_input.dart",
-    "lib/features/people/data/person_repository.dart",
+    "lib/core/database/drift_repositories.dart",
     "test/features/people/application/person_service_clear_and_import_test.dart"
    ],
    "verification": "code-audit verified (A1-A4) and fix verified by automated tests in the working tree (flutter 653, functions 91, hosting 12 passing); device/runtime not verified",
@@ -6552,7 +6571,7 @@
    "branch": "BRANCH-05",
    "evidence": [
     "lib/features/people/application/person_service.dart",
-    "lib/features/people/data/person_repository.dart",
+    "lib/core/database/drift_repositories.dart",
     "lib/features/people/domain/person_input.dart",
     "test/features/people/application/person_service_test.dart",
     "test/features/people/application/person_service_clear_and_import_test.dart",
@@ -7013,7 +7032,7 @@
    "branch": "BRANCH-05",
    "evidence": [
     "lib/core/database/drift_repositories.dart",
-    "lib/features/people/data/person_repository.dart",
+    "lib/features/people/data/drift_people_repository.dart",
     "test/core/database/drift_repositories_test.dart"
    ],
    "verification": "code-audit static trace of working tree (A1-A4); no runtime proof",
@@ -7063,7 +7082,8 @@
    "parent": "PEOPLE",
    "branch": "BRANCH-05",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart",
+    "lib/features/people/application/person_service.dart"
    ],
    "verification": "code-audit static trace of working tree (A1-A4); no runtime proof",
    "issues": [
@@ -8363,18 +8383,24 @@
    "id": "SEND-SHARE",
    "kind": "feature",
    "level": 2,
-   "label": "System share and copy",
+   "label": "System share, copy and targeted platform handoff",
    "status": "IMPLEMENTED",
    "confidence": "MEDIUM",
    "parent": "SEND",
    "branch": "BRANCH-05",
    "evidence": [
-    "lib/features/delivery/data/native_share_service.dart"
+    "lib/features/delivery/data/native_share_service.dart",
+    "lib/features/delivery/data/platform_handoff_builder.dart",
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt",
+    "test/delivery/platform_handoff_builder_test.dart",
+    "test/delivery/native_share_service_test.dart",
+    "test/features/message_studio/presentation/message_studio_optimistic_test.dart"
    ],
    "verification": "source-reviewed; runtime not independently verified",
    "issues": [
     "A2-011"
-   ]
+   ],
+   "note": "WhatsApp/SMS are prefilled; Instagram, Snapchat and LinkedIn use package-targeted Android ACTION_SEND where supported. Direct recipient selection is not guaranteed."
   },
   {
    "id": "SEND-SMS",
@@ -9689,7 +9715,7 @@
    "to": "DB-001",
    "type": "WRITES",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ]
   },
   {
@@ -9841,7 +9867,7 @@
    "to": "SCR-008",
    "type": "NAVIGATES_TO",
    "evidence": [
-    "lib/shared/design_system/settings_action_button.dart"
+    "lib/shared/design_system/widgets/settings_action_button.dart"
    ]
   },
   {
@@ -10265,7 +10291,7 @@
    "to": "A4-017",
    "type": "BLOCKED_BY",
    "evidence": [
-    "google-services.json"
+    "android/app/google-services.json"
    ]
   },
   {
@@ -10337,7 +10363,7 @@
    "to": "A3-036",
    "type": "BLOCKED_BY",
    "evidence": [
-    "google-services.json"
+    "android/app/google-services.json"
    ]
   },
   {
@@ -14181,6 +14207,14 @@
    ]
   },
   {
+   "from": "BRANCH-19",
+   "to": "EXT-014",
+   "type": "CONTAINS",
+   "evidence": [
+    "docs/graph/graph-overlay.json"
+   ]
+  },
+  {
    "from": "BRANCH-20",
    "to": "SEC-001",
    "type": "CONTAINS",
@@ -17145,7 +17179,7 @@
    "to": "DB-001",
    "type": "WRITES",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ]
   },
   {
@@ -17249,7 +17283,7 @@
    "to": "A1-011",
    "type": "BLOCKED_BY",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ]
   },
   {
@@ -17297,7 +17331,7 @@
    "to": "A1-011",
    "type": "BLOCKED_BY",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ]
   },
   {
@@ -17943,6 +17977,14 @@
    ]
   },
   {
+   "from": "NATIVE-SHARE",
+   "to": "TEST-001",
+   "type": "TESTED_BY",
+   "evidence": [
+    "test/delivery/native_share_service_test.dart"
+   ]
+  },
+  {
    "from": "NAV",
    "to": "A1-023",
    "type": "BLOCKED_BY",
@@ -18155,7 +18197,7 @@
    "to": "A1-008",
    "type": "BLOCKED_BY",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/features/people/data/drift_people_repository.dart"
    ]
   },
   {
@@ -18163,7 +18205,7 @@
    "to": "A1-011",
    "type": "BLOCKED_BY",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ]
   },
   {
@@ -18331,7 +18373,7 @@
    "to": "STUDIO",
    "type": "DEPENDS_ON",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/features/people/data/drift_people_repository.dart"
    ]
   },
   {
@@ -18355,7 +18397,7 @@
    "to": "A1-008",
    "type": "BLOCKED_BY",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/features/people/data/drift_people_repository.dart"
    ]
   },
   {
@@ -18363,7 +18405,7 @@
    "to": "A1-011",
    "type": "BLOCKED_BY",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ]
   },
   {
@@ -18739,7 +18781,7 @@
    "to": "A1-008",
    "type": "BLOCKED_BY",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/features/people/data/drift_people_repository.dart"
    ]
   },
   {
@@ -18779,7 +18821,7 @@
    "to": "A1-011",
    "type": "BLOCKED_BY",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ]
   },
   {
@@ -19792,6 +19834,15 @@
   },
   {
    "from": "SEND-SHARE",
+   "to": "EXT-014",
+   "type": "CALLS",
+   "evidence": [
+    "lib/features/delivery/data/native_share_service.dart",
+    "android/app/src/main/kotlin/com/yashsomani/ai_birthday/MainActivity.kt"
+   ]
+  },
+  {
+   "from": "SEND-SHARE",
    "to": "NATIVE-SHARE",
    "type": "CONTAINS",
    "evidence": [
@@ -19804,6 +19855,14 @@
    "type": "CONTAINS",
    "evidence": [
     "docs/graph/feature-registry.json"
+   ]
+  },
+  {
+   "from": "SEND-SHARE",
+   "to": "TEST-001",
+   "type": "TESTED_BY",
+   "evidence": [
+    "test/delivery/platform_handoff_builder_test.dart"
    ]
   },
   {
@@ -20787,7 +20846,7 @@
    "to": "DB-001",
    "type": "WRITES",
    "evidence": [
-    "lib/features/people/data/person_repository.dart"
+    "lib/core/database/drift_repositories.dart"
    ]
   },
   {

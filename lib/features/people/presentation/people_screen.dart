@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +12,7 @@ import 'package:ai_birthday/features/people/data/person_providers.dart'
     show personServiceProvider;
 import 'package:ai_birthday/features/people/domain/models/person.dart';
 import 'package:ai_birthday/features/people/domain/person_input.dart';
+import 'package:ai_birthday/features/people/presentation/csv_import_sheet.dart';
 import 'package:ai_birthday/shared/design_system/design_system.dart';
 
 class PeopleScreen extends ConsumerStatefulWidget {
@@ -101,110 +99,14 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     WidgetRef ref,
     List<Person> currentPeople,
   ) async {
-    final textController = TextEditingController();
-    final CsvParseResult? parsedCandidates;
-    try {
-      parsedCandidates = await showModalBottomSheet<CsvParseResult>(
-        context: context,
-        isScrollControlled: true,
-        builder: (sheetContext) => AppBottomSheet(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Import Contacts (CSV)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  tooltip: 'Close',
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.of(sheetContext).pop();
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Paste CSV with columns: Name, Month, Day, Year, Phone, Relationship.',
-              style: TextStyle(
-                fontSize: 12,
-                color: context.colors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final picked = await FilePicker.platform.pickFiles(
-                  type: FileType.custom,
-                  allowedExtensions: const ['csv'],
-                  withData: true,
-                );
-                if (picked == null) return;
-                final file = picked.files.single;
-                if (file.size > ContactCsvService.maxInputBytes ||
-                    file.bytes == null) {
-                  if (sheetContext.mounted) {
-                    ScaffoldMessenger.of(sheetContext).showSnackBar(
-                      const SnackBar(
-                        content: Text('Choose a CSV file no larger than 1 MB.'),
-                      ),
-                    );
-                  }
-                  return;
-                }
-                try {
-                  textController.text = utf8.decode(
-                    file.bytes!,
-                    allowMalformed: false,
-                  );
-                } on FormatException {
-                  if (sheetContext.mounted) {
-                    ScaffoldMessenger.of(sheetContext).showSnackBar(
-                      const SnackBar(
-                        content: Text('The CSV must be UTF-8 encoded.'),
-                      ),
-                    );
-                  }
-                }
-              },
-              icon: const Icon(Icons.attach_file),
-              label: const Text('Choose CSV File'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: textController,
-              maxLines: 5,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Sarah,10,7,1992,+14155552671,Friend\n...',
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  final csvService = ref.read(contactCsvServiceProvider);
-                  final parseResult = csvService.parseCsvWithResult(
-                    textController.text,
-                    existingPeople: currentPeople,
-                  );
-                  Navigator.of(sheetContext).pop(parseResult);
-                },
-                child: const Text('Parse & Review Candidates'),
-              ),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      textController.dispose();
-    }
+    final parsedCandidates = await showModalBottomSheet<CsvParseResult>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => CsvImportSheet(
+        currentPeople: currentPeople,
+        csvService: ref.read(contactCsvServiceProvider),
+      ),
+    );
 
     if (parsedCandidates == null || !context.mounted) return;
     final result = parsedCandidates;
@@ -805,319 +707,301 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
           ),
         ],
       ),
-      body: peopleAsync.when(
-        data: (people) {
-          if (people.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.people_outline,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'No contacts added yet',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
+      body: AppResponsiveContainer(
+        maxWidth: 720,
+        child: peopleAsync.when(
+          data: (people) {
+            if (people.isEmpty) {
+              return EditorialEmptyState(
+                icon: Icons.people_outline,
+                title: 'No contacts added yet',
+                message:
                     'Add contacts manually or import birthdays directly from your phone.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.colors.textSecondary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      context.push('/people/add');
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Birthday Contact'),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () =>
-                        _syncDeviceContacts(context, ref, currentPeople),
-                    icon: const Icon(Icons.contact_phone_outlined),
-                    label: const Text('Import from Phone'),
-                  ),
-                ],
-              ),
-            );
-          }
+                action: FilledButton.icon(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    context.push('/people/add');
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Birthday Contact'),
+                ),
+                secondaryAction: OutlinedButton.icon(
+                  onPressed: () =>
+                      _syncDeviceContacts(context, ref, currentPeople),
+                  icon: const Icon(Icons.contact_phone_outlined),
+                  label: const Text('Import from Phone'),
+                ),
+              );
+            }
 
-          final trimmed = _query.trim();
-          // ⚡ Bolt: Pre-compile case-insensitive RegExp to avoid O(N) .toLowerCase() string allocations
-          final searchRegex = trimmed.isEmpty
-              ? null
-              : RegExp(RegExp.escape(trimmed), caseSensitive: false);
-          final filtered = people.where((person) {
-            final matchesQuery =
-                trimmed.isEmpty ||
-                searchRegex!.hasMatch(person.name) ||
-                searchRegex.hasMatch(person.relationship.displayName);
-            final matchesRelationship =
-                _relationshipFilter == null ||
-                person.relationship == _relationshipFilter;
-            final matchesMonth =
-                _birthdayMonthFilter == null ||
-                person.birthdayMonth == _birthdayMonthFilter;
-            return matchesQuery && matchesRelationship && matchesMonth;
-          }).toList();
+            final trimmed = _query.trim();
+            // ⚡ Bolt: Pre-compile case-insensitive RegExp to avoid O(N) .toLowerCase() string allocations
+            final searchRegex = trimmed.isEmpty
+                ? null
+                : RegExp(RegExp.escape(trimmed), caseSensitive: false);
+            final filtered = people.where((person) {
+              final matchesQuery =
+                  trimmed.isEmpty ||
+                  searchRegex!.hasMatch(person.name) ||
+                  searchRegex.hasMatch(person.relationship.displayName);
+              final matchesRelationship =
+                  _relationshipFilter == null ||
+                  person.relationship == _relationshipFilter;
+              final matchesMonth =
+                  _birthdayMonthFilter == null ||
+                  person.birthdayMonth == _birthdayMonthFilter;
+              return matchesQuery && matchesRelationship && matchesMonth;
+            }).toList();
 
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (value) => setState(() => _query = value),
-                  decoration: InputDecoration(
-                    hintText: 'Search contacts',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _query.isEmpty
-                        ? null
-                        : IconButton(
-                            icon: const Icon(Icons.close),
-                            tooltip: 'Clear search',
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              _searchController.clear();
-                              setState(() => _query = '');
-                            },
-                          ),
-                    isDense: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() => _query = value),
+                    decoration: InputDecoration(
+                      hintText: 'Search contacts',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.close),
+                              tooltip: 'Clear search',
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                _searchController.clear();
+                                setState(() => _query = '');
+                              },
+                            ),
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final relationshipFilter =
-                        DropdownButtonFormField<RelationshipCategory?>(
-                          key: const ValueKey('people-relationship-filter'),
-                          initialValue: _relationshipFilter,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Relationship',
-                            isDense: true,
-                          ),
-                          items: [
-                            const DropdownMenuItem<RelationshipCategory?>(
-                              value: null,
-                              child: Text('All relationships'),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final relationshipFilter =
+                          DropdownButtonFormField<RelationshipCategory?>(
+                            key: const ValueKey('people-relationship-filter'),
+                            initialValue: _relationshipFilter,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Relationship',
+                              isDense: true,
                             ),
-                            for (final relationship
-                                in RelationshipCategory.values)
-                              DropdownMenuItem(
-                                value: relationship,
-                                child: Text(relationship.displayName),
+                            items: [
+                              const DropdownMenuItem<RelationshipCategory?>(
+                                value: null,
+                                child: Text('All relationships'),
                               ),
-                          ],
-                          onChanged: (value) =>
-                              setState(() => _relationshipFilter = value),
-                        );
-                    final monthFilter = DropdownButtonFormField<int>(
-                      key: const ValueKey('people-month-filter'),
-                      initialValue: _birthdayMonthFilter ?? 0,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Birthday month',
-                        isDense: true,
-                      ),
-                      items: [
-                        const DropdownMenuItem(
-                          value: 0,
-                          child: Text('Any month'),
+                              for (final relationship
+                                  in RelationshipCategory.values)
+                                DropdownMenuItem(
+                                  value: relationship,
+                                  child: Text(relationship.displayName),
+                                ),
+                            ],
+                            onChanged: (value) =>
+                                setState(() => _relationshipFilter = value),
+                          );
+                      final monthFilter = DropdownButtonFormField<int>(
+                        key: const ValueKey('people-month-filter'),
+                        initialValue: _birthdayMonthFilter ?? 0,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Birthday month',
+                          isDense: true,
                         ),
-                        for (var month = 1; month <= 12; month++)
-                          DropdownMenuItem(
-                            value: month,
-                            child: Text(
-                              DateFormat.MMMM().format(DateTime(2000, month)),
-                            ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: 0,
+                            child: Text('Any month'),
                           ),
-                      ],
-                      onChanged: (value) => setState(
-                        () => _birthdayMonthFilter = value == 0 ? null : value,
-                      ),
-                    );
-                    if (constraints.maxWidth < 440) {
-                      return Column(
+                          for (var month = 1; month <= 12; month++)
+                            DropdownMenuItem(
+                              value: month,
+                              child: Text(
+                                DateFormat.MMMM().format(DateTime(2000, month)),
+                              ),
+                            ),
+                        ],
+                        onChanged: (value) => setState(
+                          () =>
+                              _birthdayMonthFilter = value == 0 ? null : value,
+                        ),
+                      );
+                      if (constraints.maxWidth < 440) {
+                        return Column(
+                          children: [
+                            relationshipFilter,
+                            const SizedBox(height: 8),
+                            monthFilter,
+                          ],
+                        );
+                      }
+                      return Row(
                         children: [
-                          relationshipFilter,
-                          const SizedBox(height: 8),
-                          monthFilter,
+                          Expanded(child: relationshipFilter),
+                          const SizedBox(width: 12),
+                          Expanded(child: monthFilter),
                         ],
                       );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(child: relationshipFilter),
-                        const SizedBox(width: 12),
-                        Expanded(child: monthFilter),
-                      ],
-                    );
-                  },
+                    },
+                  ),
                 ),
-              ),
-              Expanded(
-                child: filtered.isEmpty
-                    ? _noSearchResults(trimmed)
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(
-                          16,
-                          8,
-                          16,
-                          AppSpacing.bottomClearance,
-                        ),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final person = filtered[index];
-                          final next = _next(person);
-                          final dateStr = !person.hasBirthday
-                              ? 'No birthday set'
-                              : !person.hasResolvableBirthday
-                              ? 'Feb 29 • choose celebration date'
-                              : DateFormat.MMMMd().format(next!.nextDate);
-                          final ageTurn =
-                              (person.hasBirthday &&
-                                  person.birthYear != null &&
-                                  next != null)
-                              ? ' • turns ${next.year - person.birthYear!}'
-                              : '';
+                Expanded(
+                  child: filtered.isEmpty
+                      ? _noSearchResults(trimmed)
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(
+                            16,
+                            8,
+                            16,
+                            AppSpacing.bottomClearance,
+                          ),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final person = filtered[index];
+                            final next = _next(person);
+                            final dateStr = !person.hasBirthday
+                                ? 'No birthday set'
+                                : !person.hasResolvableBirthday
+                                ? 'Feb 29 • choose celebration date'
+                                : DateFormat.MMMMd().format(next!.nextDate);
+                            final ageTurn =
+                                (person.hasBirthday &&
+                                    person.birthYear != null &&
+                                    next != null)
+                                ? ' • turns ${next.year - person.birthYear!}'
+                                : '';
 
-                          return Card(
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              leading: CircleAvatar(
-                                backgroundColor: (next?.isToday ?? false)
-                                    ? AppColors.primaryTerracottaContainer
-                                    : null,
-                                foregroundColor: (next?.isToday ?? false)
-                                    ? AppColors.primaryTerracotta
-                                    : null,
-                                child: Text(
-                                  person.name.isNotEmpty
-                                      ? person.name[0].toUpperCase()
-                                      : '?',
+                            return Card(
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                leading: CircleAvatar(
+                                  backgroundColor: (next?.isToday ?? false)
+                                      ? AppColors.primaryTerracottaContainer
+                                      : null,
+                                  foregroundColor: (next?.isToday ?? false)
+                                      ? AppColors.primaryTerracotta
+                                      : null,
+                                  child: Text(
+                                    person.name.isNotEmpty
+                                        ? person.name[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                title: Text(
+                                  person.name,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ),
-                              title: Text(
-                                person.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '$dateStr$ageTurn • ${relationshipCardLabel(person.relationship, person.relationshipCloseness)}',
-                                  ),
-                                  if (next != null) ...[
-                                    const SizedBox(height: 4),
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: CountdownChip(
-                                        daysUntil: next.daysUntil,
-                                        isToday: next.isToday,
-                                        customLabel: _countdownLabel(next),
-                                      ),
-                                    ),
-                                  ],
-                                  if (person.importantFacts.isNotEmpty) ...[
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                     const SizedBox(height: 4),
                                     Text(
-                                      'Facts: ${person.importantFacts.join(', ')}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[600],
+                                      '$dateStr$ageTurn • ${relationshipCardLabel(person.relationship, person.relationshipCloseness)}',
+                                    ),
+                                    if (next != null) ...[
+                                      const SizedBox(height: 4),
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: CountdownChip(
+                                          daysUntil: next.daysUntil,
+                                          isToday: next.isToday,
+                                          customLabel: _countdownLabel(next),
+                                        ),
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                    ],
+                                    if (person.importantFacts.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Facts: ${person.importantFacts.join(', ')}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: context.colors.textSecondary,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                trailing: PopupMenuButton<String>(
+                                  tooltip: 'Person actions',
+                                  onSelected: (action) async {
+                                    HapticFeedback.lightImpact();
+                                    if (action == 'message') {
+                                      // Person-scoped Studio route: no birthday lookup, so
+                                      // the action can never silently no-op on a missing row
+                                      // (same route notifications/calendar use).
+                                      context.push(
+                                        '/message-studio/person/${person.id}',
+                                      );
+                                    } else if (action == 'edit') {
+                                      context.push('/people/edit/${person.id}');
+                                    } else if (action == 'delete') {
+                                      _confirmAndDelete(context, ref, person);
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    if (person.hasResolvableBirthday)
+                                      const PopupMenuItem(
+                                        value: 'message',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.auto_awesome, size: 18),
+                                            SizedBox(width: 8),
+                                            Text('Message Studio'),
+                                          ],
+                                        ),
+                                      ),
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Edit'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text('Delete'),
                                     ),
                                   ],
-                                ],
-                              ),
-                              trailing: PopupMenuButton<String>(
-                                tooltip: 'Person actions',
-                                onSelected: (action) async {
+                                ),
+                                onTap: () {
                                   HapticFeedback.lightImpact();
-                                  if (action == 'message') {
-                                    // Person-scoped Studio route: no birthday lookup, so
-                                    // the action can never silently no-op on a missing row
-                                    // (same route notifications/calendar use).
-                                    context.push(
-                                      '/message-studio/person/${person.id}',
-                                    );
-                                  } else if (action == 'edit') {
-                                    context.push('/people/edit/${person.id}');
-                                  } else if (action == 'delete') {
-                                    _confirmAndDelete(context, ref, person);
-                                  }
+                                  _showPersonDetailsModal(context, ref, person);
                                 },
-                                itemBuilder: (context) => [
-                                  if (person.hasResolvableBirthday)
-                                    const PopupMenuItem(
-                                      value: 'message',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.auto_awesome, size: 18),
-                                          SizedBox(width: 8),
-                                          Text('Message Studio'),
-                                        ],
-                                      ),
-                                    ),
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('Edit'),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('Delete'),
-                                  ),
-                                ],
                               ),
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                _showPersonDetailsModal(context, ref, person);
-                              },
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => EmptyState(
-          icon: Icons.cloud_off_outlined,
-          title: 'Could not load contacts',
-          message: 'Your saved birthdays have not been deleted.',
-          action: TextButton.icon(
-            onPressed: () => ref.invalidate(peopleStreamProvider),
-            icon: const Icon(Icons.refresh),
-            label: const Text('Try again'),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, _) => EmptyState(
+            icon: Icons.cloud_off_outlined,
+            title: 'Could not load contacts',
+            message: 'Your saved birthdays have not been deleted.',
+            action: TextButton.icon(
+              onPressed: () => ref.invalidate(peopleStreamProvider),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try again'),
+            ),
           ),
         ),
       ),
@@ -1135,46 +1019,25 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
   Widget _noSearchResults(String query) {
     final hasFilters =
         _relationshipFilter != null || _birthdayMonthFilter != null;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.search_off, size: 48, color: Colors.grey),
-            const SizedBox(height: 12),
-            const Text(
-              'No contacts found',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              query.isNotEmpty
-                  ? 'Nothing matches "$query". Try another name or clear the filters.'
-                  : hasFilters
-                  ? 'No people match the selected relationship and birthday month.'
-                  : 'Add a contact or import birthdays from your phone or a CSV file.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: context.colors.textSecondary,
-              ),
-            ),
-            if (query.isNotEmpty || hasFilters) ...[
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => setState(() {
-                  _searchController.clear();
-                  _query = '';
-                  _relationshipFilter = null;
-                  _birthdayMonthFilter = null;
-                }),
-                child: const Text('Clear search and filters'),
-              ),
-            ],
-          ],
-        ),
-      ),
+    return EditorialEmptyState(
+      icon: Icons.search_off,
+      title: 'No contacts found',
+      message: query.isNotEmpty
+          ? 'Nothing matches "$query". Try another name or clear the filters.'
+          : hasFilters
+          ? 'No people match the selected relationship and birthday month.'
+          : 'Add a contact or import birthdays from your phone or a CSV file.',
+      action: query.isNotEmpty || hasFilters
+          ? TextButton(
+              onPressed: () => setState(() {
+                _searchController.clear();
+                _query = '';
+                _relationshipFilter = null;
+                _birthdayMonthFilter = null;
+              }),
+              child: const Text('Clear search and filters'),
+            )
+          : null,
     );
   }
 
